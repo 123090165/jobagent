@@ -151,6 +151,40 @@ http://127.0.0.1:8000/docs
 - `job_analysis`
 - `analysis_count`
 
+### GET /applications
+
+用途：列出投递跟进记录。
+
+查询参数：
+
+- `limit`：最多返回多少条，默认 20，最大 100。
+- `status`：按状态筛选。
+- `keyword`：按岗位、公司、JD、备注或下一步行动搜索。
+
+### POST /applications
+
+用途：为岗位创建或更新投递跟进记录。
+
+请求：
+
+```json
+{
+  "job_id": 1,
+  "status": "interested",
+  "notes": "岗位匹配度不错",
+  "next_action": "定制简历",
+  "resume_version_label": "v1"
+}
+```
+
+### GET /applications/{application_id}
+
+用途：读取单条投递跟进记录。
+
+### PATCH /applications/{application_id}
+
+用途：更新投递状态、备注、下一步行动或简历版本。
+
 ### POST /match/analyze
 
 用途：根据结构化简历和 JD 生成匹配报告。
@@ -195,6 +229,7 @@ http://127.0.0.1:8000/docs
 - API 层不写复杂业务逻辑。
 - 当前只提供最小 SQLite 保存能力，不做用户系统。
 - `GET /jobs` 只查询已保存 JD，不抓取外部网站。
+- `/applications` 只做本地 tracker，不执行自动投递。
 - 暂不做用户系统。
 - 暂不做自动投递。
 - `use_llm_jd` 只影响 JDAnalysisAgent，失败时回退 mock。

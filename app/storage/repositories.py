@@ -6,6 +6,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
+from app.schemas.application import ApplicationStatus
 from app.schemas.report import FinalReport
 from app.storage.database import init_database
 
@@ -238,6 +239,187 @@ def get_job_posting(connection: sqlite3.Connection, job_id: int) -> dict[str, An
     }
 
 
+def upsert_application_record(
+    connection: sqlite3.Connection,
+    *,
+    job_id: int,
+    status: ApplicationStatus = "interested",
+    notes: str | None = None,
+    next_action: str | None = None,
+    resume_version_label: str | None = None,
+) -> dict[str, Any] | None:
+    init_database(connection)
+    if not _job_exists(connection, job_id):
+        return None
+
+    with connection:
+        connection.execute(
+            """
+            INSERT INTO application_records (
+                job_posting_id,
+                status,
+                notes,
+                next_action,
+                resume_version_label
+            )
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(job_posting_id) DO UPDATE SET
+                status = excluded.status,
+                notes = excluded.notes,
+                next_action = excluded.next_action,
+                resume_version_label = excluded.resume_version_label,
+                updated_at = CURRENT_TIMESTAMP
+            """,
+            (job_id, status, notes, next_action, resume_version_label),
+        )
+    return get_application_by_job_id(connection, job_id)
+
+
+def update_application_record(
+    connection: sqlite3.Connection,
+    *,
+    application_id: int,
+    status: ApplicationStatus | None = None,
+    notes: str | None = None,
+    next_action: str | None = None,
+    resume_version_label: str | None = None,
+) -> dict[str, Any] | None:
+    init_database(connection)
+    existing = get_application_record(connection, application_id)
+    if existing is None:
+        return None
+
+    new_status = status if status is not None else existing["status"]
+    new_notes = notes if notes is not None else existing["notes"]
+    new_next_action = next_action if next_action is not None else existing["next_action"]
+    new_resume_version_label = (
+        resume_version_label if resume_version_label is not None else existing["resume_version_label"]
+    )
+    with connection:
+        connection.execute(
+            """
+            UPDATE application_records
+            SET
+                status = ?,
+                notes = ?,
+                next_action = ?,
+                resume_version_label = ?,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+            """,
+            (
+                new_status,
+                new_notes,
+                new_next_action,
+                new_resume_version_label,
+                application_id,
+            ),
+        )
+    return get_application_record(connection, application_id)
+
+
+def list_application_records(
+    connection: sqlite3.Connection,
+    *,
+    limit: int = 20,
+    status: str | None = None,
+    keyword: str | None = None,
+) -> list[dict[str, Any]]:
+    init_database(connection)
+    query = """
+        SELECT
+            app.id,
+            app.job_posting_id,
+            app.status,
+            app.notes,
+            app.next_action,
+            app.resume_version_label,
+            app.created_at,
+            app.updated_at,
+            jp.job_title,
+            jp.company
+        FROM application_records app
+        JOIN job_postings jp ON app.job_posting_id = jp.id
+    """
+    where_clauses: list[str] = []
+    parameters: list[Any] = []
+    if status:
+        where_clauses.append("app.status = ?")
+        parameters.append(status)
+    if keyword:
+        where_clauses.append(
+            """
+            (
+                jp.job_title LIKE ?
+                OR jp.company LIKE ?
+                OR jp.raw_jd LIKE ?
+                OR app.notes LIKE ?
+                OR app.next_action LIKE ?
+            )
+            """
+        )
+        like_keyword = f"%{keyword}%"
+        parameters.extend([like_keyword, like_keyword, like_keyword, like_keyword, like_keyword])
+    if where_clauses:
+        query += " WHERE " + " AND ".join(where_clauses)
+    query += " ORDER BY app.updated_at DESC, app.id DESC LIMIT ?"
+    parameters.append(_normalize_limit(limit))
+    rows = connection.execute(query, tuple(parameters)).fetchall()
+    return [_application_row_to_dict(row) for row in rows]
+
+
+def get_application_record(connection: sqlite3.Connection, application_id: int) -> dict[str, Any] | None:
+    init_database(connection)
+    row = connection.execute(
+        """
+        SELECT
+            app.id,
+            app.job_posting_id,
+            app.status,
+            app.notes,
+            app.next_action,
+            app.resume_version_label,
+            app.created_at,
+            app.updated_at,
+            jp.job_title,
+            jp.company
+        FROM application_records app
+        JOIN job_postings jp ON app.job_posting_id = jp.id
+        WHERE app.id = ?
+        """,
+        (application_id,),
+    ).fetchone()
+    if row is None:
+        return None
+    return _application_row_to_dict(row)
+
+
+def get_application_by_job_id(connection: sqlite3.Connection, job_id: int) -> dict[str, Any] | None:
+    init_database(connection)
+    row = connection.execute(
+        """
+        SELECT
+            app.id,
+            app.job_posting_id,
+            app.status,
+            app.notes,
+            app.next_action,
+            app.resume_version_label,
+            app.created_at,
+            app.updated_at,
+            jp.job_title,
+            jp.company
+        FROM application_records app
+        JOIN job_postings jp ON app.job_posting_id = jp.id
+        WHERE app.job_posting_id = ?
+        """,
+        (job_id,),
+    ).fetchone()
+    if row is None:
+        return None
+    return _application_row_to_dict(row)
+
+
 def count_analysis_records(connection: sqlite3.Connection) -> int:
     init_database(connection)
     row = connection.execute("SELECT COUNT(*) AS count FROM analysis_records").fetchone()
@@ -247,6 +429,12 @@ def count_analysis_records(connection: sqlite3.Connection) -> int:
 def count_job_postings(connection: sqlite3.Connection) -> int:
     init_database(connection)
     row = connection.execute("SELECT COUNT(*) AS count FROM job_postings").fetchone()
+    return int(row["count"])
+
+
+def count_application_records(connection: sqlite3.Connection) -> int:
+    init_database(connection)
+    row = connection.execute("SELECT COUNT(*) AS count FROM application_records").fetchone()
     return int(row["count"])
 
 
@@ -270,6 +458,26 @@ def _get_or_create_job_posting(connection: sqlite3.Connection, report: FinalRepo
             report.job_analysis.company,
         ),
     )
+
+
+def _job_exists(connection: sqlite3.Connection, job_id: int) -> bool:
+    row = connection.execute("SELECT id FROM job_postings WHERE id = ?", (job_id,)).fetchone()
+    return row is not None
+
+
+def _application_row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
+    return {
+        "id": row["id"],
+        "job_id": row["job_posting_id"],
+        "status": row["status"],
+        "notes": row["notes"],
+        "next_action": row["next_action"],
+        "resume_version_label": row["resume_version_label"],
+        "job_title": row["job_title"],
+        "company": row["company"],
+        "created_at": row["created_at"],
+        "updated_at": row["updated_at"],
+    }
 
 
 def _insert_and_get_id(

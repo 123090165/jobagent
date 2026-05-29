@@ -3,6 +3,7 @@ from __future__ import annotations
 from fastapi import FastAPI
 
 from app.api.routes_analyze import router as analyze_router
+from app.api.routes_applications import router as applications_router
 from app.api.routes_jobs import router as jobs_router
 from app.api.routes_match import router as match_router
 from app.api.routes_records import router as records_router
@@ -31,6 +32,7 @@ def create_app() -> FastAPI:
     api.include_router(match_router)
     api.include_router(reports_router)
     api.include_router(records_router)
+    api.include_router(applications_router)
     return api
 
 

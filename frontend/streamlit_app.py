@@ -11,6 +11,7 @@ if str(ROOT_DIR) not in sys.path:
 
 from app.services.mock_pipeline import run_mock_pipeline
 from app.services.llm_service import is_llm_configured
+from app.services.application_service import list_applications, save_application
 from app.services.storage_service import (
     list_saved_analysis_records,
     list_saved_job_postings,
@@ -57,7 +58,7 @@ def main() -> None:
         if use_llm_jd and not is_llm_configured():
             st.info("当前未配置 LLM API key，本次会自动回退到 mock JD 分析。")
 
-    tab_analyze, tab_history, tab_jobs = st.tabs(["生成报告", "历史记录", "岗位库"])
+    tab_analyze, tab_history, tab_jobs, tab_tracker = st.tabs(["生成报告", "历史记录", "岗位库", "投递跟进"])
 
     with tab_analyze:
         render_analysis_tab(use_llm_jd=use_llm_jd, save_result=save_result)
@@ -67,6 +68,9 @@ def main() -> None:
 
     with tab_jobs:
         render_jobs_tab()
+
+    with tab_tracker:
+        render_tracker_tab()
 
 
 def render_analysis_tab(*, use_llm_jd: bool, save_result: bool) -> None:
@@ -204,6 +208,58 @@ def render_jobs_tab() -> None:
         st.json(job_analysis)
 
 
+def render_tracker_tab() -> None:
+    st.subheader("投递跟进")
+    jobs = list_saved_job_postings(limit=100)
+    if not jobs:
+        st.info("还没有岗位。请先保存一次分析，岗位会出现在这里。")
+        return
+
+    with st.form("application_form"):
+        selected_job_id = st.selectbox(
+            "选择岗位",
+            options=[job["id"] for job in jobs],
+            format_func=lambda job_id: _format_job_option(job_id, jobs),
+        )
+        status = st.selectbox(
+            "状态",
+            options=["interested", "applied", "interviewing", "rejected", "offer", "archived"],
+            format_func=_format_status_label,
+        )
+        resume_version_label = st.text_input("简历版本", placeholder="例如：v1-fastapi-backend")
+        next_action = st.text_input("下一步行动", placeholder="例如：今晚定制简历并投递")
+        notes = st.text_area("备注", placeholder="记录岗位偏好、投递渠道、面试反馈等")
+        submitted = st.form_submit_button("保存跟进状态", type="primary", use_container_width=True)
+
+    if submitted:
+        record = save_application(
+            job_id=int(selected_job_id),
+            status=status,
+            notes=notes.strip() or None,
+            next_action=next_action.strip() or None,
+            resume_version_label=resume_version_label.strip() or None,
+        )
+        if record is None:
+            st.error("岗位不存在，无法保存跟进记录。")
+        else:
+            st.success(f"已保存跟进记录：#{record['id']}")
+
+    st.markdown("### 当前跟进列表")
+    status_filter = st.selectbox(
+        "按状态筛选",
+        options=["全部", "interested", "applied", "interviewing", "rejected", "offer", "archived"],
+        format_func=lambda value: "全部" if value == "全部" else _format_status_label(value),
+    )
+    applications = list_applications(
+        status=None if status_filter == "全部" else status_filter,
+        limit=100,
+    )
+    if not applications:
+        st.info("还没有跟进记录。")
+        return
+    st.dataframe(applications, hide_index=True, use_container_width=True)
+
+
 def render_search_controls(key_prefix: str) -> tuple[str, int]:
     left, right = st.columns([3, 1])
     with left:
@@ -229,6 +285,18 @@ def _format_job_option(job_id: int, jobs: list[dict]) -> str:
     title = job.get("job_title") or "未识别岗位"
     count = job.get("analysis_count", 0)
     return f"#{job_id} | {title} | {count} 次分析"
+
+
+def _format_status_label(status: str) -> str:
+    labels = {
+        "interested": "感兴趣",
+        "applied": "已投递",
+        "interviewing": "面试中",
+        "rejected": "已拒绝",
+        "offer": "Offer",
+        "archived": "归档",
+    }
+    return labels.get(status, status)
 
 
 if __name__ == "__main__":

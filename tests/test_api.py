@@ -146,3 +146,58 @@ def test_job_endpoint_returns_404_for_missing_job(tmp_path, monkeypatch) -> None
 
     assert response.status_code == 404
     assert response.json()["detail"] == "job not found"
+
+
+def test_application_tracker_api_flow(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("JOBAGENT_DB_PATH", str(tmp_path / "applications.sqlite3"))
+
+    save_response = client.post(
+        "/analyze/full",
+        json={
+            "resume_text": SAMPLE_RESUME,
+            "jd_text": SAMPLE_JD,
+            "save_result": True,
+        },
+    )
+    assert save_response.status_code == 200
+
+    jobs_response = client.get("/jobs")
+    job_id = jobs_response.json()[0]["id"]
+
+    create_response = client.post(
+        "/applications",
+        json={
+            "job_id": job_id,
+            "status": "interested",
+            "notes": "岗位匹配度不错",
+            "next_action": "定制简历",
+        },
+    )
+    assert create_response.status_code == 200
+    application = create_response.json()
+    assert application["status"] == "interested"
+    assert application["job_id"] == job_id
+
+    patch_response = client.patch(
+        f"/applications/{application['id']}",
+        json={"status": "applied", "next_action": "等待反馈"},
+    )
+    assert patch_response.status_code == 200
+    assert patch_response.json()["status"] == "applied"
+
+    list_response = client.get("/applications", params={"status": "applied"})
+    assert list_response.status_code == 200
+    assert len(list_response.json()) == 1
+
+    detail_response = client.get(f"/applications/{application['id']}")
+    assert detail_response.status_code == 200
+    assert detail_response.json()["next_action"] == "等待反馈"
+
+
+def test_application_tracker_rejects_missing_job(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("JOBAGENT_DB_PATH", str(tmp_path / "missing-application-job.sqlite3"))
+
+    response = client.post("/applications", json={"job_id": 999})
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "job not found"

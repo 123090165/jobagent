@@ -72,6 +72,18 @@ def init_database(connection: sqlite3.Connection) -> None:
             FOREIGN KEY (match_report_id) REFERENCES match_reports(id),
             FOREIGN KEY (project_challenge_id) REFERENCES project_challenges(id)
         );
+
+        CREATE TABLE IF NOT EXISTS application_records (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            job_posting_id INTEGER NOT NULL UNIQUE,
+            status TEXT NOT NULL DEFAULT 'interested',
+            notes TEXT,
+            next_action TEXT,
+            resume_version_label TEXT,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (job_posting_id) REFERENCES job_postings(id)
+        );
         """
     )
     connection.commit()

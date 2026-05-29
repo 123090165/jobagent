@@ -21,6 +21,7 @@ JobAgent 是一个面向求职者的多智能体求职工作台。当前版本�
 - FastAPI 后端接口。
 - SQLite 保存分析记录。
 - 历史记录和岗位库基础查询。
+- 投递 tracker 最小状态机。
 - pytest 测试。
 
 当前不做：
@@ -53,6 +54,7 @@ Streamlit 当前包含：
 - 生成报告
 - 历史记录
 - 岗位库
+- 投递跟进
 
 详细说明见 [docs/STREAMLIT_APP.md](docs/STREAMLIT_APP.md)。
 
@@ -112,6 +114,16 @@ GET /jobs/{job_id}
 当前只查询已保存的 JD，不做外部网站抓取。
 
 详细说明见 [docs/STORAGE.md](docs/STORAGE.md)。
+
+## 投递 Tracker
+
+当前支持本地投递跟进状态：
+
+```text
+interested -> applied -> interviewing -> rejected / offer / archived
+```
+
+详细说明见 [docs/APPLICATION_TRACKER.md](docs/APPLICATION_TRACKER.md)。
 
 ## 运行测试
 
