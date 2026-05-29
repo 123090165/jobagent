@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from app.api.routes_analyze import router as analyze_router
 from app.api.routes_jobs import router as jobs_router
 from app.api.routes_match import router as match_router
+from app.api.routes_records import router as records_router
 from app.api.routes_reports import router as reports_router
 from app.api.routes_resume import router as resume_router
 from app.schemas.api import HealthResponse
@@ -29,6 +30,7 @@ def create_app() -> FastAPI:
     api.include_router(jobs_router)
     api.include_router(match_router)
     api.include_router(reports_router)
+    api.include_router(records_router)
     return api
 
 

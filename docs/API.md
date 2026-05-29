@@ -45,12 +45,29 @@ http://127.0.0.1:8000/docs
 {
   "resume_text": "简历文本",
   "jd_text": "JD 文本",
-  "use_llm_jd": false
+  "use_llm_jd": false,
+  "save_result": false
 }
 ```
 
 返回：
 
+- `resume_profile`
+- `job_analysis`
+- `match_report`
+- `optimization_result`
+- `project_challenge_report`
+- `markdown_report`
+- `record_id`：当 `save_result` 为 `true` 时返回保存记录 ID，否则为 `null`
+
+### GET /records/{record_id}
+
+用途：读取已保存的完整分析记录。
+
+返回：
+
+- `id`
+- `created_at`
 - `resume_profile`
 - `job_analysis`
 - `match_report`
@@ -129,7 +146,7 @@ http://127.0.0.1:8000/docs
 ## 3. 当前边界
 
 - API 层不写复杂业务逻辑。
-- 暂不接数据库。
+- 当前只提供最小 SQLite 保存能力，不做用户系统。
 - 暂不做用户系统。
 - 暂不做自动投递。
 - `use_llm_jd` 只影响 JDAnalysisAgent，失败时回退 mock。

@@ -76,6 +76,22 @@ http://127.0.0.1:8000/docs
 
 当前 API 说明见 [docs/API.md](docs/API.md)。
 
+## 可选：保存分析记录到 SQLite
+
+`POST /analyze/full` 支持传入：
+
+```json
+{
+  "save_result": true
+}
+```
+
+保存后会返回 `record_id`，可通过 `GET /records/{record_id}` 读取。
+
+默认数据库文件为 `data/jobagent.sqlite3`，不会提交到 Git。
+
+详细说明见 [docs/STORAGE.md](docs/STORAGE.md)。
+
 ## 运行测试
 
 ```bash
@@ -127,6 +143,6 @@ docs/
 
 1. 完善 JDAnalysisAgent 的真实 LLM 输出质量和评估样例。
 2. 增加 FastAPI 后端。
-3. 接入 SQLite 保存 JD、简历版本和报告。
+3. 完善 SQLite 岗位库、简历版本和报告检索。
 4. 使用 LangGraph 编排多 Agent。
 5. 扩展岗位数据库、RAG、MCP 和 tracker。

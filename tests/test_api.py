@@ -75,3 +75,35 @@ def test_stepwise_api_flow() -> None:
     assert report_response.status_code == 200
     assert "markdown_report" in report_response.json()
     assert "项目拷打问题" in report_response.json()["markdown_report"]
+
+
+def test_full_analysis_can_save_and_load_record(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("JOBAGENT_DB_PATH", str(tmp_path / "api-test.sqlite3"))
+
+    response = client.post(
+        "/analyze/full",
+        json={
+            "resume_text": SAMPLE_RESUME,
+            "jd_text": SAMPLE_JD,
+            "save_result": True,
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["record_id"] is not None
+
+    record_response = client.get(f"/records/{payload['record_id']}")
+    assert record_response.status_code == 200
+    record = record_response.json()
+    assert record["id"] == payload["record_id"]
+    assert record["markdown_report"] == payload["markdown_report"]
+
+
+def test_record_endpoint_returns_404_for_missing_record(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("JOBAGENT_DB_PATH", str(tmp_path / "missing.sqlite3"))
+
+    response = client.get("/records/999")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "record not found"

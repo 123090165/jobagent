@@ -4,6 +4,7 @@ from pydantic import BaseModel
 
 from app.schemas.job import JobAnalysis
 from app.schemas.match import MatchReport, ProjectChallengeReport, ResumeOptimizationResult
+from app.schemas.report import FinalReport
 from app.schemas.resume import ResumeProfile
 
 
@@ -16,6 +17,11 @@ class FullAnalysisRequest(BaseModel):
     resume_text: str
     jd_text: str
     use_llm_jd: bool = False
+    save_result: bool = False
+
+
+class FullAnalysisResponse(FinalReport):
+    record_id: int | None = None
 
 
 class ResumeParseRequest(BaseModel):
@@ -42,3 +48,8 @@ class ReportGenerateRequest(BaseModel):
 
 class MarkdownReportResponse(BaseModel):
     markdown_report: str
+
+
+class AnalysisRecordResponse(FullAnalysisResponse):
+    id: int
+    created_at: str
