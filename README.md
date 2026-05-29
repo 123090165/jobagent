@@ -169,6 +169,8 @@ $env:JOBAGENT_LLM_MODEL="gpt-4o-mini"
 - `data/samples/sample_resume.md`
 - `data/jd_examples/sample_jd.md`
 
+更完整的演示脚本见 [Demo Guide](docs/DEMO_GUIDE.md)。
+
 ## 阶段路线
 
 | 阶段 | 目标 | 状态 |
@@ -262,6 +264,7 @@ docs/
 ## 关键文档
 
 - [Development Review Guide](docs/DEVELOPMENT_REVIEW_GUIDE.md)
+- [Demo Guide](docs/DEMO_GUIDE.md)
 - [Git Workflow](docs/GIT_WORKFLOW.md)
 - [API](docs/API.md)
 - [SQLite Storage](docs/STORAGE.md)
