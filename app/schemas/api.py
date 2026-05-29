@@ -1,0 +1,44 @@
+from __future__ import annotations
+
+from pydantic import BaseModel
+
+from app.schemas.job import JobAnalysis
+from app.schemas.match import MatchReport, ProjectChallengeReport, ResumeOptimizationResult
+from app.schemas.resume import ResumeProfile
+
+
+class HealthResponse(BaseModel):
+    status: str
+    version: str
+
+
+class FullAnalysisRequest(BaseModel):
+    resume_text: str
+    jd_text: str
+    use_llm_jd: bool = False
+
+
+class ResumeParseRequest(BaseModel):
+    resume_text: str
+
+
+class JDAnalysisRequest(BaseModel):
+    jd_text: str
+    use_llm: bool = False
+
+
+class MatchAnalysisRequest(BaseModel):
+    resume_profile: ResumeProfile
+    job_analysis: JobAnalysis
+
+
+class ReportGenerateRequest(BaseModel):
+    resume_profile: ResumeProfile
+    job_analysis: JobAnalysis
+    match_report: MatchReport
+    optimization_result: ResumeOptimizationResult
+    project_challenge_report: ProjectChallengeReport
+
+
+class MarkdownReportResponse(BaseModel):
+    markdown_report: str

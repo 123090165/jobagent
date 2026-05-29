@@ -62,6 +62,20 @@ $env:JOBAGENT_LLM_MODEL="gpt-4o-mini"
 
 详细说明见 [docs/LLM_INTEGRATION.md](docs/LLM_INTEGRATION.md)。
 
+## 运行 FastAPI 后端
+
+```bash
+.venv\Scripts\python.exe -m uvicorn app.main:app --reload
+```
+
+打开接口文档：
+
+```text
+http://127.0.0.1:8000/docs
+```
+
+当前 API 说明见 [docs/API.md](docs/API.md)。
+
 ## 运行测试
 
 ```bash
@@ -74,10 +88,17 @@ pytest
 app/
   main.py
   schemas/
+    api.py
     resume.py
     job.py
     match.py
     report.py
+  api/
+    routes_analyze.py
+    routes_resume.py
+    routes_jobs.py
+    routes_match.py
+    routes_reports.py
   services/
     mock_pipeline.py
     report_service.py
