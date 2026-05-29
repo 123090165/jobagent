@@ -36,3 +36,21 @@ def test_run_mock_pipeline_rejects_empty_input() -> None:
 
     with pytest.raises(ValueError):
         run_mock_pipeline(SAMPLE_RESUME, "")
+
+
+def test_run_mock_pipeline_can_request_llm_jd_with_fallback() -> None:
+    result = run_mock_pipeline(SAMPLE_RESUME, SAMPLE_JD, use_llm_jd=True)
+
+    assert result.job_analysis.required_skills
+    assert result.markdown_report
+
+
+def test_mock_jd_analysis_separates_required_and_preferred_skills() -> None:
+    jd_text = "招聘 Python 后端工程师，要求 FastAPI、SQL、REST API，有 LLM 应用经验优先。"
+
+    result = run_mock_pipeline(SAMPLE_RESUME, jd_text)
+
+    assert "FastAPI" in result.job_analysis.required_skills
+    assert "SQL" in result.job_analysis.required_skills
+    assert "LLM" not in result.job_analysis.required_skills
+    assert "LLM" in result.job_analysis.preferred_skills

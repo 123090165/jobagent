@@ -60,6 +60,37 @@ def _extract_skills(text: str) -> list[str]:
     return found
 
 
+def _split_clauses(text: str) -> list[str]:
+    return [part.strip() for part in re.split(r"[，,。；;：:]", text) if part.strip()]
+
+
+def _extract_preferred_skills(lines: list[str]) -> list[str]:
+    skills: list[str] = []
+    for line in lines:
+        if "加分" in line:
+            skills.extend(_extract_skills(line.split("加分", 1)[1]))
+            continue
+        for clause in _split_clauses(line):
+            if "优先" in clause:
+                skills.extend(_extract_skills(clause))
+    return _dedupe(skills)
+
+
+def _extract_required_skills(lines: list[str]) -> list[str]:
+    trigger_words = ["要求", "必须", "熟悉", "掌握", "精通", "职责", "负责"]
+    preferred_words = ["优先", "加分"]
+    skills: list[str] = []
+    for line in lines:
+        if not any(word in line for word in trigger_words):
+            continue
+        segment = line.split("要求", 1)[1] if "要求" in line else line
+        required_clauses = [
+            clause for clause in _split_clauses(segment) if not any(word in clause for word in preferred_words)
+        ]
+        skills.extend(_extract_skills("，".join(required_clauses)))
+    return _dedupe(skills)
+
+
 def _first_reasonable_title(lines: list[str], fallback: str) -> str:
     for line in lines:
         if len(line) <= 60 and any(word in line for word in ["工程师", "开发", "实习", "Agent", "LLM", "算法"]):
@@ -144,14 +175,8 @@ def mock_jd_analysis(jd_text: str) -> JobAnalysis:
     lines = _clean_lines(jd_text)
     all_skills = _extract_skills(jd_text)
 
-    preferred_lines = [line for line in lines if any(word in line for word in ["优先", "加分"])]
-    preferred_skills = _dedupe(skill for line in preferred_lines for skill in _extract_skills(line))
-    required_lines = [
-        line
-        for line in lines
-        if any(word in line for word in ["要求", "必须", "熟悉", "掌握", "精通", "职责", "负责"])
-    ]
-    required_skills = _dedupe(skill for line in required_lines for skill in _extract_skills(line))
+    preferred_skills = _extract_preferred_skills(lines)
+    required_skills = _extract_required_skills(lines)
     if not required_skills:
         required_skills = [skill for skill in all_skills if skill not in preferred_skills]
 
@@ -364,7 +389,7 @@ def mock_project_challenge(
     )
 
 
-def run_mock_pipeline(resume_text: str, jd_text: str) -> FinalReport:
+def run_mock_pipeline(resume_text: str, jd_text: str, *, use_llm_jd: bool = False) -> FinalReport:
     """Run the full v0.1 mock analysis flow."""
     normalized_resume = resume_text.strip()
     normalized_jd = jd_text.strip()
@@ -375,7 +400,12 @@ def run_mock_pipeline(resume_text: str, jd_text: str) -> FinalReport:
         raise ValueError("jd_text cannot be empty")
 
     resume_profile = mock_resume_parse(normalized_resume)
-    job_analysis = mock_jd_analysis(normalized_jd)
+    if use_llm_jd:
+        from app.agents.jd_analysis_agent import analyze_jd
+
+        job_analysis = analyze_jd(normalized_jd, use_llm=True)
+    else:
+        job_analysis = mock_jd_analysis(normalized_jd)
     match_report = mock_match_analysis(resume_profile, job_analysis)
     optimization_result = mock_resume_optimization(
         normalized_resume,

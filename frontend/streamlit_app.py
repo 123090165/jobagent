@@ -10,6 +10,7 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 from app.services.mock_pipeline import run_mock_pipeline
+from app.services.llm_service import is_llm_configured
 
 
 SAMPLE_RESUME = """张三
@@ -35,7 +36,14 @@ def main() -> None:
     with st.sidebar:
         st.subheader("当前阶段")
         st.write("先跑通简历 + JD 到报告的最小闭环。")
-        st.write("暂不接 LLM、数据库、LangGraph、自动投递。")
+        st.write("本轮只允许可选接入 JDAnalysisAgent，不接数据库、LangGraph、自动投递。")
+        use_llm_jd = st.checkbox(
+            "启用 LLM JD 分析",
+            value=False,
+            help="需要先配置 JOBAGENT_LLM_API_KEY；失败时会自动回退到 mock JD 分析。",
+        )
+        if use_llm_jd and not is_llm_configured():
+            st.info("当前未配置 LLM API key，本次会自动回退到 mock JD 分析。")
 
     left, right = st.columns(2)
     with left:
@@ -49,7 +57,11 @@ def main() -> None:
             return
 
         try:
-            result = run_mock_pipeline(resume_text=resume_text, jd_text=jd_text)
+            result = run_mock_pipeline(
+                resume_text=resume_text,
+                jd_text=jd_text,
+                use_llm_jd=use_llm_jd,
+            )
         except ValueError as exc:
             st.error(str(exc))
             return

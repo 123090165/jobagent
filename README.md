@@ -40,6 +40,28 @@ pip install -r requirements.txt
 streamlit run frontend/streamlit_app.py
 ```
 
+如果使用项目虚拟环境：
+
+```bash
+.venv\Scripts\python.exe -m streamlit run frontend/streamlit_app.py
+```
+
+## 可选：启用 LLM JD 分析
+
+当前只有 `JDAnalysisAgent` 支持可选 LLM。未配置 API key 时，系统会自动回退到 mock JD 分析。
+
+PowerShell 示例：
+
+```powershell
+$env:JOBAGENT_LLM_API_KEY="your-api-key"
+$env:JOBAGENT_LLM_BASE_URL="https://api.openai.com/v1"
+$env:JOBAGENT_LLM_MODEL="gpt-4o-mini"
+```
+
+然后在 Streamlit 侧边栏勾选“启用 LLM JD 分析”。
+
+详细说明见 [docs/LLM_INTEGRATION.md](docs/LLM_INTEGRATION.md)。
+
 ## 运行测试
 
 ```bash
@@ -82,7 +104,7 @@ docs/
 
 ## 后续路线
 
-1. 替换 JDAnalysisAgent 为真实 LLM 输出。
+1. 完善 JDAnalysisAgent 的真实 LLM 输出质量和评估样例。
 2. 增加 FastAPI 后端。
 3. 接入 SQLite 保存 JD、简历版本和报告。
 4. 使用 LangGraph 编排多 Agent。
