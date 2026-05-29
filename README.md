@@ -8,25 +8,27 @@ JobAgent 是一个面向求职者的多智能体求职工作台。当前版本�
 
 ## 当前状态
 
-已完成第一轮最小代码骨架：
+已完成 MVP 主干能力：
 
 - Streamlit 页面。
 - Pydantic schema。
 - mock 简历解析。
-- mock JD 分析。
+- mock JD 分析和可选 LLM JD 分析。
 - mock 匹配报告。
 - mock 简历优化建议。
 - mock 项目追问。
 - Markdown 报告生成。
-- 最小测试。
+- FastAPI 后端接口。
+- SQLite 保存分析记录。
+- 历史记录和岗位库基础查询。
+- pytest 测试。
 
 当前不做：
 
-- 真实 LLM。
-- 数据库。
 - LangGraph。
 - 自动投递。
 - 招聘网站登录和验证码处理。
+- 外部岗位 URL 抓取。
 
 ## 安装
 
@@ -45,6 +47,14 @@ streamlit run frontend/streamlit_app.py
 ```bash
 .venv\Scripts\python.exe -m streamlit run frontend/streamlit_app.py
 ```
+
+Streamlit 当前包含：
+
+- 生成报告
+- 历史记录
+- 岗位库
+
+详细说明见 [docs/STREAMLIT_APP.md](docs/STREAMLIT_APP.md)。
 
 ## 可选：启用 LLM JD 分析
 
@@ -129,6 +139,10 @@ app/
   services/
     mock_pipeline.py
     report_service.py
+    storage_service.py
+  storage/
+    database.py
+    repositories.py
 frontend/
   streamlit_app.py
 tests/

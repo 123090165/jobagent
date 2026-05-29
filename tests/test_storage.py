@@ -3,6 +3,11 @@ from __future__ import annotations
 from pathlib import Path
 
 from app.services.mock_pipeline import run_mock_pipeline
+from app.services.storage_service import (
+    list_saved_analysis_records,
+    list_saved_job_postings,
+    save_final_report,
+)
 from app.storage.database import get_connection, init_database
 from app.storage.repositories import (
     count_analysis_records,
@@ -69,3 +74,17 @@ def test_list_and_get_job_posting(tmp_path: Path) -> None:
     assert job is not None
     assert job["raw_jd"] == report.job_analysis.raw_jd
     assert job["analysis_count"] == 1
+
+
+def test_storage_service_closes_database_connections(tmp_path: Path) -> None:
+    database_path = tmp_path / "service-close.sqlite3"
+    report = run_mock_pipeline(SAMPLE_RESUME, SAMPLE_JD)
+
+    record_id = save_final_report(report, database_path=database_path)
+    records = list_saved_analysis_records(database_path=database_path)
+    jobs = list_saved_job_postings(database_path=database_path)
+
+    assert record_id == 1
+    assert len(records) == 1
+    assert len(jobs) == 1
+    database_path.unlink()

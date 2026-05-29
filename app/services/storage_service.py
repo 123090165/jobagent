@@ -14,13 +14,19 @@ from app.storage.repositories import (
 
 
 def save_final_report(report: FinalReport, *, database_path: str | Path | None = None) -> int:
-    with get_connection(database_path) as connection:
+    connection = get_connection(database_path)
+    try:
         return save_analysis_record(connection, report)
+    finally:
+        connection.close()
 
 
 def load_analysis_record(record_id: int, *, database_path: str | Path | None = None) -> dict | None:
-    with get_connection(database_path) as connection:
+    connection = get_connection(database_path)
+    try:
         return get_analysis_record(connection, record_id)
+    finally:
+        connection.close()
 
 
 def list_saved_analysis_records(
@@ -29,8 +35,11 @@ def list_saved_analysis_records(
     keyword: str | None = None,
     database_path: str | Path | None = None,
 ) -> list[dict]:
-    with get_connection(database_path) as connection:
+    connection = get_connection(database_path)
+    try:
         return list_analysis_records(connection, limit=limit, keyword=keyword)
+    finally:
+        connection.close()
 
 
 def list_saved_job_postings(
@@ -39,10 +48,16 @@ def list_saved_job_postings(
     keyword: str | None = None,
     database_path: str | Path | None = None,
 ) -> list[dict]:
-    with get_connection(database_path) as connection:
+    connection = get_connection(database_path)
+    try:
         return list_job_postings(connection, limit=limit, keyword=keyword)
+    finally:
+        connection.close()
 
 
 def load_job_posting(job_id: int, *, database_path: str | Path | None = None) -> dict | None:
-    with get_connection(database_path) as connection:
+    connection = get_connection(database_path)
+    try:
         return get_job_posting(connection, job_id)
+    finally:
+        connection.close()
