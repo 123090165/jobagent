@@ -69,7 +69,41 @@ POST /analyze/full
 GET /records/1
 ```
 
-## 5. 开发难点
+列出保存记录：
+
+```text
+GET /records?keyword=Python&limit=20
+```
+
+列出岗位库：
+
+```text
+GET /jobs?keyword=FastAPI&limit=20
+```
+
+读取岗位详情：
+
+```text
+GET /jobs/1
+```
+
+## 5. 简单去重策略
+
+当前去重规则：
+
+```text
+raw_jd 完全相同 -> 复用同一条 job_posting
+```
+
+这意味着：
+
+- 同一份 JD 被多次分析，只会保存一条岗位记录。
+- 每次分析仍会生成新的 resume、match_report、project_challenge 和 analysis_record。
+- 暂不做语义去重，例如“同一岗位但 JD 文案略有不同”不会合并。
+
+语义去重需要 embedding、相似度阈值或人工确认，放到后续 RAG / Job Database 增强阶段。
+
+## 6. 开发难点
 
 SQLite 这一阶段的重点不是表很多，而是：
 
@@ -78,11 +112,13 @@ SQLite 这一阶段的重点不是表很多，而是：
 - 测试必须使用临时数据库，不能污染本地真实数据。
 - 数据库文件不能提交到 Git。
 - 先保存完整分析记录，再逐步扩展成 JD 库和 tracker。
+- 列表接口返回摘要，详情接口返回完整 JSON，避免列表过重。
 
-## 6. 面试官可能追问
+## 7. 面试官可能追问
 
 - 为什么 SQLite 起步，而不是直接 PostgreSQL？
 - 为什么既保存原始文本，又保存结构化 JSON？
 - 数据库表为什么这样拆？
 - 如何保证测试不污染真实数据库？
 - 后续做多用户时需要改哪里？
+- 现在的 JD 去重为什么只做完全匹配？

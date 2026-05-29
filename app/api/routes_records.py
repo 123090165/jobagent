@@ -2,10 +2,16 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException
 
-from app.schemas.api import AnalysisRecordResponse
-from app.services.storage_service import load_analysis_record
+from app.schemas.api import AnalysisRecordResponse, AnalysisRecordSummary
+from app.services.storage_service import list_saved_analysis_records, load_analysis_record
 
 router = APIRouter(tags=["records"])
+
+
+@router.get("/records", response_model=list[AnalysisRecordSummary])
+def list_records(limit: int = 20, keyword: str | None = None) -> list[AnalysisRecordSummary]:
+    records = list_saved_analysis_records(limit=limit, keyword=keyword)
+    return [AnalysisRecordSummary.model_validate(record) for record in records]
 
 
 @router.get("/records/{record_id}", response_model=AnalysisRecordResponse)

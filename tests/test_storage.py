@@ -4,7 +4,15 @@ from pathlib import Path
 
 from app.services.mock_pipeline import run_mock_pipeline
 from app.storage.database import get_connection, init_database
-from app.storage.repositories import count_analysis_records, get_analysis_record, save_analysis_record
+from app.storage.repositories import (
+    count_analysis_records,
+    count_job_postings,
+    get_analysis_record,
+    get_job_posting,
+    list_analysis_records,
+    list_job_postings,
+    save_analysis_record,
+)
 from tests.test_mock_pipeline import SAMPLE_JD, SAMPLE_RESUME
 
 
@@ -25,3 +33,39 @@ def test_save_and_load_analysis_record(tmp_path: Path) -> None:
     assert stored["job_analysis"]["raw_jd"] == report.job_analysis.raw_jd
     assert stored["match_report"]["overall_score"] == report.match_report.overall_score
     assert "markdown_report" in stored
+
+
+def test_save_analysis_record_deduplicates_same_jd(tmp_path: Path) -> None:
+    database_path = tmp_path / "jobagent-test.sqlite3"
+    first_report = run_mock_pipeline(SAMPLE_RESUME, SAMPLE_JD)
+    second_report = run_mock_pipeline(SAMPLE_RESUME + "\n补充：Docker", SAMPLE_JD)
+
+    with get_connection(database_path) as connection:
+        first_record_id = save_analysis_record(connection, first_report)
+        second_record_id = save_analysis_record(connection, second_report)
+        records = list_analysis_records(connection)
+        jobs = list_job_postings(connection)
+
+        assert first_record_id != second_record_id
+        assert count_analysis_records(connection) == 2
+        assert count_job_postings(connection) == 1
+
+    assert len(records) == 2
+    assert len(jobs) == 1
+    assert jobs[0]["analysis_count"] == 2
+
+
+def test_list_and_get_job_posting(tmp_path: Path) -> None:
+    database_path = tmp_path / "jobagent-test.sqlite3"
+    report = run_mock_pipeline(SAMPLE_RESUME, SAMPLE_JD)
+
+    with get_connection(database_path) as connection:
+        save_analysis_record(connection, report)
+        jobs = list_job_postings(connection, keyword="FastAPI")
+        job = get_job_posting(connection, jobs[0]["id"])
+
+    assert len(jobs) == 1
+    assert jobs[0]["keyword_text"]
+    assert job is not None
+    assert job["raw_jd"] == report.job_analysis.raw_jd
+    assert job["analysis_count"] == 1

@@ -75,6 +75,23 @@ http://127.0.0.1:8000/docs
 - `project_challenge_report`
 - `markdown_report`
 
+### GET /records
+
+用途：列出已保存的分析记录摘要。
+
+查询参数：
+
+- `limit`：最多返回多少条，默认 20，最大 100。
+- `keyword`：按岗位标题、公司、JD 原文或结构化分析 JSON 搜索。
+
+返回：
+
+- `id`
+- `created_at`
+- `job_title`
+- `company`
+- `overall_score`
+
 ### POST /resume/parse
 
 用途：单独解析简历。
@@ -103,6 +120,36 @@ http://127.0.0.1:8000/docs
 ```
 
 返回：`JobAnalysis`
+
+### GET /jobs
+
+用途：列出已保存的岗位 JD 摘要。
+
+查询参数：
+
+- `limit`：最多返回多少条，默认 20，最大 100。
+- `keyword`：按岗位标题、公司、JD 原文或结构化分析 JSON 搜索。
+
+返回：
+
+- `id`
+- `created_at`
+- `job_title`
+- `company`
+- `keyword_text`
+- `analysis_count`
+
+### GET /jobs/{job_id}
+
+用途：读取已保存的岗位 JD 详情。
+
+返回：
+
+- `id`
+- `created_at`
+- `raw_jd`
+- `job_analysis`
+- `analysis_count`
 
 ### POST /match/analyze
 
@@ -147,6 +194,7 @@ http://127.0.0.1:8000/docs
 
 - API 层不写复杂业务逻辑。
 - 当前只提供最小 SQLite 保存能力，不做用户系统。
+- `GET /jobs` 只查询已保存 JD，不抓取外部网站。
 - 暂不做用户系统。
 - 暂不做自动投递。
 - `use_llm_jd` 只影响 JDAnalysisAgent，失败时回退 mock。

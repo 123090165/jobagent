@@ -24,19 +24,7 @@ def save_analysis_record(connection: sqlite3.Connection, report: FinalReport) ->
                 _model_to_json(report.resume_profile),
             ),
         )
-        job_id = _insert_and_get_id(
-            connection,
-            """
-            INSERT INTO job_postings (raw_jd, analysis_json, job_title, company)
-            VALUES (?, ?, ?, ?)
-            """,
-            (
-                report.job_analysis.raw_jd,
-                _model_to_json(report.job_analysis),
-                report.job_analysis.job_title,
-                report.job_analysis.company,
-            ),
-        )
+        job_id = _get_or_create_job_posting(connection, report)
         match_id = _insert_and_get_id(
             connection,
             """
@@ -127,10 +115,161 @@ def get_analysis_record(connection: sqlite3.Connection, record_id: int) -> dict[
     }
 
 
+def list_analysis_records(
+    connection: sqlite3.Connection,
+    *,
+    limit: int = 20,
+    keyword: str | None = None,
+) -> list[dict[str, Any]]:
+    init_database(connection)
+    query = """
+        SELECT
+            ar.id,
+            ar.created_at,
+            jp.job_title,
+            jp.company,
+            mr.overall_score
+        FROM analysis_records ar
+        JOIN job_postings jp ON ar.job_posting_id = jp.id
+        JOIN match_reports mr ON ar.match_report_id = mr.id
+    """
+    parameters: list[Any] = []
+    if keyword:
+        query += """
+            WHERE jp.job_title LIKE ?
+               OR jp.company LIKE ?
+               OR jp.raw_jd LIKE ?
+               OR jp.analysis_json LIKE ?
+        """
+        like_keyword = f"%{keyword}%"
+        parameters.extend([like_keyword, like_keyword, like_keyword, like_keyword])
+    query += " ORDER BY ar.created_at DESC, ar.id DESC LIMIT ?"
+    parameters.append(_normalize_limit(limit))
+    rows = connection.execute(query, tuple(parameters)).fetchall()
+    return [
+        {
+            "id": row["id"],
+            "created_at": row["created_at"],
+            "job_title": row["job_title"],
+            "company": row["company"],
+            "overall_score": row["overall_score"],
+        }
+        for row in rows
+    ]
+
+
+def list_job_postings(
+    connection: sqlite3.Connection,
+    *,
+    limit: int = 20,
+    keyword: str | None = None,
+) -> list[dict[str, Any]]:
+    init_database(connection)
+    query = """
+        SELECT
+            jp.id,
+            jp.created_at,
+            jp.job_title,
+            jp.company,
+            jp.analysis_json,
+            COUNT(ar.id) AS analysis_count
+        FROM job_postings jp
+        LEFT JOIN analysis_records ar ON ar.job_posting_id = jp.id
+    """
+    parameters: list[Any] = []
+    if keyword:
+        query += """
+            WHERE jp.job_title LIKE ?
+               OR jp.company LIKE ?
+               OR jp.raw_jd LIKE ?
+               OR jp.analysis_json LIKE ?
+        """
+        like_keyword = f"%{keyword}%"
+        parameters.extend([like_keyword, like_keyword, like_keyword, like_keyword])
+    query += """
+        GROUP BY jp.id
+        ORDER BY jp.created_at DESC, jp.id DESC
+        LIMIT ?
+    """
+    parameters.append(_normalize_limit(limit))
+    rows = connection.execute(query, tuple(parameters)).fetchall()
+    results: list[dict[str, Any]] = []
+    for row in rows:
+        analysis = json.loads(row["analysis_json"])
+        keywords = analysis.get("keywords") or []
+        results.append(
+            {
+                "id": row["id"],
+                "created_at": row["created_at"],
+                "job_title": row["job_title"],
+                "company": row["company"],
+                "keyword_text": ", ".join(keywords[:8]) if keywords else None,
+                "analysis_count": row["analysis_count"],
+            }
+        )
+    return results
+
+
+def get_job_posting(connection: sqlite3.Connection, job_id: int) -> dict[str, Any] | None:
+    init_database(connection)
+    row = connection.execute(
+        """
+        SELECT
+            jp.id,
+            jp.created_at,
+            jp.raw_jd,
+            jp.analysis_json,
+            COUNT(ar.id) AS analysis_count
+        FROM job_postings jp
+        LEFT JOIN analysis_records ar ON ar.job_posting_id = jp.id
+        WHERE jp.id = ?
+        GROUP BY jp.id
+        """,
+        (job_id,),
+    ).fetchone()
+    if row is None:
+        return None
+    return {
+        "id": row["id"],
+        "created_at": row["created_at"],
+        "raw_jd": row["raw_jd"],
+        "job_analysis": json.loads(row["analysis_json"]),
+        "analysis_count": row["analysis_count"],
+    }
+
+
 def count_analysis_records(connection: sqlite3.Connection) -> int:
     init_database(connection)
     row = connection.execute("SELECT COUNT(*) AS count FROM analysis_records").fetchone()
     return int(row["count"])
+
+
+def count_job_postings(connection: sqlite3.Connection) -> int:
+    init_database(connection)
+    row = connection.execute("SELECT COUNT(*) AS count FROM job_postings").fetchone()
+    return int(row["count"])
+
+
+def _get_or_create_job_posting(connection: sqlite3.Connection, report: FinalReport) -> int:
+    existing = connection.execute(
+        "SELECT id FROM job_postings WHERE raw_jd = ? ORDER BY id LIMIT 1",
+        (report.job_analysis.raw_jd,),
+    ).fetchone()
+    if existing is not None:
+        return int(existing["id"])
+    return _insert_and_get_id(
+        connection,
+        """
+        INSERT INTO job_postings (raw_jd, analysis_json, job_title, company)
+        VALUES (?, ?, ?, ?)
+        """,
+        (
+            report.job_analysis.raw_jd,
+            _model_to_json(report.job_analysis),
+            report.job_analysis.job_title,
+            report.job_analysis.company,
+        ),
+    )
 
 
 def _insert_and_get_id(
@@ -144,3 +283,7 @@ def _insert_and_get_id(
 
 def _model_to_json(model: BaseModel) -> str:
     return model.model_dump_json(ensure_ascii=False)
+
+
+def _normalize_limit(limit: int) -> int:
+    return max(1, min(limit, 100))

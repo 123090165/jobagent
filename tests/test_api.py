@@ -107,3 +107,42 @@ def test_record_endpoint_returns_404_for_missing_record(tmp_path, monkeypatch) -
 
     assert response.status_code == 404
     assert response.json()["detail"] == "record not found"
+
+
+def test_can_list_records_and_jobs_after_saving(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("JOBAGENT_DB_PATH", str(tmp_path / "job-list.sqlite3"))
+
+    save_response = client.post(
+        "/analyze/full",
+        json={
+            "resume_text": SAMPLE_RESUME,
+            "jd_text": SAMPLE_JD,
+            "save_result": True,
+        },
+    )
+    assert save_response.status_code == 200
+
+    records_response = client.get("/records", params={"keyword": "Python"})
+    assert records_response.status_code == 200
+    records = records_response.json()
+    assert len(records) == 1
+    assert records[0]["overall_score"] > 0
+
+    jobs_response = client.get("/jobs", params={"keyword": "Python"})
+    assert jobs_response.status_code == 200
+    jobs = jobs_response.json()
+    assert len(jobs) == 1
+    assert jobs[0]["analysis_count"] == 1
+
+    job_response = client.get(f"/jobs/{jobs[0]['id']}")
+    assert job_response.status_code == 200
+    assert job_response.json()["analysis_count"] == 1
+
+
+def test_job_endpoint_returns_404_for_missing_job(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("JOBAGENT_DB_PATH", str(tmp_path / "missing-job.sqlite3"))
+
+    response = client.get("/jobs/999")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "job not found"

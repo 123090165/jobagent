@@ -90,6 +90,17 @@ http://127.0.0.1:8000/docs
 
 默认数据库文件为 `data/jobagent.sqlite3`，不会提交到 Git。
 
+岗位库基础接口：
+
+```text
+GET /records
+GET /records/{record_id}
+GET /jobs
+GET /jobs/{job_id}
+```
+
+当前只查询已保存的 JD，不做外部网站抓取。
+
 详细说明见 [docs/STORAGE.md](docs/STORAGE.md)。
 
 ## 运行测试

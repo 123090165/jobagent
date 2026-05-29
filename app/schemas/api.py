@@ -53,3 +53,28 @@ class MarkdownReportResponse(BaseModel):
 class AnalysisRecordResponse(FullAnalysisResponse):
     id: int
     created_at: str
+
+
+class AnalysisRecordSummary(BaseModel):
+    id: int
+    created_at: str
+    job_title: str | None = None
+    company: str | None = None
+    overall_score: float
+
+
+class JobPostingSummary(BaseModel):
+    id: int
+    created_at: str
+    job_title: str | None = None
+    company: str | None = None
+    keyword_text: str | None = None
+    analysis_count: int = 0
+
+
+class JobPostingResponse(BaseModel):
+    id: int
+    created_at: str
+    raw_jd: str
+    job_analysis: JobAnalysis
+    analysis_count: int = 0
