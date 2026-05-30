@@ -19,6 +19,7 @@ class ApplicationCreateRequest(BaseModel):
     status: ApplicationStatus = "interested"
     notes: str | None = None
     next_action: str | None = None
+    resume_version_id: int | None = None
     resume_version_label: str | None = None
 
 
@@ -26,6 +27,7 @@ class ApplicationUpdateRequest(BaseModel):
     status: ApplicationStatus | None = None
     notes: str | None = None
     next_action: str | None = None
+    resume_version_id: int | None = None
     resume_version_label: str | None = None
 
 
@@ -35,6 +37,7 @@ class ApplicationRecordResponse(BaseModel):
     status: ApplicationStatus
     notes: str | None = None
     next_action: str | None = None
+    resume_version_id: int | None = None
     resume_version_label: str | None = None
     job_title: str | None = None
     company: str | None = None

@@ -194,6 +194,61 @@ def test_application_tracker_api_flow(tmp_path, monkeypatch) -> None:
     assert detail_response.json()["next_action"] == "等待反馈"
 
 
+def test_resume_version_api_flow(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("JOBAGENT_DB_PATH", str(tmp_path / "resume-version-api.sqlite3"))
+
+    save_response = client.post(
+        "/analyze/full",
+        json={
+            "resume_text": SAMPLE_RESUME,
+            "jd_text": SAMPLE_JD,
+            "save_result": True,
+        },
+    )
+    assert save_response.status_code == 200
+    analysis_id = save_response.json()["record_id"]
+
+    jobs_response = client.get("/jobs")
+    job_id = jobs_response.json()[0]["id"]
+
+    create_response = client.post(
+        "/resume-versions",
+        json={
+            "label": "v1-api-targeted",
+            "base_resume_text": SAMPLE_RESUME,
+            "tailored_resume_text": SAMPLE_RESUME + "\n补充：突出 API 设计经验。",
+            "target_job_id": job_id,
+            "source_analysis_record_id": analysis_id,
+            "notes": "针对目标岗位定制",
+        },
+    )
+    assert create_response.status_code == 200
+    version = create_response.json()
+    assert version["target_job_id"] == job_id
+    assert version["source_analysis_record_id"] == analysis_id
+
+    list_response = client.get("/resume-versions", params={"keyword": "api"})
+    assert list_response.status_code == 200
+    assert len(list_response.json()) == 1
+
+    detail_response = client.get(f"/resume-versions/{version['id']}")
+    assert detail_response.status_code == 200
+    assert detail_response.json()["base_resume_text"] == SAMPLE_RESUME
+
+    application_response = client.post(
+        "/applications",
+        json={
+            "job_id": job_id,
+            "status": "interested",
+            "resume_version_id": version["id"],
+        },
+    )
+    assert application_response.status_code == 200
+    application = application_response.json()
+    assert application["resume_version_id"] == version["id"]
+    assert application["resume_version_label"] == "v1-api-targeted"
+
+
 def test_application_tracker_rejects_missing_job(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("JOBAGENT_DB_PATH", str(tmp_path / "missing-application-job.sqlite3"))
 

@@ -239,6 +239,140 @@ def get_job_posting(connection: sqlite3.Connection, job_id: int) -> dict[str, An
     }
 
 
+def create_resume_version(
+    connection: sqlite3.Connection,
+    *,
+    label: str,
+    base_resume_text: str,
+    tailored_resume_text: str | None = None,
+    target_job_id: int | None = None,
+    source_analysis_record_id: int | None = None,
+    notes: str | None = None,
+) -> dict[str, Any] | None:
+    init_database(connection)
+    if target_job_id is not None and not _job_exists(connection, target_job_id):
+        return None
+    if source_analysis_record_id is not None and not _analysis_record_exists(
+        connection,
+        source_analysis_record_id,
+    ):
+        return None
+
+    with connection:
+        resume_version_id = _insert_and_get_id(
+            connection,
+            """
+            INSERT INTO resume_versions (
+                label,
+                base_resume_text,
+                tailored_resume_text,
+                target_job_posting_id,
+                source_analysis_record_id,
+                notes
+            )
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                label,
+                base_resume_text,
+                tailored_resume_text,
+                target_job_id,
+                source_analysis_record_id,
+                notes,
+            ),
+        )
+    return get_resume_version(connection, resume_version_id)
+
+
+def list_resume_versions(
+    connection: sqlite3.Connection,
+    *,
+    limit: int = 20,
+    keyword: str | None = None,
+    target_job_id: int | None = None,
+) -> list[dict[str, Any]]:
+    init_database(connection)
+    query = """
+        SELECT
+            rv.id,
+            rv.label,
+            rv.target_job_posting_id,
+            rv.source_analysis_record_id,
+            rv.notes,
+            rv.created_at,
+            rv.updated_at,
+            jp.job_title,
+            jp.company
+        FROM resume_versions rv
+        LEFT JOIN job_postings jp ON rv.target_job_posting_id = jp.id
+    """
+    where_clauses: list[str] = []
+    parameters: list[Any] = []
+    if target_job_id is not None:
+        where_clauses.append("rv.target_job_posting_id = ?")
+        parameters.append(target_job_id)
+    if keyword:
+        where_clauses.append(
+            """
+            (
+                rv.label LIKE ?
+                OR rv.base_resume_text LIKE ?
+                OR rv.tailored_resume_text LIKE ?
+                OR rv.notes LIKE ?
+                OR jp.job_title LIKE ?
+                OR jp.company LIKE ?
+            )
+            """
+        )
+        like_keyword = f"%{keyword}%"
+        parameters.extend(
+            [
+                like_keyword,
+                like_keyword,
+                like_keyword,
+                like_keyword,
+                like_keyword,
+                like_keyword,
+            ]
+        )
+    if where_clauses:
+        query += " WHERE " + " AND ".join(where_clauses)
+    query += " ORDER BY rv.updated_at DESC, rv.id DESC LIMIT ?"
+    parameters.append(_normalize_limit(limit))
+    rows = connection.execute(query, tuple(parameters)).fetchall()
+    return [_resume_version_summary_row_to_dict(row) for row in rows]
+
+
+def get_resume_version(
+    connection: sqlite3.Connection,
+    resume_version_id: int,
+) -> dict[str, Any] | None:
+    init_database(connection)
+    row = connection.execute(
+        """
+        SELECT
+            rv.id,
+            rv.label,
+            rv.base_resume_text,
+            rv.tailored_resume_text,
+            rv.target_job_posting_id,
+            rv.source_analysis_record_id,
+            rv.notes,
+            rv.created_at,
+            rv.updated_at,
+            jp.job_title,
+            jp.company
+        FROM resume_versions rv
+        LEFT JOIN job_postings jp ON rv.target_job_posting_id = jp.id
+        WHERE rv.id = ?
+        """,
+        (resume_version_id,),
+    ).fetchone()
+    if row is None:
+        return None
+    return _resume_version_row_to_dict(row)
+
+
 def upsert_application_record(
     connection: sqlite3.Connection,
     *,
@@ -246,10 +380,13 @@ def upsert_application_record(
     status: ApplicationStatus = "interested",
     notes: str | None = None,
     next_action: str | None = None,
+    resume_version_id: int | None = None,
     resume_version_label: str | None = None,
 ) -> dict[str, Any] | None:
     init_database(connection)
     if not _job_exists(connection, job_id):
+        return None
+    if resume_version_id is not None and not _resume_version_exists(connection, resume_version_id):
         return None
 
     with connection:
@@ -260,17 +397,19 @@ def upsert_application_record(
                 status,
                 notes,
                 next_action,
+                resume_version_id,
                 resume_version_label
             )
-            VALUES (?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?)
             ON CONFLICT(job_posting_id) DO UPDATE SET
                 status = excluded.status,
                 notes = excluded.notes,
                 next_action = excluded.next_action,
+                resume_version_id = excluded.resume_version_id,
                 resume_version_label = excluded.resume_version_label,
                 updated_at = CURRENT_TIMESTAMP
             """,
-            (job_id, status, notes, next_action, resume_version_label),
+            (job_id, status, notes, next_action, resume_version_id, resume_version_label),
         )
     return get_application_by_job_id(connection, job_id)
 
@@ -282,6 +421,7 @@ def update_application_record(
     status: ApplicationStatus | None = None,
     notes: str | None = None,
     next_action: str | None = None,
+    resume_version_id: int | None = None,
     resume_version_label: str | None = None,
 ) -> dict[str, Any] | None:
     init_database(connection)
@@ -292,6 +432,9 @@ def update_application_record(
     new_status = status if status is not None else existing["status"]
     new_notes = notes if notes is not None else existing["notes"]
     new_next_action = next_action if next_action is not None else existing["next_action"]
+    new_resume_version_id = resume_version_id if resume_version_id is not None else existing["resume_version_id"]
+    if new_resume_version_id is not None and not _resume_version_exists(connection, new_resume_version_id):
+        return None
     new_resume_version_label = (
         resume_version_label if resume_version_label is not None else existing["resume_version_label"]
     )
@@ -303,6 +446,7 @@ def update_application_record(
                 status = ?,
                 notes = ?,
                 next_action = ?,
+                resume_version_id = ?,
                 resume_version_label = ?,
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
@@ -311,6 +455,7 @@ def update_application_record(
                 new_status,
                 new_notes,
                 new_next_action,
+                new_resume_version_id,
                 new_resume_version_label,
                 application_id,
             ),
@@ -333,13 +478,15 @@ def list_application_records(
             app.status,
             app.notes,
             app.next_action,
-            app.resume_version_label,
+            app.resume_version_id,
+            COALESCE(app.resume_version_label, rv.label) AS resume_version_label,
             app.created_at,
             app.updated_at,
             jp.job_title,
             jp.company
         FROM application_records app
         JOIN job_postings jp ON app.job_posting_id = jp.id
+        LEFT JOIN resume_versions rv ON app.resume_version_id = rv.id
     """
     where_clauses: list[str] = []
     parameters: list[Any] = []
@@ -355,11 +502,23 @@ def list_application_records(
                 OR jp.raw_jd LIKE ?
                 OR app.notes LIKE ?
                 OR app.next_action LIKE ?
+                OR app.resume_version_label LIKE ?
+                OR rv.label LIKE ?
             )
             """
         )
         like_keyword = f"%{keyword}%"
-        parameters.extend([like_keyword, like_keyword, like_keyword, like_keyword, like_keyword])
+        parameters.extend(
+            [
+                like_keyword,
+                like_keyword,
+                like_keyword,
+                like_keyword,
+                like_keyword,
+                like_keyword,
+                like_keyword,
+            ]
+        )
     if where_clauses:
         query += " WHERE " + " AND ".join(where_clauses)
     query += " ORDER BY app.updated_at DESC, app.id DESC LIMIT ?"
@@ -378,13 +537,15 @@ def get_application_record(connection: sqlite3.Connection, application_id: int) 
             app.status,
             app.notes,
             app.next_action,
-            app.resume_version_label,
+            app.resume_version_id,
+            COALESCE(app.resume_version_label, rv.label) AS resume_version_label,
             app.created_at,
             app.updated_at,
             jp.job_title,
             jp.company
         FROM application_records app
         JOIN job_postings jp ON app.job_posting_id = jp.id
+        LEFT JOIN resume_versions rv ON app.resume_version_id = rv.id
         WHERE app.id = ?
         """,
         (application_id,),
@@ -404,13 +565,15 @@ def get_application_by_job_id(connection: sqlite3.Connection, job_id: int) -> di
             app.status,
             app.notes,
             app.next_action,
-            app.resume_version_label,
+            app.resume_version_id,
+            COALESCE(app.resume_version_label, rv.label) AS resume_version_label,
             app.created_at,
             app.updated_at,
             jp.job_title,
             jp.company
         FROM application_records app
         JOIN job_postings jp ON app.job_posting_id = jp.id
+        LEFT JOIN resume_versions rv ON app.resume_version_id = rv.id
         WHERE app.job_posting_id = ?
         """,
         (job_id,),
@@ -435,6 +598,12 @@ def count_job_postings(connection: sqlite3.Connection) -> int:
 def count_application_records(connection: sqlite3.Connection) -> int:
     init_database(connection)
     row = connection.execute("SELECT COUNT(*) AS count FROM application_records").fetchone()
+    return int(row["count"])
+
+
+def count_resume_versions(connection: sqlite3.Connection) -> int:
+    init_database(connection)
+    row = connection.execute("SELECT COUNT(*) AS count FROM resume_versions").fetchone()
     return int(row["count"])
 
 
@@ -465,6 +634,41 @@ def _job_exists(connection: sqlite3.Connection, job_id: int) -> bool:
     return row is not None
 
 
+def _analysis_record_exists(connection: sqlite3.Connection, record_id: int) -> bool:
+    row = connection.execute("SELECT id FROM analysis_records WHERE id = ?", (record_id,)).fetchone()
+    return row is not None
+
+
+def _resume_version_exists(connection: sqlite3.Connection, resume_version_id: int) -> bool:
+    row = connection.execute("SELECT id FROM resume_versions WHERE id = ?", (resume_version_id,)).fetchone()
+    return row is not None
+
+
+def _resume_version_summary_row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
+    return {
+        "id": row["id"],
+        "label": row["label"],
+        "target_job_id": row["target_job_posting_id"],
+        "target_job_title": row["job_title"],
+        "target_company": row["company"],
+        "source_analysis_record_id": row["source_analysis_record_id"],
+        "notes": row["notes"],
+        "created_at": row["created_at"],
+        "updated_at": row["updated_at"],
+    }
+
+
+def _resume_version_row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
+    data = _resume_version_summary_row_to_dict(row)
+    data.update(
+        {
+            "base_resume_text": row["base_resume_text"],
+            "tailored_resume_text": row["tailored_resume_text"],
+        }
+    )
+    return data
+
+
 def _application_row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
     return {
         "id": row["id"],
@@ -472,6 +676,7 @@ def _application_row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
         "status": row["status"],
         "notes": row["notes"],
         "next_action": row["next_action"],
+        "resume_version_id": row["resume_version_id"],
         "resume_version_label": row["resume_version_label"],
         "job_title": row["job_title"],
         "company": row["company"],

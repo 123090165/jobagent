@@ -73,17 +73,48 @@ def init_database(connection: sqlite3.Connection) -> None:
             FOREIGN KEY (project_challenge_id) REFERENCES project_challenges(id)
         );
 
+        CREATE TABLE IF NOT EXISTS resume_versions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            label TEXT NOT NULL,
+            base_resume_text TEXT NOT NULL,
+            tailored_resume_text TEXT,
+            target_job_posting_id INTEGER,
+            source_analysis_record_id INTEGER,
+            notes TEXT,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (target_job_posting_id) REFERENCES job_postings(id),
+            FOREIGN KEY (source_analysis_record_id) REFERENCES analysis_records(id)
+        );
+
         CREATE TABLE IF NOT EXISTS application_records (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             job_posting_id INTEGER NOT NULL UNIQUE,
             status TEXT NOT NULL DEFAULT 'interested',
             notes TEXT,
             next_action TEXT,
+            resume_version_id INTEGER,
             resume_version_label TEXT,
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (job_posting_id) REFERENCES job_postings(id)
+            FOREIGN KEY (job_posting_id) REFERENCES job_postings(id),
+            FOREIGN KEY (resume_version_id) REFERENCES resume_versions(id)
         );
         """
     )
+    _ensure_column(connection, "application_records", "resume_version_id", "INTEGER")
     connection.commit()
+
+
+def _ensure_column(
+    connection: sqlite3.Connection,
+    table_name: str,
+    column_name: str,
+    column_definition: str,
+) -> None:
+    columns = {
+        row["name"]
+        for row in connection.execute(f"PRAGMA table_info({table_name})").fetchall()
+    }
+    if column_name not in columns:
+        connection.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_definition}")

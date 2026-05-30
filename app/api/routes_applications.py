@@ -35,10 +35,12 @@ def create_or_update_application(request: ApplicationCreateRequest) -> Applicati
         status=request.status,
         notes=request.notes,
         next_action=request.next_action,
+        resume_version_id=request.resume_version_id,
         resume_version_label=request.resume_version_label,
     )
     if record is None:
-        raise HTTPException(status_code=404, detail="job not found")
+        detail = "job or resume version not found" if request.resume_version_id is not None else "job not found"
+        raise HTTPException(status_code=404, detail=detail)
     return ApplicationRecordResponse.model_validate(record)
 
 
@@ -60,8 +62,14 @@ def patch_application(
         status=request.status,
         notes=request.notes,
         next_action=request.next_action,
+        resume_version_id=request.resume_version_id,
         resume_version_label=request.resume_version_label,
     )
     if record is None:
-        raise HTTPException(status_code=404, detail="application not found")
+        detail = (
+            "application or resume version not found"
+            if request.resume_version_id is not None
+            else "application not found"
+        )
+        raise HTTPException(status_code=404, detail=detail)
     return ApplicationRecordResponse.model_validate(record)

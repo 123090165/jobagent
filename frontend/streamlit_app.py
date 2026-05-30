@@ -12,6 +12,11 @@ if str(ROOT_DIR) not in sys.path:
 from app.services.mock_pipeline import run_mock_pipeline
 from app.services.llm_service import is_llm_configured
 from app.services.application_service import list_applications, save_application
+from app.services.resume_version_service import (
+    list_saved_resume_versions,
+    load_resume_version,
+    save_resume_version,
+)
 from app.services.storage_service import (
     list_saved_analysis_records,
     list_saved_job_postings,
@@ -58,7 +63,9 @@ def main() -> None:
         if use_llm_jd and not is_llm_configured():
             st.info("当前未配置 LLM API key，本次会自动回退到 mock JD 分析。")
 
-    tab_analyze, tab_history, tab_jobs, tab_tracker = st.tabs(["生成报告", "历史记录", "岗位库", "投递跟进"])
+    tab_analyze, tab_history, tab_jobs, tab_versions, tab_tracker = st.tabs(
+        ["生成报告", "历史记录", "岗位库", "简历版本", "投递跟进"]
+    )
 
     with tab_analyze:
         render_analysis_tab(use_llm_jd=use_llm_jd, save_result=save_result)
@@ -68,6 +75,9 @@ def main() -> None:
 
     with tab_jobs:
         render_jobs_tab()
+
+    with tab_versions:
+        render_resume_versions_tab()
 
     with tab_tracker:
         render_tracker_tab()
@@ -208,6 +218,79 @@ def render_jobs_tab() -> None:
         st.json(job_analysis)
 
 
+def render_resume_versions_tab() -> None:
+    st.subheader("简历版本")
+    jobs = list_saved_job_postings(limit=100)
+
+    with st.form("resume_version_form"):
+        label = st.text_input("版本标签", placeholder="例如：v1-fastapi-backend")
+        selected_job_id = st.selectbox(
+            "目标岗位",
+            options=[None] + [job["id"] for job in jobs],
+            format_func=lambda job_id: _format_optional_job_option(job_id, jobs),
+        )
+        base_resume_text = st.text_area("原始简历文本", value=SAMPLE_RESUME, height=220)
+        tailored_resume_text = st.text_area(
+            "定制后简历文本",
+            placeholder="可粘贴针对目标 JD 调整后的版本；不要新增未真实发生的经历。",
+            height=220,
+        )
+        notes = st.text_area("版本备注", placeholder="记录这个版本面向的岗位、修改重点和待补充信息。")
+        submitted = st.form_submit_button("保存简历版本", type="primary", use_container_width=True)
+
+    if submitted:
+        if not label.strip() or not base_resume_text.strip():
+            st.warning("请填写版本标签和原始简历文本。")
+        else:
+            version = save_resume_version(
+                label=label.strip(),
+                base_resume_text=base_resume_text.strip(),
+                tailored_resume_text=tailored_resume_text.strip() or None,
+                target_job_id=int(selected_job_id) if selected_job_id is not None else None,
+                notes=notes.strip() or None,
+            )
+            if version is None:
+                st.error("关联岗位不存在，无法保存简历版本。")
+            else:
+                st.success(f"已保存简历版本：#{version['id']}")
+
+    st.markdown("### 已保存版本")
+    keyword, limit = render_search_controls("resume_versions")
+    versions = list_saved_resume_versions(keyword=keyword or None, limit=limit)
+    if not versions:
+        st.info("还没有保存的简历版本。")
+        return
+
+    st.dataframe(versions, hide_index=True, use_container_width=True)
+    selected_version_id = st.selectbox(
+        "查看版本详情",
+        options=[version["id"] for version in versions],
+        format_func=lambda version_id: _format_resume_version_option(version_id, versions),
+    )
+    version = load_resume_version(int(selected_version_id))
+    if version is None:
+        st.warning("简历版本不存在或已被删除。")
+        return
+
+    col1, col2, col3 = st.columns(3)
+    col1.metric("版本", version["label"])
+    col2.metric("目标岗位", version.get("target_job_title") or "未关联")
+    col3.metric("创建时间", version["created_at"])
+
+    base_tab, tailored_tab, metadata_tab = st.tabs(["原始简历", "定制版本", "版本信息"])
+    with base_tab:
+        st.text_area("原始简历", value=version["base_resume_text"], height=300, disabled=True)
+    with tailored_tab:
+        st.text_area(
+            "定制版本",
+            value=version.get("tailored_resume_text") or "未填写定制后文本。",
+            height=300,
+            disabled=True,
+        )
+    with metadata_tab:
+        st.json(version)
+
+
 def render_tracker_tab() -> None:
     st.subheader("投递跟进")
     jobs = list_saved_job_postings(limit=100)
@@ -226,18 +309,37 @@ def render_tracker_tab() -> None:
             options=["interested", "applied", "interviewing", "rejected", "offer", "archived"],
             format_func=_format_status_label,
         )
-        resume_version_label = st.text_input("简历版本", placeholder="例如：v1-fastapi-backend")
+        resume_versions = list_saved_resume_versions(limit=100)
+        selected_resume_version_id = st.selectbox(
+            "关联简历版本",
+            options=[None] + [version["id"] for version in resume_versions],
+            format_func=lambda version_id: _format_optional_resume_version_option(
+                version_id,
+                resume_versions,
+            ),
+        )
+        if selected_resume_version_id is None:
+            resume_version_label = st.text_input("简历版本标签", placeholder="例如：v1-fastapi-backend")
+        else:
+            resume_version_label = None
         next_action = st.text_input("下一步行动", placeholder="例如：今晚定制简历并投递")
         notes = st.text_area("备注", placeholder="记录岗位偏好、投递渠道、面试反馈等")
         submitted = st.form_submit_button("保存跟进状态", type="primary", use_container_width=True)
 
     if submitted:
+        manual_resume_version_label = (resume_version_label.strip() or None) if resume_version_label else None
+        selected_version_id = (
+            int(selected_resume_version_id)
+            if selected_resume_version_id is not None
+            else None
+        )
         record = save_application(
             job_id=int(selected_job_id),
             status=status,
             notes=notes.strip() or None,
             next_action=next_action.strip() or None,
-            resume_version_label=resume_version_label.strip() or None,
+            resume_version_id=selected_version_id,
+            resume_version_label=manual_resume_version_label,
         )
         if record is None:
             st.error("岗位不存在，无法保存跟进记录。")
@@ -285,6 +387,26 @@ def _format_job_option(job_id: int, jobs: list[dict]) -> str:
     title = job.get("job_title") or "未识别岗位"
     count = job.get("analysis_count", 0)
     return f"#{job_id} | {title} | {count} 次分析"
+
+
+def _format_optional_job_option(job_id: int | None, jobs: list[dict]) -> str:
+    if job_id is None:
+        return "不关联岗位"
+    return _format_job_option(job_id, jobs)
+
+
+def _format_resume_version_option(version_id: int, versions: list[dict]) -> str:
+    version = next((item for item in versions if item["id"] == version_id), None)
+    if not version:
+        return str(version_id)
+    target = version.get("target_job_title") or "未关联岗位"
+    return f"#{version_id} | {version['label']} | {target}"
+
+
+def _format_optional_resume_version_option(version_id: int | None, versions: list[dict]) -> str:
+    if version_id is None:
+        return "不关联版本，手动填写标签"
+    return _format_resume_version_option(version_id, versions)
 
 
 def _format_status_label(status: str) -> str:

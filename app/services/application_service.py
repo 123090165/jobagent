@@ -18,6 +18,7 @@ def save_application(
     status: ApplicationStatus = "interested",
     notes: str | None = None,
     next_action: str | None = None,
+    resume_version_id: int | None = None,
     resume_version_label: str | None = None,
     database_path: str | Path | None = None,
 ) -> dict | None:
@@ -29,6 +30,7 @@ def save_application(
             status=status,
             notes=notes,
             next_action=next_action,
+            resume_version_id=resume_version_id,
             resume_version_label=resume_version_label,
         )
     finally:
@@ -41,6 +43,7 @@ def update_application(
     status: ApplicationStatus | None = None,
     notes: str | None = None,
     next_action: str | None = None,
+    resume_version_id: int | None = None,
     resume_version_label: str | None = None,
     database_path: str | Path | None = None,
 ) -> dict | None:
@@ -52,6 +55,7 @@ def update_application(
             status=status,
             notes=notes,
             next_action=next_action,
+            resume_version_id=resume_version_id,
             resume_version_label=resume_version_label,
         )
     finally:

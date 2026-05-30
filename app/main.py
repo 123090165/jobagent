@@ -9,6 +9,7 @@ from app.api.routes_match import router as match_router
 from app.api.routes_records import router as records_router
 from app.api.routes_reports import router as reports_router
 from app.api.routes_resume import router as resume_router
+from app.api.routes_resume_versions import router as resume_versions_router
 from app.schemas.api import HealthResponse
 from app.services.mock_pipeline import run_mock_pipeline
 
@@ -33,6 +34,7 @@ def create_app() -> FastAPI:
     api.include_router(reports_router)
     api.include_router(records_router)
     api.include_router(applications_router)
+    api.include_router(resume_versions_router)
     return api
 
 
