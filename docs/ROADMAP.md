@@ -4,7 +4,7 @@
 
 ## 当前优先级
 
-当前只推进 v0.1 准备和 Mock MVP。
+当前已经完成 Mock MVP、可选 LLM JDAnalysisAgent、FastAPI、SQLite、岗位库、tracker 和简历版本管理。下一步优先加强工作流和 Agent 架构，为 LangGraph 迁移做准备。
 
 核心目标：
 
@@ -92,8 +92,19 @@
 - 项目拷打增强。
 - 模拟面试流程。
 - 投递 tracker。
+- 简历版本管理。
 - 一周行动计划。
 - 面试反馈记录。
+
+## v0.7 Workflow Architecture
+
+交付物：
+
+- `app/workflows/` 显式编排层。
+- 将当前 service pipeline 拆成可追踪步骤。
+- 补齐 ResumeParseAgent、MatchAgent、ResumeOptimizeAgent、ProjectChallengeAgent、ReportAgent 的 mock agent 外壳。
+- 保持现有 schema 和 fallback 路径。
+- 为后续 LangGraph 节点迁移做准备。
 
 ## v1.0 Portfolio Version
 

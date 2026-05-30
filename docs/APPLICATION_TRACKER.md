@@ -10,6 +10,12 @@
 job_posting -> application_record -> status / notes / next_action
 ```
 
+如果已经保存了简历版本，也可以形成更完整的链路：
+
+```text
+job_posting + resume_version -> application_record
+```
+
 当前不做：
 
 - 不做自动投递。
@@ -37,11 +43,14 @@ job_posting -> application_record -> status / notes / next_action
 - `status`
 - `notes`
 - `next_action`
+- `resume_version_id`
 - `resume_version_label`
 - `created_at`
 - `updated_at`
 
 当前一个岗位只保留一条 tracker 记录。重复保存同一 `job_id` 会更新原记录。
+
+`resume_version_id` 用于关联真实简历版本；`resume_version_label` 保留为轻量标签和旧数据兼容字段。
 
 ## 4. API
 
@@ -54,6 +63,7 @@ POST /applications
   "status": "interested",
   "notes": "岗位匹配度不错",
   "next_action": "定制简历",
+  "resume_version_id": 1,
   "resume_version_label": "v1-fastapi-backend"
 }
 ```
@@ -86,6 +96,7 @@ GET /applications/1
 
 - tracker 要依附岗位库，不能凭空创建岗位。
 - 状态要有明确枚举，不要随手写自由字符串。
+- 简历版本应该通过 `resume_version_id` 结构化关联，不能只靠备注文本。
 - route 只负责请求响应，状态保存逻辑放 service/repository。
 - 当前不做复杂状态转移限制，先保证本地跟进闭环。
 
@@ -96,3 +107,4 @@ GET /applications/1
 - 为什么一个岗位只保留一条 tracker 记录？
 - 如果未来多用户，表结构要怎么改？
 - 为什么不做自动投递？
+- 为什么既保留 `resume_version_id`，又保留 `resume_version_label`？

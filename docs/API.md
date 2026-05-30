@@ -173,6 +173,7 @@ http://127.0.0.1:8000/docs
   "status": "interested",
   "notes": "岗位匹配度不错",
   "next_action": "定制简历",
+  "resume_version_id": 1,
   "resume_version_label": "v1"
 }
 ```
@@ -184,6 +185,58 @@ http://127.0.0.1:8000/docs
 ### PATCH /applications/{application_id}
 
 用途：更新投递状态、备注、下一步行动或简历版本。
+
+### GET /resume-versions
+
+用途：列出已保存的简历版本。
+
+查询参数：
+
+- `limit`：最多返回多少条，默认 20，最大 100。
+- `keyword`：按版本标签、简历文本、备注、岗位标题或公司搜索。
+- `target_job_id`：按关联岗位筛选。
+
+### POST /resume-versions
+
+用途：创建简历版本。
+
+请求：
+
+```json
+{
+  "label": "v1-fastapi-backend",
+  "base_resume_text": "原始简历文本",
+  "tailored_resume_text": "针对目标 JD 调整后的简历文本",
+  "target_job_id": 1,
+  "source_analysis_record_id": 1,
+  "notes": "突出 FastAPI、SQL 和 API 设计经验"
+}
+```
+
+当前约束：
+
+- `base_resume_text` 保存原始简历，不会被覆盖。
+- `tailored_resume_text` 保存用户确认后的定制版本，可以为空。
+- `target_job_id` 和 `source_analysis_record_id` 都是可选关联。
+- 不自动生成或编造简历经历。
+
+### GET /resume-versions/{resume_version_id}
+
+用途：读取单条简历版本详情。
+
+返回：
+
+- `id`
+- `label`
+- `base_resume_text`
+- `tailored_resume_text`
+- `target_job_id`
+- `target_job_title`
+- `target_company`
+- `source_analysis_record_id`
+- `notes`
+- `created_at`
+- `updated_at`
 
 ### POST /match/analyze
 
@@ -227,9 +280,10 @@ http://127.0.0.1:8000/docs
 ## 3. 当前边界
 
 - API 层不写复杂业务逻辑。
-- 当前只提供最小 SQLite 保存能力，不做用户系统。
+- 当前提供本地 SQLite 保存能力，不做用户系统。
 - `GET /jobs` 只查询已保存 JD，不抓取外部网站。
 - `/applications` 只做本地 tracker，不执行自动投递。
+- `/resume-versions` 只保存用户提供的原始简历和定制文本，不自动编造经历。
 - 暂不做用户系统。
 - 暂不做自动投递。
 - `use_llm_jd` 只影响 JDAnalysisAgent，失败时回退 mock。

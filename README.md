@@ -27,6 +27,7 @@ JobAgent 是一个面向求职者的本地求职准备工作台，核心目标�
 - Mock pipeline：不依赖真实 LLM 也能端到端运行。
 - 可选 LLM JDAnalysisAgent：调用失败或未配置 API key 时回退 mock。
 - SQLite 存储：保存分析记录、岗位 JD、匹配报告、项目追问和 tracker。
+- 简历版本管理：保存原始简历、定制后文本，并可关联目标岗位和投递记录。
 - pytest 测试：覆盖 mock pipeline、API、存储、LLM fallback、投递 tracker。
 
 明确不做：
@@ -100,6 +101,7 @@ pip install -r requirements.txt
 - 生成报告：输入简历和 JD，输出 Markdown 报告。
 - 历史记录：查看已保存的分析结果。
 - 岗位库：查看保存过的 JD 和结构化分析。
+- 简历版本：保存针对不同岗位定制的简历版本。
 - 投递跟进：对岗位记录状态、备注、下一步行动和简历版本。
 
 ### 3. 启动 FastAPI 后端
@@ -121,7 +123,9 @@ GET  /health
 POST /analyze/full
 GET  /records
 GET  /jobs
+GET  /resume-versions
 GET  /applications
+POST /resume-versions
 POST /applications
 PATCH /applications/{application_id}
 ```
@@ -160,9 +164,10 @@ $env:JOBAGENT_LLM_MODEL="gpt-4o-mini"
 2. 勾选“保存本次分析”，生成 Markdown 报告。
 3. 进入“历史记录”，展示同一次分析可以被检索和复盘。
 4. 进入“岗位库”，展示 JD 已被结构化保存，并保留原始 JD。
-5. 进入“投递跟进”，把目标岗位标记为 `interested` 或 `applied`，填写下一步行动。
-6. 打开 FastAPI `/docs`，展示同一套能力已经可以通过 API 调用。
-7. 运行 `pytest`，说明核心流程由测试保护，而不是只靠手动点击页面。
+5. 进入“简历版本”，保存一个针对目标岗位的定制版本。
+6. 进入“投递跟进”，把目标岗位标记为 `interested` 或 `applied`，并关联简历版本。
+7. 打开 FastAPI `/docs`，展示同一套能力已经可以通过 API 调用。
+8. 运行 `pytest`，说明核心流程由测试保护，而不是只靠手动点击页面。
 
 样例数据：
 
@@ -181,9 +186,10 @@ $env:JOBAGENT_LLM_MODEL="gpt-4o-mini"
 | Phase 3 | FastAPI 后端，拆出可复用 API 层 | 已完成 |
 | Phase 4 | SQLite 分析记录、岗位库基础查询 | 已完成 |
 | Phase 5 | Streamlit 历史记录、岗位库、投递 tracker | 已完成 |
-| Phase 6 | README、Demo、架构图、作品集展示材料 | 进行中 |
-| Phase 7 | LangGraph 工作流、RAG 检索、MCP 工具封装 | 后续 |
-| Phase 8 | Docker、部署说明、答辩材料和截图 | 后续 |
+| Phase 6 | README、Demo、架构图、作品集展示材料 | 已完成 |
+| Phase 7 | 简历版本管理，关联岗位和 tracker | 已完成 |
+| Phase 8 | LangGraph 工作流、RAG 检索、MCP 工具封装 | 后续 |
+| Phase 9 | Docker、部署说明、答辩材料和截图 | 后续 |
 
 ## 面试讲述版
 
@@ -230,6 +236,7 @@ app/
     routes_records.py
     routes_reports.py
     routes_resume.py
+    routes_resume_versions.py
   schemas/
     api.py
     application.py
@@ -237,11 +244,13 @@ app/
     match.py
     report.py
     resume.py
+    resume_version.py
   services/
     application_service.py
     llm_service.py
     mock_pipeline.py
     report_service.py
+    resume_version_service.py
     storage_service.py
   storage/
     database.py
@@ -253,6 +262,7 @@ tests/
   test_application_tracker.py
   test_jd_analysis_agent.py
   test_mock_pipeline.py
+  test_resume_versions.py
   test_storage.py
 data/
   samples/
@@ -270,4 +280,5 @@ docs/
 - [SQLite Storage](docs/STORAGE.md)
 - [Streamlit App](docs/STREAMLIT_APP.md)
 - [Application Tracker](docs/APPLICATION_TRACKER.md)
+- [Resume Versioning](docs/RESUME_VERSIONING.md)
 - [LLM Integration](docs/LLM_INTEGRATION.md)

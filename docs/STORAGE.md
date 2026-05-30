@@ -1,13 +1,16 @@
 # SQLite Storage
 
-> 用途：记录 JobAgent 的本地 SQLite 存储设计。当前只保存完整分析记录，为后续 JD 库、简历版本、报告历史和 tracker 打基础。
+> 用途：记录 JobAgent 的本地 SQLite 存储设计。当前保存完整分析记录、岗位库、简历版本和 tracker，为后续报告检索、版本对比和求职复盘打基础。
 
 ## 1. 当前目标
 
-这一阶段只做最小存储闭环：
+这一阶段已经从最小分析记录扩展为本地求职工作台存储闭环：
 
 ```text
-简历 + JD -> 分析报告 -> 可选保存到 SQLite -> 按 record_id 读取
+简历 + JD -> 分析报告 -> SQLite
+岗位 JD -> 岗位库
+原始简历 + 定制文本 -> 简历版本
+岗位 + 简历版本 -> 投递 tracker
 ```
 
 当前不做：
@@ -16,7 +19,7 @@
 - 不做登录权限。
 - 不做复杂数据库迁移。
 - 不做 PostgreSQL。
-- 不做投递 tracker。
+- 不做多用户权限系统。
 
 ## 2. 数据库位置
 
@@ -41,6 +44,8 @@ $env:JOBAGENT_DB_PATH="data/dev.sqlite3"
 - `match_reports`：保存匹配报告和总分。
 - `project_challenges`：保存项目追问。
 - `analysis_records`：把一次完整分析串起来，并保存 Markdown 报告。
+- `resume_versions`：保存原始简历文本、定制后文本、目标岗位和来源分析记录。
+- `application_records`：保存岗位投递状态、下一步行动、备注和可选简历版本关联。
 
 ## 4. API 用法
 
@@ -87,6 +92,31 @@ GET /jobs?keyword=FastAPI&limit=20
 GET /jobs/1
 ```
 
+创建简历版本：
+
+```json
+POST /resume-versions
+{
+  "label": "v1-fastapi-backend",
+  "base_resume_text": "原始简历文本",
+  "tailored_resume_text": "针对目标岗位定制后的简历文本",
+  "target_job_id": 1,
+  "source_analysis_record_id": 1
+}
+```
+
+关联投递 tracker：
+
+```json
+POST /applications
+{
+  "job_id": 1,
+  "status": "interested",
+  "resume_version_id": 1,
+  "next_action": "使用 v1 版本投递"
+}
+```
+
 ## 5. 简单去重策略
 
 当前去重规则：
@@ -111,8 +141,9 @@ SQLite 这一阶段的重点不是表很多，而是：
 - 保存逻辑不要写进 API route。
 - 测试必须使用临时数据库，不能污染本地真实数据。
 - 数据库文件不能提交到 Git。
-- 先保存完整分析记录，再逐步扩展成 JD 库和 tracker。
+- 完整分析记录、JD 库、简历版本和 tracker 要通过外键或显式 ID 关联。
 - 列表接口返回摘要，详情接口返回完整 JSON，避免列表过重。
+- 简历版本不能覆盖原始简历，定制版本必须单独保存。
 
 ## 7. 面试官可能追问
 
@@ -122,3 +153,5 @@ SQLite 这一阶段的重点不是表很多，而是：
 - 如何保证测试不污染真实数据库？
 - 后续做多用户时需要改哪里？
 - 现在的 JD 去重为什么只做完全匹配？
+- 为什么需要独立的简历版本表，而不是只在 tracker 中写标签？
+- 简历版本和分析记录、岗位、投递记录之间如何关联？

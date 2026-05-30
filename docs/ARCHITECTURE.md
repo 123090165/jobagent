@@ -40,6 +40,7 @@ app/
   agents/       Agent 节点、prompt 和 LLM 调用包装
   schemas/      Pydantic 数据模型
   services/     业务编排和核心流程
+  workflows/    后续显式工作流编排层
   tools/        可复用工具函数
   storage/      数据库连接、模型和仓储
   evaluation/   评估规则和测试辅助
@@ -126,6 +127,7 @@ START
 
 - v0.1：不接数据库，必要时使用内存对象。
 - v0.3：SQLite 保存 JD、简历版本、报告和项目追问。
+- 当前：SQLite 已保存分析记录、岗位库、简历版本和投递 tracker。
 - 后期：PostgreSQL 支持更完整的用户和投递数据。
 - 后期：Chroma 或其他向量库支持 RAG。
 
@@ -136,6 +138,7 @@ START
 - `match_reports`
 - `resume_versions`
 - `project_challenges`
+- `application_records`
 
 ## 8. Evaluation 层
 
@@ -176,3 +179,10 @@ START
 - 使用 LangGraph 管理多 Agent 状态流转。
 - 建立岗位知识库和历史报告检索。
 - 将文件读取、岗位检索、报告生成等能力封装为 MCP tools。
+
+### 当前过渡阶段：Workflow Architecture
+
+- 先抽出 `app/workflows/` 显式编排层。
+- 将现有 service pipeline 拆成可观察步骤。
+- 补齐 mock Agent 外壳，保持 schema 不变。
+- 等边界稳定后再迁移到 LangGraph。
