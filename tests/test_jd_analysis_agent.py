@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from app.agents.jd_analysis_agent import analyze_jd, analyze_jd_with_llm
+from app.agents.jd_analysis_agent import analyze_jd, analyze_jd_with_llm, run_jd_analysis_agent
 from app.services.llm_service import LLMServiceError, parse_json_object
 
 
@@ -53,6 +53,17 @@ def test_analyze_jd_falls_back_to_mock_when_llm_fails() -> None:
     assert result.raw_jd == SAMPLE_JD.strip()
     assert result.required_skills
     assert "Python" in result.keywords
+
+
+def test_run_jd_analysis_agent_reports_fallback_metadata() -> None:
+    service = FakeLLMService(should_fail=True)
+
+    result = run_jd_analysis_agent(SAMPLE_JD, use_llm=True, service=service)  # type: ignore[arg-type]
+
+    assert result.output.required_skills
+    assert result.metadata.agent_name == "JDAnalysisAgent"
+    assert result.metadata.mode == "fallback"
+    assert result.metadata.fallback_reason == "LLMServiceError"
 
 
 def test_parse_json_object_accepts_markdown_fenced_json() -> None:

@@ -4,6 +4,7 @@ from typing import Any
 
 from pydantic import ValidationError
 
+from app.agents.types import AgentExecutionMode, AgentRunMetadata, AgentRunResult
 from app.schemas.job import JobAnalysis
 from app.services.llm_service import LLMService, LLMServiceError
 
@@ -45,17 +46,43 @@ def analyze_jd(
     service: LLMService | None = None,
 ) -> JobAnalysis:
     """Analyze a JD with LLM when enabled, otherwise fall back to mock rules."""
+    return run_jd_analysis_agent(
+        jd_text,
+        use_llm=use_llm,
+        service=service,
+    ).output
+
+
+def run_jd_analysis_agent(
+    jd_text: str,
+    *,
+    use_llm: bool = False,
+    service: LLMService | None = None,
+) -> AgentRunResult[JobAnalysis]:
+    """Analyze a JD and return execution metadata for workflow tracing."""
     normalized_jd = jd_text.strip()
     if not normalized_jd:
         raise ValueError("jd_text cannot be empty")
 
     if not use_llm:
-        return _mock_jd_analysis(normalized_jd)
+        return AgentRunResult(
+            output=_mock_jd_analysis(normalized_jd),
+            metadata=_metadata(mode="mock"),
+        )
 
     try:
-        return analyze_jd_with_llm(normalized_jd, service=service)
-    except (LLMServiceError, ValidationError, ValueError, TypeError):
-        return _mock_jd_analysis(normalized_jd)
+        return AgentRunResult(
+            output=analyze_jd_with_llm(normalized_jd, service=service),
+            metadata=_metadata(mode="llm"),
+        )
+    except (LLMServiceError, ValidationError, ValueError, TypeError) as exc:
+        return AgentRunResult(
+            output=_mock_jd_analysis(normalized_jd),
+            metadata=_metadata(
+                mode="fallback",
+                fallback_reason=type(exc).__name__,
+            ),
+        )
 
 
 def analyze_jd_with_llm(jd_text: str, *, service: LLMService | None = None) -> JobAnalysis:
@@ -89,3 +116,20 @@ def _mock_jd_analysis(jd_text: str) -> JobAnalysis:
     from app.services.mock_pipeline import mock_jd_analysis
 
     return mock_jd_analysis(jd_text)
+
+
+def _metadata(
+    *,
+    mode: AgentExecutionMode,
+    fallback_reason: str | None = None,
+) -> AgentRunMetadata:
+    return AgentRunMetadata(
+        agent_name="JDAnalysisAgent",
+        mode=mode,
+        fallback_reason=fallback_reason,
+        guardrails=[
+            "不编造 JD 中不存在的信息",
+            "不把加分项误判为必备项",
+            "LLM 输出必须通过 JobAnalysis schema 校验",
+        ],
+    )

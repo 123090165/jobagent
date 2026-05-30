@@ -4,16 +4,18 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from app.agents.jd_analysis_agent import analyze_jd
-from app.agents.match_agent import analyze_match
-from app.agents.project_challenge_agent import generate_project_challenges
-from app.agents.report_agent import generate_report
-from app.agents.resume_optimize_agent import optimize_resume
-from app.agents.resume_parse_agent import parse_resume
+from app.agents.jd_analysis_agent import run_jd_analysis_agent
+from app.agents.match_agent import run_match_agent
+from app.agents.project_challenge_agent import run_project_challenge_agent
+from app.agents.report_agent import run_report_agent
+from app.agents.resume_optimize_agent import run_resume_optimize_agent
+from app.agents.resume_parse_agent import run_resume_parse_agent
+from app.agents.types import AgentExecutionMode, AgentRunMetadata
 from app.schemas.job import JobAnalysis
 from app.schemas.match import MatchReport, ProjectChallengeReport, ResumeOptimizationResult
 from app.schemas.report import FinalReport
 from app.schemas.resume import ResumeProfile
+from app.services.llm_service import LLMService
 
 WorkflowStepStatus = Literal["completed"]
 
@@ -21,7 +23,10 @@ WorkflowStepStatus = Literal["completed"]
 class WorkflowStepTrace(BaseModel):
     name: str
     status: WorkflowStepStatus
+    mode: AgentExecutionMode
     summary: str
+    fallback_reason: str | None = None
+    guardrails: list[str] = Field(default_factory=list)
 
 
 class JobAnalysisWorkflowState(BaseModel):
@@ -47,6 +52,7 @@ def run_job_analysis_workflow(
     jd_text: str,
     *,
     use_llm_jd: bool = False,
+    jd_llm_service: LLMService | None = None,
 ) -> JobAnalysisWorkflowResult:
     """Run the explicit JobAgent analysis workflow with traceable steps."""
     normalized_resume = resume_text.strip()
@@ -63,64 +69,69 @@ def run_job_analysis_workflow(
         use_llm_jd=use_llm_jd,
     )
 
-    state.resume_profile = parse_resume(normalized_resume)
+    resume_result = run_resume_parse_agent(normalized_resume)
+    state.resume_profile = resume_result.output
     _record_step(
         state,
-        "ResumeParseAgent",
+        resume_result.metadata,
         f"识别技能 {len(state.resume_profile.skills)} 个，项目 {len(state.resume_profile.projects)} 个。",
     )
 
-    if use_llm_jd:
-        state.job_analysis = analyze_jd(normalized_jd, use_llm=True)
-        jd_summary = "使用 JDAnalysisAgent 请求 LLM；失败时由 Agent 内部回退 mock。"
-    else:
-        state.job_analysis = analyze_jd(normalized_jd, use_llm=False)
-        jd_summary = "使用 mock JD 规则分析。"
+    jd_result = run_jd_analysis_agent(
+        normalized_jd,
+        use_llm=use_llm_jd,
+        service=jd_llm_service,
+    )
+    state.job_analysis = jd_result.output
     _record_step(
         state,
-        "JDAnalysisAgent",
-        f"{jd_summary} 必备技能 {len(state.job_analysis.required_skills)} 个。",
+        jd_result.metadata,
+        f"{_format_mode_summary(jd_result.metadata)} 必备技能 {len(state.job_analysis.required_skills)} 个。",
     )
 
-    state.match_report = analyze_match(state.resume_profile, state.job_analysis)
+    match_result = run_match_agent(state.resume_profile, state.job_analysis)
+    state.match_report = match_result.output
     _record_step(
         state,
-        "MatchAgent",
+        match_result.metadata,
         f"生成匹配报告，总分 {state.match_report.overall_score:.1f}。",
     )
 
-    state.optimization_result = optimize_resume(
+    optimization_result = run_resume_optimize_agent(
         normalized_resume,
         state.resume_profile,
         state.job_analysis,
         state.match_report,
     )
+    state.optimization_result = optimization_result.output
     _record_step(
         state,
-        "ResumeOptimizeAgent",
+        optimization_result.metadata,
         f"生成 {len(state.optimization_result.jd_targeted_bullets)} 条 JD 定向建议。",
     )
 
-    state.project_challenge_report = generate_project_challenges(
+    challenge_result = run_project_challenge_agent(
         state.resume_profile,
         state.job_analysis,
     )
+    state.project_challenge_report = challenge_result.output
     _record_step(
         state,
-        "ProjectInterviewAgent",
+        challenge_result.metadata,
         "生成项目追问和面试官关注点。",
     )
 
-    state.markdown_report = generate_report(
+    report_result = run_report_agent(
         resume_profile=state.resume_profile,
         job_analysis=state.job_analysis,
         match_report=state.match_report,
         optimization_result=state.optimization_result,
         project_challenge_report=state.project_challenge_report,
     )
+    state.markdown_report = report_result.output
     _record_step(
         state,
-        "ReportAgent",
+        report_result.metadata,
         "聚合结构化结果并生成 Markdown 报告。",
     )
 
@@ -137,13 +148,24 @@ def run_job_analysis_workflow(
 
 def _record_step(
     state: JobAnalysisWorkflowState,
-    name: str,
+    metadata: AgentRunMetadata,
     summary: str,
 ) -> None:
     state.steps.append(
         WorkflowStepTrace(
-            name=name,
+            name=metadata.agent_name,
             status="completed",
+            mode=metadata.mode,
             summary=summary,
+            fallback_reason=metadata.fallback_reason,
+            guardrails=metadata.guardrails,
         )
     )
+
+
+def _format_mode_summary(metadata: AgentRunMetadata) -> str:
+    if metadata.mode == "llm":
+        return "使用 LLM JD 分析"
+    if metadata.mode == "fallback":
+        return f"LLM 分析失败，已回退 mock（{metadata.fallback_reason}）"
+    return "使用 mock JD 规则分析"
