@@ -158,6 +158,7 @@
 - 当前还没有直接上 LangGraph，是先稳定状态和步骤边界。
 - workflow state 记录中间结果，step trace 记录执行顺序和摘要。
 - workflow 调用 Agent 外壳，不直接调用底层 mock 函数。
+- step trace 会记录 `mock`、`llm` 或 `fallback`，便于说明 LLM 是否真的参与。
 - 后续 LangGraph 可以按这些步骤迁移成 node。
 
 ## 4. 面试讲述版
@@ -220,5 +221,6 @@
 - 简历版本页面能保存原始简历和定制文本。
 - tracker 能关联已保存的简历版本。
 - Workflow 层能记录 6 个主流程步骤。
+- Agent trace 能记录执行模式、fallback 原因和 guardrails。
 - `pytest` 通过。
 - 不新增自动投递、招聘网站登录、验证码处理、复杂爬虫或多用户权限能力。

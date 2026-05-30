@@ -4,7 +4,7 @@
 
 ## 当前优先级
 
-当前已经完成 Mock MVP、可选 LLM JDAnalysisAgent、FastAPI、SQLite、岗位库、tracker、简历版本管理、显式 workflow 编排层和 mock Agent 外壳。下一步优先细化 Agent fallback 元信息，再考虑 LangGraph 迁移。
+当前已经完成 Mock MVP、可选 LLM JDAnalysisAgent、FastAPI、SQLite、岗位库、tracker、简历版本管理、显式 workflow 编排层、mock Agent 外壳和 Agent trace 元信息。下一步优先把 trace 持久化到 SQLite，再考虑 LangGraph 迁移。
 
 核心目标：
 
@@ -125,6 +125,15 @@
 - 在 workflow step trace 中展示 fallback 来源。
 - 为 LLM Agent 失败原因保留可调试摘要。
 - 不把底层异常直接暴露给用户。
+
+## v0.10 Workflow Trace Persistence
+
+交付物：
+
+- 将 workflow step trace 保存到 SQLite。
+- 分析记录详情可以展示每一步执行模式。
+- 支持排查某次分析是否发生 LLM fallback。
+- 不记录敏感底层异常原文。
 
 ## v1.0 Portfolio Version
 

@@ -116,6 +116,9 @@ generate_report(...) -> str
 ## 4. 当前边界
 
 - Agent 外壳已经独立。
+- Agent 必须提供 `run_*_agent` 元信息入口。
+- Agent 必须记录执行模式：`mock`、`llm` 或 `fallback`。
+- Agent 必须声明自己的 guardrails。
 - 底层 mock 启发式暂时复用 `app/services/mock_pipeline.py` 中的函数。
 - workflow 不再直接调用 mock service 函数。
 - API 和 Streamlit 入口不变。
@@ -137,8 +140,10 @@ generate_report(...) -> str
 当前测试覆盖：
 
 - 每个 mock Agent 返回共享 Pydantic schema。
+- 每个 Agent 运行元信息包含 mode 和 guardrails。
 - ResumeParseAgent 拒绝空简历。
 - workflow 仍然按 6 个 Agent 步骤执行。
+- JDAnalysisAgent LLM 失败时记录 fallback。
 - `run_mock_pipeline` 外部契约不变。
 
 ## 7. 面试官可能追问
@@ -152,6 +157,6 @@ generate_report(...) -> str
 ## 8. 下一步
 
 - 把更多 mock 实现逐步从 `mock_pipeline.py` 搬到对应 Agent。
-- 给 Agent 增加错误和 fallback 元信息。
-- 让 workflow step trace 记录每个 Agent 的 fallback 来源。
+- 将 Agent trace 写入 SQLite，和分析记录关联。
+- 给 Agent trace 增加耗时统计。
 - 再考虑将 workflow 映射成 LangGraph。

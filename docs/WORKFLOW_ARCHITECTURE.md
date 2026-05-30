@@ -49,7 +49,10 @@ from app.workflows.job_analysis_workflow import run_job_analysis_workflow
 
 - `name`
 - `status`
+- `mode`
 - `summary`
+- `fallback_reason`
+- `guardrails`
 
 ### JobAnalysisWorkflowState
 
@@ -96,6 +99,8 @@ from app.workflows.job_analysis_workflow import run_job_analysis_workflow
 - workflow 能返回完整 `FinalReport`。
 - workflow 会记录 6 个步骤。
 - workflow 步骤通过 Agent 外壳执行。
+- workflow 步骤必须记录执行模式和 guardrails。
+- JDAnalysisAgent fallback 时必须记录 fallback 原因。
 - `run_mock_pipeline` 委托给 workflow 后外部契约不变。
 - 空输入仍然抛出清晰错误。
 
@@ -110,6 +115,7 @@ from app.workflows.job_analysis_workflow import run_job_analysis_workflow
 ## 8. 后续方向
 
 - 把 mock Agent 外壳从 service 进一步拆到 `app/agents/`。
-- 给每个步骤补充耗时、错误信息和 fallback 来源。
+- 给每个步骤补充耗时。
 - 增加 workflow run id，方便和分析记录关联。
+- 将 trace 写入 SQLite。
 - 在 LangGraph 版本中复用当前 state 字段和步骤名称。
