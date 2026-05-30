@@ -134,7 +134,7 @@ def render_analysis_tab(*, use_llm_jd: bool, save_result: bool) -> None:
 
         with tab_structured:
             st.subheader("执行轨迹")
-            st.json(workflow_steps)
+            render_workflow_trace(workflow_steps)
             st.subheader("简历解析")
             st.json(result.resume_profile.model_dump())
             st.subheader("JD 分析")
@@ -187,12 +187,42 @@ def render_history_tab() -> None:
         st.markdown(record["markdown_report"])
     with detail_trace:
         workflow_steps = record.get("workflow_steps") or []
-        if not workflow_steps:
-            st.info("这条历史记录没有保存 workflow trace，可能来自旧版本。")
-        else:
-            st.dataframe(workflow_steps, hide_index=True, use_container_width=True)
+        render_workflow_trace(workflow_steps)
     with detail_json:
         st.json(record)
+
+
+def render_workflow_trace(workflow_steps: list[dict]) -> None:
+    if not workflow_steps:
+        st.info("这条记录没有保存 workflow trace，可能来自旧版本。")
+        return
+
+    workflow_run_id = workflow_steps[0].get("workflow_run_id") or "未记录"
+    total_duration_ms = sum(float(step.get("duration_ms") or 0.0) for step in workflow_steps)
+    fallback_count = sum(1 for step in workflow_steps if step.get("mode") == "fallback")
+
+    col1, col2, col3 = st.columns(3)
+    col1.metric("步骤数", len(workflow_steps))
+    col2.metric("总耗时", f"{total_duration_ms:.1f} ms")
+    col3.metric("Fallback", fallback_count)
+    st.caption(f"Workflow Run ID：{workflow_run_id}")
+
+    rows = []
+    for index, step in enumerate(workflow_steps, start=1):
+        guardrails = step.get("guardrails") or []
+        rows.append(
+            {
+                "序号": index,
+                "Agent": step.get("name"),
+                "模式": step.get("mode"),
+                "状态": step.get("status"),
+                "耗时(ms)": round(float(step.get("duration_ms") or 0.0), 1),
+                "Fallback 原因": step.get("fallback_reason") or "",
+                "摘要": step.get("summary"),
+                "Guardrails": "；".join(guardrails),
+            }
+        )
+    st.dataframe(rows, hide_index=True, use_container_width=True)
 
 
 def render_jobs_tab() -> None:

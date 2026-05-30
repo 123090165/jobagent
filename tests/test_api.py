@@ -29,6 +29,8 @@ def test_full_analysis_endpoint_returns_report() -> None:
     assert "匹配度总览" in payload["markdown_report"]
     assert len(payload["workflow_steps"]) == 6
     assert payload["workflow_steps"][0]["mode"] == "mock"
+    assert payload["workflow_steps"][0]["workflow_run_id"]
+    assert payload["workflow_steps"][0]["duration_ms"] >= 0
 
 
 def test_full_analysis_endpoint_rejects_empty_resume() -> None:
@@ -102,6 +104,8 @@ def test_full_analysis_can_save_and_load_record(tmp_path, monkeypatch) -> None:
     assert record["markdown_report"] == payload["markdown_report"]
     assert len(record["workflow_steps"]) == 6
     assert record["workflow_steps"][0]["name"] == "ResumeParseAgent"
+    assert record["workflow_steps"][0]["workflow_run_id"] == payload["workflow_steps"][0]["workflow_run_id"]
+    assert record["workflow_steps"][0]["duration_ms"] >= 0
 
 
 def test_record_endpoint_returns_404_for_missing_record(tmp_path, monkeypatch) -> None:

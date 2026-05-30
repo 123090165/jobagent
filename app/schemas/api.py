@@ -14,10 +14,12 @@ class HealthResponse(BaseModel):
 
 
 class WorkflowStepTraceResponse(BaseModel):
+    workflow_run_id: str | None = None
     name: str
     status: str
     mode: str
     summary: str
+    duration_ms: float = 0.0
     fallback_reason: str | None = None
     guardrails: list[str] = Field(default_factory=list)
 

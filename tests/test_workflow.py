@@ -31,6 +31,9 @@ def test_job_analysis_workflow_records_step_trace() -> None:
     assert all(step.status == "completed" for step in result.state.steps)
     assert {step.mode for step in result.state.steps} == {"mock"}
     assert all(step.guardrails for step in result.state.steps)
+    assert result.state.workflow_run_id
+    assert all(step.workflow_run_id == result.state.workflow_run_id for step in result.state.steps)
+    assert all(step.duration_ms >= 0 for step in result.state.steps)
 
 
 def test_mock_pipeline_delegates_to_workflow_without_changing_contract() -> None:

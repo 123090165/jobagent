@@ -129,10 +129,12 @@ def list_workflow_steps(connection: sqlite3.Connection, *, record_id: int) -> li
     rows = connection.execute(
         """
         SELECT
+            workflow_run_id,
             agent_name,
             status,
             mode,
             summary,
+            duration_ms,
             fallback_reason,
             guardrails_json
         FROM workflow_step_traces
@@ -143,10 +145,12 @@ def list_workflow_steps(connection: sqlite3.Connection, *, record_id: int) -> li
     ).fetchall()
     return [
         {
+            "workflow_run_id": row["workflow_run_id"],
             "name": row["agent_name"],
             "status": row["status"],
             "mode": row["mode"],
             "summary": row["summary"],
+            "duration_ms": float(row["duration_ms"] or 0.0),
             "fallback_reason": row["fallback_reason"],
             "guardrails": json.loads(row["guardrails_json"]),
         }
@@ -678,23 +682,27 @@ def _insert_workflow_steps(
             """
             INSERT INTO workflow_step_traces (
                 analysis_record_id,
+                workflow_run_id,
                 step_index,
                 agent_name,
                 status,
                 mode,
                 summary,
+                duration_ms,
                 fallback_reason,
                 guardrails_json
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 record_id,
+                step.get("workflow_run_id"),
                 index,
                 step["name"],
                 step["status"],
                 step["mode"],
                 step["summary"],
+                float(step.get("duration_ms") or 0.0),
                 step.get("fallback_reason"),
                 json.dumps(step.get("guardrails") or [], ensure_ascii=False),
             ),

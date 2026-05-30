@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from time import perf_counter
 from typing import Literal
+from uuid import uuid4
 
 from pydantic import BaseModel, Field
 
@@ -21,15 +23,18 @@ WorkflowStepStatus = Literal["completed"]
 
 
 class WorkflowStepTrace(BaseModel):
+    workflow_run_id: str
     name: str
     status: WorkflowStepStatus
     mode: AgentExecutionMode
     summary: str
+    duration_ms: float = 0.0
     fallback_reason: str | None = None
     guardrails: list[str] = Field(default_factory=list)
 
 
 class JobAnalysisWorkflowState(BaseModel):
+    workflow_run_id: str = Field(default_factory=lambda: uuid4().hex)
     resume_text: str
     jd_text: str
     use_llm_jd: bool = False
@@ -69,14 +74,17 @@ def run_job_analysis_workflow(
         use_llm_jd=use_llm_jd,
     )
 
+    step_started_at = perf_counter()
     resume_result = run_resume_parse_agent(normalized_resume)
     state.resume_profile = resume_result.output
     _record_step(
         state,
         resume_result.metadata,
         f"识别技能 {len(state.resume_profile.skills)} 个，项目 {len(state.resume_profile.projects)} 个。",
+        duration_ms=_elapsed_ms(step_started_at),
     )
 
+    step_started_at = perf_counter()
     jd_result = run_jd_analysis_agent(
         normalized_jd,
         use_llm=use_llm_jd,
@@ -87,16 +95,20 @@ def run_job_analysis_workflow(
         state,
         jd_result.metadata,
         f"{_format_mode_summary(jd_result.metadata)} 必备技能 {len(state.job_analysis.required_skills)} 个。",
+        duration_ms=_elapsed_ms(step_started_at),
     )
 
+    step_started_at = perf_counter()
     match_result = run_match_agent(state.resume_profile, state.job_analysis)
     state.match_report = match_result.output
     _record_step(
         state,
         match_result.metadata,
         f"生成匹配报告，总分 {state.match_report.overall_score:.1f}。",
+        duration_ms=_elapsed_ms(step_started_at),
     )
 
+    step_started_at = perf_counter()
     optimization_result = run_resume_optimize_agent(
         normalized_resume,
         state.resume_profile,
@@ -108,8 +120,10 @@ def run_job_analysis_workflow(
         state,
         optimization_result.metadata,
         f"生成 {len(state.optimization_result.jd_targeted_bullets)} 条 JD 定向建议。",
+        duration_ms=_elapsed_ms(step_started_at),
     )
 
+    step_started_at = perf_counter()
     challenge_result = run_project_challenge_agent(
         state.resume_profile,
         state.job_analysis,
@@ -119,8 +133,10 @@ def run_job_analysis_workflow(
         state,
         challenge_result.metadata,
         "生成项目追问和面试官关注点。",
+        duration_ms=_elapsed_ms(step_started_at),
     )
 
+    step_started_at = perf_counter()
     report_result = run_report_agent(
         resume_profile=state.resume_profile,
         job_analysis=state.job_analysis,
@@ -133,6 +149,7 @@ def run_job_analysis_workflow(
         state,
         report_result.metadata,
         "聚合结构化结果并生成 Markdown 报告。",
+        duration_ms=_elapsed_ms(step_started_at),
     )
 
     final_report = FinalReport(
@@ -150,13 +167,17 @@ def _record_step(
     state: JobAnalysisWorkflowState,
     metadata: AgentRunMetadata,
     summary: str,
+    *,
+    duration_ms: float,
 ) -> None:
     state.steps.append(
         WorkflowStepTrace(
+            workflow_run_id=state.workflow_run_id,
             name=metadata.agent_name,
             status="completed",
             mode=metadata.mode,
             summary=summary,
+            duration_ms=duration_ms,
             fallback_reason=metadata.fallback_reason,
             guardrails=metadata.guardrails,
         )
@@ -169,3 +190,7 @@ def _format_mode_summary(metadata: AgentRunMetadata) -> str:
     if metadata.mode == "fallback":
         return f"LLM 分析失败，已回退 mock（{metadata.fallback_reason}）"
     return "使用 mock JD 规则分析"
+
+
+def _elapsed_ms(started_at: float) -> float:
+    return round((perf_counter() - started_at) * 1000, 3)

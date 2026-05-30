@@ -90,11 +90,13 @@ def init_database(connection: sqlite3.Connection) -> None:
         CREATE TABLE IF NOT EXISTS workflow_step_traces (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             analysis_record_id INTEGER NOT NULL,
+            workflow_run_id TEXT,
             step_index INTEGER NOT NULL,
             agent_name TEXT NOT NULL,
             status TEXT NOT NULL,
             mode TEXT NOT NULL,
             summary TEXT NOT NULL,
+            duration_ms REAL,
             fallback_reason TEXT,
             guardrails_json TEXT NOT NULL,
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -117,6 +119,8 @@ def init_database(connection: sqlite3.Connection) -> None:
         """
     )
     _ensure_column(connection, "application_records", "resume_version_id", "INTEGER")
+    _ensure_column(connection, "workflow_step_traces", "workflow_run_id", "TEXT")
+    _ensure_column(connection, "workflow_step_traces", "duration_ms", "REAL")
     connection.commit()
 
 

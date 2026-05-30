@@ -111,4 +111,6 @@ def test_save_analysis_record_with_workflow_steps(tmp_path: Path) -> None:
     assert len(steps) == 6
     assert steps[0]["name"] == "ResumeParseAgent"
     assert steps[0]["mode"] == "mock"
+    assert steps[0]["workflow_run_id"] == workflow_result.state.workflow_run_id
+    assert steps[0]["duration_ms"] >= 0
     assert steps[0]["guardrails"]
