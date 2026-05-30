@@ -26,6 +26,7 @@ JobAgent 是一个面向求职者的本地求职准备工作台，核心目标�
 - Pydantic schema：稳定 Agent、service、API、UI 之间的数据流。
 - Mock pipeline：不依赖真实 LLM 也能端到端运行。
 - Workflow 编排层：记录主链路步骤，为后续 LangGraph 迁移做准备。
+- Agent 边界：ResumeParse、JDAnalysis、Match、ResumeOptimize、ProjectChallenge、Report 都有独立入口。
 - 可选 LLM JDAnalysisAgent：调用失败或未配置 API key 时回退 mock。
 - SQLite 存储：保存分析记录、岗位 JD、匹配报告、项目追问和 tracker。
 - 简历版本管理：保存原始简历、定制后文本，并可关联目标岗位和投递记录。
@@ -230,6 +231,11 @@ app/
   main.py
   agents/
     jd_analysis_agent.py
+    match_agent.py
+    project_challenge_agent.py
+    report_agent.py
+    resume_optimize_agent.py
+    resume_parse_agent.py
   api/
     routes_analyze.py
     routes_applications.py
@@ -263,6 +269,7 @@ frontend/
   streamlit_app.py
 tests/
   test_api.py
+  test_agents.py
   test_application_tracker.py
   test_jd_analysis_agent.py
   test_mock_pipeline.py
@@ -279,6 +286,7 @@ docs/
 
 - [Development Review Guide](docs/DEVELOPMENT_REVIEW_GUIDE.md)
 - [Demo Guide](docs/DEMO_GUIDE.md)
+- [Agent Boundaries](docs/AGENT_BOUNDARIES.md)
 - [Git Workflow](docs/GIT_WORKFLOW.md)
 - [API](docs/API.md)
 - [SQLite Storage](docs/STORAGE.md)

@@ -157,6 +157,7 @@
 
 - 当前还没有直接上 LangGraph，是先稳定状态和步骤边界。
 - workflow state 记录中间结果，step trace 记录执行顺序和摘要。
+- workflow 调用 Agent 外壳，不直接调用底层 mock 函数。
 - 后续 LangGraph 可以按这些步骤迁移成 node。
 
 ## 4. 面试讲述版

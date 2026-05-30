@@ -37,7 +37,7 @@ Tools / Storage / LLM / RAG / MCP
 ```text
 app/
   api/          FastAPI routes，只处理请求和响应
-  agents/       Agent 节点、prompt 和 LLM 调用包装
+  agents/       Agent 节点、prompt、LLM 调用包装和 mock Agent 外壳
   schemas/      Pydantic 数据模型
   services/     业务编排和核心流程
   workflows/    显式工作流编排层，记录步骤和运行状态
@@ -104,6 +104,7 @@ START
 ```
 
 当前 `JobAnalysisWorkflowState` 会记录输入、中间结果、最终报告和 `WorkflowStepTrace`。
+workflow 调用 Agent 外壳，而不是直接调用底层 mock 函数。
 这样可以先稳定步骤边界，再把步骤映射成 LangGraph node。
 
 ## 6. Tools 层
@@ -185,5 +186,5 @@ START
 
 - 已抽出 `app/workflows/` 显式编排层。
 - 已将现有 service pipeline 拆成可观察步骤。
-- 补齐 mock Agent 外壳，保持 schema 不变。
+- 已补齐 mock Agent 外壳，保持 schema 不变。
 - 等边界稳定后再迁移到 LangGraph。

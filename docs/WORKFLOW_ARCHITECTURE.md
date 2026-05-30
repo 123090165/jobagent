@@ -39,6 +39,8 @@ from app.workflows.job_analysis_workflow import run_job_analysis_workflow
 
 这样 Streamlit、FastAPI 和旧测试不需要改调用方式。
 
+当前 workflow 调用 `app/agents/` 中的 Agent 外壳，而不是直接调用底层 mock 函数。
+
 ## 3. 核心对象
 
 ### WorkflowStepTrace
@@ -93,6 +95,7 @@ from app.workflows.job_analysis_workflow import run_job_analysis_workflow
 
 - workflow 能返回完整 `FinalReport`。
 - workflow 会记录 6 个步骤。
+- workflow 步骤通过 Agent 外壳执行。
 - `run_mock_pipeline` 委托给 workflow 后外部契约不变。
 - 空输入仍然抛出清晰错误。
 

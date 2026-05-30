@@ -4,7 +4,7 @@
 
 ## 当前优先级
 
-当前已经完成 Mock MVP、可选 LLM JDAnalysisAgent、FastAPI、SQLite、岗位库、tracker、简历版本管理和显式 workflow 编排层。下一步优先补齐 Agent 外壳，为 LangGraph 迁移做准备。
+当前已经完成 Mock MVP、可选 LLM JDAnalysisAgent、FastAPI、SQLite、岗位库、tracker、简历版本管理、显式 workflow 编排层和 mock Agent 外壳。下一步优先细化 Agent fallback 元信息，再考虑 LangGraph 迁移。
 
 核心目标：
 
@@ -116,6 +116,15 @@
 - 将 workflow 中的步骤调用逐步迁移到 agent 层。
 - 每个 Agent 只负责一个结构化输入输出。
 - 保持现有 service、API 和 Streamlit 调用方式不变。
+
+## v0.9 Agent Trace and Fallback Metadata
+
+交付物：
+
+- 记录每个 Agent 的执行模式：mock、LLM、fallback。
+- 在 workflow step trace 中展示 fallback 来源。
+- 为 LLM Agent 失败原因保留可调试摘要。
+- 不把底层异常直接暴露给用户。
 
 ## v1.0 Portfolio Version
 
