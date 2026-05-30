@@ -26,6 +26,7 @@ JobAgent 是一个面向求职者的本地求职准备工作台，核心目标�
 - Pydantic schema：稳定 Agent、service、API、UI 之间的数据流。
 - Mock pipeline：不依赖真实 LLM 也能端到端运行。
 - Workflow 编排层：记录主链路步骤、Agent 模式和 guardrails，为后续 LangGraph 迁移做准备。
+- LangGraph 迁移准备：用 `WorkflowGraphSpec` 固定 node、edge、state reads/writes 和迁移契约。
 - Agent 边界：ResumeParse、JDAnalysis、Match、ResumeOptimize、ProjectChallenge、Report 都有独立入口。
 - Agent Trace：每步记录 `mock`、`llm` 或 `fallback` 模式、fallback 原因、耗时和 guardrails。
 - 可选 LLM JDAnalysisAgent：调用失败或未配置 API key 时回退 mock。
@@ -200,8 +201,9 @@ $env:JOBAGENT_LLM_MODEL="gpt-4o-mini"
 | Phase 8 | 显式 Workflow 编排层，为 LangGraph 做准备 | 已完成 |
 | Phase 9 | Workflow trace 持久化，支持历史记录复盘每个 Agent 步骤 | 已完成 |
 | Phase 10 | Workflow observability cleanup，补 run id、耗时和 trace 摘要展示 | 已完成 |
-| Phase 11 | LangGraph 工作流、RAG 检索、MCP 工具封装 | 后续 |
-| Phase 12 | Docker、部署说明、答辩材料和截图 | 后续 |
+| Phase 11 | LangGraph migration prep，固定 node 映射和迁移契约 | 已完成 |
+| Phase 12 | LangGraph 原型、RAG 检索、MCP 工具封装 | 后续 |
+| Phase 13 | Docker、部署说明、答辩材料和截图 | 后续 |
 
 ## 面试讲述版
 
@@ -235,6 +237,7 @@ tracker 负责记录求职状态，但不碰招聘网站登录、验证码和自
 - SQLite 为什么适合作为当前阶段存储？
 - tracker 为什么依赖岗位库，而不是手动新建任意岗位？
 - 如何证明某次分析真的用了 LLM，或者发生了 fallback？
+- 为什么先做 `WorkflowGraphSpec`，而不是直接把主流程替换成 LangGraph？
 - 后续如果多用户化，需要改哪些表和接口？
 
 ## 目录结构
@@ -310,4 +313,5 @@ docs/
 - [Resume Versioning](docs/RESUME_VERSIONING.md)
 - [Workflow Architecture](docs/WORKFLOW_ARCHITECTURE.md)
 - [Workflow Trace Persistence](docs/WORKFLOW_TRACE_PERSISTENCE.md)
+- [LangGraph Migration Prep](docs/LANGGRAPH_MIGRATION_PREP.md)
 - [LLM Integration](docs/LLM_INTEGRATION.md)

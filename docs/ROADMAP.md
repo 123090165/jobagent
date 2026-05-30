@@ -157,6 +157,17 @@
 - 先做迁移文档和最小实验，不急于替换稳定主链路。
 - 继续保留 mock/fallback 路径。
 
+状态：已完成。
+
+## v0.13 LangGraph Prototype
+
+交付物：
+
+- 在不破坏 `run_job_analysis_workflow` 契约的前提下，做一个可选 LangGraph 原型入口。
+- 复用 `WorkflowGraphSpec` 的 node、edge 和 state 字段。
+- 保留 mock/fallback 路径。
+- 不把 LangGraph 原型接入默认 API 和 Streamlit，直到测试稳定。
+
 ## v1.0 Portfolio Version
 
 交付物：

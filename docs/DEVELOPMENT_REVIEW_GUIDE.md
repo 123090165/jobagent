@@ -276,6 +276,7 @@ JobAgent 不只是一个能跑的项目，它要帮你建立完整的开发思�
 - state 是否和 schema 对齐？
 - 是否保留了 mock 或 fallback 路径？
 - workflow 是否仍然不直接写数据库，而是由 storage 层持久化 trace？
+- 是否先用 `WorkflowGraphSpec` 固定 node、edge 和 state reads/writes，再考虑替换运行时框架？
 
 ## 9. 阶段 6：岗位数据库和 URL 添加
 
@@ -443,6 +444,7 @@ JobAgent 不只是一个能跑的项目，它要帮你建立完整的开发思�
 - 后续接 FastAPI、SQLite、LangGraph 是否自然？
 - 现在的设计哪里可能成为瓶颈？
 - 哪些地方应该先保持简单？
+- 新增 workflow step 时，是否同步更新 graph spec 和测试？
 
 ## 13. 每次开发后的复盘模板
 

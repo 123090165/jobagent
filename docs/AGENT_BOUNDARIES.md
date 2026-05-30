@@ -135,6 +135,8 @@ generate_report(...) -> str
 - workflow 更像编排层，而不是业务逻辑堆叠。
 - LangGraph node 可以直接映射到 Agent 调用。
 
+当前 `app/workflows/graph_spec.py` 已经把每个 Agent 映射为未来 LangGraph node，并记录 state reads/writes。它只作为迁移蓝图，不改变当前 Agent 调用方式。
+
 ## 6. 测试重点
 
 当前测试覆盖：
@@ -143,6 +145,7 @@ generate_report(...) -> str
 - 每个 Agent 运行元信息包含 mode 和 guardrails。
 - ResumeParseAgent 拒绝空简历。
 - workflow 仍然按 6 个 Agent 步骤执行。
+- graph spec 中的 Agent 顺序和真实 workflow step 顺序一致。
 - JDAnalysisAgent LLM 失败时记录 fallback。
 - `run_mock_pipeline` 外部契约不变。
 
@@ -153,10 +156,10 @@ generate_report(...) -> str
 - 为什么 ReportAgent 不重新分析业务？
 - ResumeOptimizeAgent 如何防止编造经历？
 - 后续迁移 LangGraph 时，每个 Agent 如何对应 node？
+- fallback 应该留在 Agent 内部，还是交给 LangGraph 条件边？
 
 ## 8. 下一步
 
 - 把更多 mock 实现逐步从 `mock_pipeline.py` 搬到对应 Agent。
-- 将 Agent trace 写入 SQLite，和分析记录关联。
-- 给 Agent trace 增加耗时统计。
-- 再考虑将 workflow 映射成 LangGraph。
+- 基于 `WorkflowGraphSpec` 做可选 LangGraph 原型入口。
+- 在原型稳定前，不替换默认 API 和 Streamlit 主链路。

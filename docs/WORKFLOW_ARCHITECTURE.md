@@ -22,6 +22,7 @@ ResumeParseAgent
 ```text
 app/workflows/
   __init__.py
+  graph_spec.py
   job_analysis_workflow.py
 ```
 
@@ -40,6 +41,14 @@ from app.workflows.job_analysis_workflow import run_job_analysis_workflow
 这样旧测试和兼容入口不需要改调用方式。FastAPI 和 Streamlit 的端到端分析入口已经直接调用 `run_job_analysis_workflow`，以便拿到 `workflow_steps` 并保存。
 
 当前 workflow 调用 `app/agents/` 中的 Agent 外壳，而不是直接调用底层 mock 函数。
+
+LangGraph 迁移准备层：
+
+```python
+from app.workflows.graph_spec import get_job_analysis_graph_spec
+```
+
+`graph_spec.py` 固定当前 6 个 node、edge、state reads/writes 和迁移契约，但不引入 LangGraph 依赖，也不替换当前主链路。
 
 ## 3. 核心对象
 
@@ -79,9 +88,18 @@ from app.workflows.job_analysis_workflow import run_job_analysis_workflow
 保存到 SQLite 时，每个 `WorkflowStepTrace` 会转换为 `workflow_step_traces` 表中的一行，并通过 `analysis_record_id` 关联到对应分析记录。
 `workflow_run_id` 用来标识一次 workflow 运行，`duration_ms` 用来记录单个 step 的耗时；workflow 只生成这些元信息，不直接写数据库。
 
+### WorkflowGraphSpec
+
+记录未来 LangGraph 迁移需要的静态结构：
+
+- `nodes`：每个 node 对应哪个 Agent、读取哪些 state 字段、写入哪些 state 字段。
+- `edges`：当前主链路线性顺序。
+- `contract_notes`：迁移期间必须保持的 API、Streamlit、storage 和 fallback 契约。
+
 ## 4. 当前边界
 
 - 不引入 LangGraph。
+- 不把 `graph_spec.py` 当作运行时框架，只把它当作迁移蓝图。
 - `/analyze/full` 会返回 `workflow_steps`。
 - Streamlit 会在生成报告和历史记录详情中展示 `workflow_steps`。
 - 不改变 mock pipeline 的外部契约。
@@ -111,6 +129,7 @@ from app.workflows.job_analysis_workflow import run_job_analysis_workflow
 - workflow 步骤必须记录执行模式和 guardrails。
 - JDAnalysisAgent fallback 时必须记录 fallback 原因。
 - workflow 步骤必须记录同一个 `workflow_run_id` 和非负 `duration_ms`。
+- graph spec 必须和真实 workflow step 顺序一致。
 - 保存分析记录时必须同步保存 workflow steps。
 - 历史记录详情必须能读取 workflow steps。
 - `run_mock_pipeline` 委托给 workflow 后外部契约不变。
@@ -125,6 +144,7 @@ from app.workflows.job_analysis_workflow import run_job_analysis_workflow
 - `workflow_run_id` 和 `analysis_record_id` 分别解决什么问题？
 - 为什么先做轻量耗时统计，而不是直接接完整 tracing 平台？
 - 后续每个步骤如何迁移成 LangGraph node？
+- `WorkflowGraphSpec` 和真正的 LangGraph `StateGraph` 有什么区别？
 - 某个 Agent 失败后应该在哪里处理 fallback？
 
 ## 8. 后续方向
