@@ -2,7 +2,7 @@
 
 JobAgent 是一个面向求职者的本地求职准备工作台，核心目标是把“简历和 JD 是否匹配、应该怎么改、面试会被怎么追问、投递进展到哪一步”变成可结构化记录和复盘的流程。
 
-当前版本已经从 Mock MVP 推进到可运行的本地工作台：支持 Streamlit Demo、FastAPI 后端、SQLite 分析记录、岗位库查询、可选 LLM JD 分析，以及投递 tracker 最小状态机。
+当前版本已经从 Mock MVP 推进到可运行的本地工作台：支持 Streamlit Demo、FastAPI 后端、SQLite 分析记录、岗位库查询、可选 LLM JD 分析、workflow 执行轨迹持久化，以及投递 tracker 最小状态机。
 
 ```text
 简历文本 + JD 文本
@@ -11,8 +11,8 @@ JobAgent 是一个面向求职者的本地求职准备工作台，核心目标�
   -> 匹配报告
   -> 简历优化建议
   -> 项目面试追问
-  -> Markdown 报告
-  -> 可选保存到 SQLite / 加入投递跟进
+  -> Markdown 报告 + 执行轨迹
+  -> 可选保存到 SQLite / 历史复盘 / 加入投递跟进
 ```
 
 ## 项目边界
@@ -21,17 +21,17 @@ JobAgent 是一个面向求职者的本地求职准备工作台，核心目标�
 
 已完成：
 
-- Streamlit 页面：生成报告、历史记录、岗位库、投递跟进。
+- Streamlit 页面：生成报告、历史记录、岗位库、简历版本、投递跟进和执行轨迹展示。
 - FastAPI 后端：分析、简历解析、JD 分析、匹配、报告、记录、岗位、投递 tracker API。
 - Pydantic schema：稳定 Agent、service、API、UI 之间的数据流。
 - Mock pipeline：不依赖真实 LLM 也能端到端运行。
-- Workflow 编排层：记录主链路步骤，为后续 LangGraph 迁移做准备。
+- Workflow 编排层：记录主链路步骤、Agent 模式和 guardrails，为后续 LangGraph 迁移做准备。
 - Agent 边界：ResumeParse、JDAnalysis、Match、ResumeOptimize、ProjectChallenge、Report 都有独立入口。
-- Agent Trace：每步记录 `mock`、`llm` 或 `fallback` 模式和 guardrails。
+- Agent Trace：每步记录 `mock`、`llm` 或 `fallback` 模式、fallback 原因和 guardrails。
 - 可选 LLM JDAnalysisAgent：调用失败或未配置 API key 时回退 mock。
-- SQLite 存储：保存分析记录、岗位 JD、匹配报告、项目追问和 tracker。
+- SQLite 存储：保存分析记录、岗位 JD、匹配报告、项目追问、workflow step trace、简历版本和 tracker。
 - 简历版本管理：保存原始简历、定制后文本，并可关联目标岗位和投递记录。
-- pytest 测试：覆盖 mock pipeline、API、存储、LLM fallback、投递 tracker。
+- pytest 测试：覆盖 mock pipeline、API、存储、LLM fallback、workflow trace 持久化、简历版本和投递 tracker。
 
 明确不做：
 
@@ -53,20 +53,25 @@ flowchart TD
     APIClient --> FastAPI["FastAPI Routes"]
     FastAPI --> Services
 
-    Services --> Resume["Resume Mock Parser"]
-    Services --> JD["JDAnalysisAgent<br/>Mock or optional LLM"]
-    Services --> Match["Match Report Service"]
-    Services --> Optimize["Resume Optimization Mock"]
-    Services --> Challenge["Project Challenge Mock"]
-    Services --> Report["Markdown Report Service"]
+    Services --> Workflow["Workflow Orchestration"]
+    Workflow --> Resume["ResumeParseAgent<br/>Mock"]
+    Workflow --> JD["JDAnalysisAgent<br/>Mock or optional LLM"]
+    Workflow --> Match["MatchAgent<br/>Mock"]
+    Workflow --> Optimize["ResumeOptimizeAgent<br/>Mock"]
+    Workflow --> Challenge["ProjectInterviewAgent<br/>Mock"]
+    Workflow --> Report["ReportAgent<br/>Mock"]
+    Workflow --> Trace["WorkflowStepTrace"]
     Services --> AppTracker["Application Tracker Service"]
 
     JD --> LLM["OpenAI-compatible LLM<br/>optional"]
     Services --> Schemas["Pydantic Schemas"]
     Services --> Storage["SQLite Repository"]
+    Trace --> Storage
 
     Storage --> Records["analysis_records"]
+    Storage --> StepTraces["workflow_step_traces"]
     Storage --> Jobs["job_postings"]
+    Storage --> ResumeVersions["resume_versions"]
     Storage --> Applications["application_records"]
 ```
 
@@ -101,8 +106,8 @@ pip install -r requirements.txt
 
 页面包含：
 
-- 生成报告：输入简历和 JD，输出 Markdown 报告。
-- 历史记录：查看已保存的分析结果。
+- 生成报告：输入简历和 JD，输出 Markdown 报告和执行轨迹。
+- 历史记录：查看已保存的分析结果和每次 workflow step trace。
 - 岗位库：查看保存过的 JD 和结构化分析。
 - 简历版本：保存针对不同岗位定制的简历版本。
 - 投递跟进：对岗位记录状态、备注、下一步行动和简历版本。
@@ -158,14 +163,15 @@ $env:JOBAGENT_LLM_MODEL="gpt-4o-mini"
 - FastAPI route 是否保持薄封装。
 - SQLite 存储是否使用临时库测试。
 - Application tracker 是否能创建、筛选和更新状态。
+- Workflow step trace 是否能随分析记录保存并在详情中读取。
 
 ## Demo 展示路径
 
 推荐演示顺序：
 
 1. 在“生成报告”页粘贴样例简历和 JD。
-2. 勾选“保存本次分析”，生成 Markdown 报告。
-3. 进入“历史记录”，展示同一次分析可以被检索和复盘。
+2. 勾选“保存本次分析”，生成 Markdown 报告，并展示每个 Agent 的执行轨迹。
+3. 进入“历史记录”，展示同一次分析可以被检索、查看报告和复盘 workflow trace。
 4. 进入“岗位库”，展示 JD 已被结构化保存，并保留原始 JD。
 5. 进入“简历版本”，保存一个针对目标岗位的定制版本。
 6. 进入“投递跟进”，把目标岗位标记为 `interested` 或 `applied`，并关联简历版本。
@@ -192,8 +198,9 @@ $env:JOBAGENT_LLM_MODEL="gpt-4o-mini"
 | Phase 6 | README、Demo、架构图、作品集展示材料 | 已完成 |
 | Phase 7 | 简历版本管理，关联岗位和 tracker | 已完成 |
 | Phase 8 | 显式 Workflow 编排层，为 LangGraph 做准备 | 已完成 |
-| Phase 9 | LangGraph 工作流、RAG 检索、MCP 工具封装 | 后续 |
-| Phase 10 | Docker、部署说明、答辩材料和截图 | 后续 |
+| Phase 9 | Workflow trace 持久化，支持历史记录复盘每个 Agent 步骤 | 已完成 |
+| Phase 10 | LangGraph 工作流、RAG 检索、MCP 工具封装 | 后续 |
+| Phase 11 | Docker、部署说明、答辩材料和截图 | 后续 |
 
 ## 面试讲述版
 
@@ -210,6 +217,8 @@ JobAgent 是一个求职准备工作台。我没有一开始做自动投递，�
 工程上我把 UI、API、service、agent、storage 分层。
 Streamlit 负责 Demo 展示，FastAPI 负责接口，SQLite 负责本地持久化，
 tracker 负责记录求职状态，但不碰招聘网站登录、验证码和自动投递。
+同时每次端到端分析都会保存 workflow step trace，可以回看每个 Agent 使用的是 mock、LLM 还是 fallback，
+这让系统不只是能生成结果，也能解释结果是怎么来的。
 
 这个项目的重点不是堆概念，而是展示一个 AI 应用从需求边界、结构化数据流、
 可替换 Agent、失败回退、存储复盘到测试验证的完整工程过程。
@@ -223,6 +232,7 @@ tracker 负责记录求职状态，但不碰招聘网站登录、验证码和自
 - API route 和 service 的边界是什么？
 - SQLite 为什么适合作为当前阶段存储？
 - tracker 为什么依赖岗位库，而不是手动新建任意岗位？
+- 如何证明某次分析真的用了 LLM，或者发生了 fallback？
 - 后续如果多用户化，需要改哪些表和接口？
 
 ## 目录结构
@@ -297,4 +307,5 @@ docs/
 - [Application Tracker](docs/APPLICATION_TRACKER.md)
 - [Resume Versioning](docs/RESUME_VERSIONING.md)
 - [Workflow Architecture](docs/WORKFLOW_ARCHITECTURE.md)
+- [Workflow Trace Persistence](docs/WORKFLOW_TRACE_PERSISTENCE.md)
 - [LLM Integration](docs/LLM_INTEGRATION.md)

@@ -8,6 +8,7 @@
 
 ```text
 简历 + JD -> 分析报告 -> SQLite
+workflow step trace -> 分析记录详情
 岗位 JD -> 岗位库
 原始简历 + 定制文本 -> 简历版本
 岗位 + 简历版本 -> 投递 tracker
@@ -44,6 +45,7 @@ $env:JOBAGENT_DB_PATH="data/dev.sqlite3"
 - `match_reports`：保存匹配报告和总分。
 - `project_challenges`：保存项目追问。
 - `analysis_records`：把一次完整分析串起来，并保存 Markdown 报告。
+- `workflow_step_traces`：保存一次分析中每个 Agent 步骤的执行模式、摘要、fallback 原因和 guardrails。
 - `resume_versions`：保存原始简历文本、定制后文本、目标岗位和来源分析记录。
 - `application_records`：保存岗位投递状态、下一步行动、备注和可选简历版本关联。
 
@@ -64,7 +66,17 @@ POST /analyze/full
 
 ```json
 {
-  "record_id": 1
+  "record_id": 1,
+  "workflow_steps": [
+    {
+      "name": "ResumeParseAgent",
+      "status": "completed",
+      "mode": "mock",
+      "summary": "识别技能 6 个，项目 1 个。",
+      "fallback_reason": null,
+      "guardrails": ["保留原始简历文本"]
+    }
+  ]
 }
 ```
 
@@ -73,6 +85,8 @@ POST /analyze/full
 ```text
 GET /records/1
 ```
+
+详情会返回完整分析结果和 `workflow_steps`。旧记录没有 trace 时，`workflow_steps` 为空列表。
 
 列出保存记录：
 
@@ -142,6 +156,8 @@ SQLite 这一阶段的重点不是表很多，而是：
 - 测试必须使用临时数据库，不能污染本地真实数据。
 - 数据库文件不能提交到 Git。
 - 完整分析记录、JD 库、简历版本和 tracker 要通过外键或显式 ID 关联。
+- workflow step trace 必须通过 `analysis_record_id` 关联到分析记录，不由 workflow 层直接写库。
+- trace 只保存错误类型或摘要，不保存底层异常原文。
 - 列表接口返回摘要，详情接口返回完整 JSON，避免列表过重。
 - 简历版本不能覆盖原始简历，定制版本必须单独保存。
 
@@ -153,5 +169,7 @@ SQLite 这一阶段的重点不是表很多，而是：
 - 如何保证测试不污染真实数据库？
 - 后续做多用户时需要改哪里？
 - 现在的 JD 去重为什么只做完全匹配？
+- 为什么 workflow trace 独立成表，而不是直接塞进 `analysis_records` 的 JSON 字段？
+- 如何通过 trace 判断某次分析是否发生了 LLM fallback？
 - 为什么需要独立的简历版本表，而不是只在 tracker 中写标签？
 - 简历版本和分析记录、岗位、投递记录之间如何关联？

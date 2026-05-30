@@ -7,7 +7,7 @@
 每个 Agent 执行后都必须产生元信息：
 
 ```text
-Agent output + AgentRunMetadata -> WorkflowStepTrace
+Agent output + AgentRunMetadata -> WorkflowStepTrace -> SQLite
 ```
 
 当前元信息包括：
@@ -22,6 +22,7 @@ Agent output + AgentRunMetadata -> WorkflowStepTrace
 ```text
 app/agents/types.py
 app/workflows/job_analysis_workflow.py
+app/storage/repositories.py
 ```
 
 核心类型：
@@ -117,6 +118,8 @@ WorkflowStepTrace
 - JDAnalysisAgent LLM 失败时返回 `fallback`。
 - workflow step trace 记录每一步的 `mode`。
 - workflow step trace 记录 JDAnalysisAgent 的 `fallback_reason`。
+- 保存分析记录时，workflow step trace 会写入 SQLite。
+- 读取历史记录详情时，会返回已保存的 workflow step trace。
 - fallback 后仍返回完整 `FinalReport`。
 
 ## 7. 面试官可能追问
@@ -126,10 +129,11 @@ WorkflowStepTrace
 - 为什么 fallback 只记录错误类型，不直接展示底层异常？
 - guardrails 是写在 prompt 里，还是代码层也有约束？
 - 后续 LangGraph 如何利用这些 trace 信息？
+- 为什么 trace 只保存错误类型，不保存底层异常原文？
 
 ## 8. 后续方向
 
 - 增加耗时统计。
 - 增加 workflow run id。
 - 区分 schema validation fallback 和 service failure fallback。
-- 将 trace 写入 SQLite，和分析记录关联。
+- 在 Streamlit 和 API 中增加更友好的 trace 过滤和摘要展示。

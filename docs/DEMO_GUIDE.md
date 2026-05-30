@@ -54,12 +54,14 @@
 - 保持 LLM 关闭，先展示 mock pipeline 的稳定闭环。
 - 勾选“保存本次分析”。
 - 点击生成报告。
+- 在结构化结果里查看 workflow 执行轨迹。
 
 讲解重点：
 
 - 第一版先追求结构化闭环，不追求模型效果。
 - mock 输出也走同一套 Pydantic schema，后续替换 LLM 不影响下游。
 - 报告来自结构化对象，而不是直接在页面里拼一段文本。
+- 执行轨迹会显示每个 Agent 的 `mock`、`llm` 或 `fallback` 模式。
 
 ### Step 2：查看历史记录
 
@@ -67,11 +69,12 @@
 
 - 切到“历史记录”页面。
 - 查看刚保存的分析记录。
-- 展开 Markdown 报告和结构化详情。
+- 展开 Markdown 报告、执行轨迹和结构化详情。
 
 讲解重点：
 
 - 保存原始文本和结构化结果，方便复盘。
+- 保存 workflow step trace，方便解释某次分析是否使用了 LLM 或发生 fallback。
 - 列表页只展示摘要，详情页再展示完整内容。
 - 测试使用临时数据库，不污染真实本地数据。
 
@@ -89,7 +92,7 @@
 - 当前去重规则是 `raw_jd` 完全一致则复用岗位记录。
 - 语义去重、标签和 URL 提取属于后续阶段。
 
-### Step 4：创建投递跟进
+### Step 4：创建简历版本
 
 操作：
 
@@ -159,6 +162,7 @@
 - workflow state 记录中间结果，step trace 记录执行顺序和摘要。
 - workflow 调用 Agent 外壳，不直接调用底层 mock 函数。
 - step trace 会记录 `mock`、`llm` 或 `fallback`，便于说明 LLM 是否真的参与。
+- 保存分析记录时，step trace 会写入 SQLite，并在历史记录详情中展示。
 - 后续 LangGraph 可以按这些步骤迁移成 node。
 
 ## 4. 面试讲述版
@@ -222,5 +226,6 @@
 - tracker 能关联已保存的简历版本。
 - Workflow 层能记录 6 个主流程步骤。
 - Agent trace 能记录执行模式、fallback 原因和 guardrails。
+- Workflow trace 能随分析记录持久化，并通过 API/Streamlit 读取。
 - `pytest` 通过。
 - 不新增自动投递、招聘网站登录、验证码处理、复杂爬虫或多用户权限能力。

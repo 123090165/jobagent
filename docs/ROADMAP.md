@@ -4,7 +4,7 @@
 
 ## 当前优先级
 
-当前已经完成 Mock MVP、可选 LLM JDAnalysisAgent、FastAPI、SQLite、岗位库、tracker、简历版本管理、显式 workflow 编排层、mock Agent 外壳和 Agent trace 元信息。下一步优先把 trace 持久化到 SQLite，再考虑 LangGraph 迁移。
+当前已经完成 Mock MVP、可选 LLM JDAnalysisAgent、FastAPI、SQLite、岗位库、tracker、简历版本管理、显式 workflow 编排层、mock Agent 外壳、Agent trace 元信息和 workflow trace 持久化。下一步优先继续加强架构可观察性和后续 LangGraph 迁移准备，而不是扩展自动投递或复杂爬虫。
 
 核心目标：
 
@@ -134,6 +134,17 @@
 - 分析记录详情可以展示每一步执行模式。
 - 支持排查某次分析是否发生 LLM fallback。
 - 不记录敏感底层异常原文。
+
+状态：已完成。
+
+## v0.11 Workflow Observability Cleanup
+
+交付物：
+
+- 为 workflow step trace 增加更清晰的摘要展示。
+- 梳理 API、Streamlit、storage 对 trace 字段的边界。
+- 为后续耗时统计、workflow run id 和 LangGraph 节点迁移预留字段设计。
+- 保持 workflow 不直接写数据库、UI 不直接写 SQL。
 
 ## v1.0 Portfolio Version
 

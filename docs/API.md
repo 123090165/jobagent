@@ -58,7 +58,26 @@ http://127.0.0.1:8000/docs
 - `optimization_result`
 - `project_challenge_report`
 - `markdown_report`
+- `workflow_steps`：本次 workflow 的步骤轨迹，每步包含 `name`、`status`、`mode`、`summary`、`fallback_reason` 和 `guardrails`
 - `record_id`：当 `save_result` 为 `true` 时返回保存记录 ID，否则为 `null`
+
+示例：
+
+```json
+{
+  "record_id": 1,
+  "workflow_steps": [
+    {
+      "name": "JDAnalysisAgent",
+      "status": "completed",
+      "mode": "fallback",
+      "summary": "识别岗位 Python 后端开发，必备技能 4 个。",
+      "fallback_reason": "llm_service_error",
+      "guardrails": ["不编造 JD 中不存在的信息"]
+    }
+  ]
+}
+```
 
 ### GET /records/{record_id}
 
@@ -74,6 +93,7 @@ http://127.0.0.1:8000/docs
 - `optimization_result`
 - `project_challenge_report`
 - `markdown_report`
+- `workflow_steps`：保存分析时写入的 workflow step trace；旧记录可能为空列表。
 
 ### GET /records
 
@@ -280,6 +300,8 @@ http://127.0.0.1:8000/docs
 ## 3. 当前边界
 
 - API 层不写复杂业务逻辑。
+- `/analyze/full` 必须走 `run_job_analysis_workflow`，由 workflow 产生 `workflow_steps`。
+- 保存分析记录时，API 只把 `workflow_steps` 交给 storage service，不直接写 SQL。
 - 当前提供本地 SQLite 保存能力，不做用户系统。
 - `GET /jobs` 只查询已保存 JD，不抓取外部网站。
 - `/applications` 只做本地 tracker，不执行自动投递。
@@ -294,6 +316,7 @@ http://127.0.0.1:8000/docs
 
 - 保持 API route 很薄。
 - 保持 schema 和 service 可复用。
+- 保持 workflow trace 可观察，但不把底层异常原文暴露给用户。
 - 错误输入要返回清晰 HTTP 状态码。
 - 未来前端、测试、自动化流程都能复用 API。
 
@@ -303,4 +326,5 @@ http://127.0.0.1:8000/docs
 - API route 和 service 的边界是什么？
 - 为什么 `/analyze/full` 和拆步骤接口都需要？
 - 如果 LLM 调用失败，API 怎么处理？
+- `workflow_steps` 为什么放在完整分析响应和历史记录详情里，而不是列表接口里？
 - 后续接数据库时，哪些接口需要变化？

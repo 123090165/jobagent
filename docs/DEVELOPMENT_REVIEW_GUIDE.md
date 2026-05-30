@@ -10,6 +10,7 @@ JobAgent 不只是一个能跑的项目，它要帮你建立完整的开发思�
 - 先跑通最小闭环，再逐步引入复杂技术。
 - 用 schema 稳定数据流，而不是随手传 dict。
 - 用 service、agent、tool、storage 分层管理复杂度。
+- 用 workflow trace 记录每个 Agent 的执行模式和 fallback 状态，让结果可解释、可复盘。
 - 用测试和复盘保证项目可解释、可维护、可答辩。
 - 面对面试追问时，能讲清楚取舍、难点、风险和改进方向。
 
@@ -231,6 +232,7 @@ JobAgent 不只是一个能跑的项目，它要帮你建立完整的开发思�
 
 - 是否保存原始 JD 和结构化结果？
 - 是否保存原始简历和优化建议？
+- 是否保存 workflow step trace，并能在历史记录详情中读取？
 - 数据访问是否集中在 `app/storage/`？
 - 是否避免在 service 中直接散写 SQL？
 
@@ -257,6 +259,7 @@ JobAgent 不只是一个能跑的项目，它要帮你建立完整的开发思�
 - conditional routing。
 - workflow orchestration。
 - observability。
+- trace persistence。
 
 ### 面试官可能追问
 
@@ -272,6 +275,7 @@ JobAgent 不只是一个能跑的项目，它要帮你建立完整的开发思�
 - 每个 node 是否只做一件事？
 - state 是否和 schema 对齐？
 - 是否保留了 mock 或 fallback 路径？
+- workflow 是否仍然不直接写数据库，而是由 storage 层持久化 trace？
 
 ## 9. 阶段 6：岗位数据库和 URL 添加
 
@@ -423,6 +427,7 @@ JobAgent 不只是一个能跑的项目，它要帮你建立完整的开发思�
 - 有哪些最小测试？
 - Agent trace 是否记录了 `mock`、`llm` 或 `fallback`？
 - fallback 是否记录了原因类型，同时避免把底层异常原文暴露给用户？
+- 历史记录详情是否能复盘 workflow trace，而不是只看到最终报告？
 
 ### 真实性和伦理
 

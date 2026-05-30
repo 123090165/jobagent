@@ -15,7 +15,7 @@ ResumeParseAgent
 -> ReportAgent
 ```
 
-每一步都写入 `WorkflowStepTrace`，并聚合到 `JobAnalysisWorkflowState`。
+每一步都写入 `WorkflowStepTrace`，并聚合到 `JobAnalysisWorkflowState`。当分析结果被保存时，trace 会通过 storage service 写入 SQLite，供历史记录详情复盘。
 
 ## 2. 代码位置
 
@@ -37,7 +37,7 @@ from app.services.mock_pipeline import run_mock_pipeline
 from app.workflows.job_analysis_workflow import run_job_analysis_workflow
 ```
 
-这样 Streamlit、FastAPI 和旧测试不需要改调用方式。
+这样旧测试和兼容入口不需要改调用方式。FastAPI 和 Streamlit 的端到端分析入口已经直接调用 `run_job_analysis_workflow`，以便拿到 `workflow_steps` 并保存。
 
 当前 workflow 调用 `app/agents/` 中的 Agent 外壳，而不是直接调用底层 mock 函数。
 
@@ -71,11 +71,15 @@ from app.workflows.job_analysis_workflow import run_job_analysis_workflow
 - `final_report`
 - `state`
 
+### workflow_step_traces
+
+保存到 SQLite 时，每个 `WorkflowStepTrace` 会转换为 `workflow_step_traces` 表中的一行，并通过 `analysis_record_id` 关联到对应分析记录。
+
 ## 4. 当前边界
 
 - 不引入 LangGraph。
-- 不改变 API 响应结构。
-- 不改变 Streamlit 调用入口。
+- `/analyze/full` 会返回 `workflow_steps`。
+- Streamlit 会在生成报告和历史记录详情中展示 `workflow_steps`。
 - 不改变 mock pipeline 的外部契约。
 - 不在 workflow 里直接写数据库。
 - 不在 workflow 里做 UI 展示逻辑。
@@ -101,6 +105,8 @@ from app.workflows.job_analysis_workflow import run_job_analysis_workflow
 - workflow 步骤通过 Agent 外壳执行。
 - workflow 步骤必须记录执行模式和 guardrails。
 - JDAnalysisAgent fallback 时必须记录 fallback 原因。
+- 保存分析记录时必须同步保存 workflow steps。
+- 历史记录详情必须能读取 workflow steps。
 - `run_mock_pipeline` 委托给 workflow 后外部契约不变。
 - 空输入仍然抛出清晰错误。
 
@@ -109,6 +115,7 @@ from app.workflows.job_analysis_workflow import run_job_analysis_workflow
 - 为什么不直接上 LangGraph？
 - workflow state 里应该放什么，不应该放什么？
 - 现在的 workflow 和 service 层边界是什么？
+- workflow trace 为什么由 storage 层持久化，而不是 workflow 自己写数据库？
 - 后续每个步骤如何迁移成 LangGraph node？
 - 某个 Agent 失败后应该在哪里处理 fallback？
 
@@ -117,5 +124,5 @@ from app.workflows.job_analysis_workflow import run_job_analysis_workflow
 - 把 mock Agent 外壳从 service 进一步拆到 `app/agents/`。
 - 给每个步骤补充耗时。
 - 增加 workflow run id，方便和分析记录关联。
-- 将 trace 写入 SQLite。
+- 增加更友好的 trace 查询、过滤和摘要展示。
 - 在 LangGraph 版本中复用当前 state 字段和步骤名称。
