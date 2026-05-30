@@ -27,9 +27,9 @@ JobAgent 是一个面向求职者的本地求职准备工作台，核心目标�
 - Mock pipeline：不依赖真实 LLM 也能端到端运行。
 - Workflow 编排层：记录主链路步骤、Agent 模式和 guardrails，为后续 LangGraph 迁移做准备。
 - Agent 边界：ResumeParse、JDAnalysis、Match、ResumeOptimize、ProjectChallenge、Report 都有独立入口。
-- Agent Trace：每步记录 `mock`、`llm` 或 `fallback` 模式、fallback 原因和 guardrails。
+- Agent Trace：每步记录 `mock`、`llm` 或 `fallback` 模式、fallback 原因、耗时和 guardrails。
 - 可选 LLM JDAnalysisAgent：调用失败或未配置 API key 时回退 mock。
-- SQLite 存储：保存分析记录、岗位 JD、匹配报告、项目追问、workflow step trace、简历版本和 tracker。
+- SQLite 存储：保存分析记录、岗位 JD、匹配报告、项目追问、带 run id/耗时的 workflow step trace、简历版本和 tracker。
 - 简历版本管理：保存原始简历、定制后文本，并可关联目标岗位和投递记录。
 - pytest 测试：覆盖 mock pipeline、API、存储、LLM fallback、workflow trace 持久化、简历版本和投递 tracker。
 
@@ -199,8 +199,9 @@ $env:JOBAGENT_LLM_MODEL="gpt-4o-mini"
 | Phase 7 | 简历版本管理，关联岗位和 tracker | 已完成 |
 | Phase 8 | 显式 Workflow 编排层，为 LangGraph 做准备 | 已完成 |
 | Phase 9 | Workflow trace 持久化，支持历史记录复盘每个 Agent 步骤 | 已完成 |
-| Phase 10 | LangGraph 工作流、RAG 检索、MCP 工具封装 | 后续 |
-| Phase 11 | Docker、部署说明、答辩材料和截图 | 后续 |
+| Phase 10 | Workflow observability cleanup，补 run id、耗时和 trace 摘要展示 | 已完成 |
+| Phase 11 | LangGraph 工作流、RAG 检索、MCP 工具封装 | 后续 |
+| Phase 12 | Docker、部署说明、答辩材料和截图 | 后续 |
 
 ## 面试讲述版
 
@@ -218,6 +219,7 @@ JobAgent 是一个求职准备工作台。我没有一开始做自动投递，�
 Streamlit 负责 Demo 展示，FastAPI 负责接口，SQLite 负责本地持久化，
 tracker 负责记录求职状态，但不碰招聘网站登录、验证码和自动投递。
 同时每次端到端分析都会保存 workflow step trace，可以回看每个 Agent 使用的是 mock、LLM 还是 fallback，
+也能看到同一次 workflow run 的 ID 和每个步骤耗时，
 这让系统不只是能生成结果，也能解释结果是怎么来的。
 
 这个项目的重点不是堆概念，而是展示一个 AI 应用从需求边界、结构化数据流、

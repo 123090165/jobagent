@@ -426,6 +426,7 @@ JobAgent 不只是一个能跑的项目，它要帮你建立完整的开发思�
 - LLM 输出不稳定怎么办？
 - 有哪些最小测试？
 - Agent trace 是否记录了 `mock`、`llm` 或 `fallback`？
+- Workflow trace 是否记录了 `workflow_run_id` 和每步 `duration_ms`？
 - fallback 是否记录了原因类型，同时避免把底层异常原文暴露给用户？
 - 历史记录详情是否能复盘 workflow trace，而不是只看到最终报告？
 

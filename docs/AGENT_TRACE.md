@@ -12,8 +12,10 @@ Agent output + AgentRunMetadata -> WorkflowStepTrace -> SQLite
 
 当前元信息包括：
 
+- `workflow_run_id`：一次 workflow 执行的唯一标识。
 - `agent_name`：Agent 名称。
 - `mode`：执行模式，只允许 `mock`、`llm`、`fallback`。
+- `duration_ms`：该 Agent 步骤耗时。
 - `fallback_reason`：发生 fallback 时记录原因类型。
 - `guardrails`：该 Agent 必须遵守的约束。
 
@@ -40,6 +42,7 @@ WorkflowStepTrace
 - 必须返回共享 Pydantic schema。
 - 必须提供 `run_*_agent` 形式的元信息入口。
 - 必须记录 `mode`。
+- 必须保留 workflow 生成的 `workflow_run_id` 和 `duration_ms`。
 - 如果发生 fallback，必须记录 `fallback_reason`。
 - 必须写明该 Agent 的 `guardrails`。
 - 不允许把底层异常原文直接暴露给用户。
@@ -118,6 +121,7 @@ WorkflowStepTrace
 - JDAnalysisAgent LLM 失败时返回 `fallback`。
 - workflow step trace 记录每一步的 `mode`。
 - workflow step trace 记录 JDAnalysisAgent 的 `fallback_reason`。
+- workflow step trace 记录同一次运行的 `workflow_run_id` 和每步 `duration_ms`。
 - 保存分析记录时，workflow step trace 会写入 SQLite。
 - 读取历史记录详情时，会返回已保存的 workflow step trace。
 - fallback 后仍返回完整 `FinalReport`。
@@ -125,6 +129,7 @@ WorkflowStepTrace
 ## 7. 面试官可能追问
 
 - 你如何证明某一步用了 LLM 还是 mock？
+- 你如何定位某一步耗时异常？
 - LLM 失败时系统怎么恢复？
 - 为什么 fallback 只记录错误类型，不直接展示底层异常？
 - guardrails 是写在 prompt 里，还是代码层也有约束？
@@ -133,7 +138,5 @@ WorkflowStepTrace
 
 ## 8. 后续方向
 
-- 增加耗时统计。
-- 增加 workflow run id。
 - 区分 schema validation fallback 和 service failure fallback。
 - 在 Streamlit 和 API 中增加更友好的 trace 过滤和摘要展示。

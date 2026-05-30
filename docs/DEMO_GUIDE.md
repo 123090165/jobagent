@@ -62,6 +62,7 @@
 - mock 输出也走同一套 Pydantic schema，后续替换 LLM 不影响下游。
 - 报告来自结构化对象，而不是直接在页面里拼一段文本。
 - 执行轨迹会显示每个 Agent 的 `mock`、`llm` 或 `fallback` 模式。
+- 执行轨迹还会显示本次 `workflow_run_id`、总耗时和 fallback 数。
 
 ### Step 2：查看历史记录
 
@@ -75,6 +76,7 @@
 
 - 保存原始文本和结构化结果，方便复盘。
 - 保存 workflow step trace，方便解释某次分析是否使用了 LLM 或发生 fallback。
+- step 耗时可以帮助说明当前只是轻量 observability，后续迁移 LangGraph 时可继续复用这些字段。
 - 列表页只展示摘要，详情页再展示完整内容。
 - 测试使用临时数据库，不污染真实本地数据。
 
@@ -163,6 +165,7 @@
 - workflow 调用 Agent 外壳，不直接调用底层 mock 函数。
 - step trace 会记录 `mock`、`llm` 或 `fallback`，便于说明 LLM 是否真的参与。
 - 保存分析记录时，step trace 会写入 SQLite，并在历史记录详情中展示。
+- `workflow_run_id` 标识一次执行，`analysis_record_id` 标识保存后的历史记录。
 - 后续 LangGraph 可以按这些步骤迁移成 node。
 
 ## 4. 面试讲述版
@@ -227,5 +230,6 @@
 - Workflow 层能记录 6 个主流程步骤。
 - Agent trace 能记录执行模式、fallback 原因和 guardrails。
 - Workflow trace 能随分析记录持久化，并通过 API/Streamlit 读取。
+- Workflow trace 能展示 run id、步骤耗时和 fallback 摘要。
 - `pytest` 通过。
 - 不新增自动投递、招聘网站登录、验证码处理、复杂爬虫或多用户权限能力。

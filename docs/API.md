@@ -58,7 +58,7 @@ http://127.0.0.1:8000/docs
 - `optimization_result`
 - `project_challenge_report`
 - `markdown_report`
-- `workflow_steps`：本次 workflow 的步骤轨迹，每步包含 `name`、`status`、`mode`、`summary`、`fallback_reason` 和 `guardrails`
+- `workflow_steps`：本次 workflow 的步骤轨迹，每步包含 `workflow_run_id`、`name`、`status`、`mode`、`summary`、`duration_ms`、`fallback_reason` 和 `guardrails`
 - `record_id`：当 `save_result` 为 `true` 时返回保存记录 ID，否则为 `null`
 
 示例：
@@ -68,10 +68,12 @@ http://127.0.0.1:8000/docs
   "record_id": 1,
   "workflow_steps": [
     {
+      "workflow_run_id": "f4d8a2d0c7f24d5a9c4d3f6c4b2a1e90",
       "name": "JDAnalysisAgent",
       "status": "completed",
       "mode": "fallback",
       "summary": "识别岗位 Python 后端开发，必备技能 4 个。",
+      "duration_ms": 52.8,
       "fallback_reason": "llm_service_error",
       "guardrails": ["不编造 JD 中不存在的信息"]
     }
@@ -302,6 +304,7 @@ http://127.0.0.1:8000/docs
 - API 层不写复杂业务逻辑。
 - `/analyze/full` 必须走 `run_job_analysis_workflow`，由 workflow 产生 `workflow_steps`。
 - 保存分析记录时，API 只把 `workflow_steps` 交给 storage service，不直接写 SQL。
+- API 只返回 workflow 已生成的 `workflow_run_id` 和 `duration_ms`，不在 route 层自行计时。
 - 当前提供本地 SQLite 保存能力，不做用户系统。
 - `GET /jobs` 只查询已保存 JD，不抓取外部网站。
 - `/applications` 只做本地 tracker，不执行自动投递。
@@ -317,6 +320,7 @@ http://127.0.0.1:8000/docs
 - 保持 API route 很薄。
 - 保持 schema 和 service 可复用。
 - 保持 workflow trace 可观察，但不把底层异常原文暴露给用户。
+- `workflow_steps` 可用于详情复盘，不放入 `/records` 摘要列表，避免列表响应过重。
 - 错误输入要返回清晰 HTTP 状态码。
 - 未来前端、测试、自动化流程都能复用 API。
 

@@ -143,8 +143,19 @@
 
 - 为 workflow step trace 增加更清晰的摘要展示。
 - 梳理 API、Streamlit、storage 对 trace 字段的边界。
-- 为后续耗时统计、workflow run id 和 LangGraph 节点迁移预留字段设计。
+- 增加 `workflow_run_id`、`duration_ms` 和 Streamlit trace 摘要展示。
 - 保持 workflow 不直接写数据库、UI 不直接写 SQL。
+
+状态：已完成。
+
+## v0.12 LangGraph Migration Prep
+
+交付物：
+
+- 对照现有 `WorkflowStepTrace` 和 `JobAnalysisWorkflowState`，设计 LangGraph node 映射表。
+- 保持现有 API、Streamlit 和 storage 契约不变。
+- 先做迁移文档和最小实验，不急于替换稳定主链路。
+- 继续保留 mock/fallback 路径。
 
 ## v1.0 Portfolio Version
 

@@ -47,10 +47,12 @@ from app.workflows.job_analysis_workflow import run_job_analysis_workflow
 
 记录一次步骤执行：
 
+- `workflow_run_id`
 - `name`
 - `status`
 - `mode`
 - `summary`
+- `duration_ms`
 - `fallback_reason`
 - `guardrails`
 
@@ -58,6 +60,7 @@ from app.workflows.job_analysis_workflow import run_job_analysis_workflow
 
 保存工作流运行状态：
 
+- `workflow_run_id`
 - 原始输入：`resume_text`、`jd_text`
 - 配置：`use_llm_jd`
 - 中间结果：`resume_profile`、`job_analysis`、`match_report`
@@ -74,6 +77,7 @@ from app.workflows.job_analysis_workflow import run_job_analysis_workflow
 ### workflow_step_traces
 
 保存到 SQLite 时，每个 `WorkflowStepTrace` 会转换为 `workflow_step_traces` 表中的一行，并通过 `analysis_record_id` 关联到对应分析记录。
+`workflow_run_id` 用来标识一次 workflow 运行，`duration_ms` 用来记录单个 step 的耗时；workflow 只生成这些元信息，不直接写数据库。
 
 ## 4. 当前边界
 
@@ -83,6 +87,7 @@ from app.workflows.job_analysis_workflow import run_job_analysis_workflow
 - 不改变 mock pipeline 的外部契约。
 - 不在 workflow 里直接写数据库。
 - 不在 workflow 里做 UI 展示逻辑。
+- 不把耗时统计写到 API route 或 Streamlit 页面里。
 
 ## 5. 为什么先做这一层
 
@@ -105,6 +110,7 @@ from app.workflows.job_analysis_workflow import run_job_analysis_workflow
 - workflow 步骤通过 Agent 外壳执行。
 - workflow 步骤必须记录执行模式和 guardrails。
 - JDAnalysisAgent fallback 时必须记录 fallback 原因。
+- workflow 步骤必须记录同一个 `workflow_run_id` 和非负 `duration_ms`。
 - 保存分析记录时必须同步保存 workflow steps。
 - 历史记录详情必须能读取 workflow steps。
 - `run_mock_pipeline` 委托给 workflow 后外部契约不变。
@@ -116,13 +122,14 @@ from app.workflows.job_analysis_workflow import run_job_analysis_workflow
 - workflow state 里应该放什么，不应该放什么？
 - 现在的 workflow 和 service 层边界是什么？
 - workflow trace 为什么由 storage 层持久化，而不是 workflow 自己写数据库？
+- `workflow_run_id` 和 `analysis_record_id` 分别解决什么问题？
+- 为什么先做轻量耗时统计，而不是直接接完整 tracing 平台？
 - 后续每个步骤如何迁移成 LangGraph node？
 - 某个 Agent 失败后应该在哪里处理 fallback？
 
 ## 8. 后续方向
 
 - 把 mock Agent 外壳从 service 进一步拆到 `app/agents/`。
-- 给每个步骤补充耗时。
-- 增加 workflow run id，方便和分析记录关联。
 - 增加更友好的 trace 查询、过滤和摘要展示。
+- 在 LangGraph 版本中把当前 step 字段映射成 node 执行元信息。
 - 在 LangGraph 版本中复用当前 state 字段和步骤名称。
