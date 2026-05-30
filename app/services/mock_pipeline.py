@@ -12,7 +12,6 @@ from app.schemas.match import (
 )
 from app.schemas.report import FinalReport
 from app.schemas.resume import EducationItem, ProjectExperience, ResumeProfile, WorkExperience
-from app.services.report_service import generate_markdown_report
 
 
 KNOWN_SKILLS = [
@@ -390,43 +389,11 @@ def mock_project_challenge(
 
 
 def run_mock_pipeline(resume_text: str, jd_text: str, *, use_llm_jd: bool = False) -> FinalReport:
-    """Run the full v0.1 mock analysis flow."""
-    normalized_resume = resume_text.strip()
-    normalized_jd = jd_text.strip()
+    """Run the current analysis flow through the explicit workflow layer."""
+    from app.workflows.job_analysis_workflow import run_job_analysis_workflow
 
-    if not normalized_resume:
-        raise ValueError("resume_text cannot be empty")
-    if not normalized_jd:
-        raise ValueError("jd_text cannot be empty")
-
-    resume_profile = mock_resume_parse(normalized_resume)
-    if use_llm_jd:
-        from app.agents.jd_analysis_agent import analyze_jd
-
-        job_analysis = analyze_jd(normalized_jd, use_llm=True)
-    else:
-        job_analysis = mock_jd_analysis(normalized_jd)
-    match_report = mock_match_analysis(resume_profile, job_analysis)
-    optimization_result = mock_resume_optimization(
-        normalized_resume,
-        resume_profile,
-        job_analysis,
-        match_report,
-    )
-    project_challenge_report = mock_project_challenge(resume_profile, job_analysis)
-    markdown_report = generate_markdown_report(
-        resume_profile=resume_profile,
-        job_analysis=job_analysis,
-        match_report=match_report,
-        optimization_result=optimization_result,
-        project_challenge_report=project_challenge_report,
-    )
-
-    return FinalReport(
-        resume_profile=resume_profile,
-        job_analysis=job_analysis,
-        match_report=match_report,
-        optimization_result=optimization_result,
-        project_challenge_report=project_challenge_report,
-        markdown_report=markdown_report,
-    )
+    return run_job_analysis_workflow(
+        resume_text=resume_text,
+        jd_text=jd_text,
+        use_llm_jd=use_llm_jd,
+    ).final_report
