@@ -5,18 +5,15 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from app.agents.jd_analysis_agent import analyze_jd
+from app.agents.match_agent import analyze_match
+from app.agents.project_challenge_agent import generate_project_challenges
+from app.agents.report_agent import generate_report
+from app.agents.resume_optimize_agent import optimize_resume
+from app.agents.resume_parse_agent import parse_resume
 from app.schemas.job import JobAnalysis
 from app.schemas.match import MatchReport, ProjectChallengeReport, ResumeOptimizationResult
 from app.schemas.report import FinalReport
 from app.schemas.resume import ResumeProfile
-from app.services.mock_pipeline import (
-    mock_jd_analysis,
-    mock_match_analysis,
-    mock_project_challenge,
-    mock_resume_optimization,
-    mock_resume_parse,
-)
-from app.services.report_service import generate_markdown_report
 
 WorkflowStepStatus = Literal["completed"]
 
@@ -66,7 +63,7 @@ def run_job_analysis_workflow(
         use_llm_jd=use_llm_jd,
     )
 
-    state.resume_profile = mock_resume_parse(normalized_resume)
+    state.resume_profile = parse_resume(normalized_resume)
     _record_step(
         state,
         "ResumeParseAgent",
@@ -77,7 +74,7 @@ def run_job_analysis_workflow(
         state.job_analysis = analyze_jd(normalized_jd, use_llm=True)
         jd_summary = "使用 JDAnalysisAgent 请求 LLM；失败时由 Agent 内部回退 mock。"
     else:
-        state.job_analysis = mock_jd_analysis(normalized_jd)
+        state.job_analysis = analyze_jd(normalized_jd, use_llm=False)
         jd_summary = "使用 mock JD 规则分析。"
     _record_step(
         state,
@@ -85,14 +82,14 @@ def run_job_analysis_workflow(
         f"{jd_summary} 必备技能 {len(state.job_analysis.required_skills)} 个。",
     )
 
-    state.match_report = mock_match_analysis(state.resume_profile, state.job_analysis)
+    state.match_report = analyze_match(state.resume_profile, state.job_analysis)
     _record_step(
         state,
         "MatchAgent",
         f"生成匹配报告，总分 {state.match_report.overall_score:.1f}。",
     )
 
-    state.optimization_result = mock_resume_optimization(
+    state.optimization_result = optimize_resume(
         normalized_resume,
         state.resume_profile,
         state.job_analysis,
@@ -104,7 +101,7 @@ def run_job_analysis_workflow(
         f"生成 {len(state.optimization_result.jd_targeted_bullets)} 条 JD 定向建议。",
     )
 
-    state.project_challenge_report = mock_project_challenge(
+    state.project_challenge_report = generate_project_challenges(
         state.resume_profile,
         state.job_analysis,
     )
@@ -114,7 +111,7 @@ def run_job_analysis_workflow(
         "生成项目追问和面试官关注点。",
     )
 
-    state.markdown_report = generate_markdown_report(
+    state.markdown_report = generate_report(
         resume_profile=state.resume_profile,
         job_analysis=state.job_analysis,
         match_report=state.match_report,
