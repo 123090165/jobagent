@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 from app.schemas.report import FinalReport
 from app.storage.database import get_connection
@@ -13,10 +14,15 @@ from app.storage.repositories import (
 )
 
 
-def save_final_report(report: FinalReport, *, database_path: str | Path | None = None) -> int:
+def save_final_report(
+    report: FinalReport,
+    *,
+    workflow_steps: list[dict[str, Any]] | None = None,
+    database_path: str | Path | None = None,
+) -> int:
     connection = get_connection(database_path)
     try:
-        return save_analysis_record(connection, report)
+        return save_analysis_record(connection, report, workflow_steps=workflow_steps)
     finally:
         connection.close()
 

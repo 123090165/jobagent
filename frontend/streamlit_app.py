@@ -9,7 +9,6 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from app.services.mock_pipeline import run_mock_pipeline
 from app.services.llm_service import is_llm_configured
 from app.services.application_service import list_applications, save_application
 from app.services.resume_version_service import (
@@ -24,6 +23,7 @@ from app.services.storage_service import (
     load_job_posting,
     save_final_report,
 )
+from app.workflows.job_analysis_workflow import run_job_analysis_workflow
 
 
 SAMPLE_RESUME = """张三
@@ -96,7 +96,7 @@ def render_analysis_tab(*, use_llm_jd: bool, save_result: bool) -> None:
             return
 
         try:
-            result = run_mock_pipeline(
+            workflow_result = run_job_analysis_workflow(
                 resume_text=resume_text,
                 jd_text=jd_text,
                 use_llm_jd=use_llm_jd,
@@ -105,9 +105,11 @@ def render_analysis_tab(*, use_llm_jd: bool, save_result: bool) -> None:
             st.error(str(exc))
             return
 
+        result = workflow_result.final_report
+        workflow_steps = [step.model_dump() for step in workflow_result.state.steps]
         record_id: int | None = None
         if save_result:
-            record_id = save_final_report(result)
+            record_id = save_final_report(result, workflow_steps=workflow_steps)
             st.success(f"已保存分析记录：#{record_id}")
 
         match = result.match_report
@@ -131,6 +133,8 @@ def render_analysis_tab(*, use_llm_jd: bool, save_result: bool) -> None:
             )
 
         with tab_structured:
+            st.subheader("执行轨迹")
+            st.json(workflow_steps)
             st.subheader("简历解析")
             st.json(result.resume_profile.model_dump())
             st.subheader("JD 分析")
@@ -178,9 +182,15 @@ def render_history_tab() -> None:
     col2.metric("岗位", record["job_analysis"].get("job_title") or "未识别")
     col3.metric("创建时间", record["created_at"])
 
-    detail_report, detail_json = st.tabs(["报告", "结构化详情"])
+    detail_report, detail_trace, detail_json = st.tabs(["报告", "执行轨迹", "结构化详情"])
     with detail_report:
         st.markdown(record["markdown_report"])
+    with detail_trace:
+        workflow_steps = record.get("workflow_steps") or []
+        if not workflow_steps:
+            st.info("这条历史记录没有保存 workflow trace，可能来自旧版本。")
+        else:
+            st.dataframe(workflow_steps, hide_index=True, use_container_width=True)
     with detail_json:
         st.json(record)
 

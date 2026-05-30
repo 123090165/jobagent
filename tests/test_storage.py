@@ -16,8 +16,10 @@ from app.storage.repositories import (
     get_job_posting,
     list_analysis_records,
     list_job_postings,
+    list_workflow_steps,
     save_analysis_record,
 )
+from app.workflows.job_analysis_workflow import run_job_analysis_workflow
 from tests.test_mock_pipeline import SAMPLE_JD, SAMPLE_RESUME
 
 
@@ -88,3 +90,25 @@ def test_storage_service_closes_database_connections(tmp_path: Path) -> None:
     assert len(records) == 1
     assert len(jobs) == 1
     database_path.unlink()
+
+
+def test_save_analysis_record_with_workflow_steps(tmp_path: Path) -> None:
+    database_path = tmp_path / "workflow-trace.sqlite3"
+    workflow_result = run_job_analysis_workflow(SAMPLE_RESUME, SAMPLE_JD)
+    workflow_steps = [step.model_dump() for step in workflow_result.state.steps]
+
+    with get_connection(database_path) as connection:
+        record_id = save_analysis_record(
+            connection,
+            workflow_result.final_report,
+            workflow_steps=workflow_steps,
+        )
+        stored = get_analysis_record(connection, record_id)
+        steps = list_workflow_steps(connection, record_id=record_id)
+
+    assert stored is not None
+    assert len(stored["workflow_steps"]) == 6
+    assert len(steps) == 6
+    assert steps[0]["name"] == "ResumeParseAgent"
+    assert steps[0]["mode"] == "mock"
+    assert steps[0]["guardrails"]

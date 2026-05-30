@@ -11,7 +11,12 @@ from app.schemas.report import FinalReport
 from app.storage.database import init_database
 
 
-def save_analysis_record(connection: sqlite3.Connection, report: FinalReport) -> int:
+def save_analysis_record(
+    connection: sqlite3.Connection,
+    report: FinalReport,
+    *,
+    workflow_steps: list[dict[str, Any]] | None = None,
+) -> int:
     init_database(connection)
     with connection:
         resume_id = _insert_and_get_id(
@@ -77,6 +82,7 @@ def save_analysis_record(connection: sqlite3.Connection, report: FinalReport) ->
                 report.markdown_report,
             ),
         )
+        _insert_workflow_steps(connection, record_id=record_id, workflow_steps=workflow_steps or [])
     return record_id
 
 
@@ -104,6 +110,7 @@ def get_analysis_record(connection: sqlite3.Connection, record_id: int) -> dict[
     ).fetchone()
     if row is None:
         return None
+    workflow_steps = list_workflow_steps(connection, record_id=record_id)
     return {
         "id": row["id"],
         "created_at": row["created_at"],
@@ -113,7 +120,38 @@ def get_analysis_record(connection: sqlite3.Connection, record_id: int) -> dict[
         "optimization_result": json.loads(row["optimization_json"]),
         "project_challenge_report": json.loads(row["challenge_json"]),
         "markdown_report": row["markdown_report"],
+        "workflow_steps": workflow_steps,
     }
+
+
+def list_workflow_steps(connection: sqlite3.Connection, *, record_id: int) -> list[dict[str, Any]]:
+    init_database(connection)
+    rows = connection.execute(
+        """
+        SELECT
+            agent_name,
+            status,
+            mode,
+            summary,
+            fallback_reason,
+            guardrails_json
+        FROM workflow_step_traces
+        WHERE analysis_record_id = ?
+        ORDER BY step_index ASC, id ASC
+        """,
+        (record_id,),
+    ).fetchall()
+    return [
+        {
+            "name": row["agent_name"],
+            "status": row["status"],
+            "mode": row["mode"],
+            "summary": row["summary"],
+            "fallback_reason": row["fallback_reason"],
+            "guardrails": json.loads(row["guardrails_json"]),
+        }
+        for row in rows
+    ]
 
 
 def list_analysis_records(
@@ -627,6 +665,40 @@ def _get_or_create_job_posting(connection: sqlite3.Connection, report: FinalRepo
             report.job_analysis.company,
         ),
     )
+
+
+def _insert_workflow_steps(
+    connection: sqlite3.Connection,
+    *,
+    record_id: int,
+    workflow_steps: list[dict[str, Any]],
+) -> None:
+    for index, step in enumerate(workflow_steps):
+        connection.execute(
+            """
+            INSERT INTO workflow_step_traces (
+                analysis_record_id,
+                step_index,
+                agent_name,
+                status,
+                mode,
+                summary,
+                fallback_reason,
+                guardrails_json
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                record_id,
+                index,
+                step["name"],
+                step["status"],
+                step["mode"],
+                step["summary"],
+                step.get("fallback_reason"),
+                json.dumps(step.get("guardrails") or [], ensure_ascii=False),
+            ),
+        )
 
 
 def _job_exists(connection: sqlite3.Connection, job_id: int) -> bool:

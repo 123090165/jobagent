@@ -87,6 +87,20 @@ def init_database(connection: sqlite3.Connection) -> None:
             FOREIGN KEY (source_analysis_record_id) REFERENCES analysis_records(id)
         );
 
+        CREATE TABLE IF NOT EXISTS workflow_step_traces (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            analysis_record_id INTEGER NOT NULL,
+            step_index INTEGER NOT NULL,
+            agent_name TEXT NOT NULL,
+            status TEXT NOT NULL,
+            mode TEXT NOT NULL,
+            summary TEXT NOT NULL,
+            fallback_reason TEXT,
+            guardrails_json TEXT NOT NULL,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (analysis_record_id) REFERENCES analysis_records(id)
+        );
+
         CREATE TABLE IF NOT EXISTS application_records (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             job_posting_id INTEGER NOT NULL UNIQUE,

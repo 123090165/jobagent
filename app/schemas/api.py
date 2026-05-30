@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.schemas.job import JobAnalysis
 from app.schemas.match import MatchReport, ProjectChallengeReport, ResumeOptimizationResult
@@ -13,6 +13,15 @@ class HealthResponse(BaseModel):
     version: str
 
 
+class WorkflowStepTraceResponse(BaseModel):
+    name: str
+    status: str
+    mode: str
+    summary: str
+    fallback_reason: str | None = None
+    guardrails: list[str] = Field(default_factory=list)
+
+
 class FullAnalysisRequest(BaseModel):
     resume_text: str
     jd_text: str
@@ -22,6 +31,7 @@ class FullAnalysisRequest(BaseModel):
 
 class FullAnalysisResponse(FinalReport):
     record_id: int | None = None
+    workflow_steps: list[WorkflowStepTraceResponse] = Field(default_factory=list)
 
 
 class ResumeParseRequest(BaseModel):

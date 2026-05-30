@@ -27,6 +27,8 @@ def test_full_analysis_endpoint_returns_report() -> None:
     assert payload["job_analysis"]["required_skills"]
     assert payload["match_report"]["overall_score"] > 0
     assert "匹配度总览" in payload["markdown_report"]
+    assert len(payload["workflow_steps"]) == 6
+    assert payload["workflow_steps"][0]["mode"] == "mock"
 
 
 def test_full_analysis_endpoint_rejects_empty_resume() -> None:
@@ -98,6 +100,8 @@ def test_full_analysis_can_save_and_load_record(tmp_path, monkeypatch) -> None:
     record = record_response.json()
     assert record["id"] == payload["record_id"]
     assert record["markdown_report"] == payload["markdown_report"]
+    assert len(record["workflow_steps"]) == 6
+    assert record["workflow_steps"][0]["name"] == "ResumeParseAgent"
 
 
 def test_record_endpoint_returns_404_for_missing_record(tmp_path, monkeypatch) -> None:
