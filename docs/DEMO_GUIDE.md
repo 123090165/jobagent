@@ -142,8 +142,22 @@
 讲解重点：
 
 - 不是只靠手动点页面证明功能可用。
-- API、存储、LLM fallback、tracker、简历版本都有最小测试保护。
+- API、存储、LLM fallback、tracker、简历版本、workflow 步骤都有最小测试保护。
 - deprecation warning 来自依赖链，不影响当前功能正确性。
+
+### Step 8：讲解 Workflow 编排
+
+操作：
+
+- 打开 `docs/WORKFLOW_ARCHITECTURE.md`。
+- 展示主流程步骤：ResumeParseAgent -> JDAnalysisAgent -> MatchAgent -> ResumeOptimizeAgent -> ProjectInterviewAgent -> ReportAgent。
+- 说明 `run_mock_pipeline` 仍然是兼容入口，但内部已委托给 workflow。
+
+讲解重点：
+
+- 当前还没有直接上 LangGraph，是先稳定状态和步骤边界。
+- workflow state 记录中间结果，step trace 记录执行顺序和摘要。
+- 后续 LangGraph 可以按这些步骤迁移成 node。
 
 ## 4. 面试讲述版
 
@@ -204,5 +218,6 @@
 - Demo Guide 包含演示路径和讲解重点。
 - 简历版本页面能保存原始简历和定制文本。
 - tracker 能关联已保存的简历版本。
+- Workflow 层能记录 6 个主流程步骤。
 - `pytest` 通过。
 - 不新增自动投递、招聘网站登录、验证码处理、复杂爬虫或多用户权限能力。

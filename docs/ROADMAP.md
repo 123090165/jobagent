@@ -4,7 +4,7 @@
 
 ## 当前优先级
 
-当前已经完成 Mock MVP、可选 LLM JDAnalysisAgent、FastAPI、SQLite、岗位库、tracker 和简历版本管理。下一步优先加强工作流和 Agent 架构，为 LangGraph 迁移做准备。
+当前已经完成 Mock MVP、可选 LLM JDAnalysisAgent、FastAPI、SQLite、岗位库、tracker、简历版本管理和显式 workflow 编排层。下一步优先补齐 Agent 外壳，为 LangGraph 迁移做准备。
 
 核心目标：
 
@@ -102,9 +102,20 @@
 
 - `app/workflows/` 显式编排层。
 - 将当前 service pipeline 拆成可追踪步骤。
-- 补齐 ResumeParseAgent、MatchAgent、ResumeOptimizeAgent、ProjectChallengeAgent、ReportAgent 的 mock agent 外壳。
+- `JobAnalysisWorkflowState`。
+- `WorkflowStepTrace`。
+- 保持 `run_mock_pipeline` 外部契约不变。
 - 保持现有 schema 和 fallback 路径。
 - 为后续 LangGraph 节点迁移做准备。
+
+## v0.8 Agent Boundary Cleanup
+
+交付物：
+
+- 补齐 ResumeParseAgent、MatchAgent、ResumeOptimizeAgent、ProjectChallengeAgent、ReportAgent 的 mock agent 外壳。
+- 将 workflow 中的步骤调用逐步迁移到 agent 层。
+- 每个 Agent 只负责一个结构化输入输出。
+- 保持现有 service、API 和 Streamlit 调用方式不变。
 
 ## v1.0 Portfolio Version
 

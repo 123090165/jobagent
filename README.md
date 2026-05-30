@@ -25,6 +25,7 @@ JobAgent 是一个面向求职者的本地求职准备工作台，核心目标�
 - FastAPI 后端：分析、简历解析、JD 分析、匹配、报告、记录、岗位、投递 tracker API。
 - Pydantic schema：稳定 Agent、service、API、UI 之间的数据流。
 - Mock pipeline：不依赖真实 LLM 也能端到端运行。
+- Workflow 编排层：记录主链路步骤，为后续 LangGraph 迁移做准备。
 - 可选 LLM JDAnalysisAgent：调用失败或未配置 API key 时回退 mock。
 - SQLite 存储：保存分析记录、岗位 JD、匹配报告、项目追问和 tracker。
 - 简历版本管理：保存原始简历、定制后文本，并可关联目标岗位和投递记录。
@@ -188,8 +189,9 @@ $env:JOBAGENT_LLM_MODEL="gpt-4o-mini"
 | Phase 5 | Streamlit 历史记录、岗位库、投递 tracker | 已完成 |
 | Phase 6 | README、Demo、架构图、作品集展示材料 | 已完成 |
 | Phase 7 | 简历版本管理，关联岗位和 tracker | 已完成 |
-| Phase 8 | LangGraph 工作流、RAG 检索、MCP 工具封装 | 后续 |
-| Phase 9 | Docker、部署说明、答辩材料和截图 | 后续 |
+| Phase 8 | 显式 Workflow 编排层，为 LangGraph 做准备 | 已完成 |
+| Phase 9 | LangGraph 工作流、RAG 检索、MCP 工具封装 | 后续 |
+| Phase 10 | Docker、部署说明、答辩材料和截图 | 后续 |
 
 ## 面试讲述版
 
@@ -255,6 +257,8 @@ app/
   storage/
     database.py
     repositories.py
+  workflows/
+    job_analysis_workflow.py
 frontend/
   streamlit_app.py
 tests/
@@ -281,4 +285,5 @@ docs/
 - [Streamlit App](docs/STREAMLIT_APP.md)
 - [Application Tracker](docs/APPLICATION_TRACKER.md)
 - [Resume Versioning](docs/RESUME_VERSIONING.md)
+- [Workflow Architecture](docs/WORKFLOW_ARCHITECTURE.md)
 - [LLM Integration](docs/LLM_INTEGRATION.md)

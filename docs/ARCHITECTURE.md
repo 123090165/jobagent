@@ -40,7 +40,7 @@ app/
   agents/       Agent 节点、prompt 和 LLM 调用包装
   schemas/      Pydantic 数据模型
   services/     业务编排和核心流程
-  workflows/    后续显式工作流编排层
+  workflows/    显式工作流编排层，记录步骤和运行状态
   tools/        可复用工具函数
   storage/      数据库连接、模型和仓储
   evaluation/   评估规则和测试辅助
@@ -88,7 +88,7 @@ data/           样例简历、样例 JD 和 golden cases
 
 ## 5. Agent Workflow 层
 
-后续使用 LangGraph 编排多 Agent。
+当前先使用 `app/workflows/` 编排主流程，后续再迁移到 LangGraph。
 
 推荐流程：
 
@@ -103,7 +103,8 @@ START
 -> END
 ```
 
-第一版可以由普通 service 模拟这个流程，等数据结构稳定后再迁移到 LangGraph。
+当前 `JobAnalysisWorkflowState` 会记录输入、中间结果、最终报告和 `WorkflowStepTrace`。
+这样可以先稳定步骤边界，再把步骤映射成 LangGraph node。
 
 ## 6. Tools 层
 
@@ -182,7 +183,7 @@ START
 
 ### 当前过渡阶段：Workflow Architecture
 
-- 先抽出 `app/workflows/` 显式编排层。
-- 将现有 service pipeline 拆成可观察步骤。
+- 已抽出 `app/workflows/` 显式编排层。
+- 已将现有 service pipeline 拆成可观察步骤。
 - 补齐 mock Agent 外壳，保持 schema 不变。
 - 等边界稳定后再迁移到 LangGraph。
