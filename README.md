@@ -2,10 +2,11 @@
 
 JobAgent 是一个面向求职者的本地求职准备工作台，核心目标是把“简历和 JD 是否匹配、应该怎么改、面试会被怎么追问、投递进展到哪一步”变成可结构化记录和复盘的流程。
 
-当前版本已经从 Mock MVP 推进到可运行的本地工作台：支持 Streamlit Demo、FastAPI 后端、SQLite 分析记录、岗位库查询、可选 LLM JD 分析、workflow 执行轨迹持久化，以及投递 tracker 最小状态机。
+当前版本已经从 Mock MVP 推进到可运行的本地工作台：支持 Streamlit Demo、FastAPI 后端、SQLite 分析记录、岗位库查询、txt/md 简历文件解析、可选 LLM JD 分析、workflow 执行轨迹持久化，以及投递 tracker 最小状态机。
 
 ```text
-简历文本 + JD 文本
+简历文本或 .txt/.md 简历文件 + JD 文本
+  -> 简历文件转纯文本（可选）
   -> 结构化简历解析
   -> JD 分析
   -> 匹配报告
@@ -23,6 +24,7 @@ JobAgent 是一个面向求职者的本地求职准备工作台，核心目标�
 
 - Streamlit 页面：生成报告、历史记录、岗位库、简历版本、投递跟进和执行轨迹展示。
 - FastAPI 后端：分析、简历解析、JD 分析、匹配、报告、记录、岗位、投递 tracker API。
+- 简历文件解析：支持 `.txt` / `.md` UTF-8 文件转纯文本，并复用 `ResumeParseAgent` 输出 `ResumeProfile`。
 - Pydantic schema：稳定 Agent、service、API、UI 之间的数据流。
 - Mock pipeline：不依赖真实 LLM 也能端到端运行。
 - Workflow 编排层：记录主链路步骤、Agent 模式和 guardrails，为后续 LangGraph 迁移做准备。
@@ -42,6 +44,7 @@ JobAgent 是一个面向求职者的本地求职准备工作台，核心目标�
 - 复杂爬虫和反爬绕过。
 - 多用户权限系统。
 - 编造简历经历、公司、项目、数据或技术栈。
+- PDF/DOCX 简历解析（后续计划，当前不引入大型文档解析依赖）。
 
 ## 架构图
 
@@ -107,7 +110,7 @@ pip install -r requirements.txt
 
 页面包含：
 
-- 生成报告：输入简历和 JD，输出 Markdown 报告和执行轨迹。
+- 生成报告：粘贴简历文本，或上传 `.txt` / `.md` 简历文件，再输入 JD，输出 Markdown 报告和执行轨迹。
 - 历史记录：查看已保存的分析结果和每次 workflow step trace。
 - 岗位库：查看保存过的 JD 和结构化分析。
 - 简历版本：保存针对不同岗位定制的简历版本。
@@ -130,6 +133,7 @@ http://127.0.0.1:8000/docs
 ```text
 GET  /health
 POST /analyze/full
+POST /resume/parse-file
 GET  /records
 GET  /jobs
 GET  /resume-versions
@@ -202,8 +206,9 @@ $env:JOBAGENT_LLM_MODEL="gpt-4o-mini"
 | Phase 9 | Workflow trace 持久化，支持历史记录复盘每个 Agent 步骤 | 已完成 |
 | Phase 10 | Workflow observability cleanup，补 run id、耗时和 trace 摘要展示 | 已完成 |
 | Phase 11 | LangGraph migration prep，固定 node 映射和迁移契约 | 已完成 |
-| Phase 12 | LangGraph 原型、RAG 检索、MCP 工具封装 | 后续 |
-| Phase 13 | Docker、部署说明、答辩材料和截图 | 后续 |
+| Phase 12 | Resume File Parser MVP，支持 txt/md 简历文件转纯文本并复用 ResumeParseAgent | 已完成 |
+| Phase 13 | LangGraph 原型、RAG 检索、MCP 工具封装 | 后续 |
+| Phase 14 | Docker、部署说明、答辩材料和截图 | 后续 |
 
 ## 面试讲述版
 
@@ -275,6 +280,7 @@ app/
     llm_service.py
     mock_pipeline.py
     report_service.py
+    resume_file_service.py
     resume_version_service.py
     storage_service.py
   storage/
@@ -290,6 +296,7 @@ tests/
   test_application_tracker.py
   test_jd_analysis_agent.py
   test_mock_pipeline.py
+  test_resume_file_service.py
   test_resume_versions.py
   test_storage.py
 data/
@@ -311,6 +318,7 @@ docs/
 - [Streamlit App](docs/STREAMLIT_APP.md)
 - [Application Tracker](docs/APPLICATION_TRACKER.md)
 - [Resume Versioning](docs/RESUME_VERSIONING.md)
+- [Resume File Parser](docs/RESUME_FILE_PARSER.md)
 - [Workflow Architecture](docs/WORKFLOW_ARCHITECTURE.md)
 - [Workflow Trace Persistence](docs/WORKFLOW_TRACE_PERSISTENCE.md)
 - [LangGraph Migration Prep](docs/LANGGRAPH_MIGRATION_PREP.md)

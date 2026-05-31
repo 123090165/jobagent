@@ -128,6 +128,35 @@ http://127.0.0.1:8000/docs
 
 返回：`ResumeProfile`
 
+### POST /resume/parse-file
+
+用途：上传 `.txt` 或 `.md` 简历文件，先提取 UTF-8 纯文本，再复用 `ResumeParseAgent` 返回结构化简历。
+
+请求类型：`multipart/form-data`
+
+字段：
+
+- `file`：简历文件，当前只支持 `.txt` / `.md`。
+
+返回：
+
+```json
+{
+  "filename": "resume.md",
+  "file_type": "md",
+  "extracted_text": "简历纯文本",
+  "resume_profile": {}
+}
+```
+
+错误：
+
+- 空文件：`400 resume file cannot be empty`
+- 不支持扩展名：`400 unsupported resume file type`
+- 非 UTF-8 文本：`400 resume file must be UTF-8 text`
+
+当前不支持 PDF/DOCX，也不会从文件内容里推断或编造简历经历；文件解析只负责把受支持文件转成纯文本。
+
 ### POST /jobs/analyze
 
 用途：单独分析 JD。
@@ -309,8 +338,10 @@ http://127.0.0.1:8000/docs
 - `GET /jobs` 只查询已保存 JD，不抓取外部网站。
 - `/applications` 只做本地 tracker，不执行自动投递。
 - `/resume-versions` 只保存用户提供的原始简历和定制文本，不自动编造经历。
+- `/resume/parse-file` 只支持 `.txt` / `.md`，并且只做文本提取和 `ResumeParseAgent` 调用。
 - 暂不做用户系统。
 - 暂不做自动投递。
+- 暂不做 PDF/DOCX 简历解析。
 - `use_llm_jd` 只影响 JDAnalysisAgent，失败时回退 mock。
 
 ## 4. 开发难点
