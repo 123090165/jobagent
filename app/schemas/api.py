@@ -40,6 +40,13 @@ class ResumeParseRequest(BaseModel):
     resume_text: str
 
 
+class ResumeFileParseResponse(BaseModel):
+    filename: str
+    file_type: str
+    extracted_text: str
+    resume_profile: ResumeProfile
+
+
 class JDAnalysisRequest(BaseModel):
     jd_text: str
     use_llm: bool = False

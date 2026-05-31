@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import sys
 from pathlib import Path
 
@@ -16,6 +17,7 @@ from app.services.resume_version_service import (
     load_resume_version,
     save_resume_version,
 )
+from app.services.resume_file_service import ResumeFileParseError, extract_text_from_resume_file
 from app.services.storage_service import (
     list_saved_analysis_records,
     list_saved_job_postings,
@@ -84,9 +86,34 @@ def main() -> None:
 
 
 def render_analysis_tab(*, use_llm_jd: bool, save_result: bool) -> None:
+    if "analysis_resume_text" not in st.session_state:
+        st.session_state["analysis_resume_text"] = SAMPLE_RESUME
+
     left, right = st.columns(2)
     with left:
-        resume_text = st.text_area("简历文本", value=SAMPLE_RESUME, height=320)
+        uploaded_resume = st.file_uploader(
+            "上传简历文件（.txt / .md）",
+            type=["txt", "md"],
+            key="analysis_resume_file",
+        )
+        if uploaded_resume is not None:
+            resume_file_bytes = uploaded_resume.getvalue()
+            resume_file_fingerprint = (
+                f"{uploaded_resume.name}:{hashlib.sha256(resume_file_bytes).hexdigest()}"
+            )
+            if st.session_state.get("analysis_resume_file_fingerprint") != resume_file_fingerprint:
+                try:
+                    extracted_resume_text = extract_text_from_resume_file(
+                        uploaded_resume.name,
+                        resume_file_bytes,
+                    )
+                except ResumeFileParseError as exc:
+                    st.error(str(exc))
+                else:
+                    st.session_state["analysis_resume_text"] = extracted_resume_text
+                    st.session_state["analysis_resume_file_fingerprint"] = resume_file_fingerprint
+                    st.success(f"已读取简历文件：{uploaded_resume.name}")
+        resume_text = st.text_area("简历文本", key="analysis_resume_text", height=320)
     with right:
         jd_text = st.text_area("目标岗位 JD", value=SAMPLE_JD, height=320)
 

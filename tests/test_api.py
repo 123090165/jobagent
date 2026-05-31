@@ -81,6 +81,67 @@ def test_stepwise_api_flow() -> None:
     assert "项目拷打问题" in report_response.json()["markdown_report"]
 
 
+def test_resume_parse_file_endpoint_accepts_txt() -> None:
+    response = client.post(
+        "/resume/parse-file",
+        files={"file": ("resume.txt", SAMPLE_RESUME.encode("utf-8"), "text/plain")},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["filename"] == "resume.txt"
+    assert payload["file_type"] == "txt"
+    assert payload["extracted_text"] == SAMPLE_RESUME.strip()
+    assert payload["resume_profile"]["raw_text"] == SAMPLE_RESUME.strip()
+    assert payload["resume_profile"]["skills"]
+
+
+def test_resume_parse_file_endpoint_accepts_md() -> None:
+    markdown_resume = f"# Resume\n\n{SAMPLE_RESUME}"
+
+    response = client.post(
+        "/resume/parse-file",
+        files={"file": ("resume.md", markdown_resume.encode("utf-8"), "text/markdown")},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["filename"] == "resume.md"
+    assert payload["file_type"] == "md"
+    assert payload["extracted_text"].startswith("# Resume")
+    assert payload["resume_profile"]["raw_text"].startswith("# Resume")
+
+
+def test_resume_parse_file_endpoint_rejects_empty_file() -> None:
+    response = client.post(
+        "/resume/parse-file",
+        files={"file": ("resume.txt", b"", "text/plain")},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "resume file cannot be empty"
+
+
+def test_resume_parse_file_endpoint_rejects_unsupported_extension() -> None:
+    response = client.post(
+        "/resume/parse-file",
+        files={"file": ("resume.pdf", b"fake pdf", "application/pdf")},
+    )
+
+    assert response.status_code == 400
+    assert "unsupported resume file type" in response.json()["detail"]
+
+
+def test_resume_parse_file_endpoint_rejects_decode_failure() -> None:
+    response = client.post(
+        "/resume/parse-file",
+        files={"file": ("resume.txt", b"\xff\xfe\x00\x00", "text/plain")},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "resume file must be UTF-8 text"
+
+
 def test_full_analysis_can_save_and_load_record(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("JOBAGENT_DB_PATH", str(tmp_path / "api-test.sqlite3"))
 
