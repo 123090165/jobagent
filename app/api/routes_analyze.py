@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 
 from app.schemas.api import FullAnalysisRequest, FullAnalysisResponse
+from app.services.errors import JobAgentError
 from app.services.storage_service import save_final_report
 from app.workflows.job_analysis_workflow import run_job_analysis_workflow
 
@@ -18,7 +19,7 @@ def analyze_full(request: FullAnalysisRequest) -> FullAnalysisResponse:
             use_llm_jd=request.use_llm_jd,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise JobAgentError(str(exc), "analysis_input_invalid") from exc
 
     result = workflow_result.final_report
     workflow_steps = [step.model_dump() for step in workflow_result.state.steps]

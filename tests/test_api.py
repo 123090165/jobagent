@@ -41,6 +41,7 @@ def test_full_analysis_endpoint_rejects_empty_resume() -> None:
 
     assert response.status_code == 400
     assert response.json()["detail"] == "resume_text cannot be empty"
+    assert response.json()["error_code"] == "analysis_input_invalid"
 
 
 def test_stepwise_api_flow() -> None:
@@ -81,6 +82,15 @@ def test_stepwise_api_flow() -> None:
     assert "项目拷打问题" in report_response.json()["markdown_report"]
 
 
+def test_resume_parse_endpoint_returns_error_code_for_empty_text() -> None:
+    response = client.post("/resume/parse", json={"resume_text": ""})
+
+    assert response.status_code == 400
+    payload = response.json()
+    assert payload["detail"] == "resume_text cannot be empty"
+    assert payload["error_code"] == "resume_text_empty"
+
+
 def test_resume_parse_file_endpoint_accepts_txt() -> None:
     response = client.post(
         "/resume/parse-file",
@@ -119,7 +129,9 @@ def test_resume_parse_file_endpoint_rejects_empty_file() -> None:
     )
 
     assert response.status_code == 400
-    assert response.json()["detail"] == "resume file cannot be empty"
+    payload = response.json()
+    assert payload["detail"] == "resume file cannot be empty"
+    assert payload["error_code"] == "resume_file_empty"
 
 
 def test_resume_parse_file_endpoint_rejects_unsupported_extension() -> None:
@@ -129,7 +141,9 @@ def test_resume_parse_file_endpoint_rejects_unsupported_extension() -> None:
     )
 
     assert response.status_code == 400
-    assert "unsupported resume file type" in response.json()["detail"]
+    payload = response.json()
+    assert "unsupported resume file type" in payload["detail"]
+    assert payload["error_code"] == "resume_file_type_unsupported"
 
 
 def test_resume_parse_file_endpoint_rejects_decode_failure() -> None:
@@ -139,7 +153,23 @@ def test_resume_parse_file_endpoint_rejects_decode_failure() -> None:
     )
 
     assert response.status_code == 400
-    assert response.json()["detail"] == "resume file must be UTF-8 text"
+    payload = response.json()
+    assert payload["detail"] == "resume file must be UTF-8 text"
+    assert payload["error_code"] == "resume_file_decode_failed"
+
+
+def test_resume_parse_file_endpoint_rejects_oversized_file(monkeypatch) -> None:
+    monkeypatch.setenv("JOBAGENT_MAX_RESUME_FILE_BYTES", "16")
+
+    response = client.post(
+        "/resume/parse-file",
+        files={"file": ("resume.txt", b"this resume is too long", "text/plain")},
+    )
+
+    assert response.status_code == 400
+    payload = response.json()
+    assert payload["detail"] == "resume file is too large"
+    assert payload["error_code"] == "resume_file_too_large"
 
 
 def test_full_analysis_can_save_and_load_record(tmp_path, monkeypatch) -> None:

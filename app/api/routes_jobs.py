@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException
 from app.agents.jd_analysis_agent import analyze_jd
 from app.schemas.api import JDAnalysisRequest, JobPostingResponse, JobPostingSummary
 from app.schemas.job import JobAnalysis
+from app.services.errors import JobAgentError
 from app.services.storage_service import list_saved_job_postings, load_job_posting
 
 router = APIRouter(tags=["jobs"])
@@ -29,4 +30,4 @@ def analyze_job(request: JDAnalysisRequest) -> JobAnalysis:
     try:
         return analyze_jd(request.jd_text, use_llm=request.use_llm)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise JobAgentError(str(exc), "jd_input_invalid") from exc

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from fastapi import Request
 from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 
 from app.api.routes_analyze import router as analyze_router
 from app.api.routes_applications import router as applications_router
@@ -11,6 +13,7 @@ from app.api.routes_reports import router as reports_router
 from app.api.routes_resume import router as resume_router
 from app.api.routes_resume_versions import router as resume_versions_router
 from app.schemas.api import HealthResponse
+from app.services.errors import JobAgentError
 from app.services.mock_pipeline import run_mock_pipeline
 
 API_VERSION = "0.3.0"
@@ -26,6 +29,16 @@ def create_app() -> FastAPI:
     @api.get("/health", response_model=HealthResponse)
     def health() -> HealthResponse:
         return HealthResponse(status="ok", version=API_VERSION)
+
+    @api.exception_handler(JobAgentError)
+    async def jobagent_error_handler(
+        request: Request,
+        exc: JobAgentError,
+    ) -> JSONResponse:
+        return JSONResponse(
+            status_code=400,
+            content={"detail": exc.message, "error_code": exc.error_code},
+        )
 
     api.include_router(analyze_router)
     api.include_router(resume_router)
