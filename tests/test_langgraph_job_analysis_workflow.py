@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+from dataclasses import dataclass
 
 import pytest
 
@@ -13,6 +14,54 @@ from app.workflows.langgraph_job_analysis_workflow import (
 from tests.test_mock_pipeline import SAMPLE_JD, SAMPLE_RESUME
 
 LANGGRAPH_INSTALLED = importlib.util.find_spec("langgraph") is not None
+
+
+@dataclass
+class _FakeCompiledGraph:
+    builder: "_FakeStateGraph"
+
+    def invoke(self, initial_state: dict):
+        state = dict(initial_state)
+        current = self.builder.entry_point
+        while current:
+            updates = self.builder.nodes[current](state) or {}
+            state.update(updates)
+            if current == self.builder.finish_point:
+                break
+            if current in self.builder.conditional_edges:
+                next_step = self.builder.conditional_edges[current](state)
+                current = next_step
+            else:
+                current = self.builder.edges.get(current)
+        return state
+
+
+class _FakeStateGraph:
+    def __init__(self, state_type):
+        self.state_type = state_type
+        self.nodes = {}
+        self.edges = {}
+        self.conditional_edges = {}
+        self.entry_point = None
+        self.finish_point = None
+
+    def add_node(self, name, func):
+        self.nodes[name] = func
+
+    def set_entry_point(self, name):
+        self.entry_point = name
+
+    def add_edge(self, source, target):
+        self.edges[source] = target
+
+    def add_conditional_edges(self, source, func):
+        self.conditional_edges[source] = func
+
+    def set_finish_point(self, name):
+        self.finish_point = name
+
+    def compile(self):
+        return _FakeCompiledGraph(self)
 
 
 class FailingLLMService:
@@ -101,6 +150,49 @@ def test_langgraph_workflow_requires_dependency_when_missing() -> None:
         run_langgraph_job_analysis_workflow(SAMPLE_RESUME, SAMPLE_JD)
 
 
+def test_langgraph_workflow_can_run_with_fake_state_graph(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "app.workflows.langgraph_job_analysis_workflow._load_state_graph",
+        lambda: _FakeStateGraph,
+    )
+
+    result = run_langgraph_job_analysis_workflow(SAMPLE_RESUME, SAMPLE_JD)
+
+    assert isinstance(result, LangGraphJobAnalysisWorkflowResult)
+    assert result.state.route_decision == "resume_optimize"
+    assert result.state.missing_info_report is not None
+    assert result.state.missing_info_report.summary
+    assert "MissingInfoAgent" in [step.name for step in result.state.steps]
+
+
+def test_langgraph_low_match_path_keeps_missing_info_report_with_fake_state_graph(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "app.workflows.langgraph_job_analysis_workflow._load_state_graph",
+        lambda: _FakeStateGraph,
+    )
+    low_match_resume = """
+    李四
+    个人介绍：做过课程作业和文档整理，暂时没有后端项目经验。
+    """
+    demanding_jd = """
+    高级 AI 平台工程师
+    要求：熟悉 Python、FastAPI、SQL、Redis、Docker、LangGraph、RAG、LLM、OpenAI、Git。
+    """
+
+    result = run_langgraph_job_analysis_workflow(low_match_resume, demanding_jd)
+
+    assert result.state.route_decision == "low_match_prepare"
+    assert result.state.missing_info_report is not None
+    assert result.state.missing_info_report.questions
+    assert "MissingInfoAgent" in [step.name for step in result.state.steps]
+
+
+def test_default_python_workflow_is_not_extended_with_missing_info_state() -> None:
+    result = run_job_analysis_workflow(SAMPLE_RESUME, SAMPLE_JD)
+
+    assert not hasattr(result.state, "missing_info_report")
+
+
 @pytest.mark.skipif(not LANGGRAPH_INSTALLED, reason="langgraph is not installed")
 def test_langgraph_workflow_standard_path_returns_compatible_result() -> None:
     result = run_langgraph_job_analysis_workflow(SAMPLE_RESUME, SAMPLE_JD)
@@ -116,11 +208,13 @@ def test_langgraph_workflow_standard_path_returns_compatible_result() -> None:
         "ResumeParseAgent",
         "JDAnalysisAgent",
         "MatchAgent",
+        "MissingInfoAgent",
         "MatchScoreRouter",
         "ResumeOptimizeAgent",
         "ProjectInterviewAgent",
         "ReportAgent",
     ]
+    assert result.state.missing_info_report is not None
 
 
 @pytest.mark.skipif(not LANGGRAPH_INSTALLED, reason="langgraph is not installed")
@@ -131,6 +225,7 @@ def test_langgraph_workflow_default_modes_are_mock() -> None:
     assert {step.mode for step in result.state.steps} == {"mock"}
     assert all(step.guardrails for step in result.state.steps)
     assert all(step.workflow_run_id == result.state.workflow_run_id for step in result.state.steps)
+    assert result.state.missing_info_report is not None
 
 
 @pytest.mark.skipif(not LANGGRAPH_INSTALLED, reason="langgraph is not installed")
@@ -148,6 +243,7 @@ def test_langgraph_workflow_can_record_llm_modes() -> None:
 
     step_by_name = {step.name: step for step in result.state.steps}
     assert step_by_name["JDAnalysisAgent"].mode == "llm"
+    assert step_by_name["MissingInfoAgent"].mode == "mock"
     assert step_by_name["ResumeOptimizeAgent"].mode == "llm"
     assert step_by_name["ProjectInterviewAgent"].mode == "llm"
     assert result.final_report.optimization_result.keywords_to_add == ["REST API"]
@@ -173,6 +269,7 @@ def test_langgraph_workflow_llm_failures_fallback_without_breaking_flow() -> Non
     assert step_by_name["JDAnalysisAgent"].fallback_reason == "LLMServiceError"
     assert step_by_name["ResumeOptimizeAgent"].fallback_reason == "LLMServiceError"
     assert step_by_name["ProjectInterviewAgent"].fallback_reason == "LLMServiceError"
+    assert step_by_name["MissingInfoAgent"].mode == "mock"
     assert result.final_report.markdown_report
 
 
@@ -194,11 +291,13 @@ def test_langgraph_workflow_low_match_path_is_traceable_and_safe() -> None:
     assert result.final_report.markdown_report
     assert "ResumeOptimizeAgent" not in step_names
     assert "ProjectInterviewAgent" not in step_names
+    assert "MissingInfoAgent" in step_names
     assert "LowMatchPreparation" in step_names
 
     route_step = next(step for step in result.state.steps if step.name == "MatchScoreRouter")
     prep_step = next(step for step in result.state.steps if step.name == "LowMatchPreparation")
     assert "below 50" in route_step.summary
     assert "low-match" in prep_step.summary
+    assert result.state.missing_info_report is not None
     assert result.final_report.optimization_result is not None
     assert result.final_report.project_challenge_report is not None

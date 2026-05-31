@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 
 from app.agents.jd_analysis_agent import run_jd_analysis_agent
 from app.agents.match_agent import run_match_agent
+from app.agents.missing_info_agent import run_missing_info_agent
 from app.agents.project_challenge_agent import run_project_challenge_agent
 from app.agents.report_agent import run_report_agent
 from app.agents.resume_optimize_agent import run_resume_optimize_agent
@@ -15,6 +16,7 @@ from app.agents.resume_parse_agent import run_resume_parse_agent
 from app.agents.types import AgentExecutionMode, AgentRunMetadata
 from app.schemas.job import JobAnalysis
 from app.schemas.match import MatchReport, ProjectChallengeReport, ResumeOptimizationResult
+from app.schemas.missing_info import MissingInfoReport
 from app.schemas.report import FinalReport
 from app.schemas.resume import ResumeProfile
 from app.services.llm_service import LLMService
@@ -34,6 +36,7 @@ class LangGraphJobAnalysisWorkflowState(BaseModel):
     resume_profile: ResumeProfile | None = None
     job_analysis: JobAnalysis | None = None
     match_report: MatchReport | None = None
+    missing_info_report: MissingInfoReport | None = None
     optimization_result: ResumeOptimizationResult | None = None
     project_challenge_report: ProjectChallengeReport | None = None
     markdown_report: str | None = None
@@ -56,6 +59,7 @@ class _GraphState(TypedDict, total=False):
     resume_profile: ResumeProfile
     job_analysis: JobAnalysis
     match_report: MatchReport
+    missing_info_report: MissingInfoReport
     optimization_result: ResumeOptimizationResult
     project_challenge_report: ProjectChallengeReport
     markdown_report: str
@@ -141,6 +145,30 @@ def run_langgraph_job_analysis_workflow(
                     state["workflow_run_id"],
                     result.metadata,
                     summary=f"Generated match report with overall score {match_report.overall_score:.1f}.",
+                    duration_ms=_elapsed_ms(started_at),
+                ),
+            ),
+        }
+
+    def missing_info_check_node(state: _GraphState) -> _GraphState:
+        started_at = perf_counter()
+        result = run_missing_info_agent(
+            state["resume_profile"],
+            state["job_analysis"],
+            state["match_report"],
+        )
+        missing_info_report = result.output
+        return {
+            "missing_info_report": missing_info_report,
+            "steps": _append_step(
+                state,
+                _step_from_metadata(
+                    state["workflow_run_id"],
+                    result.metadata,
+                    summary=(
+                        f"Generated {len(missing_info_report.questions)} missing-info questions. "
+                        f"{missing_info_report.summary}"
+                    ),
                     duration_ms=_elapsed_ms(started_at),
                 ),
             ),
@@ -299,6 +327,7 @@ def run_langgraph_job_analysis_workflow(
     builder.add_node("resume_parse", resume_parse_node)
     builder.add_node("jd_analysis", jd_analysis_node)
     builder.add_node("match", match_node)
+    builder.add_node("missing_info_check", missing_info_check_node)
     builder.add_node("route_by_match_score", route_by_match_score)
     builder.add_node("low_match_prepare", low_match_prepare_node)
     builder.add_node("resume_optimize", resume_optimize_node)
@@ -308,7 +337,8 @@ def run_langgraph_job_analysis_workflow(
     builder.set_entry_point("resume_parse")
     builder.add_edge("resume_parse", "jd_analysis")
     builder.add_edge("jd_analysis", "match")
-    builder.add_edge("match", "route_by_match_score")
+    builder.add_edge("match", "missing_info_check")
+    builder.add_edge("missing_info_check", "route_by_match_score")
     builder.add_conditional_edges("route_by_match_score", next_node_after_routing)
     builder.add_edge("low_match_prepare", "report")
     builder.add_edge("resume_optimize", "project_challenge")
