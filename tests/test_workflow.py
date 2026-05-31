@@ -13,6 +13,25 @@ class FailingLLMService:
         raise LLMServiceError("fake workflow failure")
 
 
+class ResumeOptimizeLLMService:
+    def chat_completion_json(self, *, system_prompt: str, user_prompt: str):
+        return {
+            "overall_issues": ["需要更明确地对齐 JD 的 API 能力。"],
+            "keywords_to_add": ["REST API"],
+            "skills_section_suggestions": ["把 FastAPI 和 REST API 放在技能栏前半部分。"],
+            "project_rewrite_suggestions": [
+                {
+                    "original": "JobAgent 求职分析工具",
+                    "suggestion": "基于已有 JobAgent 项目强调 API、schema 和测试职责。",
+                    "reason": "只改写已有项目表达，不新增事实。",
+                }
+            ],
+            "jd_targeted_bullets": ["基于已有项目补充 API 设计和测试覆盖说明。"],
+            "do_not_exaggerate": ["不要新增没有真实使用过的技术栈。"],
+            "missing_info_needed": ["如有真实数据，可补充测试数量或接口数量。"],
+        }
+
+
 def test_job_analysis_workflow_records_step_trace() -> None:
     result = run_job_analysis_workflow(SAMPLE_RESUME, SAMPLE_JD)
 
@@ -64,3 +83,33 @@ def test_job_analysis_workflow_records_llm_fallback_metadata() -> None:
     assert jd_step.fallback_reason == "LLMServiceError"
     assert "回退 mock" in jd_step.summary
     assert result.final_report.job_analysis.required_skills
+
+
+def test_job_analysis_workflow_records_resume_optimize_llm_metadata() -> None:
+    result = run_job_analysis_workflow(
+        SAMPLE_RESUME,
+        SAMPLE_JD,
+        use_llm_resume_optimize=True,
+        resume_optimize_llm_service=ResumeOptimizeLLMService(),  # type: ignore[arg-type]
+    )
+
+    optimize_step = next(step for step in result.state.steps if step.name == "ResumeOptimizeAgent")
+    assert optimize_step.mode == "llm"
+    assert optimize_step.fallback_reason is None
+    assert "使用 LLM 简历优化" in optimize_step.summary
+    assert result.final_report.optimization_result.keywords_to_add == ["REST API"]
+
+
+def test_job_analysis_workflow_records_resume_optimize_fallback_metadata() -> None:
+    result = run_job_analysis_workflow(
+        SAMPLE_RESUME,
+        SAMPLE_JD,
+        use_llm_resume_optimize=True,
+        resume_optimize_llm_service=FailingLLMService(),  # type: ignore[arg-type]
+    )
+
+    optimize_step = next(step for step in result.state.steps if step.name == "ResumeOptimizeAgent")
+    assert optimize_step.mode == "fallback"
+    assert optimize_step.fallback_reason == "LLMServiceError"
+    assert "简历优化失败，已回退 mock" in optimize_step.summary
+    assert result.final_report.optimization_result.jd_targeted_bullets

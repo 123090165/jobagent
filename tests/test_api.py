@@ -31,6 +31,10 @@ def test_full_analysis_endpoint_returns_report() -> None:
     assert payload["workflow_steps"][0]["mode"] == "mock"
     assert payload["workflow_steps"][0]["workflow_run_id"]
     assert payload["workflow_steps"][0]["duration_ms"] >= 0
+    optimize_step = next(
+        step for step in payload["workflow_steps"] if step["name"] == "ResumeOptimizeAgent"
+    )
+    assert optimize_step["mode"] == "mock"
 
 
 def test_full_analysis_endpoint_rejects_empty_resume() -> None:
@@ -42,6 +46,28 @@ def test_full_analysis_endpoint_rejects_empty_resume() -> None:
     assert response.status_code == 400
     assert response.json()["detail"] == "resume_text cannot be empty"
     assert response.json()["error_code"] == "analysis_input_invalid"
+
+
+def test_full_analysis_endpoint_accepts_resume_optimize_llm_flag(monkeypatch) -> None:
+    monkeypatch.delenv("JOBAGENT_LLM_API_KEY", raising=False)
+
+    response = client.post(
+        "/analyze/full",
+        json={
+            "resume_text": SAMPLE_RESUME,
+            "jd_text": SAMPLE_JD,
+            "use_llm_resume_optimize": True,
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    optimize_step = next(
+        step for step in payload["workflow_steps"] if step["name"] == "ResumeOptimizeAgent"
+    )
+    assert optimize_step["mode"] == "fallback"
+    assert optimize_step["fallback_reason"] == "LLMServiceError"
+    assert payload["optimization_result"]["jd_targeted_bullets"]
 
 
 def test_stepwise_api_flow() -> None:

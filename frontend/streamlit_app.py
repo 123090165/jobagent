@@ -57,20 +57,31 @@ def main() -> None:
             value=False,
             help="需要先配置 JOBAGENT_LLM_API_KEY；失败时会自动回退到 mock JD 分析。",
         )
+        use_llm_resume_optimize = st.checkbox(
+            "启用 LLM 简历优化",
+            value=False,
+            help="需要先配置 JOBAGENT_LLM_API_KEY；失败时会自动回退到 mock 简历优化。",
+        )
         save_result = st.checkbox(
             "保存本次分析",
             value=True,
             help="保存到本地 SQLite，之后可在历史记录和岗位库中查看。",
         )
         if use_llm_jd and not is_llm_configured():
-            st.info("当前未配置 LLM API key，本次会自动回退到 mock JD 分析。")
+            st.info("当前未配置 LLM API key，本次 JD 分析会自动回退到 mock。")
+        if use_llm_resume_optimize and not is_llm_configured():
+            st.info("当前未配置 LLM API key，本次简历优化会自动回退到 mock。")
 
     tab_analyze, tab_history, tab_jobs, tab_versions, tab_tracker = st.tabs(
         ["生成报告", "历史记录", "岗位库", "简历版本", "投递跟进"]
     )
 
     with tab_analyze:
-        render_analysis_tab(use_llm_jd=use_llm_jd, save_result=save_result)
+        render_analysis_tab(
+            use_llm_jd=use_llm_jd,
+            use_llm_resume_optimize=use_llm_resume_optimize,
+            save_result=save_result,
+        )
 
     with tab_history:
         render_history_tab()
@@ -85,7 +96,12 @@ def main() -> None:
         render_tracker_tab()
 
 
-def render_analysis_tab(*, use_llm_jd: bool, save_result: bool) -> None:
+def render_analysis_tab(
+    *,
+    use_llm_jd: bool,
+    use_llm_resume_optimize: bool,
+    save_result: bool,
+) -> None:
     if "analysis_resume_text" not in st.session_state:
         st.session_state["analysis_resume_text"] = SAMPLE_RESUME
 
@@ -127,6 +143,7 @@ def render_analysis_tab(*, use_llm_jd: bool, save_result: bool) -> None:
                 resume_text=resume_text,
                 jd_text=jd_text,
                 use_llm_jd=use_llm_jd,
+                use_llm_resume_optimize=use_llm_resume_optimize,
             )
         except ValueError as exc:
             st.error(str(exc))

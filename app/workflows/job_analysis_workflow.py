@@ -38,6 +38,7 @@ class JobAnalysisWorkflowState(BaseModel):
     resume_text: str
     jd_text: str
     use_llm_jd: bool = False
+    use_llm_resume_optimize: bool = False
     resume_profile: ResumeProfile | None = None
     job_analysis: JobAnalysis | None = None
     match_report: MatchReport | None = None
@@ -58,6 +59,8 @@ def run_job_analysis_workflow(
     *,
     use_llm_jd: bool = False,
     jd_llm_service: LLMService | None = None,
+    use_llm_resume_optimize: bool = False,
+    resume_optimize_llm_service: LLMService | None = None,
 ) -> JobAnalysisWorkflowResult:
     """Run the explicit JobAgent analysis workflow with traceable steps."""
     normalized_resume = resume_text.strip()
@@ -72,6 +75,7 @@ def run_job_analysis_workflow(
         resume_text=normalized_resume,
         jd_text=normalized_jd,
         use_llm_jd=use_llm_jd,
+        use_llm_resume_optimize=use_llm_resume_optimize,
     )
 
     step_started_at = perf_counter()
@@ -114,12 +118,17 @@ def run_job_analysis_workflow(
         state.resume_profile,
         state.job_analysis,
         state.match_report,
+        use_llm=use_llm_resume_optimize,
+        service=resume_optimize_llm_service,
     )
     state.optimization_result = optimization_result.output
     _record_step(
         state,
         optimization_result.metadata,
-        f"生成 {len(state.optimization_result.jd_targeted_bullets)} 条 JD 定向建议。",
+        (
+            f"{_format_resume_optimize_mode_summary(optimization_result.metadata)} "
+            f"生成 {len(state.optimization_result.jd_targeted_bullets)} 条 JD 定向建议。"
+        ),
         duration_ms=_elapsed_ms(step_started_at),
     )
 
@@ -190,6 +199,14 @@ def _format_mode_summary(metadata: AgentRunMetadata) -> str:
     if metadata.mode == "fallback":
         return f"LLM 分析失败，已回退 mock（{metadata.fallback_reason}）"
     return "使用 mock JD 规则分析"
+
+
+def _format_resume_optimize_mode_summary(metadata: AgentRunMetadata) -> str:
+    if metadata.mode == "llm":
+        return "使用 LLM 简历优化"
+    if metadata.mode == "fallback":
+        return f"LLM 简历优化失败，已回退 mock（{metadata.fallback_reason}）"
+    return "使用 mock 简历优化"
 
 
 def _elapsed_ms(started_at: float) -> float:
