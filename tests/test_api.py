@@ -4,8 +4,9 @@ from types import SimpleNamespace
 
 from fastapi.testclient import TestClient
 
-from app.api import routes_analyze
+from app.api import routes_analyze, routes_jobs
 from app.main import app
+from app.services.jd_url_service import JDUrlImportError
 from app.workflows.job_analysis_workflow import WorkflowStepTrace, run_job_analysis_workflow
 from tests.test_mock_pipeline import SAMPLE_JD, SAMPLE_RESUME
 
@@ -251,6 +252,45 @@ def test_stepwise_api_flow() -> None:
     assert report_response.status_code == 200
     assert "markdown_report" in report_response.json()
     assert "项目拷打问题" in report_response.json()["markdown_report"]
+
+
+def test_import_jd_url_endpoint_returns_extracted_text(monkeypatch) -> None:
+    monkeypatch.setattr(
+        routes_jobs,
+        "import_jd_from_url",
+        lambda url: "Python backend role. " * 8,
+    )
+
+    response = client.post(
+        "/jobs/import-url",
+        json={"url": "https://example.com/job"},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["url"] == "https://example.com/job"
+    assert "Python backend role." in payload["extracted_text"]
+    assert payload["warning"] is None
+
+
+def test_import_jd_url_endpoint_returns_error_code(monkeypatch) -> None:
+    def fake_import(url: str) -> str:
+        raise JDUrlImportError(
+            "Failed to fetch JD URL. Please paste the JD manually.",
+            "jd_url_fetch_failed",
+        )
+
+    monkeypatch.setattr(routes_jobs, "import_jd_from_url", fake_import)
+
+    response = client.post(
+        "/jobs/import-url",
+        json={"url": "https://example.com/job"},
+    )
+
+    assert response.status_code == 400
+    payload = response.json()
+    assert payload["detail"] == "Failed to fetch JD URL. Please paste the JD manually."
+    assert payload["error_code"] == "jd_url_fetch_failed"
 
 
 def test_resume_parse_endpoint_returns_error_code_for_empty_text() -> None:

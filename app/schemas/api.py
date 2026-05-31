@@ -55,6 +55,16 @@ class JDAnalysisRequest(BaseModel):
     use_llm: bool = False
 
 
+class JDUrlImportRequest(BaseModel):
+    url: str
+
+
+class JDUrlImportResponse(BaseModel):
+    url: str
+    extracted_text: str
+    warning: str | None = None
+
+
 class MatchAnalysisRequest(BaseModel):
     resume_profile: ResumeProfile
     job_analysis: JobAnalysis

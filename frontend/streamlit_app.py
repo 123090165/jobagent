@@ -10,6 +10,7 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
+from app.services.jd_url_service import JDUrlImportError, import_jd_from_url
 from app.services.llm_service import is_llm_configured
 from app.services.application_service import list_applications, save_application
 from app.services.resume_version_service import (
@@ -123,6 +124,8 @@ def render_analysis_tab(
 ) -> None:
     if "analysis_resume_text" not in st.session_state:
         st.session_state["analysis_resume_text"] = SAMPLE_RESUME
+    if "analysis_jd_text" not in st.session_state:
+        st.session_state["analysis_jd_text"] = SAMPLE_JD
 
     left, right = st.columns(2)
     with left:
@@ -150,7 +153,21 @@ def render_analysis_tab(
                     st.success(f"已读取简历文件：{uploaded_resume.name}")
         resume_text = st.text_area("简历文本", key="analysis_resume_text", height=320)
     with right:
-        jd_text = st.text_area("目标岗位 JD", value=SAMPLE_JD, height=320)
+        jd_url = st.text_input(
+            "JD URL",
+            key="analysis_jd_url",
+            placeholder="https://example.com/job",
+        )
+        if st.button("从 URL 导入 JD", use_container_width=True):
+            try:
+                imported_jd_text = import_jd_from_url(jd_url)
+            except JDUrlImportError as exc:
+                st.error(str(exc))
+            else:
+                st.session_state["analysis_jd_text"] = imported_jd_text
+                st.success("已从 URL 导入 JD 文本")
+        st.caption("安全边界：只支持公开 http/https 网页文本提取，失败时请手动粘贴 JD。")
+        jd_text = st.text_area("目标岗位 JD", key="analysis_jd_text", height=320)
 
     if st.button("生成分析报告", type="primary", use_container_width=True):
         if not resume_text.strip() or not jd_text.strip():
