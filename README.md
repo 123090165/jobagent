@@ -30,6 +30,7 @@ JobAgent 是一个面向求职者的本地求职准备工作台，核心目标�
 - Mock pipeline：不依赖真实 LLM 也能端到端运行。
 - Workflow 编排层：记录主链路步骤、Agent 模式和 guardrails，为后续 LangGraph 迁移做准备。
 - LangGraph 迁移准备：用 `WorkflowGraphSpec` 固定 node、edge、state reads/writes 和迁移契约。
+- LangGraph Workflow Prototype：新增并行原型 workflow，用 graph node + 条件分支验证迁移方向，但当前不替换默认 workflow。
 - Agent 边界：ResumeParse、JDAnalysis、Match、ResumeOptimize、ProjectChallenge、Report 都有独立入口。
 - Agent Trace：每步记录 `mock`、`llm` 或 `fallback` 模式、fallback 原因、耗时和 guardrails。
 - 可选 LLM JDAnalysisAgent：调用失败或未配置 API key 时回退 mock。
@@ -255,8 +256,9 @@ $env:JOBAGENT_MAX_RESUME_FILE_BYTES="1048576"
 | Phase 13 | Stability and Demo Materials，补文件大小限制、统一错误返回、演示脚本和答辩材料 | 已完成 |
 | Phase 14 | ResumeOptimizeAgent LLM Mode，可选 LLM 简历优化并失败回退 mock | 已完成 |
 | Phase 15 | ProjectChallengeAgent LLM Mode，可选 LLM 项目追问并失败回退 mock | 已完成 |
-| Phase 16 | LangGraph 原型、RAG 检索、MCP 工具封装 | 后续 |
-| Phase 17 | Docker、部署说明、答辩截图整理 | 后续 |
+| Phase 16 | LangGraph Workflow Prototype，新增并行 graph workflow 和低匹配条件分支，但不替换默认 workflow | 已完成 |
+| Phase 17 | RAG 检索、MCP 工具封装 | 后续 |
+| Phase 18 | Docker、部署说明、答辩截图整理 | 后续 |
 
 ## 面试讲述版
 
@@ -376,4 +378,5 @@ docs/
 - [Workflow Architecture](docs/WORKFLOW_ARCHITECTURE.md)
 - [Workflow Trace Persistence](docs/WORKFLOW_TRACE_PERSISTENCE.md)
 - [LangGraph Migration Prep](docs/LANGGRAPH_MIGRATION_PREP.md)
+- [LangGraph Workflow Prototype](docs/LANGGRAPH_WORKFLOW_PROTOTYPE.md)
 - [LLM Integration](docs/LLM_INTEGRATION.md)
