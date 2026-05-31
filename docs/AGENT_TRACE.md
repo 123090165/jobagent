@@ -71,6 +71,7 @@ WorkflowStepTrace
 
 - JDAnalysisAgent
 - ResumeOptimizeAgent
+- ProjectInterviewAgent
 
 ### fallback
 
@@ -80,6 +81,7 @@ WorkflowStepTrace
 
 - JDAnalysisAgent
 - ResumeOptimizeAgent
+- ProjectInterviewAgent
 
 ## 5. 当前 Guardrails
 
@@ -110,7 +112,10 @@ WorkflowStepTrace
 ### ProjectInterviewAgent
 
 - 追问必须基于简历项目和目标 JD。
+- 不追问简历里不存在的项目、公司或技术栈。
+- 不编造项目背景、数据、指标或技术栈。
 - 暴露短板时给出可执行补强方向。
+- LLM 输出必须通过 `ProjectChallengeReport` schema 校验。
 
 ### ReportAgent
 
@@ -125,9 +130,12 @@ WorkflowStepTrace
 - JDAnalysisAgent LLM 失败时返回 `fallback`。
 - ResumeOptimizeAgent LLM 成功时返回 `llm`。
 - ResumeOptimizeAgent LLM 失败、非法 JSON 或 schema 校验失败时返回 `fallback`。
+- ProjectInterviewAgent LLM 成功时返回 `llm`。
+- ProjectInterviewAgent LLM 失败、非法 JSON 或 schema 校验失败时返回 `fallback`。
 - workflow step trace 记录每一步的 `mode`。
 - workflow step trace 记录 JDAnalysisAgent 的 `fallback_reason`。
 - workflow step trace 记录 ResumeOptimizeAgent 的 `fallback_reason`。
+- workflow step trace 记录 ProjectInterviewAgent 的 `fallback_reason`。
 - workflow step trace 记录同一次运行的 `workflow_run_id` 和每步 `duration_ms`。
 - 保存分析记录时，workflow step trace 会写入 SQLite。
 - 读取历史记录详情时，会返回已保存的 workflow step trace。
