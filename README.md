@@ -31,6 +31,7 @@ JobAgent 是一个面向求职者的本地求职准备工作台，核心目标�
 - Workflow 编排层：记录主链路步骤、Agent 模式和 guardrails，为后续 LangGraph 迁移做准备。
 - LangGraph 迁移准备：用 `WorkflowGraphSpec` 固定 node、edge、state reads/writes 和迁移契约。
 - LangGraph Workflow Prototype：新增并行原型 workflow，用 graph node + 条件分支验证迁移方向，但当前不替换默认 workflow。
+- FastAPI / Streamlit 实验入口：可选启用 `use_langgraph_workflow`，但默认仍然使用 Python workflow。
 - Agent 边界：ResumeParse、JDAnalysis、Match、ResumeOptimize、ProjectChallenge、Report 都有独立入口。
 - Agent Trace：每步记录 `mock`、`llm` 或 `fallback` 模式、fallback 原因、耗时和 guardrails。
 - 可选 LLM JDAnalysisAgent：调用失败或未配置 API key 时回退 mock。
@@ -117,6 +118,7 @@ pip install -r requirements.txt
 页面包含：
 
 - 生成报告：粘贴简历文本，或上传 `.txt` / `.md` 简历文件，再输入 JD，输出 Markdown 报告和执行轨迹。
+- 侧边栏可选“启用 LangGraph 原型 workflow”：当前为实验模式，不替换默认 workflow，会使用 graph node 和 match score 条件分支。
 - 历史记录：查看已保存的分析结果和每次 workflow step trace。
 - 岗位库：查看保存过的 JD 和结构化分析。
 - 简历版本：保存针对不同岗位定制的简历版本。
@@ -164,11 +166,15 @@ $env:JOBAGENT_LLM_MODEL="gpt-4o-mini"
 - “启用 LLM JD 分析”
 - “启用 LLM 简历优化”
 - “启用 LLM 项目追问”
+- “启用 LangGraph 原型 workflow”
+
+默认情况下 `use_langgraph_workflow = false`，系统继续走现有 Python workflow；只有显式开启实验入口时才会调用 LangGraph prototype。
 
 通过 API 调用完整分析时，可传：
 
 ```json
 {
+  "use_langgraph_workflow": false,
   "use_llm_jd": true,
   "use_llm_resume_optimize": true,
   "use_llm_project_challenge": true

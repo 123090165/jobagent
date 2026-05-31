@@ -30,6 +30,7 @@
 
 - 默认入口：`run_job_analysis_workflow(...)`
 - 原型入口：`run_langgraph_job_analysis_workflow(...)`
+- API / Streamlit 实验入口：`use_langgraph_workflow = true`
 
 ## 当前 graph 节点
 
@@ -165,3 +166,41 @@ result = run_langgraph_job_analysis_workflow(
 ```
 
 如果环境里还没有安装 `langgraph`，函数会抛出明确错误，提醒先安装依赖。
+
+## 如何通过 FastAPI 使用
+
+默认情况下，`POST /analyze/full` 仍然使用 Python workflow。
+
+只有显式传入下面的实验参数时，才会切到 LangGraph prototype：
+
+```json
+{
+  "resume_text": "...",
+  "jd_text": "...",
+  "use_langgraph_workflow": true
+}
+```
+
+说明：
+
+- `use_langgraph_workflow` 默认值是 `false`
+- 返回结构仍然是原来的 `FullAnalysisResponse`
+- `workflow_steps` 会继续返回
+- 如果走 LangGraph prototype，trace 里会看到 `MatchScoreRouter`
+
+## 如何通过 Streamlit 使用
+
+在 Streamlit 侧边栏可以勾选：
+
+- `启用 LangGraph 原型 workflow`
+
+这个开关的定位是实验入口：
+
+- 不替换默认 Python workflow
+- 会使用 graph node
+- 会使用基于 match score 的条件分支
+
+生成报告后，可以在执行轨迹区域看到当前 workflow 类型：
+
+- `default_python`
+- `langgraph_prototype`
