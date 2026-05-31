@@ -26,6 +26,7 @@ from app.services.storage_service import (
     save_final_report,
 )
 from app.workflows.job_analysis_workflow import run_job_analysis_workflow
+from app.workflows.langgraph_job_analysis_workflow import run_langgraph_job_analysis_workflow
 
 
 SAMPLE_RESUME = """张三
@@ -67,6 +68,11 @@ def main() -> None:
             value=False,
             help="需要先配置 JOBAGENT_LLM_API_KEY；失败时会自动回退到 mock 项目追问。",
         )
+        use_langgraph_workflow = st.checkbox(
+            "启用 LangGraph 原型 workflow",
+            value=False,
+            help="当前为实验模式，不替换默认 Python workflow；会使用 graph node 和 match score 条件分支。",
+        )
         save_result = st.checkbox(
             "保存本次分析",
             value=True,
@@ -78,6 +84,8 @@ def main() -> None:
             st.info("当前未配置 LLM API key，本次简历优化会自动回退到 mock。")
         if use_llm_project_challenge and not is_llm_configured():
             st.info("当前未配置 LLM API key，本次项目追问会自动回退到 mock。")
+        if use_langgraph_workflow:
+            st.caption("当前已启用 LangGraph 原型 workflow：实验入口，不替换默认 Python workflow。")
 
     tab_analyze, tab_history, tab_jobs, tab_versions, tab_tracker = st.tabs(
         ["生成报告", "历史记录", "岗位库", "简历版本", "投递跟进"]
@@ -88,6 +96,7 @@ def main() -> None:
             use_llm_jd=use_llm_jd,
             use_llm_resume_optimize=use_llm_resume_optimize,
             use_llm_project_challenge=use_llm_project_challenge,
+            use_langgraph_workflow=use_langgraph_workflow,
             save_result=save_result,
         )
 
@@ -109,6 +118,7 @@ def render_analysis_tab(
     use_llm_jd: bool,
     use_llm_resume_optimize: bool,
     use_llm_project_challenge: bool,
+    use_langgraph_workflow: bool,
     save_result: bool,
 ) -> None:
     if "analysis_resume_text" not in st.session_state:
@@ -148,19 +158,25 @@ def render_analysis_tab(
             return
 
         try:
-            workflow_result = run_job_analysis_workflow(
+            workflow_runner = (
+                run_langgraph_job_analysis_workflow
+                if use_langgraph_workflow
+                else run_job_analysis_workflow
+            )
+            workflow_result = workflow_runner(
                 resume_text=resume_text,
                 jd_text=jd_text,
                 use_llm_jd=use_llm_jd,
                 use_llm_resume_optimize=use_llm_resume_optimize,
                 use_llm_project_challenge=use_llm_project_challenge,
             )
-        except ValueError as exc:
+        except (RuntimeError, ValueError) as exc:
             st.error(str(exc))
             return
 
         result = workflow_result.final_report
         workflow_steps = [step.model_dump() for step in workflow_result.state.steps]
+        workflow_type = "langgraph_prototype" if use_langgraph_workflow else "default_python"
         record_id: int | None = None
         if save_result:
             record_id = save_final_report(result, workflow_steps=workflow_steps)
@@ -188,6 +204,7 @@ def render_analysis_tab(
 
         with tab_structured:
             st.subheader("执行轨迹")
+            st.caption(f"当前 workflow 类型：{workflow_type}")
             render_workflow_trace(workflow_steps)
             st.subheader("简历解析")
             st.json(result.resume_profile.model_dump())

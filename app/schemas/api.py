@@ -27,6 +27,7 @@ class WorkflowStepTraceResponse(BaseModel):
 class FullAnalysisRequest(BaseModel):
     resume_text: str
     jd_text: str
+    use_langgraph_workflow: bool = False
     use_llm_jd: bool = False
     use_llm_resume_optimize: bool = False
     use_llm_project_challenge: bool = False

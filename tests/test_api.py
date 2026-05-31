@@ -1,11 +1,41 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 from fastapi.testclient import TestClient
 
+from app.api import routes_analyze
 from app.main import app
+from app.workflows.job_analysis_workflow import WorkflowStepTrace, run_job_analysis_workflow
 from tests.test_mock_pipeline import SAMPLE_JD, SAMPLE_RESUME
 
 client = TestClient(app)
+
+
+def _build_fake_langgraph_workflow_result():
+    baseline = run_job_analysis_workflow(SAMPLE_RESUME, SAMPLE_JD)
+    workflow_run_id = baseline.state.workflow_run_id
+    router_step = WorkflowStepTrace(
+        workflow_run_id=workflow_run_id,
+        name="MatchScoreRouter",
+        status="completed",
+        mode="mock",
+        summary="Route to resume optimization and project challenge path.",
+        duration_ms=0.1,
+        guardrails=[
+            "Route by deterministic score threshold only.",
+            "Do not claim LLM optimization ran when the workflow intentionally skipped it.",
+        ],
+    )
+    steps = [
+        *baseline.state.steps[:3],
+        router_step,
+        *baseline.state.steps[3:],
+    ]
+    return SimpleNamespace(
+        final_report=baseline.final_report,
+        state=SimpleNamespace(steps=steps),
+    )
 
 
 def test_health_endpoint() -> None:
@@ -39,6 +69,95 @@ def test_full_analysis_endpoint_returns_report() -> None:
         step for step in payload["workflow_steps"] if step["name"] == "ProjectInterviewAgent"
     )
     assert challenge_step["mode"] == "mock"
+
+
+def test_full_analysis_endpoint_defaults_to_python_workflow(monkeypatch) -> None:
+    calls = {"default": 0, "langgraph": 0}
+    baseline = run_job_analysis_workflow(SAMPLE_RESUME, SAMPLE_JD)
+
+    def fake_default_workflow(**kwargs):
+        calls["default"] += 1
+        return baseline
+
+    def fake_langgraph_workflow(**kwargs):
+        calls["langgraph"] += 1
+        raise AssertionError("langgraph workflow should not be called by default")
+
+    monkeypatch.setattr(routes_analyze, "run_job_analysis_workflow", fake_default_workflow)
+    monkeypatch.setattr(
+        routes_analyze,
+        "run_langgraph_job_analysis_workflow",
+        fake_langgraph_workflow,
+    )
+
+    response = client.post(
+        "/analyze/full",
+        json={"resume_text": SAMPLE_RESUME, "jd_text": SAMPLE_JD},
+    )
+
+    assert response.status_code == 200
+    assert calls == {"default": 1, "langgraph": 0}
+
+
+def test_full_analysis_endpoint_can_use_langgraph_workflow(monkeypatch) -> None:
+    fake_result = _build_fake_langgraph_workflow_result()
+
+    def fake_langgraph_workflow(**kwargs):
+        return fake_result
+
+    monkeypatch.setattr(
+        routes_analyze,
+        "run_langgraph_job_analysis_workflow",
+        fake_langgraph_workflow,
+    )
+
+    response = client.post(
+        "/analyze/full",
+        json={
+            "resume_text": SAMPLE_RESUME,
+            "jd_text": SAMPLE_JD,
+            "use_langgraph_workflow": True,
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["workflow_steps"]
+    assert any(step["name"] == "MatchScoreRouter" for step in payload["workflow_steps"])
+
+
+def test_full_analysis_can_save_langgraph_record(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("JOBAGENT_DB_PATH", str(tmp_path / "langgraph-api-test.sqlite3"))
+    fake_result = _build_fake_langgraph_workflow_result()
+
+    def fake_langgraph_workflow(**kwargs):
+        return fake_result
+
+    monkeypatch.setattr(
+        routes_analyze,
+        "run_langgraph_job_analysis_workflow",
+        fake_langgraph_workflow,
+    )
+
+    response = client.post(
+        "/analyze/full",
+        json={
+            "resume_text": SAMPLE_RESUME,
+            "jd_text": SAMPLE_JD,
+            "use_langgraph_workflow": True,
+            "save_result": True,
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["record_id"] is not None
+    assert any(step["name"] == "MatchScoreRouter" for step in payload["workflow_steps"])
+
+    record_response = client.get(f"/records/{payload['record_id']}")
+    assert record_response.status_code == 200
+    record = record_response.json()
+    assert any(step["name"] == "MatchScoreRouter" for step in record["workflow_steps"])
 
 
 def test_full_analysis_endpoint_rejects_empty_resume() -> None:
