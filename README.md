@@ -2,7 +2,7 @@
 
 JobAgent 是一个面向求职者的本地求职准备工作台，核心目标是把“简历和 JD 是否匹配、应该怎么改、面试会被怎么追问、投递进展到哪一步”变成可结构化记录和复盘的流程。
 
-当前版本已经从 Mock MVP 推进到可运行的本地工作台：支持 Streamlit Demo、FastAPI 后端、SQLite 分析记录、岗位库查询、txt/md 简历文件解析、可选 LLM JD 分析、workflow 执行轨迹持久化，以及投递 tracker 最小状态机。
+当前版本已经从 Mock MVP 推进到可运行的本地工作台：支持 Streamlit Demo、FastAPI 后端、SQLite 分析记录、岗位库查询、txt/md 简历文件解析、统一业务错误返回、可选 LLM JD 分析、workflow 执行轨迹持久化，以及投递 tracker 最小状态机。
 
 ```text
 简历文本或 .txt/.md 简历文件 + JD 文本
@@ -24,7 +24,8 @@ JobAgent 是一个面向求职者的本地求职准备工作台，核心目标�
 
 - Streamlit 页面：生成报告、历史记录、岗位库、简历版本、投递跟进和执行轨迹展示。
 - FastAPI 后端：分析、简历解析、JD 分析、匹配、报告、记录、岗位、投递 tracker API。
-- 简历文件解析：支持 `.txt` / `.md` UTF-8 文件转纯文本，并复用 `ResumeParseAgent` 输出 `ResumeProfile`。
+- 简历文件解析：支持 `.txt` / `.md` UTF-8 文件转纯文本，默认最大 1MB，并复用 `ResumeParseAgent` 输出 `ResumeProfile`。
+- 统一业务错误：文件解析等业务错误通过 `detail` 和 `error_code` 返回，方便 API 调用方和页面展示。
 - Pydantic schema：稳定 Agent、service、API、UI 之间的数据流。
 - Mock pipeline：不依赖真实 LLM 也能端到端运行。
 - Workflow 编排层：记录主链路步骤、Agent 模式和 guardrails，为后续 LangGraph 迁移做准备。
@@ -155,7 +156,24 @@ $env:JOBAGENT_LLM_MODEL="gpt-4o-mini"
 
 然后在 Streamlit 侧边栏勾选“启用 LLM JD 分析”。
 
-### 5. 运行测试
+### 5. 可选调整简历文件大小限制
+
+`.txt` / `.md` 简历文件默认最大 1MB。可以通过环境变量覆盖：
+
+```powershell
+$env:JOBAGENT_MAX_RESUME_FILE_BYTES="1048576"
+```
+
+超出限制时，API 返回：
+
+```json
+{
+  "detail": "resume file is too large",
+  "error_code": "resume_file_too_large"
+}
+```
+
+### 6. 运行测试
 
 ```powershell
 .venv\Scripts\python.exe -m pytest
@@ -190,6 +208,12 @@ $env:JOBAGENT_LLM_MODEL="gpt-4o-mini"
 
 更完整的演示脚本见 [Demo Guide](docs/DEMO_GUIDE.md)。
 
+展示与答辩材料：
+
+- [Demo Script](docs/DEMO_SCRIPT.md)
+- [Portfolio Pitch](docs/PORTFOLIO_PITCH.md)
+- [Screenshot Guide](docs/SCREENSHOT_GUIDE.md)
+
 ## 阶段路线
 
 | 阶段 | 目标 | 状态 |
@@ -207,8 +231,9 @@ $env:JOBAGENT_LLM_MODEL="gpt-4o-mini"
 | Phase 10 | Workflow observability cleanup，补 run id、耗时和 trace 摘要展示 | 已完成 |
 | Phase 11 | LangGraph migration prep，固定 node 映射和迁移契约 | 已完成 |
 | Phase 12 | Resume File Parser MVP，支持 txt/md 简历文件转纯文本并复用 ResumeParseAgent | 已完成 |
-| Phase 13 | LangGraph 原型、RAG 检索、MCP 工具封装 | 后续 |
-| Phase 14 | Docker、部署说明、答辩材料和截图 | 后续 |
+| Phase 13 | Stability and Demo Materials，补文件大小限制、统一错误返回、演示脚本和答辩材料 | 已完成 |
+| Phase 14 | LangGraph 原型、RAG 检索、MCP 工具封装 | 后续 |
+| Phase 15 | Docker、部署说明、答辩截图整理 | 后续 |
 
 ## 面试讲述版
 
@@ -277,6 +302,7 @@ app/
     resume_version.py
   services/
     application_service.py
+    errors.py
     llm_service.py
     mock_pipeline.py
     report_service.py
@@ -310,6 +336,9 @@ docs/
 
 - [Development Review Guide](docs/DEVELOPMENT_REVIEW_GUIDE.md)
 - [Demo Guide](docs/DEMO_GUIDE.md)
+- [Demo Script](docs/DEMO_SCRIPT.md)
+- [Portfolio Pitch](docs/PORTFOLIO_PITCH.md)
+- [Screenshot Guide](docs/SCREENSHOT_GUIDE.md)
 - [Agent Boundaries](docs/AGENT_BOUNDARIES.md)
 - [Agent Trace](docs/AGENT_TRACE.md)
 - [Git Workflow](docs/GIT_WORKFLOW.md)

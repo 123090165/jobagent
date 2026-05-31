@@ -15,7 +15,7 @@
 用途：
 
 - 输入简历文本。
-- 可上传 `.txt` / `.md` 简历文件，并把提取出的文本填入简历输入区。
+- 可上传 `.txt` / `.md` 简历文件，并把提取出的文本填入简历输入区；默认文件大小限制为 1MB。
 - 输入目标岗位 JD。
 - 可选启用 LLM JD 分析。
 - 可选保存本次分析到 SQLite。
@@ -75,6 +75,7 @@
 
 - 页面只展示和触发已有服务，不重新写业务逻辑。
 - 简历文件上传只调用 `resume_file_service` 提取纯文本，不在页面里实现解析规则。
+- 文件大小限制也由 `resume_file_service` 统一校验，页面只展示错误 message。
 - 保存能力调用 `storage_service`，不在页面里写 SQL。
 - 简历版本能力调用 `resume_version_service`，不在页面里直接操作 SQLite。
 - 生成报告页必须通过 `run_job_analysis_workflow` 拿到 `workflow_steps`，不能绕回旧的底层 mock 函数。

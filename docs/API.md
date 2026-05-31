@@ -138,6 +138,11 @@ http://127.0.0.1:8000/docs
 
 - `file`：简历文件，当前只支持 `.txt` / `.md`。
 
+大小限制：
+
+- 默认最大 1MB。
+- 可通过 `JOBAGENT_MAX_RESUME_FILE_BYTES` 覆盖。
+
 返回：
 
 ```json
@@ -151,9 +156,19 @@ http://127.0.0.1:8000/docs
 
 错误：
 
-- 空文件：`400 resume file cannot be empty`
-- 不支持扩展名：`400 unsupported resume file type`
-- 非 UTF-8 文本：`400 resume file must be UTF-8 text`
+- 空文件：`400 resume_file_empty`
+- 不支持扩展名：`400 resume_file_type_unsupported`
+- 非 UTF-8 文本：`400 resume_file_decode_failed`
+- 超出大小限制：`400 resume_file_too_large`
+
+业务错误返回格式：
+
+```json
+{
+  "detail": "resume file is too large",
+  "error_code": "resume_file_too_large"
+}
+```
 
 当前不支持 PDF/DOCX，也不会从文件内容里推断或编造简历经历；文件解析只负责把受支持文件转成纯文本。
 

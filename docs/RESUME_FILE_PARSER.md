@@ -11,6 +11,11 @@
 - `.txt`
 - `.md`
 
+默认大小限制：
+
+- 最大 1MB。
+- 可通过 `JOBAGENT_MAX_RESUME_FILE_BYTES` 配置。
+
 暂不支持：
 
 - `.pdf`
@@ -23,6 +28,7 @@ PDF/DOCX 放到后续计划，不在当前 MVP 引入大型文档解析依赖。
 ```text
 UploadFile bytes
 -> resume_file_service 校验文件名和扩展名
+-> 文件大小校验
 -> UTF-8 解码
 -> 空内容校验
 -> extracted_text
@@ -62,8 +68,18 @@ tests/test_api.py
 - 不支持的扩展名：`unsupported resume file type`
 - 非 UTF-8 内容：`resume file must be UTF-8 text`
 - 缺少文件名：`filename is required`
+- 超出大小限制：`resume file is too large`
 
-这些错误在 API 中映射为 HTTP 400，方便前端和调用方直接展示。
+这些错误继承统一 `JobAgentError`，包含 `message` 和 `error_code`。API 中映射为 HTTP 400，并返回：
+
+```json
+{
+  "detail": "resume file is too large",
+  "error_code": "resume_file_too_large"
+}
+```
+
+Streamlit 页面只展示用户友好的 message。
 
 ## 6. 后续计划
 
