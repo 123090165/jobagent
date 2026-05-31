@@ -39,6 +39,7 @@ class JobAnalysisWorkflowState(BaseModel):
     jd_text: str
     use_llm_jd: bool = False
     use_llm_resume_optimize: bool = False
+    use_llm_project_challenge: bool = False
     resume_profile: ResumeProfile | None = None
     job_analysis: JobAnalysis | None = None
     match_report: MatchReport | None = None
@@ -61,6 +62,8 @@ def run_job_analysis_workflow(
     jd_llm_service: LLMService | None = None,
     use_llm_resume_optimize: bool = False,
     resume_optimize_llm_service: LLMService | None = None,
+    use_llm_project_challenge: bool = False,
+    project_challenge_llm_service: LLMService | None = None,
 ) -> JobAnalysisWorkflowResult:
     """Run the explicit JobAgent analysis workflow with traceable steps."""
     normalized_resume = resume_text.strip()
@@ -76,6 +79,7 @@ def run_job_analysis_workflow(
         jd_text=normalized_jd,
         use_llm_jd=use_llm_jd,
         use_llm_resume_optimize=use_llm_resume_optimize,
+        use_llm_project_challenge=use_llm_project_challenge,
     )
 
     step_started_at = perf_counter()
@@ -136,12 +140,14 @@ def run_job_analysis_workflow(
     challenge_result = run_project_challenge_agent(
         state.resume_profile,
         state.job_analysis,
+        use_llm=use_llm_project_challenge,
+        service=project_challenge_llm_service,
     )
     state.project_challenge_report = challenge_result.output
     _record_step(
         state,
         challenge_result.metadata,
-        "生成项目追问和面试官关注点。",
+        _format_project_challenge_mode_summary(challenge_result.metadata),
         duration_ms=_elapsed_ms(step_started_at),
     )
 
@@ -207,6 +213,14 @@ def _format_resume_optimize_mode_summary(metadata: AgentRunMetadata) -> str:
     if metadata.mode == "fallback":
         return f"LLM 简历优化失败，已回退 mock（{metadata.fallback_reason}）"
     return "使用 mock 简历优化"
+
+
+def _format_project_challenge_mode_summary(metadata: AgentRunMetadata) -> str:
+    if metadata.mode == "llm":
+        return "使用 LLM 项目追问"
+    if metadata.mode == "fallback":
+        return f"LLM 项目追问失败，已回退 mock（{metadata.fallback_reason}）"
+    return "使用 mock 项目追问"
 
 
 def _elapsed_ms(started_at: float) -> float:

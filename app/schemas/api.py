@@ -29,6 +29,7 @@ class FullAnalysisRequest(BaseModel):
     jd_text: str
     use_llm_jd: bool = False
     use_llm_resume_optimize: bool = False
+    use_llm_project_challenge: bool = False
     save_result: bool = False
 
 

@@ -35,6 +35,10 @@ def test_full_analysis_endpoint_returns_report() -> None:
         step for step in payload["workflow_steps"] if step["name"] == "ResumeOptimizeAgent"
     )
     assert optimize_step["mode"] == "mock"
+    challenge_step = next(
+        step for step in payload["workflow_steps"] if step["name"] == "ProjectInterviewAgent"
+    )
+    assert challenge_step["mode"] == "mock"
 
 
 def test_full_analysis_endpoint_rejects_empty_resume() -> None:
@@ -68,6 +72,28 @@ def test_full_analysis_endpoint_accepts_resume_optimize_llm_flag(monkeypatch) ->
     assert optimize_step["mode"] == "fallback"
     assert optimize_step["fallback_reason"] == "LLMServiceError"
     assert payload["optimization_result"]["jd_targeted_bullets"]
+
+
+def test_full_analysis_endpoint_accepts_project_challenge_llm_flag(monkeypatch) -> None:
+    monkeypatch.delenv("JOBAGENT_LLM_API_KEY", raising=False)
+
+    response = client.post(
+        "/analyze/full",
+        json={
+            "resume_text": SAMPLE_RESUME,
+            "jd_text": SAMPLE_JD,
+            "use_llm_project_challenge": True,
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    challenge_step = next(
+        step for step in payload["workflow_steps"] if step["name"] == "ProjectInterviewAgent"
+    )
+    assert challenge_step["mode"] == "fallback"
+    assert challenge_step["fallback_reason"] == "LLMServiceError"
+    assert payload["project_challenge_report"]["basic_questions"]
 
 
 def test_stepwise_api_flow() -> None:

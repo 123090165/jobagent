@@ -32,6 +32,42 @@ class ResumeOptimizeLLMService:
         }
 
 
+class ProjectChallengeLLMService:
+    def chat_completion_json(self, *, system_prompt: str, user_prompt: str):
+        return {
+            "basic_questions": [
+                {
+                    "question": "JobAgent 解决的核心问题是什么？",
+                    "evaluates": "是否能讲清项目背景。",
+                    "answer_framework": "按问题、目标用户、方案来回答。",
+                }
+            ],
+            "technical_deep_dive_questions": [
+                {
+                    "question": "你在 JobAgent 里如何组织 FastAPI、Pydantic 和 workflow？",
+                    "evaluates": "是否理解项目中的数据流。",
+                    "answer_framework": "从 schema、service、agent、storage 角度回答。",
+                }
+            ],
+            "architecture_questions": [
+                {
+                    "question": "如果分析步骤继续增加，你会怎么保持 workflow 可维护？",
+                    "evaluates": "是否具备架构演进意识。",
+                    "answer_framework": "从状态、trace 和测试三方面回答。",
+                }
+            ],
+            "tradeoff_questions": [
+                {
+                    "question": "为什么现在保留 mock fallback？",
+                    "evaluates": "是否理解稳定性和可用性的取舍。",
+                    "answer_framework": "从可用性、成本和失败恢复说明。",
+                }
+            ],
+            "interviewer_concerns": ["项目是否缺少真实输入输出约束。"],
+            "improvement_suggestions": ["准备真实样例演示结构化输入和 trace。"],
+        }
+
+
 def test_job_analysis_workflow_records_step_trace() -> None:
     result = run_job_analysis_workflow(SAMPLE_RESUME, SAMPLE_JD)
 
@@ -113,3 +149,33 @@ def test_job_analysis_workflow_records_resume_optimize_fallback_metadata() -> No
     assert optimize_step.fallback_reason == "LLMServiceError"
     assert "简历优化失败，已回退 mock" in optimize_step.summary
     assert result.final_report.optimization_result.jd_targeted_bullets
+
+
+def test_job_analysis_workflow_records_project_challenge_llm_metadata() -> None:
+    result = run_job_analysis_workflow(
+        SAMPLE_RESUME,
+        SAMPLE_JD,
+        use_llm_project_challenge=True,
+        project_challenge_llm_service=ProjectChallengeLLMService(),  # type: ignore[arg-type]
+    )
+
+    challenge_step = next(step for step in result.state.steps if step.name == "ProjectInterviewAgent")
+    assert challenge_step.mode == "llm"
+    assert challenge_step.fallback_reason is None
+    assert "使用 LLM 项目追问" in challenge_step.summary
+    assert result.final_report.project_challenge_report.basic_questions
+
+
+def test_job_analysis_workflow_records_project_challenge_fallback_metadata() -> None:
+    result = run_job_analysis_workflow(
+        SAMPLE_RESUME,
+        SAMPLE_JD,
+        use_llm_project_challenge=True,
+        project_challenge_llm_service=FailingLLMService(),  # type: ignore[arg-type]
+    )
+
+    challenge_step = next(step for step in result.state.steps if step.name == "ProjectInterviewAgent")
+    assert challenge_step.mode == "fallback"
+    assert challenge_step.fallback_reason == "LLMServiceError"
+    assert "项目追问失败，已回退 mock" in challenge_step.summary
+    assert result.final_report.project_challenge_report.technical_deep_dive_questions

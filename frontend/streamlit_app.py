@@ -62,6 +62,11 @@ def main() -> None:
             value=False,
             help="需要先配置 JOBAGENT_LLM_API_KEY；失败时会自动回退到 mock 简历优化。",
         )
+        use_llm_project_challenge = st.checkbox(
+            "启用 LLM 项目追问",
+            value=False,
+            help="需要先配置 JOBAGENT_LLM_API_KEY；失败时会自动回退到 mock 项目追问。",
+        )
         save_result = st.checkbox(
             "保存本次分析",
             value=True,
@@ -71,6 +76,8 @@ def main() -> None:
             st.info("当前未配置 LLM API key，本次 JD 分析会自动回退到 mock。")
         if use_llm_resume_optimize and not is_llm_configured():
             st.info("当前未配置 LLM API key，本次简历优化会自动回退到 mock。")
+        if use_llm_project_challenge and not is_llm_configured():
+            st.info("当前未配置 LLM API key，本次项目追问会自动回退到 mock。")
 
     tab_analyze, tab_history, tab_jobs, tab_versions, tab_tracker = st.tabs(
         ["生成报告", "历史记录", "岗位库", "简历版本", "投递跟进"]
@@ -80,6 +87,7 @@ def main() -> None:
         render_analysis_tab(
             use_llm_jd=use_llm_jd,
             use_llm_resume_optimize=use_llm_resume_optimize,
+            use_llm_project_challenge=use_llm_project_challenge,
             save_result=save_result,
         )
 
@@ -100,6 +108,7 @@ def render_analysis_tab(
     *,
     use_llm_jd: bool,
     use_llm_resume_optimize: bool,
+    use_llm_project_challenge: bool,
     save_result: bool,
 ) -> None:
     if "analysis_resume_text" not in st.session_state:
@@ -144,6 +153,7 @@ def render_analysis_tab(
                 jd_text=jd_text,
                 use_llm_jd=use_llm_jd,
                 use_llm_resume_optimize=use_llm_resume_optimize,
+                use_llm_project_challenge=use_llm_project_challenge,
             )
         except ValueError as exc:
             st.error(str(exc))

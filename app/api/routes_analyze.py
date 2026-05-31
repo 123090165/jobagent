@@ -18,6 +18,7 @@ def analyze_full(request: FullAnalysisRequest) -> FullAnalysisResponse:
             jd_text=request.jd_text,
             use_llm_jd=request.use_llm_jd,
             use_llm_resume_optimize=request.use_llm_resume_optimize,
+            use_llm_project_challenge=request.use_llm_project_challenge,
         )
     except ValueError as exc:
         raise JobAgentError(str(exc), "analysis_input_invalid") from exc
