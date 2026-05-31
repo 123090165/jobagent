@@ -33,6 +33,7 @@ JobAgent 是一个面向求职者的本地求职准备工作台，核心目标�
 - LangGraph 迁移准备：用 `WorkflowGraphSpec` 固定 node、edge、state reads/writes 和迁移契约。
 - LangGraph Workflow Prototype：新增并行原型 workflow，用 graph node + 条件分支验证迁移方向，但当前不替换默认 workflow。
 - FastAPI / Streamlit 实验入口：可选启用 `use_langgraph_workflow`，但默认仍然使用 Python workflow。
+- MissingInfoQuestionAgent：在 LangGraph prototype 中补充缺失信息检测节点，只生成澄清问题，不编造简历内容。
 - Agent 边界：ResumeParse、JDAnalysis、Match、ResumeOptimize、ProjectChallenge、Report 都有独立入口。
 - Agent Trace：每步记录 `mock`、`llm` 或 `fallback` 模式、fallback 原因、耗时和 guardrails。
 - 可选 LLM JDAnalysisAgent：调用失败或未配置 API key 时回退 mock。
@@ -278,8 +279,9 @@ $env:JOBAGENT_MAX_RESUME_FILE_BYTES="1048576"
 | Phase 15 | ProjectChallengeAgent LLM Mode，可选 LLM 项目追问并失败回退 mock | 已完成 |
 | Phase 16 | LangGraph Workflow Prototype，新增并行 graph workflow 和低匹配条件分支，但不替换默认 workflow | 已完成 |
 | Phase 17 | Safe JD URL Import，支持公开 JD 页面文本提取并保留手动粘贴兜底 | 已完成 |
-| Phase 18 | RAG 检索、MCP 工具封装 | 后续 |
-| Phase 19 | Docker、部署说明、答辩截图整理 | 后续 |
+| Phase 18 | MissingInfoQuestionAgent，在 LangGraph prototype 中增加缺失信息澄清节点 | 已完成 |
+| Phase 19 | RAG/MCP | 后续 |
+| Phase 20 | Docker、部署说明、答辩截图整理 | 后续 |
 
 ## 面试讲述版
 
@@ -401,4 +403,5 @@ docs/
 - [LangGraph Migration Prep](docs/LANGGRAPH_MIGRATION_PREP.md)
 - [LangGraph Workflow Prototype](docs/LANGGRAPH_WORKFLOW_PROTOTYPE.md)
 - [JD URL Import](docs/JD_URL_IMPORT.md)
+- [Missing Info Agent](docs/MISSING_INFO_AGENT.md)
 - [LLM Integration](docs/LLM_INTEGRATION.md)
