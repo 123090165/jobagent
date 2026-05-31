@@ -2,7 +2,7 @@
 
 JobAgent 是一个面向求职者的本地求职准备工作台，核心目标是把“简历和 JD 是否匹配、应该怎么改、面试会被怎么追问、投递进展到哪一步”变成可结构化记录和复盘的流程。
 
-当前版本已经从 Mock MVP 推进到可运行的本地工作台：支持 Streamlit Demo、FastAPI 后端、SQLite 分析记录、岗位库查询、txt/md 简历文件解析、统一业务错误返回、可选 LLM JD 分析、workflow 执行轨迹持久化，以及投递 tracker 最小状态机。
+当前版本已经从 Mock MVP 推进到可运行的本地工作台：支持 Streamlit Demo、FastAPI 后端、SQLite 分析记录、岗位库查询、txt/md 简历文件解析、统一业务错误返回、可选 LLM JD 分析、可选 LLM 简历优化、workflow 执行轨迹持久化，以及投递 tracker 最小状态机。
 
 ```text
 简历文本或 .txt/.md 简历文件 + JD 文本
@@ -33,6 +33,7 @@ JobAgent 是一个面向求职者的本地求职准备工作台，核心目标�
 - Agent 边界：ResumeParse、JDAnalysis、Match、ResumeOptimize、ProjectChallenge、Report 都有独立入口。
 - Agent Trace：每步记录 `mock`、`llm` 或 `fallback` 模式、fallback 原因、耗时和 guardrails。
 - 可选 LLM JDAnalysisAgent：调用失败或未配置 API key 时回退 mock。
+- 可选 LLM ResumeOptimizeAgent：只基于已有简历、JD 和匹配报告给优化建议，失败或校验不通过时回退 mock。
 - SQLite 存储：保存分析记录、岗位 JD、匹配报告、项目追问、带 run id/耗时的 workflow step trace、简历版本和 tracker。
 - 简历版本管理：保存原始简历、定制后文本，并可关联目标岗位和投递记录。
 - pytest 测试：覆盖 mock pipeline、API、存储、LLM fallback、workflow trace 持久化、简历版本和投递 tracker。
@@ -62,13 +63,14 @@ flowchart TD
     Workflow --> Resume["ResumeParseAgent<br/>Mock"]
     Workflow --> JD["JDAnalysisAgent<br/>Mock or optional LLM"]
     Workflow --> Match["MatchAgent<br/>Mock"]
-    Workflow --> Optimize["ResumeOptimizeAgent<br/>Mock"]
+    Workflow --> Optimize["ResumeOptimizeAgent<br/>Mock or optional LLM"]
     Workflow --> Challenge["ProjectInterviewAgent<br/>Mock"]
     Workflow --> Report["ReportAgent<br/>Mock"]
     Workflow --> Trace["WorkflowStepTrace"]
     Services --> AppTracker["Application Tracker Service"]
 
     JD --> LLM["OpenAI-compatible LLM<br/>optional"]
+    Optimize --> LLM
     Services --> Schemas["Pydantic Schemas"]
     Services --> Storage["SQLite Repository"]
     Trace --> Storage
@@ -144,9 +146,9 @@ POST /applications
 PATCH /applications/{application_id}
 ```
 
-### 4. 可选启用 LLM JD 分析
+### 4. 可选启用 LLM JD 分析和简历优化
 
-当前只有 `JDAnalysisAgent` 支持可选 LLM。未配置 API key 或调用失败时，系统自动回退 mock JD 分析。
+当前 `JDAnalysisAgent` 和 `ResumeOptimizeAgent` 支持可选 LLM。未配置 API key、调用失败、返回非法 JSON 或 schema 校验失败时，系统自动回退 mock。
 
 ```powershell
 $env:JOBAGENT_LLM_API_KEY="your-api-key"
@@ -154,7 +156,21 @@ $env:JOBAGENT_LLM_BASE_URL="https://api.openai.com/v1"
 $env:JOBAGENT_LLM_MODEL="gpt-4o-mini"
 ```
 
-然后在 Streamlit 侧边栏勾选“启用 LLM JD 分析”。
+然后在 Streamlit 侧边栏按需勾选：
+
+- “启用 LLM JD 分析”
+- “启用 LLM 简历优化”
+
+通过 API 调用完整分析时，可传：
+
+```json
+{
+  "use_llm_jd": true,
+  "use_llm_resume_optimize": true
+}
+```
+
+简历优化的 LLM prompt 明确禁止编造经历、公司、项目、数据或技术栈；缺少量化指标时只能建议用户补充真实数据。
 
 ### 5. 可选调整简历文件大小限制
 
@@ -182,7 +198,7 @@ $env:JOBAGENT_MAX_RESUME_FILE_BYTES="1048576"
 当前验证重点：
 
 - Mock pipeline 是否能端到端产出报告。
-- LLM JDAnalysisAgent 是否能失败回退。
+- LLM JDAnalysisAgent 和 ResumeOptimizeAgent 是否能失败回退。
 - FastAPI route 是否保持薄封装。
 - SQLite 存储是否使用临时库测试。
 - Application tracker 是否能创建、筛选和更新状态。
@@ -232,8 +248,9 @@ $env:JOBAGENT_MAX_RESUME_FILE_BYTES="1048576"
 | Phase 11 | LangGraph migration prep，固定 node 映射和迁移契约 | 已完成 |
 | Phase 12 | Resume File Parser MVP，支持 txt/md 简历文件转纯文本并复用 ResumeParseAgent | 已完成 |
 | Phase 13 | Stability and Demo Materials，补文件大小限制、统一错误返回、演示脚本和答辩材料 | 已完成 |
-| Phase 14 | LangGraph 原型、RAG 检索、MCP 工具封装 | 后续 |
-| Phase 15 | Docker、部署说明、答辩截图整理 | 后续 |
+| Phase 14 | ResumeOptimizeAgent LLM Mode，可选 LLM 简历优化并失败回退 mock | 已完成 |
+| Phase 15 | LangGraph 原型、RAG 检索、MCP 工具封装 | 后续 |
+| Phase 16 | Docker、部署说明、答辩截图整理 | 后续 |
 
 ## 面试讲述版
 
@@ -245,7 +262,7 @@ JobAgent 是一个求职准备工作台。我没有一开始做自动投递，�
 
 技术上我先用 Pydantic schema 固定输入输出，再用 mock pipeline 跑通端到端闭环。
 这样即使没有真实 LLM，系统也能稳定生成匹配报告、简历优化建议和项目追问。
-之后我只把 JDAnalysisAgent 替换成可选 LLM，并保留 mock fallback，避免模型输出不稳定影响主流程。
+之后我先把 JDAnalysisAgent 替换成可选 LLM，再为 ResumeOptimizeAgent 增加可选 LLM 模式，并保留 mock fallback，避免模型输出不稳定影响主流程。
 
 工程上我把 UI、API、service、agent、storage 分层。
 Streamlit 负责 Demo 展示，FastAPI 负责接口，SQLite 负责本地持久化，
@@ -323,6 +340,7 @@ tests/
   test_jd_analysis_agent.py
   test_mock_pipeline.py
   test_resume_file_service.py
+  test_resume_optimize_agent.py
   test_resume_versions.py
   test_storage.py
 data/

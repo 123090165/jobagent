@@ -16,7 +16,7 @@ JobAgent 的出发点是：求职者经常能写简历、看 JD，但很难稳�
 
 第一层是数据结构。我用 Pydantic 定义 `ResumeProfile`、`JobAnalysis`、`MatchReport`、优化建议、项目追问和最终报告，保证 UI、API、service、agent 之间传递的是稳定结构，而不是随手传 dict。
 
-第二层是 Agent 边界。ResumeParseAgent 负责把简历文本结构化，JDAnalysisAgent 负责解析岗位，MatchAgent 负责评分，ResumeOptimizeAgent 只基于已有内容给优化建议，ProjectChallengeAgent 生成面试追问，ReportAgent 汇总 Markdown 报告。当前只有 JDAnalysisAgent 支持可选 LLM，并且失败会 fallback 到 mock，避免模型不稳定影响主流程。
+第二层是 Agent 边界。ResumeParseAgent 负责把简历文本结构化，JDAnalysisAgent 负责解析岗位，MatchAgent 负责评分，ResumeOptimizeAgent 只基于已有内容给优化建议，ProjectChallengeAgent 生成面试追问，ReportAgent 汇总 Markdown 报告。当前 JDAnalysisAgent 和 ResumeOptimizeAgent 支持可选 LLM，并且失败会 fallback 到 mock，避免模型不稳定影响主流程。
 
 第三层是工程闭环。FastAPI route 保持薄封装，业务逻辑放在 service、agent、workflow、storage。Streamlit 只做展示和触发。SQLite 保存分析记录、岗位库、workflow trace、简历版本和投递 tracker。每次端到端分析都会生成 workflow trace，包括 run id、步骤、执行模式、耗时、fallback 原因和 guardrails。
 
@@ -34,9 +34,9 @@ JobAgent 的出发点是：求职者经常能写简历、看 JD，但很难稳�
 
 我先用显式 workflow 和 `WorkflowGraphSpec` 固定步骤、状态读写和 trace 契约。这样能先把业务边界和数据流跑稳，再考虑替换运行时框架，避免为了用框架而把业务逻辑写散。
 
-### 为什么 LLM 只接 JDAnalysisAgent？
+### 为什么先只让 JDAnalysisAgent 和 ResumeOptimizeAgent 接 LLM？
 
-JD 解析相对独立，输入输出清晰，适合作为第一个可替换 Agent。其他 Agent 先用 mock 跑稳数据流，能降低调试变量。LLM 失败时 fallback 到 mock，不影响主链路。
+JD 解析和简历优化的输入输出都比较清晰，适合逐步替换成可选 LLM。其他 Agent 先用 mock 跑稳数据流，能降低调试变量。LLM 失败时 fallback 到 mock，不影响主链路。
 
 ### 如何防止简历优化编造经历？
 

@@ -46,6 +46,7 @@ http://127.0.0.1:8000/docs
   "resume_text": "简历文本",
   "jd_text": "JD 文本",
   "use_llm_jd": false,
+  "use_llm_resume_optimize": false,
   "save_result": false
 }
 ```
@@ -60,6 +61,13 @@ http://127.0.0.1:8000/docs
 - `markdown_report`
 - `workflow_steps`：本次 workflow 的步骤轨迹，每步包含 `workflow_run_id`、`name`、`status`、`mode`、`summary`、`duration_ms`、`fallback_reason` 和 `guardrails`
 - `record_id`：当 `save_result` 为 `true` 时返回保存记录 ID，否则为 `null`
+
+说明：
+
+- `use_llm_jd` 只控制 `JDAnalysisAgent` 是否尝试使用 LLM。
+- `use_llm_resume_optimize` 只控制 `ResumeOptimizeAgent` 是否尝试使用 LLM。
+- 两者未传时默认都是 `false`，保持旧请求兼容。
+- LLM 未配置、请求失败、返回非法 JSON 或 schema 校验失败时会回退 mock，并在 `workflow_steps` 中记录 `fallback` 和 `fallback_reason`。
 
 示例：
 
@@ -358,6 +366,7 @@ http://127.0.0.1:8000/docs
 - 暂不做自动投递。
 - 暂不做 PDF/DOCX 简历解析。
 - `use_llm_jd` 只影响 JDAnalysisAgent，失败时回退 mock。
+- `use_llm_resume_optimize` 只影响 ResumeOptimizeAgent，失败时回退 mock，且不允许编造简历经历、公司、项目、数据或技术栈。
 
 ## 4. 开发难点
 

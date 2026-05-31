@@ -28,6 +28,7 @@
 
 - JD 原文会作为后续 JDAnalysisAgent 的输入。
 - 可选 LLM 只影响 JDAnalysisAgent，失败时会 fallback 到 mock。
+- 也可以勾选“启用 LLM 简历优化”，让 ResumeOptimizeAgent 尝试用 LLM 生成优化建议；失败时同样 fallback 到 mock。
 
 ## 4. 生成报告
 

@@ -18,6 +18,7 @@
 - 可上传 `.txt` / `.md` 简历文件，并把提取出的文本填入简历输入区；默认文件大小限制为 1MB。
 - 输入目标岗位 JD。
 - 可选启用 LLM JD 分析。
+- 可选启用 LLM 简历优化；失败时自动回退 mock。
 - 可选保存本次分析到 SQLite。
 - 展示 Markdown 报告、结构化结果、项目追问和 workflow 执行轨迹。
 - 执行轨迹包含步骤数、总耗时、fallback 数、`workflow_run_id` 和每步摘要。
@@ -79,6 +80,7 @@
 - 保存能力调用 `storage_service`，不在页面里写 SQL。
 - 简历版本能力调用 `resume_version_service`，不在页面里直接操作 SQLite。
 - 生成报告页必须通过 `run_job_analysis_workflow` 拿到 `workflow_steps`，不能绕回旧的底层 mock 函数。
+- LLM JD 分析和 LLM 简历优化都只通过 workflow 参数触发，页面不直接调用 LLM。
 - 历史记录页只展示 storage 返回的 trace，不自行推断某次分析用了 mock、LLM 还是 fallback。
 - 页面只负责把 `duration_ms` 做摘要展示，不负责计时。
 - 历史记录和岗位库列表只展示摘要，详情再展示完整内容。

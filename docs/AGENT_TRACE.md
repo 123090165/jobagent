@@ -70,6 +70,7 @@ WorkflowStepTrace
 当前适用：
 
 - JDAnalysisAgent
+- ResumeOptimizeAgent
 
 ### fallback
 
@@ -78,6 +79,7 @@ WorkflowStepTrace
 当前适用：
 
 - JDAnalysisAgent
+- ResumeOptimizeAgent
 
 ## 5. 当前 Guardrails
 
@@ -102,6 +104,8 @@ WorkflowStepTrace
 - 不编造经历、公司、项目、数据或技术栈。
 - 需要量化但缺少数据时只提示补充。
 - 不覆盖原始简历文本。
+- LLM 输出必须通过 `ResumeOptimizationResult` schema 校验。
+- 所有建议必须可追溯到简历或 JD。
 
 ### ProjectInterviewAgent
 
@@ -119,8 +123,11 @@ WorkflowStepTrace
 
 - Agent 元信息记录 `mode` 和 `guardrails`。
 - JDAnalysisAgent LLM 失败时返回 `fallback`。
+- ResumeOptimizeAgent LLM 成功时返回 `llm`。
+- ResumeOptimizeAgent LLM 失败、非法 JSON 或 schema 校验失败时返回 `fallback`。
 - workflow step trace 记录每一步的 `mode`。
 - workflow step trace 记录 JDAnalysisAgent 的 `fallback_reason`。
+- workflow step trace 记录 ResumeOptimizeAgent 的 `fallback_reason`。
 - workflow step trace 记录同一次运行的 `workflow_run_id` 和每步 `duration_ms`。
 - 保存分析记录时，workflow step trace 会写入 SQLite。
 - 读取历史记录详情时，会返回已保存的 workflow step trace。
