@@ -2,7 +2,7 @@
 
 JobAgent 是一个面向求职者的本地求职准备工作台，核心目标是把“简历和 JD 是否匹配、应该怎么改、面试会被怎么追问、投递进展到哪一步”变成可结构化记录和复盘的流程。
 
-当前版本已经从 Mock MVP 推进到可运行的本地工作台：支持 Streamlit Demo、FastAPI 后端、SQLite 分析记录、岗位库查询、txt/md 简历文件解析、统一业务错误返回、可选 LLM JD 分析、可选 LLM 简历优化、可选 LLM 项目追问、workflow 执行轨迹持久化，以及投递 tracker 最小状态机。
+当前版本已经从 Mock MVP 推进到可运行的本地工作台：支持 Streamlit Demo、FastAPI 后端、SQLite 分析记录、岗位库查询、txt/md 简历文件解析、安全版 JD URL 导入、统一业务错误返回、可选 LLM JD 分析、可选 LLM 简历优化、可选 LLM 项目追问、workflow 执行轨迹持久化，以及投递 tracker 最小状态机。
 
 ```text
 简历文本或 .txt/.md 简历文件 + JD 文本
@@ -25,6 +25,7 @@ JobAgent 是一个面向求职者的本地求职准备工作台，核心目标�
 - Streamlit 页面：生成报告、历史记录、岗位库、简历版本、投递跟进和执行轨迹展示。
 - FastAPI 后端：分析、简历解析、JD 分析、匹配、报告、记录、岗位、投递 tracker API。
 - 简历文件解析：支持 `.txt` / `.md` UTF-8 文件转纯文本，默认最大 1MB，并复用 `ResumeParseAgent` 输出 `ResumeProfile`。
+- 安全版 JD URL 导入：只对公开 `http/https` 页面做一次性文本提取，不登录、不执行 JavaScript、不绕过反爬，失败时提示用户手动粘贴 JD。
 - 统一业务错误：文件解析等业务错误通过 `detail` 和 `error_code` 返回，方便 API 调用方和页面展示。
 - Pydantic schema：稳定 Agent、service、API、UI 之间的数据流。
 - Mock pipeline：不依赖真实 LLM 也能端到端运行。
@@ -44,6 +45,7 @@ JobAgent 是一个面向求职者的本地求职准备工作台，核心目标�
 明确不做：
 
 - 自动投递。
+- JD URL 导入之外的复杂爬虫或批量抓取。
 - 招聘网站登录。
 - 验证码处理。
 - 复杂爬虫和反爬绕过。
@@ -118,6 +120,7 @@ pip install -r requirements.txt
 页面包含：
 
 - 生成报告：粘贴简历文本，或上传 `.txt` / `.md` 简历文件，再输入 JD，输出 Markdown 报告和执行轨迹。
+- 生成报告页支持输入公开 JD URL，并将提取结果填入现有 JD 文本框；导入失败时继续手动粘贴。
 - 侧边栏可选“启用 LangGraph 原型 workflow”：当前为实验模式，不替换默认 workflow，会使用 graph node 和 match score 条件分支。
 - 历史记录：查看已保存的分析结果和每次 workflow step trace。
 - 岗位库：查看保存过的 JD 和结构化分析。
@@ -141,6 +144,7 @@ http://127.0.0.1:8000/docs
 ```text
 GET  /health
 POST /analyze/full
+POST /jobs/import-url
 POST /resume/parse-file
 GET  /records
 GET  /jobs
@@ -169,6 +173,16 @@ $env:JOBAGENT_LLM_MODEL="gpt-4o-mini"
 - “启用 LangGraph 原型 workflow”
 
 默认情况下 `use_langgraph_workflow = false`，系统继续走现有 Python workflow；只有显式开启实验入口时才会调用 LangGraph prototype。
+
+JD URL 导入示例：
+
+```json
+{
+  "url": "https://example.com/job"
+}
+```
+
+如果导入失败，系统不会做登录、验证码处理或反爬绕过，而是返回清晰错误并提示手动粘贴 JD。
 
 通过 API 调用完整分析时，可传：
 
@@ -263,8 +277,9 @@ $env:JOBAGENT_MAX_RESUME_FILE_BYTES="1048576"
 | Phase 14 | ResumeOptimizeAgent LLM Mode，可选 LLM 简历优化并失败回退 mock | 已完成 |
 | Phase 15 | ProjectChallengeAgent LLM Mode，可选 LLM 项目追问并失败回退 mock | 已完成 |
 | Phase 16 | LangGraph Workflow Prototype，新增并行 graph workflow 和低匹配条件分支，但不替换默认 workflow | 已完成 |
-| Phase 17 | RAG 检索、MCP 工具封装 | 后续 |
-| Phase 18 | Docker、部署说明、答辩截图整理 | 后续 |
+| Phase 17 | Safe JD URL Import，支持公开 JD 页面文本提取并保留手动粘贴兜底 | 已完成 |
+| Phase 18 | RAG 检索、MCP 工具封装 | 后续 |
+| Phase 19 | Docker、部署说明、答辩截图整理 | 后续 |
 
 ## 面试讲述版
 
@@ -385,4 +400,5 @@ docs/
 - [Workflow Trace Persistence](docs/WORKFLOW_TRACE_PERSISTENCE.md)
 - [LangGraph Migration Prep](docs/LANGGRAPH_MIGRATION_PREP.md)
 - [LangGraph Workflow Prototype](docs/LANGGRAPH_WORKFLOW_PROTOTYPE.md)
+- [JD URL Import](docs/JD_URL_IMPORT.md)
 - [LLM Integration](docs/LLM_INTEGRATION.md)
