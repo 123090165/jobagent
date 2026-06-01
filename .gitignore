@@ -9,5 +9,10 @@ __pycache__/
 .env
 .env.*
 !.env.example
+demo_runs/
+!docs/demo_runs/
+!docs/demo_runs/**
+*.db
+*.sqlite
 *.sqlite3
 *.sqlite3-*
