@@ -2,7 +2,7 @@
 
 JobAgent 是一个面向求职者的本地求职准备工作台，核心目标是把“简历和 JD 是否匹配、应该怎么改、面试会被怎么追问、投递进展到哪一步”变成可结构化记录和复盘的流程。
 
-当前版本已经从 Mock MVP 推进到可运行的本地工作台：支持 Streamlit Demo、FastAPI 后端、SQLite 分析记录、岗位库查询、txt/md 简历文件解析、安全版 JD URL 导入、SearchProvider 抽象层与 MockSearchProvider、统一业务错误返回、可选 LLM JD 分析、可选 LLM 简历优化、可选 LLM 项目追问、workflow 执行轨迹持久化，以及投递 tracker 最小状态机。
+当前版本已经从 Mock MVP 推进到可运行的本地工作台：支持 Streamlit Demo、FastAPI 后端、SQLite 分析记录、岗位库查询、txt/md 简历文件解析、安全版 JD URL 导入、SearchProvider 抽象层与 MockSearchProvider、实验性的 GeminiCLIProvider、统一业务错误返回、可选 LLM JD 分析、可选 LLM 简历优化、可选 LLM 项目追问、workflow 执行轨迹持久化，以及投递 tracker 最小状态机。
 
 ```text
 简历文本或 .txt/.md 简历文件 + JD 文本
@@ -27,6 +27,7 @@ JobAgent 是一个面向求职者的本地求职准备工作台，核心目标�
 - 简历文件解析：支持 `.txt` / `.md` UTF-8 文件转纯文本，默认最大 1MB，并复用 `ResumeParseAgent` 输出 `ResumeProfile`。
 - 安全版 JD URL 导入：只对公开 `http/https` 页面做一次性文本提取，不登录、不执行 JavaScript、不绕过反爬，失败时提示用户手动粘贴 JD。
 - SearchProvider 抽象层：当前通过 `POST /search/jobs` 暴露 API-only 的 `MockSearchProvider`，为后续 Gemini CLI / RAG / MCP 接入预留 provider 边界，但本轮不接真实搜索、不联网、不入库。
+- GeminiCLIProvider experimental：`provider="gemini_cli"` 默认关闭，只有显式设置环境变量后才会调用本机 Gemini CLI，而且只传搜索 query，不传简历全文、API key 或本地敏感信息。
 - 统一业务错误：文件解析等业务错误通过 `detail` 和 `error_code` 返回，方便 API 调用方和页面展示。
 - Pydantic schema：稳定 Agent、service、API、UI 之间的数据流。
 - Mock pipeline：不依赖真实 LLM 也能端到端运行。
@@ -179,6 +180,7 @@ $env:JOBAGENT_LLM_MODEL="gpt-4o-mini"
 说明：
 
 - 当前 `POST /search/jobs` 仅作为 API-only 的 provider abstraction 演示入口。
+- `provider="gemini_cli"` 是实验功能，默认关闭，返回结果不会自动入库、不会自动触发 JD 导入，也不会自动进入分析流程。
 - Streamlit 本轮不接岗位搜索 UI，避免把 mock 搜索能力和真实联网搜索混在一起。
 
 默认情况下 `use_langgraph_workflow = false`，系统继续走现有 Python workflow；只有显式开启实验入口时才会调用 LangGraph prototype。
@@ -289,8 +291,10 @@ $env:JOBAGENT_MAX_RESUME_FILE_BYTES="1048576"
 | Phase 17 | Safe JD URL Import，支持公开 JD 页面文本提取并保留手动粘贴兜底 | 已完成 |
 | Phase 18 | MissingInfoQuestionAgent，在 LangGraph prototype 中增加缺失信息澄清节点 | 已完成 |
 | Phase 19 | SearchProvider Interface，增加 API-only 的 MockSearchProvider 和 `POST /search/jobs` | 已完成 |
-| Phase 20 | GeminiCLIProvider / RAG / MCP | 后续 |
-| Phase 21 | Docker、部署说明、答辩截图整理 | 后续 |
+| Phase 20 | GeminiCLIProvider experimental，增加默认关闭的 `provider="gemini_cli"` | 已完成 |
+| Phase 21 | SearchResult -> JobImportCandidate | 后续 |
+| Phase 22 | RAG / MCP | 后续 |
+| Phase 23 | Docker、部署说明、答辩截图整理 | 后续 |
 
 ## 面试讲述版
 
