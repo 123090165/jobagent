@@ -37,6 +37,22 @@ def test_build_fallback_jd_text_includes_core_fields() -> None:
     assert "https://example.com/jobs/1" in text
 
 
+def test_build_fallback_jd_text_prefers_jd_text_when_long_enough() -> None:
+    jd_text = "A" * 320
+    item = {
+        "title": "AI Agent Developer",
+        "company": "Example Co",
+        "location": "Shenzhen",
+        "snippet": "short snippet",
+        "url": "https://example.com/jobs/1",
+        "jd_text": jd_text,
+    }
+
+    text = demo.build_fallback_jd_text(item)
+
+    assert text == jd_text
+
+
 def test_select_first_search_item_rejects_empty_items() -> None:
     with pytest.raises(ValueError, match="Search returned no items"):
         demo.select_first_search_item({"items": []})
@@ -109,6 +125,10 @@ def test_build_sanitized_search_summary_does_not_include_resume_text() -> None:
                 "snippet": "Build agent workflows." * 40,
                 "source": "gemini_cli",
                 "resume_text": "should never be copied",
+                "skills": ["Python", "FastAPI", "LLM"],
+                "jd_text": "JD preview " * 100,
+                "is_full_jd": True,
+                "confidence": 0.82,
             }
         ],
     }
@@ -117,6 +137,11 @@ def test_build_sanitized_search_summary_does_not_include_resume_text() -> None:
 
     assert "resume_text" not in summary
     assert len(summary["selected_snippet_preview"]) <= 300
+    assert len(summary["selected_jd_text_preview"]) <= 500
+    assert summary["selected_is_full_jd"] is True
+    assert summary["selected_confidence"] == pytest.approx(0.82)
+    assert summary["selected_skills"] == ["Python", "FastAPI", "LLM"]
+    assert summary["selected_jd_text_preview"] != payload["items"][0]["jd_text"]
 
 
 def test_build_sanitized_analysis_summary_does_not_include_resume_text() -> None:

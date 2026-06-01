@@ -13,6 +13,12 @@ class SearchResultItem(BaseModel):
     snippet: str
     source: str
     retrieved_at: datetime
+    responsibilities: list[str] = Field(default_factory=list)
+    requirements: list[str] = Field(default_factory=list)
+    skills: list[str] = Field(default_factory=list)
+    jd_text: str | None = None
+    is_full_jd: bool = False
+    confidence: float = 0.0
 
 
 class SearchResultSet(BaseModel):

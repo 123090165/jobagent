@@ -15,6 +15,10 @@ def test_search_jobs_returns_search_result_set_from_mock_provider() -> None:
     assert result.query == "python backend"
     assert result.items
     assert result.items[0].source == "mock"
+    assert result.items[0].skills
+    assert result.items[0].jd_text is not None
+    assert result.items[0].is_full_jd is True
+    assert result.items[0].confidence > 0
 
 
 def test_search_jobs_respects_limit() -> None:

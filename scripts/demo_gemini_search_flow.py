@@ -21,6 +21,7 @@ HEALTHCHECK_MAX_ATTEMPTS = 10
 HEALTHCHECK_INTERVAL_SECONDS = 1
 REPORT_EXCERPT_MAX_CHARS = 1200
 SEARCH_SNIPPET_PREVIEW_MAX_CHARS = 300
+SEARCH_JD_TEXT_PREVIEW_MAX_CHARS = 500
 SCRIPT_VERSION = "v1"
 ALLOWED_RESUME_SUFFIXES = {".txt", ".md"}
 
@@ -143,6 +144,10 @@ def build_timestamp() -> str:
 
 
 def build_fallback_jd_text(item: dict[str, Any]) -> str:
+    jd_text = str(item.get("jd_text", "")).strip()
+    if len(jd_text) >= 300:
+        return jd_text
+
     title = str(item.get("title", "")).strip() or "Unknown Title"
     company = str(item.get("company", "")).strip() or "Unknown Company"
     location = str(item.get("location", "")).strip() or "Unknown Location"
@@ -194,6 +199,12 @@ def build_sanitized_search_summary(
 ) -> dict[str, Any]:
     items = payload.get("items", [])
     snippet_preview = str(selected_item.get("snippet", ""))[:SEARCH_SNIPPET_PREVIEW_MAX_CHARS]
+    jd_text_preview = str(selected_item.get("jd_text", "")).strip()[:SEARCH_JD_TEXT_PREVIEW_MAX_CHARS]
+    skills = [
+        str(skill).strip()
+        for skill in selected_item.get("skills", [])
+        if str(skill).strip()
+    ]
     return {
         "query": query,
         "provider": payload.get("provider", "gemini_cli"),
@@ -204,6 +215,10 @@ def build_sanitized_search_summary(
         "selected_url": selected_item.get("url"),
         "selected_source": selected_item.get("source"),
         "selected_snippet_preview": snippet_preview,
+        "selected_is_full_jd": bool(selected_item.get("is_full_jd", False)),
+        "selected_confidence": _clamp_float(selected_item.get("confidence", 0.0)),
+        "selected_skills": skills,
+        "selected_jd_text_preview": jd_text_preview,
     }
 
 
@@ -366,6 +381,8 @@ def build_publish_readme(context: dict[str, Any]) -> str:
         f"- Tried URL Import: {context.get('try_import_url', False)}",
         f"- URL Import Succeeded: {context.get('jd_import_success')}",
         f"- Used Fallback JD Draft: {context.get('used_fallback_jd')}",
+        f"- Gemini Returned Full JD: {context.get('selected_is_full_jd')}",
+        f"- Gemini Confidence: {context.get('selected_confidence')}",
         f"- /analyze/full Succeeded: {analysis_success}",
         f"- Used LLM: {context.get('use_llm', False)}",
         f"- Used LangGraph: {context.get('use_langgraph', False)}",
@@ -410,6 +427,14 @@ def write_json(path: Path, payload: Any) -> None:
 
 def write_text(path: Path, text: str) -> None:
     path.write_text(text, encoding="utf-8")
+
+
+def _clamp_float(value: Any) -> float:
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        return 0.0
+    return max(0.0, min(1.0, numeric))
 
 
 def request_json(
@@ -614,6 +639,8 @@ def run_demo_flow(args: argparse.Namespace) -> int:
 
         selected_item = select_first_search_item(search_response)
         context["selected_item"] = selected_item
+        context["selected_is_full_jd"] = bool(selected_item.get("is_full_jd", False))
+        context["selected_confidence"] = _clamp_float(selected_item.get("confidence", 0.0))
         write_json(output_dir / "selected_search_item.json", selected_item)
 
         fallback_jd_text = build_fallback_jd_text(selected_item)
