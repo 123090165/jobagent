@@ -39,6 +39,12 @@ class FullAnalysisResponse(FinalReport):
     workflow_steps: list[WorkflowStepTraceResponse] = Field(default_factory=list)
 
 
+class SearchJobsRequest(BaseModel):
+    query: str
+    provider: str = "mock"
+    limit: int = Field(default=5, ge=1, le=20)
+
+
 class ResumeParseRequest(BaseModel):
     resume_text: str
 
