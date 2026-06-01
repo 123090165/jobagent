@@ -37,8 +37,15 @@ def test_search_jobs_rejects_invalid_limit() -> None:
     assert exc_info.value.error_code == "search_limit_invalid"
 
 
-def test_search_jobs_rejects_unsupported_provider() -> None:
-    with pytest.raises(JobAgentError, match="not supported") as exc_info:
+def test_search_jobs_rejects_disabled_gemini_cli_provider() -> None:
+    with pytest.raises(JobAgentError, match="disabled") as exc_info:
         search_jobs("python", provider="gemini_cli")
+
+    assert exc_info.value.error_code == "search_provider_disabled"
+
+
+def test_search_jobs_rejects_unknown_provider() -> None:
+    with pytest.raises(JobAgentError, match="not supported") as exc_info:
+        search_jobs("python", provider="unknown")
 
     assert exc_info.value.error_code == "search_provider_unsupported"

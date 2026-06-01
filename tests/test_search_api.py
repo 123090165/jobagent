@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import json
+from types import SimpleNamespace
+
 from fastapi.testclient import TestClient
 
 from app.main import app
@@ -61,5 +64,41 @@ def test_search_jobs_endpoint_rejects_unsupported_provider() -> None:
     )
 
     assert response.status_code == 400
-    assert response.json()["detail"] == "Search provider is not supported"
-    assert response.json()["error_code"] == "search_provider_unsupported"
+    assert response.json()["detail"] == "Gemini CLI search provider is disabled"
+    assert response.json()["error_code"] == "search_provider_disabled"
+
+
+def test_search_jobs_endpoint_supports_gemini_cli_provider_when_enabled(monkeypatch) -> None:
+    monkeypatch.setenv("JOBAGENT_ENABLE_GEMINI_CLI", "1")
+
+    def fake_run(command, **kwargs):
+        return SimpleNamespace(
+            returncode=0,
+            stdout=json.dumps(
+                {
+                    "items": [
+                        {
+                            "title": "Python Backend Engineer",
+                            "company": "Example Co",
+                            "location": "Remote",
+                            "url": "https://example.com/jobs/python-backend",
+                            "snippet": "Build FastAPI services and workflow APIs.",
+                        }
+                    ]
+                }
+            ),
+            stderr="",
+        )
+
+    monkeypatch.setattr("app.services.search_providers.gemini_cli_provider.subprocess.run", fake_run)
+
+    response = client.post(
+        "/search/jobs",
+        json={"query": "python backend", "provider": "gemini_cli", "limit": 5},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["provider"] == "gemini_cli"
+    assert len(payload["items"]) == 1
+    assert payload["items"][0]["source"] == "gemini_cli"

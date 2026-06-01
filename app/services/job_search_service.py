@@ -2,12 +2,13 @@ from __future__ import annotations
 
 from app.schemas.search import SearchResultSet
 from app.services.errors import JobAgentError
-from app.services.search_providers import MockSearchProvider, SearchProvider
+from app.services.search_providers import GeminiCLIProvider, MockSearchProvider, SearchProvider
 
 MIN_SEARCH_LIMIT = 1
 MAX_SEARCH_LIMIT = 20
 
 _PROVIDERS: dict[str, SearchProvider] = {
+    "gemini_cli": GeminiCLIProvider(),
     "mock": MockSearchProvider(),
 }
 
