@@ -13,6 +13,8 @@
 
 This script is for local verification and demo replay. It does not change the database schema, does not trigger Streamlit UI changes, and does not automate job applications.
 
+When Gemini returns richer JD-like content, the demo flow now prefers `item.jd_text` as the analysis input when it is present and long enough. If Gemini only returns a short summary or weak snippet, the script still falls back to the existing title/company/location/snippet/url draft.
+
 ## Prerequisites
 
 - Gemini CLI is installed
@@ -46,6 +48,18 @@ python scripts/demo_gemini_search_flow.py ^
   Local raw output for debugging and verification. Do not commit this directory.
 - `docs/demo_runs/<timestamp>/`
   Sanitized summaries that are safe to review in GitHub. These files can be committed.
+  Only a capped `jd_text` preview is published there, never the full raw `jd_text`.
+
+## Published Search Summary
+
+Sanitized `docs/demo_runs/<timestamp>/search_summary.json` now includes:
+
+- `selected_is_full_jd`
+- `selected_confidence`
+- `selected_skills`
+- `selected_jd_text_preview`
+
+This keeps the demo reviewable in GitHub while avoiding publication of the full JD text returned by Gemini.
 
 ## Troubleshooting
 
@@ -55,6 +69,8 @@ python scripts/demo_gemini_search_flow.py ^
   Check `JOBAGENT_GEMINI_CLI_COMMAND` or install the expected CLI
 - Gemini output is not JSON
   The backend provider only accepts JSON object output with an `items` list
+- Gemini returns only partial JD content
+  The script records `selected_is_full_jd` and `selected_confidence`, prefers long `jd_text` when available, and otherwise falls back to the draft JD builder
 - URL import failed
   The script records the import error and continues with a fallback JD draft
 - `/analyze/full` failed
@@ -67,6 +83,7 @@ python scripts/demo_gemini_search_flow.py ^
 - does not execute arbitrary user commands
 - only starts the fixed `uvicorn` command when `--start-api` is used
 - does not pass full `resume_text` to Gemini CLI
+- does not publish full `jd_text` into `docs/demo_runs/`
 - does not auto-apply to jobs
 - does not bypass anti-bot protections
 - does not auto-save to SQLite by default

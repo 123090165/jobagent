@@ -68,6 +68,18 @@ Response:
       "location": "Remote",
       "url": "https://mock.example.com/jobs/ai-agent-developer",
       "snippet": "Build agentic workflows with Python, FastAPI, and structured evaluation for resume and JD analysis products.",
+      "responsibilities": [
+        "Design agentic workflow services",
+        "Build backend APIs for analysis flows"
+      ],
+      "requirements": [
+        "Strong Python backend experience",
+        "Experience with structured API design"
+      ],
+      "skills": ["Python", "FastAPI", "Pydantic", "LLM"],
+      "jd_text": "Title: AI Agent Developer ...",
+      "is_full_jd": true,
+      "confidence": 0.94,
       "source": "mock",
       "retrieved_at": "2026-01-01T00:00:00Z"
     }
@@ -128,12 +140,32 @@ Example request:
 
 If the experimental search results look useful, the next step should still go through explicit user confirmation plus a later import path such as `JobImportCandidate` or existing JD URL import flows.
 
+## Enriched JD Fields
+
+`GeminiCLIProvider` now tries to return richer JD-oriented fields when possible:
+
+- `responsibilities`
+- `requirements`
+- `skills`
+- `jd_text`
+- `is_full_jd`
+- `confidence`
+
+Important caveats:
+
+- Gemini CLI still does not guarantee a full JD.
+- If `is_full_jd` is `false`, do not treat the result as a complete JD.
+- `jd_text` should still be validated by the user or checked via JD URL import before any future downstream workflow.
+- Gemini-returned content is not the same as an official authoritative original job posting.
+- Results are not automatically stored in SQLite.
+
 ## Current Limits
 
 - `mock` remains the default stable provider.
 - `gemini_cli` is experimental and disabled unless `JOBAGENT_ENABLE_GEMINI_CLI=1`.
 - Results are stable mock data for testing and demo wiring.
 - Gemini CLI output must be valid JSON and may be filtered if required fields are missing.
+- Even with the upgraded prompt, Gemini may still return only partial summaries instead of a full JD.
 - Search results are not saved to SQLite.
 - Streamlit does not expose search yet; this round is API-only by design.
 
