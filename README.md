@@ -264,6 +264,7 @@ $env:JOBAGENT_MAX_RESUME_FILE_BYTES="1048576"
 展示与答辩材料：
 
 - [Demo Script](docs/DEMO_SCRIPT.md)
+- [Demo Gemini Search Flow](docs/DEMO_GEMINI_SEARCH_FLOW.md)
 - [Portfolio Pitch](docs/PORTFOLIO_PITCH.md)
 - [Screenshot Guide](docs/SCREENSHOT_GUIDE.md)
 
@@ -292,9 +293,10 @@ $env:JOBAGENT_MAX_RESUME_FILE_BYTES="1048576"
 | Phase 18 | MissingInfoQuestionAgent，在 LangGraph prototype 中增加缺失信息澄清节点 | 已完成 |
 | Phase 19 | SearchProvider Interface，增加 API-only 的 MockSearchProvider 和 `POST /search/jobs` | 已完成 |
 | Phase 20 | GeminiCLIProvider experimental，增加默认关闭的 `provider="gemini_cli"` | 已完成 |
-| Phase 21 | SearchResult -> JobImportCandidate | 后续 |
-| Phase 22 | RAG / MCP | 后续 |
-| Phase 23 | Docker、部署说明、答辩截图整理 | 后续 |
+| Phase 21 | Gemini Search Demo Script，增加安全的 CLI-to-API 自动化演示脚本和脱敏产物发布路径 | 已完成 |
+| Phase 22 | SearchResult -> JobImportCandidate | 后续 |
+| Phase 23 | RAG / MCP | 后续 |
+| Phase 24 | Docker、部署说明、答辩截图整理 | 后续 |
 
 ## 面试讲述版
 
@@ -381,10 +383,13 @@ app/
     job_analysis_workflow.py
 frontend/
   streamlit_app.py
+scripts/
+  demo_gemini_search_flow.py
 tests/
   test_api.py
   test_agents.py
   test_application_tracker.py
+  test_demo_gemini_search_flow.py
   test_jd_analysis_agent.py
   test_mock_pipeline.py
   test_resume_file_service.py
@@ -404,6 +409,7 @@ docs/
 - [Development Review Guide](docs/DEVELOPMENT_REVIEW_GUIDE.md)
 - [Demo Guide](docs/DEMO_GUIDE.md)
 - [Demo Script](docs/DEMO_SCRIPT.md)
+- [Demo Gemini Search Flow](docs/DEMO_GEMINI_SEARCH_FLOW.md)
 - [Portfolio Pitch](docs/PORTFOLIO_PITCH.md)
 - [Screenshot Guide](docs/SCREENSHOT_GUIDE.md)
 - [Agent Boundaries](docs/AGENT_BOUNDARIES.md)

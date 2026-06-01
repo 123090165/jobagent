@@ -1,0 +1,20 @@
+{
+  "timestamp": "20260601T133118Z",
+  "script_version": "v1",
+  "api_base_url": "http://127.0.0.1:8000",
+  "query": "demo shenzhen ai agent developer jobs",
+  "flags": {
+    "start_api": true,
+    "try_import_url": true,
+    "use_llm": false,
+    "use_langgraph": false,
+    "save_result": false,
+    "gemini_cli_command_overridden": true
+  },
+  "safety": {
+    "resume_text_uploaded_to_gemini_cli": false,
+    "database_write_default": false,
+    "deletes_files": false,
+    "shell_true": false
+  }
+}
