@@ -32,6 +32,28 @@ def test_search_jobs_endpoint_rejects_invalid_query() -> None:
     assert response.json()["error_code"] == "search_query_invalid"
 
 
+def test_search_jobs_endpoint_rejects_limit_below_range() -> None:
+    response = client.post(
+        "/search/jobs",
+        json={"query": "python backend", "provider": "mock", "limit": 0},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Search limit must be between 1 and 20"
+    assert response.json()["error_code"] == "search_limit_invalid"
+
+
+def test_search_jobs_endpoint_rejects_limit_above_range() -> None:
+    response = client.post(
+        "/search/jobs",
+        json={"query": "python backend", "provider": "mock", "limit": 21},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Search limit must be between 1 and 20"
+    assert response.json()["error_code"] == "search_limit_invalid"
+
+
 def test_search_jobs_endpoint_rejects_unsupported_provider() -> None:
     response = client.post(
         "/search/jobs",

@@ -42,7 +42,7 @@ class FullAnalysisResponse(FinalReport):
 class SearchJobsRequest(BaseModel):
     query: str
     provider: str = "mock"
-    limit: int = Field(default=5, ge=1, le=20)
+    limit: int = 5
 
 
 class ResumeParseRequest(BaseModel):
