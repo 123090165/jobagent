@@ -2,7 +2,7 @@
 
 JobAgent 是一个面向求职者的本地求职准备工作台，核心目标是把“简历和 JD 是否匹配、应该怎么改、面试会被怎么追问、投递进展到哪一步”变成可结构化记录和复盘的流程。
 
-当前版本已经从 Mock MVP 推进到可运行的本地工作台：支持 Streamlit Demo、FastAPI 后端、SQLite 分析记录、岗位库查询、txt/md 简历文件解析、安全版 JD URL 导入、统一业务错误返回、可选 LLM JD 分析、可选 LLM 简历优化、可选 LLM 项目追问、workflow 执行轨迹持久化，以及投递 tracker 最小状态机。
+当前版本已经从 Mock MVP 推进到可运行的本地工作台：支持 Streamlit Demo、FastAPI 后端、SQLite 分析记录、岗位库查询、txt/md 简历文件解析、安全版 JD URL 导入、SearchProvider 抽象层与 MockSearchProvider、统一业务错误返回、可选 LLM JD 分析、可选 LLM 简历优化、可选 LLM 项目追问、workflow 执行轨迹持久化，以及投递 tracker 最小状态机。
 
 ```text
 简历文本或 .txt/.md 简历文件 + JD 文本
@@ -26,6 +26,7 @@ JobAgent 是一个面向求职者的本地求职准备工作台，核心目标�
 - FastAPI 后端：分析、简历解析、JD 分析、匹配、报告、记录、岗位、投递 tracker API。
 - 简历文件解析：支持 `.txt` / `.md` UTF-8 文件转纯文本，默认最大 1MB，并复用 `ResumeParseAgent` 输出 `ResumeProfile`。
 - 安全版 JD URL 导入：只对公开 `http/https` 页面做一次性文本提取，不登录、不执行 JavaScript、不绕过反爬，失败时提示用户手动粘贴 JD。
+- SearchProvider 抽象层：当前通过 `POST /search/jobs` 暴露 API-only 的 `MockSearchProvider`，为后续 Gemini CLI / RAG / MCP 接入预留 provider 边界，但本轮不接真实搜索、不联网、不入库。
 - 统一业务错误：文件解析等业务错误通过 `detail` 和 `error_code` 返回，方便 API 调用方和页面展示。
 - Pydantic schema：稳定 Agent、service、API、UI 之间的数据流。
 - Mock pipeline：不依赖真实 LLM 也能端到端运行。
@@ -34,6 +35,7 @@ JobAgent 是一个面向求职者的本地求职准备工作台，核心目标�
 - LangGraph Workflow Prototype：新增并行原型 workflow，用 graph node + 条件分支验证迁移方向，但当前不替换默认 workflow。
 - FastAPI / Streamlit 实验入口：可选启用 `use_langgraph_workflow`，但默认仍然使用 Python workflow。
 - MissingInfoQuestionAgent：在 LangGraph prototype 中补充缺失信息检测节点，只生成澄清问题，不编造简历内容。
+- Job search API：当前仅提供 API-only 的搜索抽象演示，不接入 Streamlit 页面，避免把 mock 搜索误当成真实岗位抓取。
 - Agent 边界：ResumeParse、JDAnalysis、Match、ResumeOptimize、ProjectChallenge、Report 都有独立入口。
 - Agent Trace：每步记录 `mock`、`llm` 或 `fallback` 模式、fallback 原因、耗时和 guardrails。
 - 可选 LLM JDAnalysisAgent：调用失败或未配置 API key 时回退 mock。
@@ -145,6 +147,7 @@ http://127.0.0.1:8000/docs
 ```text
 GET  /health
 POST /analyze/full
+POST /search/jobs
 POST /jobs/import-url
 POST /resume/parse-file
 GET  /records
@@ -172,6 +175,11 @@ $env:JOBAGENT_LLM_MODEL="gpt-4o-mini"
 - “启用 LLM 简历优化”
 - “启用 LLM 项目追问”
 - “启用 LangGraph 原型 workflow”
+
+说明：
+
+- 当前 `POST /search/jobs` 仅作为 API-only 的 provider abstraction 演示入口。
+- Streamlit 本轮不接岗位搜索 UI，避免把 mock 搜索能力和真实联网搜索混在一起。
 
 默认情况下 `use_langgraph_workflow = false`，系统继续走现有 Python workflow；只有显式开启实验入口时才会调用 LangGraph prototype。
 
@@ -280,8 +288,9 @@ $env:JOBAGENT_MAX_RESUME_FILE_BYTES="1048576"
 | Phase 16 | LangGraph Workflow Prototype，新增并行 graph workflow 和低匹配条件分支，但不替换默认 workflow | 已完成 |
 | Phase 17 | Safe JD URL Import，支持公开 JD 页面文本提取并保留手动粘贴兜底 | 已完成 |
 | Phase 18 | MissingInfoQuestionAgent，在 LangGraph prototype 中增加缺失信息澄清节点 | 已完成 |
-| Phase 19 | RAG/MCP | 后续 |
-| Phase 20 | Docker、部署说明、答辩截图整理 | 后续 |
+| Phase 19 | SearchProvider Interface，增加 API-only 的 MockSearchProvider 和 `POST /search/jobs` | 已完成 |
+| Phase 20 | GeminiCLIProvider / RAG / MCP | 后续 |
+| Phase 21 | Docker、部署说明、答辩截图整理 | 后续 |
 
 ## 面试讲述版
 
@@ -340,6 +349,7 @@ app/
     routes_reports.py
     routes_resume.py
     routes_resume_versions.py
+    routes_search.py
   schemas/
     api.py
     application.py
@@ -348,14 +358,17 @@ app/
     report.py
     resume.py
     resume_version.py
+    search.py
   services/
     application_service.py
     errors.py
+    job_search_service.py
     llm_service.py
     mock_pipeline.py
     report_service.py
     resume_file_service.py
     resume_version_service.py
+    search_providers/
     storage_service.py
   storage/
     database.py
@@ -405,3 +418,4 @@ docs/
 - [JD URL Import](docs/JD_URL_IMPORT.md)
 - [Missing Info Agent](docs/MISSING_INFO_AGENT.md)
 - [LLM Integration](docs/LLM_INTEGRATION.md)
+- [Search Provider](docs/SEARCH_PROVIDER.md)
