@@ -94,7 +94,24 @@
 - 当前去重规则是 `raw_jd` 完全一致则复用岗位记录。
 - 语义去重、标签和 URL 提取属于后续阶段。
 
-### Step 4：创建简历版本
+### Step 4：生成 Job Brief
+
+操作：
+- 切到 Streamlit 的“岗位批量推荐”页签。
+- 继续使用样例简历文本。
+- 输入一个 query，例如 `python backend llm jobs`。
+- 保持 `provider=mock`。
+- 点击“生成 Job Brief”。
+- 展示排序后的推荐岗位、`scoring_quality`、风险点和 Markdown Brief。
+
+讲解重点：
+- 这是批量推荐 brief，不是自动投递。
+- 第一版明确只开放 `provider="mock"`，避免把演示数据说成真实联网搜索。
+- 每个岗位的 `fit_score` 仍然来自现有 workflow 里的 `match_report.overall_score`。
+- `scoring_quality` 用来提醒输入材料完整度，而不是岗位本身好坏。
+- `snippet_only` 的岗位应该先补完整 JD，再决定是否投入大量定制成本。
+
+### Step 5：创建简历版本
 
 操作：
 
@@ -108,7 +125,7 @@
 - 原始简历不会被覆盖，定制版本需要用户确认。
 - 当前不自动生成或编造经历，只保存用户提供的真实文本。
 
-### Step 5：创建投递跟进
+### Step 6：创建投递跟进
 
 操作：
 
@@ -124,7 +141,7 @@
 - 状态是明确枚举，而不是任意字符串。
 - 当前一个岗位对应一条 tracker 记录，重复保存同一岗位会更新原记录。
 
-### Step 6：展示 FastAPI
+### Step 7：展示 FastAPI
 
 操作：
 
@@ -137,7 +154,7 @@
 - route 保持很薄，核心逻辑在 service。
 - 后续迁移到 Web 前端时，service 和 API 可以继续复用。
 
-### Step 7：展示测试
+### Step 8：展示测试
 
 操作：
 
@@ -150,7 +167,7 @@
 - API、存储、LLM fallback、tracker、简历版本、workflow 步骤都有最小测试保护。
 - deprecation warning 来自依赖链，不影响当前功能正确性。
 
-### Step 8：讲解 Workflow 编排
+### Step 9：讲解 Workflow 编排
 
 操作：
 

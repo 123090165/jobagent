@@ -2,7 +2,7 @@
 
 JobAgent 是一个面向求职者的本地求职准备工作台，核心目标是把“简历和 JD 是否匹配、应该怎么改、面试会被怎么追问、投递进展到哪一步”变成可结构化记录和复盘的流程。
 
-当前版本已经从 Mock MVP 推进到可运行的本地工作台：支持 Streamlit Demo、FastAPI 后端、SQLite 分析记录、岗位库查询、txt/md 简历文件解析、安全版 JD URL 导入、SearchProvider 抽象层与 MockSearchProvider、实验性的 GeminiCLIProvider、统一业务错误返回、可选 LLM JD 分析、可选 LLM 简历优化、可选 LLM 项目追问、workflow 执行轨迹持久化，以及投递 tracker 最小状态机。
+当前版本已经从 Mock MVP 推进到可运行的本地工作台：支持 Streamlit Demo、FastAPI 后端、SQLite 分析记录、岗位库查询、txt/md 简历文件解析、安全版 JD URL 导入、SearchProvider 抽象层与 MockSearchProvider、实验性的 GeminiCLIProvider、Batch Job Brief MVP、统一业务错误返回、可选 LLM JD 分析、可选 LLM 简历优化、可选 LLM 项目追问、workflow 执行轨迹持久化，以及投递 tracker 最小状态机。
 
 ```text
 简历文本或 .txt/.md 简历文件 + JD 文本
@@ -28,6 +28,7 @@ JobAgent 是一个面向求职者的本地求职准备工作台，核心目标�
 - 安全版 JD URL 导入：只对公开 `http/https` 页面做一次性文本提取，不登录、不执行 JavaScript、不绕过反爬，失败时提示用户手动粘贴 JD。
 - SearchProvider 抽象层：当前通过 `POST /search/jobs` 暴露 API-only 的 `MockSearchProvider`，为后续 Gemini CLI / RAG / MCP 接入预留 provider 边界，但本轮不接真实搜索、不联网、不入库。
 - GeminiCLIProvider experimental：`provider="gemini_cli"` 默认关闭，只有显式设置环境变量后才会调用本机 Gemini CLI，而且只传搜索 query，不传简历全文、API key 或本地敏感信息；当前会尽量返回更丰富的 JD-like 字段，例如 `responsibilities`、`requirements`、`skills`、`jd_text`、`is_full_jd` 和 `confidence`，但仍不保证一定拿到完整 JD。
+- Batch Job Brief MVP：输入一份简历文本和一个搜索 query，先通过 `SearchProvider` 获取多个岗位，再逐个复用现有 workflow 生成 `match_report`，最后按 `fit_score` 排序输出推荐岗位 brief；第一版默认只开放 `provider="mock"`。
 - 统一业务错误：文件解析等业务错误通过 `detail` 和 `error_code` 返回，方便 API 调用方和页面展示。
 - Pydantic schema：稳定 Agent、service、API、UI 之间的数据流。
 - Mock pipeline：不依赖真实 LLM 也能端到端运行。
@@ -124,6 +125,7 @@ pip install -r requirements.txt
 页面包含：
 
 - 生成报告：粘贴简历文本，或上传 `.txt` / `.md` 简历文件，再输入 JD，输出 Markdown 报告和执行轨迹。
+- 岗位批量推荐：输入简历文本和搜索 query，基于 `provider="mock"` 批量生成推荐岗位 brief、风险点和投递策略。
 - 生成报告页支持输入公开 JD URL，并将提取结果填入现有 JD 文本框；导入失败时继续手动粘贴。
 - 侧边栏可选“启用 LangGraph 原型 workflow”：当前为实验模式，不替换默认 workflow，会使用 graph node 和 match score 条件分支。
 - 历史记录：查看已保存的分析结果和每次 workflow step trace。
@@ -148,6 +150,7 @@ http://127.0.0.1:8000/docs
 ```text
 GET  /health
 POST /analyze/full
+POST /brief/from-search
 POST /search/jobs
 POST /jobs/import-url
 POST /resume/parse-file
@@ -158,6 +161,18 @@ GET  /applications
 POST /resume-versions
 POST /applications
 PATCH /applications/{application_id}
+```
+
+Job Brief 请求示例：
+
+```json
+{
+  "resume_text": "Python FastAPI SQL LLM ...",
+  "query": "python backend llm jobs",
+  "provider": "mock",
+  "limit": 5,
+  "use_llm_jd": false
+}
 ```
 
 ### 4. 可选启用 LLM Agent
@@ -298,9 +313,10 @@ $env:JOBAGENT_MAX_RESUME_FILE_BYTES="1048576"
 | Phase 21 | Gemini Search Demo Script，增加安全的 CLI-to-API 自动化演示脚本和脱敏产物发布路径 | 已完成 |
 | Phase 22 | GeminiCLIProvider JD Prompt Upgrade，增强 JD-like 字段提取与兼容解析 | 已完成 |
 | Phase 23 | Real Gemini JD Experiment Runner，批量运行真实 Gemini JD 搜索实验并生成总览报告 | 已完成 |
-| Phase 24 | SearchResult -> JobImportCandidate | 后续 |
-| Phase 25 | JD Acquisition Quality Upgrade | 后续 |
-| Phase 26 | RAG / MCP | 后续 |
+| Phase 24 | Batch Job Brief MVP，批量搜索 mock 岗位并按匹配分生成推荐 brief | 已完成 |
+| Phase 25 | SearchResult -> JobImportCandidate | 后续 |
+| Phase 26 | JD Acquisition Quality Upgrade | 后续 |
+| Phase 27 | RAG / MCP | 后续 |
 
 ## 面试讲述版
 
@@ -434,3 +450,4 @@ docs/
 - [Missing Info Agent](docs/MISSING_INFO_AGENT.md)
 - [LLM Integration](docs/LLM_INTEGRATION.md)
 - [Search Provider](docs/SEARCH_PROVIDER.md)
+- [Batch Job Brief](docs/BATCH_JOB_BRIEF.md)
