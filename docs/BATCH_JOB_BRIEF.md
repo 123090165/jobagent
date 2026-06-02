@@ -109,3 +109,20 @@ POST /brief/from-search
 - 真实 JD 获取质量增强
 - 保存 Brief 到历史记录
 - 把高优先级岗位加入 tracker
+
+## 8. Resume -> Query Generator
+
+Batch Job Brief now supports a small rule-based preparation step before search:
+
+- start from `resume_text`
+- generate a few English search queries
+- pick one query manually
+- run `provider="mock"` to produce the brief
+
+This keeps the current MVP safe and explicit:
+
+- no real networking in tests
+- no hidden public scraping
+- no automatic import into storage
+
+Later rounds can connect the same query generation step to public no-login job sources.

@@ -152,6 +152,7 @@ GET  /health
 POST /analyze/full
 POST /brief/from-search
 POST /search/jobs
+POST /search/queries/from-resume
 POST /jobs/import-url
 POST /resume/parse-file
 GET  /records
@@ -174,6 +175,16 @@ Job Brief 请求示例：
   "use_llm_jd": false
 }
 ```
+
+Search Query Generator Request Example:
+```json
+{
+  "resume_text": "Python FastAPI SQL LLM ...",
+  "max_queries": 5
+}
+```
+
+The Streamlit Batch Job Brief page now supports generating a few resume-based queries first, then letting the user choose one query before running the existing `provider="mock"` brief flow.
 
 ### 4. 可选启用 LLM Agent
 
@@ -314,9 +325,11 @@ $env:JOBAGENT_MAX_RESUME_FILE_BYTES="1048576"
 | Phase 22 | GeminiCLIProvider JD Prompt Upgrade，增强 JD-like 字段提取与兼容解析 | 已完成 |
 | Phase 23 | Real Gemini JD Experiment Runner，批量运行真实 Gemini JD 搜索实验并生成总览报告 | 已完成 |
 | Phase 24 | Batch Job Brief MVP，批量搜索 mock 岗位并按匹配分生成推荐 brief | 已完成 |
-| Phase 25 | SearchResult -> JobImportCandidate | 后续 |
-| Phase 26 | JD Acquisition Quality Upgrade | 后续 |
-| Phase 27 | RAG / MCP | 后续 |
+| Phase 25 | Resume Search Query Generator | 已完成 |
+| Phase 26 | CUHKSZCareerProvider MVP | 后续 |
+| Phase 27 | JD Extraction Quality Gate | 后续 |
+| Phase 28 | SearchResult -> JobImportCandidate | 后续 |
+| Phase 29 | Real Batch Job Brief Demo | 后续 |
 
 ## 面试讲述版
 
@@ -451,3 +464,4 @@ docs/
 - [LLM Integration](docs/LLM_INTEGRATION.md)
 - [Search Provider](docs/SEARCH_PROVIDER.md)
 - [Batch Job Brief](docs/BATCH_JOB_BRIEF.md)
+- [Public Job Source Provider](docs/PUBLIC_JOB_SOURCE_PROVIDER.md)
