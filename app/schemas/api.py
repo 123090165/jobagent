@@ -45,6 +45,15 @@ class SearchJobsRequest(BaseModel):
     limit: int = 5
 
 
+class SearchQueriesFromResumeRequest(BaseModel):
+    resume_text: str
+    max_queries: int = 5
+
+
+class SearchQueriesFromResumeResponse(BaseModel):
+    queries: list[str] = Field(default_factory=list)
+
+
 class BriefFromSearchRequest(BaseModel):
     resume_text: str
     query: str

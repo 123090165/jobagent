@@ -15,6 +15,7 @@ from app.services.llm_service import is_llm_configured
 from app.services.batch_brief_service import build_brief_from_search
 from app.services.application_service import list_applications, save_application
 from app.services.errors import JobAgentError
+from app.services.search_query_service import generate_search_queries_from_resume
 from app.services.resume_version_service import (
     list_saved_resume_versions,
     load_resume_version,
@@ -258,6 +259,8 @@ def render_job_brief_tab(*, use_llm_jd: bool) -> None:
         st.session_state["brief_resume_text"] = SAMPLE_RESUME
     if "brief_query_text" not in st.session_state:
         st.session_state["brief_query_text"] = "python backend llm jobs"
+    if "brief_generated_queries" not in st.session_state:
+        st.session_state["brief_generated_queries"] = []
 
     left, right = st.columns([2, 1])
     with left:
@@ -266,6 +269,28 @@ def render_job_brief_tab(*, use_llm_jd: bool) -> None:
             key="brief_resume_text",
             height=240,
         )
+        if st.button("Generate search queries from resume", use_container_width=True):
+            try:
+                st.session_state["brief_generated_queries"] = generate_search_queries_from_resume(
+                    resume_text=resume_text,
+                    max_queries=5,
+                )
+            except JobAgentError as exc:
+                st.session_state["brief_generated_queries"] = []
+                st.error(str(exc))
+
+        generated_queries = st.session_state.get("brief_generated_queries") or []
+        if generated_queries:
+            st.markdown("**Recommended Search Queries**")
+            selected_generated_query = st.selectbox(
+                "Choose a query to fill into the search box",
+                options=generated_queries,
+                key="brief_generated_query_selection",
+            )
+            if st.button("Use selected query", use_container_width=True):
+                st.session_state["brief_query_text"] = selected_generated_query
+                st.rerun()
+
         query = st.text_input(
             "搜索 query",
             key="brief_query_text",
