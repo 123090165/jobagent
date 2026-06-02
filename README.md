@@ -266,6 +266,7 @@ $env:JOBAGENT_MAX_RESUME_FILE_BYTES="1048576"
 
 - [Demo Script](docs/DEMO_SCRIPT.md)
 - [Demo Gemini Search Flow](docs/DEMO_GEMINI_SEARCH_FLOW.md)
+- [Real Gemini JD Experiments](docs/REAL_GEMINI_JD_EXPERIMENTS.md)
 - [Portfolio Pitch](docs/PORTFOLIO_PITCH.md)
 - [Screenshot Guide](docs/SCREENSHOT_GUIDE.md)
 
@@ -296,9 +297,10 @@ $env:JOBAGENT_MAX_RESUME_FILE_BYTES="1048576"
 | Phase 20 | GeminiCLIProvider experimental，增加默认关闭的 `provider="gemini_cli"` | 已完成 |
 | Phase 21 | Gemini Search Demo Script，增加安全的 CLI-to-API 自动化演示脚本和脱敏产物发布路径 | 已完成 |
 | Phase 22 | GeminiCLIProvider JD Prompt Upgrade，增强 JD-like 字段提取与兼容解析 | 已完成 |
-| Phase 23 | SearchResult -> JobImportCandidate | 后续 |
-| Phase 24 | JD Acquisition Quality Upgrade | 后续 |
-| Phase 25 | RAG / MCP | 后续 |
+| Phase 23 | Real Gemini JD Experiment Runner，批量运行真实 Gemini JD 搜索实验并生成总览报告 | 已完成 |
+| Phase 24 | SearchResult -> JobImportCandidate | 后续 |
+| Phase 25 | JD Acquisition Quality Upgrade | 后续 |
+| Phase 26 | RAG / MCP | 后续 |
 
 ## 面试讲述版
 
@@ -412,6 +414,7 @@ docs/
 - [Demo Guide](docs/DEMO_GUIDE.md)
 - [Demo Script](docs/DEMO_SCRIPT.md)
 - [Demo Gemini Search Flow](docs/DEMO_GEMINI_SEARCH_FLOW.md)
+- [Real Gemini JD Experiments](docs/REAL_GEMINI_JD_EXPERIMENTS.md)
 - [Portfolio Pitch](docs/PORTFOLIO_PITCH.md)
 - [Screenshot Guide](docs/SCREENSHOT_GUIDE.md)
 - [Agent Boundaries](docs/AGENT_BOUNDARIES.md)
