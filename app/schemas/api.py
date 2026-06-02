@@ -45,6 +45,14 @@ class SearchJobsRequest(BaseModel):
     limit: int = 5
 
 
+class BriefFromSearchRequest(BaseModel):
+    resume_text: str
+    query: str
+    provider: str = "mock"
+    limit: int = 5
+    use_llm_jd: bool = False
+
+
 class ResumeParseRequest(BaseModel):
     resume_text: str
 

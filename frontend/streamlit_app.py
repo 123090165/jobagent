@@ -12,7 +12,9 @@ if str(ROOT_DIR) not in sys.path:
 
 from app.services.jd_url_service import JDUrlImportError, import_jd_from_url
 from app.services.llm_service import is_llm_configured
+from app.services.batch_brief_service import build_brief_from_search
 from app.services.application_service import list_applications, save_application
+from app.services.errors import JobAgentError
 from app.services.resume_version_service import (
     list_saved_resume_versions,
     load_resume_version,
@@ -26,6 +28,7 @@ from app.services.storage_service import (
     load_job_posting,
     save_final_report,
 )
+from app.schemas.brief import JobBriefReport
 from app.workflows.job_analysis_workflow import run_job_analysis_workflow
 from app.workflows.langgraph_job_analysis_workflow import run_langgraph_job_analysis_workflow
 
@@ -88,8 +91,8 @@ def main() -> None:
         if use_langgraph_workflow:
             st.caption("当前已启用 LangGraph 原型 workflow：实验入口，不替换默认 Python workflow。")
 
-    tab_analyze, tab_history, tab_jobs, tab_versions, tab_tracker = st.tabs(
-        ["生成报告", "历史记录", "岗位库", "简历版本", "投递跟进"]
+    tab_analyze, tab_brief, tab_history, tab_jobs, tab_versions, tab_tracker = st.tabs(
+        ["生成报告", "岗位批量推荐", "历史记录", "岗位库", "简历版本", "投递跟进"]
     )
 
     with tab_analyze:
@@ -100,6 +103,9 @@ def main() -> None:
             use_langgraph_workflow=use_langgraph_workflow,
             save_result=save_result,
         )
+
+    with tab_brief:
+        render_job_brief_tab(use_llm_jd=use_llm_jd)
 
     with tab_history:
         render_history_tab()
@@ -242,6 +248,159 @@ def render_analysis_tab(
                 for item in questions:
                     st.markdown(f"- **{item.question}**")
                     st.caption(f"考察点：{item.evaluates}")
+
+
+def render_job_brief_tab(*, use_llm_jd: bool) -> None:
+    st.subheader("岗位批量推荐 / Job Brief")
+    st.caption("第一版默认使用 mock provider，不保存数据库，不加入 tracker。")
+
+    if "brief_resume_text" not in st.session_state:
+        st.session_state["brief_resume_text"] = SAMPLE_RESUME
+    if "brief_query_text" not in st.session_state:
+        st.session_state["brief_query_text"] = "python backend llm jobs"
+
+    left, right = st.columns([2, 1])
+    with left:
+        resume_text = st.text_area(
+            "简历文本",
+            key="brief_resume_text",
+            height=240,
+        )
+        query = st.text_input(
+            "搜索 query",
+            key="brief_query_text",
+            placeholder="例如：python backend llm jobs",
+        )
+    with right:
+        provider = st.selectbox(
+            "Provider",
+            options=["mock"],
+            index=0,
+            help="当前 MVP 只开放 mock provider，避免把演示数据误当成真实联网结果。",
+        )
+        limit = st.select_slider(
+            "推荐岗位数量",
+            options=list(range(1, 11)),
+            value=5,
+        )
+        use_llm_jd_for_brief = st.checkbox(
+            "启用 LLM JD 分析",
+            value=use_llm_jd,
+            help="只影响岗位 brief 内部的 JDAnalysisAgent；其他 agent 仍保持 mock。",
+            key="brief_use_llm_jd",
+        )
+
+    if st.button("生成 Job Brief", type="primary", use_container_width=True):
+        try:
+            report = build_brief_from_search(
+                resume_text=resume_text,
+                query=query,
+                provider=provider,
+                limit=limit,
+                use_llm_jd=use_llm_jd_for_brief,
+            )
+        except JobAgentError as exc:
+            st.error(str(exc))
+            return
+
+        st.success(f"已生成 {report.total_jobs} 个岗位的推荐 Brief")
+        col1, col2 = st.columns(2)
+        col1.metric("岗位总数", report.total_jobs)
+        col2.metric("Top Skills", len(report.top_skills))
+
+        st.markdown("### Market Summary")
+        st.write(report.market_summary)
+        if report.scoring_quality_summary:
+            st.caption(report.scoring_quality_summary)
+
+        if report.top_skills:
+            st.markdown("### Top Skills")
+            st.write(", ".join(report.top_skills))
+
+        st.markdown("### 推荐岗位")
+        table_rows = [
+            {
+                "rank": item.rank,
+                "title": item.job.title,
+                "company": item.job.company,
+                "location": item.job.location,
+                "fit_score": item.fit_score,
+                "scoring_quality": item.scoring_quality,
+                "advice": item.advice,
+            }
+            for item in report.recommended_jobs
+        ]
+        st.dataframe(table_rows, hide_index=True, use_container_width=True)
+
+        for item in report.recommended_jobs:
+            with st.expander(f"#{item.rank} {item.job.title} | {item.job.company}"):
+                st.markdown(f"**URL:** {item.job.url or 'N/A'}")
+                st.markdown(f"**Fit Score:** {item.fit_score:.1f}")
+                st.markdown(f"**Scoring Quality:** {item.scoring_quality}")
+                st.markdown(f"**Advice:** {item.advice}")
+                st.markdown("**Fit Reasons**")
+                for reason in item.fit_reasons:
+                    st.markdown(f"- {reason}")
+                st.markdown("**Risk Points**")
+                for risk in item.risk_points:
+                    st.markdown(f"- {risk}")
+                st.markdown("**Matched Points**")
+                for point in item.match_report.matched_points:
+                    st.markdown(f"- {point}")
+                st.markdown("**Missing Points**")
+                for point in item.match_report.missing_points:
+                    st.markdown(f"- {point}")
+                st.markdown("**Short-term Suggestions**")
+                for suggestion in item.match_report.short_term_suggestions:
+                    st.markdown(f"- {suggestion}")
+
+        markdown_brief = build_job_brief_markdown(report)
+        st.markdown("### Markdown Brief")
+        st.text_area("Brief Markdown", value=markdown_brief, height=320)
+        st.download_button(
+            label="下载 Job Brief Markdown",
+            data=markdown_brief,
+            file_name="job_brief.md",
+            mime="text/markdown",
+        )
+
+
+def build_job_brief_markdown(report: JobBriefReport) -> str:
+    lines = [
+        f"# Job Brief: {report.query}",
+        "",
+        f"- Provider: {report.provider}",
+        f"- Total Jobs: {report.total_jobs}",
+        f"- Top Skills: {', '.join(report.top_skills) if report.top_skills else 'N/A'}",
+        f"- Scoring Quality Summary: {report.scoring_quality_summary or 'N/A'}",
+        "",
+        "## Market Summary",
+        report.market_summary,
+        "",
+        "## Application Strategy",
+    ]
+    lines.extend(f"- {item}" for item in report.application_strategy)
+    lines.append("")
+    lines.append("## Recommendations")
+
+    for item in report.recommended_jobs:
+        lines.extend(
+            [
+                "",
+                f"### #{item.rank} {item.job.title}",
+                f"- Company: {item.job.company}",
+                f"- Location: {item.job.location}",
+                f"- Fit Score: {item.fit_score:.1f}",
+                f"- Scoring Quality: {item.scoring_quality}",
+                f"- Advice: {item.advice}",
+                "- Fit Reasons:",
+            ]
+        )
+        lines.extend(f"  - {reason}" for reason in item.fit_reasons)
+        lines.append("- Risk Points:")
+        lines.extend(f"  - {risk}" for risk in item.risk_points)
+
+    return "\n".join(lines).strip() + "\n"
 
 
 def render_history_tab() -> None:

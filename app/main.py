@@ -6,6 +6,7 @@ from fastapi.responses import JSONResponse
 
 from app.api.routes_analyze import router as analyze_router
 from app.api.routes_applications import router as applications_router
+from app.api.routes_brief import router as brief_router
 from app.api.routes_jobs import router as jobs_router
 from app.api.routes_match import router as match_router
 from app.api.routes_records import router as records_router
@@ -42,6 +43,7 @@ def create_app() -> FastAPI:
         )
 
     api.include_router(analyze_router)
+    api.include_router(brief_router)
     api.include_router(resume_router)
     api.include_router(jobs_router)
     api.include_router(search_router)
