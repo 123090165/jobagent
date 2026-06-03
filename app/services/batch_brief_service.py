@@ -102,6 +102,8 @@ def select_job_text(job: SearchResultItem) -> str:
 
 
 def get_scoring_quality(job: SearchResultItem) -> str:
+    if job.quality_label:
+        return job.quality_label
     if job.is_full_jd:
         return "full_jd"
     if job.jd_text and job.jd_text.strip():
@@ -171,9 +173,13 @@ def build_application_strategy(
         )
 
     quality_counts = Counter(item.scoring_quality for item in recommendations)
-    if quality_counts.get("snippet_only", 0) > 0 or quality_counts.get("partial_jd", 0) > 0:
+    if (
+        quality_counts.get("snippet_only", 0) > 0
+        or quality_counts.get("partial_jd", 0) > 0
+        or quality_counts.get("external_link_only", 0) > 0
+    ):
         strategy.append(
-            "For partial_jd or snippet_only roles, confirm the full JD before investing in heavy resume tailoring."
+            "For partial_jd, external_link_only, or snippet_only roles, confirm a fuller JD before investing in heavy resume tailoring."
         )
 
     if top_skills:
@@ -193,10 +199,15 @@ def build_scoring_quality_summary(recommendations: list[JobRecommendationItem]) 
     summary = (
         f"Scoring quality mix: full_jd={counts.get('full_jd', 0)}, "
         f"partial_jd={counts.get('partial_jd', 0)}, "
+        f"external_link_only={counts.get('external_link_only', 0)}, "
         f"snippet_only={counts.get('snippet_only', 0)}."
     )
-    if counts.get("snippet_only", 0) > 0:
-        summary += " Snippet-only recommendations have lower confidence until you confirm a fuller JD."
+    if counts.get("external_link_only", 0) > 0 or counts.get("snippet_only", 0) > 0:
+        summary += (
+            f" 本次推荐中 {counts.get('full_jd', 0)} 个岗位来自完整 JD，"
+            f"{counts.get('external_link_only', 0) + counts.get('snippet_only', 0)} 个岗位只含外链或摘要，"
+            "摘要型岗位评分可信度较低。"
+        )
     return summary
 
 

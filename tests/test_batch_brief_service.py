@@ -22,6 +22,7 @@ def _build_job(
     skills: list[str] | None = None,
     jd_text: str | None = None,
     is_full_jd: bool = False,
+    quality_label: str | None = None,
 ) -> SearchResultItem:
     return SearchResultItem(
         title=title,
@@ -35,6 +36,7 @@ def _build_job(
         jd_text=jd_text,
         is_full_jd=is_full_jd,
         confidence=0.8 if is_full_jd else 0.4,
+        quality_label=quality_label,
     )
 
 
@@ -157,9 +159,10 @@ def test_recommendation_items_include_required_fields(monkeypatch) -> None:
 
 def test_scoring_quality_values_are_detected(monkeypatch) -> None:
     jobs = [
-        _build_job(title="Full JD", snippet="full snippet", jd_text="full text", is_full_jd=True),
-        _build_job(title="Partial JD", snippet="partial snippet", jd_text="partial text", is_full_jd=False),
-        _build_job(title="Snippet Only", snippet="snippet only", jd_text=None, is_full_jd=False),
+        _build_job(title="Full JD", snippet="full snippet", jd_text="full text", is_full_jd=True, quality_label="full_jd"),
+        _build_job(title="Partial JD", snippet="partial snippet", jd_text="partial text", is_full_jd=False, quality_label="partial_jd"),
+        _build_job(title="External Link", snippet="详情见外链", jd_text="详情见 https://mp.weixin.qq.com/s/example", is_full_jd=False, quality_label="external_link_only"),
+        _build_job(title="Snippet Only", snippet="snippet only", jd_text=None, is_full_jd=False, quality_label="snippet_only"),
     ]
     monkeypatch.setattr(
         "app.services.batch_brief_service.run_job_analysis_workflow",
@@ -176,8 +179,29 @@ def test_scoring_quality_values_are_detected(monkeypatch) -> None:
     assert [item.scoring_quality for item in report.recommended_jobs] == [
         "full_jd",
         "partial_jd",
+        "external_link_only",
         "snippet_only",
     ]
+
+
+def test_scoring_quality_summary_includes_external_link_only(monkeypatch) -> None:
+    jobs = [
+        _build_job(title="Full JD", snippet="full snippet", jd_text="full text", is_full_jd=True, quality_label="full_jd"),
+        _build_job(title="External Link", snippet="详情见外链", jd_text="详情见 https://mp.weixin.qq.com/s/example", quality_label="external_link_only"),
+    ]
+    monkeypatch.setattr(
+        "app.services.batch_brief_service.run_job_analysis_workflow",
+        lambda **kwargs: _fake_workflow_result(70.0, label=kwargs["jd_text"]),
+    )
+
+    report = build_brief_from_jobs(
+        resume_text="resume text",
+        query="query",
+        provider="local_db",
+        jobs=jobs,
+    )
+
+    assert "external_link_only=1" in report.scoring_quality_summary
 
 
 def test_top_skills_are_collected_and_deduped(monkeypatch) -> None:

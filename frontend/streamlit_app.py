@@ -1,8 +1,11 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import hashlib
+import json
 import sys
 from pathlib import Path
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
 
 import streamlit as st
 
@@ -30,6 +33,7 @@ from app.services.storage_service import (
     save_final_report,
 )
 from app.schemas.brief import JobBriefReport
+from app.schemas.job_import_candidate import JobImportCandidate
 from app.workflows.job_analysis_workflow import run_job_analysis_workflow
 from app.workflows.langgraph_job_analysis_workflow import run_langgraph_job_analysis_workflow
 
@@ -46,6 +50,16 @@ SAMPLE_JD = """AI 应用开发工程师
 要求：熟悉 Python、FastAPI、SQL、Pydantic，有良好的工程实践和 Git 使用经验。
 加分：了解 LangGraph、RAG、OpenAI API、Docker，有 Streamlit Demo 开发经验优先。
 """
+
+DEFAULT_API_BASE_URL = "http://127.0.0.1:8000"
+DEFAULT_API_TIMEOUT_SECONDS = 30
+SCORING_QUALITY_LABELS = {
+    "full_jd": "完整 JD",
+    "partial_jd": "部分 JD",
+    "external_link_only": "外链详情",
+    "snippet_only": "摘要评估",
+    "invalid": "无效 JD",
+}
 
 
 def main() -> None:
@@ -119,6 +133,281 @@ def main() -> None:
 
     with tab_tracker:
         render_tracker_tab()
+
+
+def request_job_brief_from_api(
+    *,
+    resume_text: str,
+    query: str,
+    provider: str,
+    limit: int,
+    use_llm_jd: bool,
+    api_base_url: str = DEFAULT_API_BASE_URL,
+    timeout_seconds: int = DEFAULT_API_TIMEOUT_SECONDS,
+) -> JobBriefReport:
+    payload = json.dumps(
+        {
+            "resume_text": resume_text,
+            "query": query,
+            "provider": provider,
+            "limit": limit,
+            "use_llm_jd": use_llm_jd,
+        }
+    ).encode("utf-8")
+    request = Request(
+        f"{api_base_url.rstrip('/')}/brief/from-search",
+        data=payload,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+
+    try:
+        with urlopen(request, timeout=timeout_seconds) as response:
+            response_body = response.read().decode("utf-8")
+    except HTTPError as exc:
+        error_body = exc.read().decode("utf-8", errors="replace")
+        error_payload = _load_json_payload(error_body)
+        raise JobAgentError(
+            str(error_payload.get("detail", f"/brief/from-search failed with status {exc.code}")),
+            str(error_payload.get("error_code", "brief_api_request_failed")),
+        ) from exc
+    except URLError as exc:
+        raise JobAgentError(
+            "无法连接 FastAPI 后端，请先启动 .venv\\Scripts\\python.exe -m uvicorn app.main:app --reload",
+            "brief_api_unavailable",
+        ) from exc
+
+    return JobBriefReport.model_validate(_load_json_payload(response_body))
+
+
+def request_brief_run_from_api(
+    *,
+    resume_text: str,
+    query: str,
+    provider: str,
+    limit: int,
+    use_llm_jd: bool,
+    api_base_url: str = DEFAULT_API_BASE_URL,
+    timeout_seconds: int = DEFAULT_API_TIMEOUT_SECONDS,
+) -> tuple[str, JobBriefReport]:
+    payload = json.dumps(
+        {
+            "resume_text": resume_text,
+            "query": query,
+            "provider": provider,
+            "limit": limit,
+            "use_llm_jd": use_llm_jd,
+        }
+    ).encode("utf-8")
+    request = Request(
+        f"{api_base_url.rstrip('/')}/brief/runs/from-search",
+        data=payload,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+
+    try:
+        with urlopen(request, timeout=timeout_seconds) as response:
+            response_body = response.read().decode("utf-8")
+    except HTTPError as exc:
+        error_body = exc.read().decode("utf-8", errors="replace")
+        error_payload = _load_json_payload(error_body)
+        raise JobAgentError(
+            str(error_payload.get("detail", f"/brief/runs/from-search failed with status {exc.code}")),
+            str(error_payload.get("error_code", "brief_api_request_failed")),
+        ) from exc
+    except URLError as exc:
+        raise JobAgentError(
+            "无法连接 FastAPI 后端，请先启动 .venv\\Scripts\\python.exe -m uvicorn app.main:app --reload",
+            "brief_api_unavailable",
+        ) from exc
+
+    body = _load_json_payload(response_body)
+    run_id = str(body.get("run_id", "")).strip()
+    if not run_id:
+        raise JobAgentError("Job Brief run API returned an empty run_id", "brief_run_api_invalid_json")
+    return run_id, JobBriefReport.model_validate(body.get("brief") or {})
+
+
+def request_brief_rerank_from_api(
+    *,
+    run_id: str,
+    require_full_jd: bool,
+    exclude_external_link_only: bool,
+    location_keywords: list[str],
+    include_keywords: list[str],
+    exclude_keywords: list[str],
+    min_fit_score: float | None,
+    limit: int | None,
+    api_base_url: str = DEFAULT_API_BASE_URL,
+    timeout_seconds: int = DEFAULT_API_TIMEOUT_SECONDS,
+) -> JobBriefReport:
+    payload = json.dumps(
+        {
+            "require_full_jd": require_full_jd,
+            "exclude_external_link_only": exclude_external_link_only,
+            "location_keywords": location_keywords,
+            "include_keywords": include_keywords,
+            "exclude_keywords": exclude_keywords,
+            "min_fit_score": min_fit_score,
+            "limit": limit,
+        }
+    ).encode("utf-8")
+    request = Request(
+        f"{api_base_url.rstrip('/')}/brief/runs/{run_id}/rerank",
+        data=payload,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+
+    try:
+        with urlopen(request, timeout=timeout_seconds) as response:
+            response_body = response.read().decode("utf-8")
+    except HTTPError as exc:
+        error_body = exc.read().decode("utf-8", errors="replace")
+        error_payload = _load_json_payload(error_body)
+        raise JobAgentError(
+            str(error_payload.get("detail", f"/brief/runs/{run_id}/rerank failed with status {exc.code}")),
+            str(error_payload.get("error_code", "brief_api_request_failed")),
+        ) from exc
+    except URLError as exc:
+        raise JobAgentError(
+            "无法连接 FastAPI 后端，请先启动 .venv\\Scripts\\python.exe -m uvicorn app.main:app --reload",
+            "brief_api_unavailable",
+        ) from exc
+
+    return JobBriefReport.model_validate(_load_json_payload(response_body))
+
+
+def request_job_candidate_from_brief_run_api(
+    *,
+    run_id: str,
+    rank: int | None = None,
+    item_id: int | None = None,
+    api_base_url: str = DEFAULT_API_BASE_URL,
+    timeout_seconds: int = DEFAULT_API_TIMEOUT_SECONDS,
+) -> JobImportCandidate:
+    payload = json.dumps(
+        {
+            "run_id": run_id,
+            "rank": rank,
+            "item_id": item_id,
+        }
+    ).encode("utf-8")
+    request = Request(
+        f"{api_base_url.rstrip('/')}/job-candidates/from-brief-run",
+        data=payload,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+
+    try:
+        with urlopen(request, timeout=timeout_seconds) as response:
+            response_body = response.read().decode("utf-8")
+    except HTTPError as exc:
+        error_body = exc.read().decode("utf-8", errors="replace")
+        error_payload = _load_json_payload(error_body)
+        raise JobAgentError(
+            str(error_payload.get("detail", f"/job-candidates/from-brief-run failed with status {exc.code}")),
+            str(error_payload.get("error_code", "job_candidate_api_request_failed")),
+        ) from exc
+    except URLError as exc:
+        raise JobAgentError(
+            "无法连接 FastAPI 后端，请先启动 .venv\\Scripts\\python.exe -m uvicorn app.main:app --reload",
+            "job_candidate_api_unavailable",
+        ) from exc
+
+    payload_object = _load_json_payload(response_body)
+    return JobImportCandidate.model_validate(payload_object.get("candidate") or {})
+
+
+def request_list_job_candidates_from_api(
+    *,
+    status: str | None = None,
+    limit: int = 20,
+    api_base_url: str = DEFAULT_API_BASE_URL,
+    timeout_seconds: int = DEFAULT_API_TIMEOUT_SECONDS,
+) -> list[JobImportCandidate]:
+    query_parts = [f"limit={int(limit)}"]
+    if status:
+        query_parts.append(f"status={status}")
+    request = Request(
+        f"{api_base_url.rstrip('/')}/job-candidates?{'&'.join(query_parts)}",
+        method="GET",
+    )
+    try:
+        with urlopen(request, timeout=timeout_seconds) as response:
+            response_body = response.read().decode("utf-8")
+    except HTTPError as exc:
+        error_body = exc.read().decode("utf-8", errors="replace")
+        error_payload = _load_json_payload(error_body)
+        raise JobAgentError(
+            str(error_payload.get("detail", f"/job-candidates failed with status {exc.code}")),
+            str(error_payload.get("error_code", "job_candidate_api_request_failed")),
+        ) from exc
+    except URLError as exc:
+        raise JobAgentError(
+            "无法连接 FastAPI 后端，请先启动 .venv\\Scripts\\python.exe -m uvicorn app.main:app --reload",
+            "job_candidate_api_unavailable",
+        ) from exc
+
+    payload_object = _load_json_payload(response_body)
+    return [
+        JobImportCandidate.model_validate(item)
+        for item in payload_object.get("candidates") or []
+        if isinstance(item, dict)
+    ]
+
+
+def request_update_job_candidate_from_api(
+    *,
+    candidate_id: str,
+    status: str,
+    user_notes: str | None = None,
+    api_base_url: str = DEFAULT_API_BASE_URL,
+    timeout_seconds: int = DEFAULT_API_TIMEOUT_SECONDS,
+) -> JobImportCandidate:
+    payload = json.dumps(
+        {
+            "status": status,
+            "user_notes": user_notes,
+        }
+    ).encode("utf-8")
+    request = Request(
+        f"{api_base_url.rstrip('/')}/job-candidates/{candidate_id}",
+        data=payload,
+        headers={"Content-Type": "application/json"},
+        method="PATCH",
+    )
+    try:
+        with urlopen(request, timeout=timeout_seconds) as response:
+            response_body = response.read().decode("utf-8")
+    except HTTPError as exc:
+        error_body = exc.read().decode("utf-8", errors="replace")
+        error_payload = _load_json_payload(error_body)
+        raise JobAgentError(
+            str(error_payload.get("detail", f"/job-candidates/{candidate_id} failed with status {exc.code}")),
+            str(error_payload.get("error_code", "job_candidate_api_request_failed")),
+        ) from exc
+    except URLError as exc:
+        raise JobAgentError(
+            "无法连接 FastAPI 后端，请先启动 .venv\\Scripts\\python.exe -m uvicorn app.main:app --reload",
+            "job_candidate_api_unavailable",
+        ) from exc
+
+    payload_object = _load_json_payload(response_body)
+    return JobImportCandidate.model_validate(payload_object.get("candidate") or {})
+
+
+def _load_json_payload(raw_text: str) -> dict[str, object]:
+    try:
+        payload = json.loads(raw_text)
+    except json.JSONDecodeError as exc:
+        raise JobAgentError("Job Brief API returned invalid JSON", "brief_api_invalid_json") from exc
+
+    if not isinstance(payload, dict):
+        raise JobAgentError("Job Brief API returned an invalid response object", "brief_api_invalid_json")
+    return payload
 
 
 def render_analysis_tab(
@@ -253,7 +542,7 @@ def render_analysis_tab(
 
 def render_job_brief_tab(*, use_llm_jd: bool) -> None:
     st.subheader("岗位批量推荐 / Job Brief")
-    st.caption("第一版默认使用 mock provider，不保存数据库，不加入 tracker。")
+    st.caption("最小演示版支持 mock 和 local_db；不在前端触发采集，不加入 tracker。")
 
     if "brief_resume_text" not in st.session_state:
         st.session_state["brief_resume_text"] = SAMPLE_RESUME
@@ -261,6 +550,12 @@ def render_job_brief_tab(*, use_llm_jd: bool) -> None:
         st.session_state["brief_query_text"] = "python backend llm jobs"
     if "brief_generated_queries" not in st.session_state:
         st.session_state["brief_generated_queries"] = []
+    if "brief_last_report" not in st.session_state:
+        st.session_state["brief_last_report"] = None
+    if "brief_last_run_id" not in st.session_state:
+        st.session_state["brief_last_run_id"] = ""
+    if "brief_candidate_flash" not in st.session_state:
+        st.session_state["brief_candidate_flash"] = ""
 
     left, right = st.columns([2, 1])
     with left:
@@ -299,10 +594,12 @@ def render_job_brief_tab(*, use_llm_jd: bool) -> None:
     with right:
         provider = st.selectbox(
             "Provider",
-            options=["mock"],
+            options=["mock", "local_db"],
             index=0,
-            help="当前 MVP 只开放 mock provider，避免把演示数据误当成真实联网结果。",
+            help="mock 使用演示岗位；local_db 从本地 public_job_posts 搜索已采集真实岗位。",
         )
+        if provider == "local_db":
+            st.info("local_db：从本地 public_job_posts 岗位库搜索真实已采集岗位。请先运行 CUHKSZ collector。")
         limit = st.select_slider(
             "推荐岗位数量",
             options=list(range(1, 11)),
@@ -314,80 +611,277 @@ def render_job_brief_tab(*, use_llm_jd: bool) -> None:
             help="只影响岗位 brief 内部的 JDAnalysisAgent；其他 agent 仍保持 mock。",
             key="brief_use_llm_jd",
         )
+        save_as_run = st.checkbox(
+            "Save this brief as a run",
+            value=False,
+            help="Saves this brief to SQLite so it can be reranked later without re-searching.",
+            key="brief_save_as_run",
+        )
 
     if st.button("生成 Job Brief", type="primary", use_container_width=True):
         try:
-            report = build_brief_from_search(
-                resume_text=resume_text,
-                query=query,
-                provider=provider,
-                limit=limit,
-                use_llm_jd=use_llm_jd_for_brief,
+            run_id = ""
+            if save_as_run:
+                run_id, report = request_brief_run_from_api(
+                    resume_text=resume_text,
+                    query=query,
+                    provider=provider,
+                    limit=limit,
+                    use_llm_jd=use_llm_jd_for_brief,
+                )
+            elif provider == "local_db":
+                report = request_job_brief_from_api(
+                    resume_text=resume_text,
+                    query=query,
+                    provider=provider,
+                    limit=limit,
+                    use_llm_jd=use_llm_jd_for_brief,
+                )
+            else:
+                report = build_brief_from_search(
+                    resume_text=resume_text,
+                    query=query,
+                    provider=provider,
+                    limit=limit,
+                    use_llm_jd=use_llm_jd_for_brief,
+                )
+        except JobAgentError as exc:
+            if provider == "local_db" and exc.error_code == "brief_jobs_empty":
+                st.error("本地岗位库为空，请先运行 python scripts/collect_cuhksz_jobs.py --limit 10")
+            else:
+                st.error(str(exc))
+            return
+
+        st.session_state["brief_last_report"] = report.model_dump(mode="json")
+        st.session_state["brief_last_run_id"] = run_id
+        st.success(f"已生成 {report.total_jobs} 个岗位的推荐 Brief")
+        if run_id:
+            st.info(f"Saved brief run: {run_id}")
+
+    stored_report = st.session_state.get("brief_last_report")
+    if stored_report:
+        render_job_brief_report(
+            JobBriefReport.model_validate(stored_report),
+            run_id=st.session_state.get("brief_last_run_id") or None,
+        )
+
+    st.markdown("---")
+    st.markdown("### Brief Run Rerank")
+    rerank_run_id = st.text_input(
+        "Run ID",
+        value=st.session_state.get("brief_last_run_id", ""),
+        key="brief_rerank_run_id",
+        placeholder="Paste a saved run_id",
+    )
+    rerank_col1, rerank_col2 = st.columns(2)
+    with rerank_col1:
+        require_full_jd = st.checkbox("Require full_jd", value=False, key="brief_rerank_require_full_jd")
+        exclude_external_link_only = st.checkbox(
+            "Exclude external_link_only",
+            value=False,
+            key="brief_rerank_exclude_external",
+        )
+        min_fit_score_value = st.number_input(
+            "Min fit score",
+            min_value=0.0,
+            max_value=100.0,
+            value=0.0,
+            step=1.0,
+            key="brief_rerank_min_fit_score",
+        )
+    with rerank_col2:
+        rerank_limit = st.select_slider(
+            "Rerank result count",
+            options=list(range(1, 11)),
+            value=5,
+            key="brief_rerank_limit",
+        )
+        location_keywords_text = st.text_input(
+            "Location keywords",
+            value="",
+            key="brief_rerank_location_keywords",
+            placeholder="e.g. Shenzhen, Remote",
+        )
+        include_keywords_text = st.text_input(
+            "Include keywords",
+            value="",
+            key="brief_rerank_include_keywords",
+            placeholder="e.g. PyTorch, biosignal",
+        )
+        exclude_keywords_text = st.text_input(
+            "Exclude keywords",
+            value="",
+            key="brief_rerank_exclude_keywords",
+            placeholder="e.g. sales, internship",
+        )
+
+    if st.button("Rerank saved brief run", use_container_width=True):
+        normalized_run_id = rerank_run_id.strip()
+        if not normalized_run_id:
+            st.warning("请先输入 run_id。")
+            return
+
+        try:
+            reranked_report = request_brief_rerank_from_api(
+                run_id=normalized_run_id,
+                require_full_jd=require_full_jd,
+                exclude_external_link_only=exclude_external_link_only,
+                location_keywords=_split_keywords(location_keywords_text),
+                include_keywords=_split_keywords(include_keywords_text),
+                exclude_keywords=_split_keywords(exclude_keywords_text),
+                min_fit_score=min_fit_score_value if min_fit_score_value > 0 else None,
+                limit=rerank_limit,
             )
         except JobAgentError as exc:
             st.error(str(exc))
             return
 
-        st.success(f"已生成 {report.total_jobs} 个岗位的推荐 Brief")
-        col1, col2 = st.columns(2)
-        col1.metric("岗位总数", report.total_jobs)
-        col2.metric("Top Skills", len(report.top_skills))
+        st.session_state["brief_last_report"] = reranked_report.model_dump(mode="json")
+        st.session_state["brief_last_run_id"] = normalized_run_id
+        st.success(f"已完成 rerank：{normalized_run_id}")
+        render_job_brief_report(reranked_report, run_id=normalized_run_id)
 
-        st.markdown("### Market Summary")
-        st.write(report.market_summary)
-        if report.scoring_quality_summary:
-            st.caption(report.scoring_quality_summary)
+    render_job_candidates_section()
 
-        if report.top_skills:
-            st.markdown("### Top Skills")
-            st.write(", ".join(report.top_skills))
 
-        st.markdown("### 推荐岗位")
-        table_rows = [
-            {
-                "rank": item.rank,
-                "title": item.job.title,
-                "company": item.job.company,
-                "location": item.job.location,
-                "fit_score": item.fit_score,
-                "scoring_quality": item.scoring_quality,
-                "advice": item.advice,
-            }
-            for item in report.recommended_jobs
-        ]
-        st.dataframe(table_rows, hide_index=True, use_container_width=True)
+def render_job_brief_report(report: JobBriefReport, *, run_id: str | None = None) -> None:
+    if run_id:
+        st.caption(f"Run ID：{run_id}")
 
-        for item in report.recommended_jobs:
-            with st.expander(f"#{item.rank} {item.job.title} | {item.job.company}"):
-                st.markdown(f"**URL:** {item.job.url or 'N/A'}")
-                st.markdown(f"**Fit Score:** {item.fit_score:.1f}")
-                st.markdown(f"**Scoring Quality:** {item.scoring_quality}")
-                st.markdown(f"**Advice:** {item.advice}")
-                st.markdown("**Fit Reasons**")
-                for reason in item.fit_reasons:
-                    st.markdown(f"- {reason}")
-                st.markdown("**Risk Points**")
-                for risk in item.risk_points:
-                    st.markdown(f"- {risk}")
-                st.markdown("**Matched Points**")
-                for point in item.match_report.matched_points:
-                    st.markdown(f"- {point}")
-                st.markdown("**Missing Points**")
-                for point in item.match_report.missing_points:
-                    st.markdown(f"- {point}")
-                st.markdown("**Short-term Suggestions**")
-                for suggestion in item.match_report.short_term_suggestions:
-                    st.markdown(f"- {suggestion}")
+    col1, col2 = st.columns(2)
+    col1.metric("岗位总数", report.total_jobs)
+    col2.metric("Top Skills", len(report.top_skills))
 
-        markdown_brief = build_job_brief_markdown(report)
-        st.markdown("### Markdown Brief")
-        st.text_area("Brief Markdown", value=markdown_brief, height=320)
-        st.download_button(
-            label="下载 Job Brief Markdown",
-            data=markdown_brief,
-            file_name="job_brief.md",
-            mime="text/markdown",
+    st.markdown("### Market Summary")
+    st.write(report.market_summary)
+    if report.scoring_quality_summary:
+        st.caption(report.scoring_quality_summary)
+
+    if report.top_skills:
+        st.markdown("### Top Skills")
+        st.write(", ".join(report.top_skills))
+
+    st.markdown("### 推荐岗位")
+    table_rows = [
+        {
+            "rank": item.rank,
+            "title": item.job.title,
+            "company": item.job.company,
+            "location": item.job.location,
+            "fit_score": item.fit_score,
+            "scoring_quality": format_scoring_quality(item.scoring_quality),
+            "advice": item.advice,
+        }
+        for item in report.recommended_jobs
+    ]
+    st.dataframe(table_rows, hide_index=True, use_container_width=True)
+
+    for item in report.recommended_jobs:
+        with st.expander(f"#{item.rank} {item.job.title} | {item.job.company}"):
+            st.markdown(f"**URL:** {item.job.url or 'N/A'}")
+            st.markdown(f"**Fit Score:** {item.fit_score:.1f}")
+            st.markdown(f"**Scoring Quality:** {format_scoring_quality(item.scoring_quality)}")
+            if item.scoring_quality == "external_link_only":
+                st.caption("该岗位主要是外链摘要，当前评分仅供参考。")
+            if run_id:
+                if st.button("Save as Candidate", key=f"save_candidate_{run_id}_{item.rank}", use_container_width=True):
+                    try:
+                        candidate = request_job_candidate_from_brief_run_api(run_id=run_id, rank=item.rank)
+                    except JobAgentError as exc:
+                        st.error(str(exc))
+                    else:
+                        st.session_state["brief_candidate_flash"] = f"Saved candidate: {candidate.candidate_id}"
+                        st.success(st.session_state["brief_candidate_flash"])
+            st.markdown(f"**Advice:** {item.advice}")
+            st.markdown("**Fit Reasons**")
+            for reason in item.fit_reasons:
+                st.markdown(f"- {reason}")
+            st.markdown("**Risk Points**")
+            for risk in item.risk_points:
+                st.markdown(f"- {risk}")
+            st.markdown("**Matched Points**")
+            for point in item.match_report.matched_points:
+                st.markdown(f"- {point}")
+            st.markdown("**Missing Points**")
+            for point in item.match_report.missing_points:
+                st.markdown(f"- {point}")
+            st.markdown("**Short-term Suggestions**")
+            for suggestion in item.match_report.short_term_suggestions:
+                st.markdown(f"- {suggestion}")
+
+    markdown_brief = build_job_brief_markdown(report)
+    st.markdown("### Markdown Brief")
+    st.text_area("Brief Markdown", value=markdown_brief, height=320)
+    st.download_button(
+        label="下载 Job Brief Markdown",
+        data=markdown_brief,
+        file_name="job_brief.md",
+        mime="text/markdown",
+    )
+
+
+def render_job_candidates_section() -> None:
+    st.markdown("---")
+    st.markdown("### Job Candidates")
+    flash_message = st.session_state.get("brief_candidate_flash") or ""
+    if flash_message:
+        st.success(flash_message)
+
+    status_filter = st.selectbox(
+        "Candidate status filter",
+        options=["all", "draft", "reviewed", "ready_for_tracker", "ready_for_analysis", "rejected"],
+        index=0,
+        key="brief_candidate_status_filter",
+    )
+
+    try:
+        candidates = request_list_job_candidates_from_api(
+            status=None if status_filter == "all" else status_filter,
+            limit=20,
         )
+    except JobAgentError as exc:
+        st.info(f"Job Candidates unavailable: {exc}")
+        return
+
+    if not candidates:
+        st.caption("还没有保存的 candidates。先从某个 brief run 推荐项点击 Save as Candidate。")
+        return
+
+    for candidate in candidates:
+        with st.expander(f"{candidate.title} | {candidate.company or 'N/A'} | {candidate.status}"):
+            st.markdown(f"**Candidate ID:** {candidate.candidate_id}")
+            st.markdown(f"**Location:** {candidate.location or 'N/A'}")
+            st.markdown(f"**Fit Score:** {candidate.fit_score if candidate.fit_score is not None else 'N/A'}")
+            st.markdown(f"**Quality:** {candidate.quality_label or 'N/A'}")
+            if candidate.jd_text_preview:
+                st.caption(candidate.jd_text_preview[:500])
+            new_status = st.selectbox(
+                "Update Status",
+                options=["reviewed", "ready_for_tracker", "ready_for_analysis", "rejected"],
+                index=0,
+                key=f"candidate_status_{candidate.candidate_id}",
+            )
+            if st.button("Update Candidate Status", key=f"candidate_update_{candidate.candidate_id}"):
+                try:
+                    updated = request_update_job_candidate_from_api(
+                        candidate_id=candidate.candidate_id,
+                        status=new_status,
+                        user_notes=candidate.user_notes,
+                    )
+                except JobAgentError as exc:
+                    st.error(str(exc))
+                else:
+                    st.session_state["brief_candidate_flash"] = f"Updated candidate: {updated.candidate_id} -> {updated.status}"
+                    st.rerun()
+
+
+def _split_keywords(value: str) -> list[str]:
+    keywords: list[str] = []
+    for item in value.replace("\n", ",").split(","):
+        normalized = item.strip()
+        if normalized and normalized not in keywords:
+            keywords.append(normalized)
+    return keywords
 
 
 def build_job_brief_markdown(report: JobBriefReport) -> str:
@@ -416,7 +910,7 @@ def build_job_brief_markdown(report: JobBriefReport) -> str:
                 f"- Company: {item.job.company}",
                 f"- Location: {item.job.location}",
                 f"- Fit Score: {item.fit_score:.1f}",
-                f"- Scoring Quality: {item.scoring_quality}",
+                f"- Scoring Quality: {format_scoring_quality(item.scoring_quality)}",
                 f"- Advice: {item.advice}",
                 "- Fit Reasons:",
             ]
@@ -426,6 +920,10 @@ def build_job_brief_markdown(report: JobBriefReport) -> str:
         lines.extend(f"  - {risk}" for risk in item.risk_points)
 
     return "\n".join(lines).strip() + "\n"
+
+
+def format_scoring_quality(value: str) -> str:
+    return SCORING_QUALITY_LABELS.get(value, value)
 
 
 def render_history_tab() -> None:

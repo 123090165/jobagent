@@ -2,9 +2,39 @@ from __future__ import annotations
 
 import pytest
 
+from app.schemas.cuhksz_career import CUHKSZJobDetail, CUHKSZJobListItem
 from app.schemas.search import SearchResultSet
 from app.services.errors import JobAgentError
 from app.services.job_search_service import search_jobs
+from app.services.public_job_storage_service import save_public_job_post
+
+
+def _build_local_detail() -> CUHKSZJobDetail:
+    jd_text = (
+        "Responsibilities:\n"
+        "- Build Python and FastAPI services.\n"
+        "Requirements:\n"
+        "- Strong SQL and testing fundamentals.\n"
+        "Skills: Python, FastAPI, SQL"
+    )
+    return CUHKSZJobDetail(
+        list_item=CUHKSZJobListItem(
+            external_id="468293",
+            title="AI Platform Intern",
+            company="Example Tech",
+            location="Shenzhen",
+            job_type="Intern",
+            education="Bachelor",
+            published_at="2026-05-30",
+            deadline="2026-07-01",
+            detail_url="https://career.cuhk.edu.cn/job/view/id/468293",
+        ),
+        jd_text=jd_text,
+        snippet=jd_text[:120],
+        is_full_jd=True,
+        confidence=0.88,
+        warnings=[],
+    )
 
 
 def test_search_jobs_returns_search_result_set_from_mock_provider() -> None:
@@ -25,6 +55,19 @@ def test_search_jobs_respects_limit() -> None:
     result = search_jobs("llm engineer", limit=2)
 
     assert len(result.items) == 2
+
+
+def test_search_jobs_supports_local_db_provider(tmp_path, monkeypatch) -> None:
+    database_path = tmp_path / "search.sqlite3"
+    save_public_job_post(_build_local_detail(), database_path=database_path)
+    monkeypatch.setenv("JOBAGENT_DB_PATH", str(database_path))
+
+    result = search_jobs("AI Platform", provider="local_db", limit=3)
+
+    assert result.provider == "local_db"
+    assert len(result.items) == 1
+    assert result.items[0].source == "cuhksz_career"
+    assert result.items[0].skills == ["Python", "FastAPI", "SQL"]
 
 
 def test_search_jobs_rejects_empty_query() -> None:

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
+from app.schemas.brief import JobBriefReport
+from app.schemas.job_import_candidate import JobImportCandidate
 from app.schemas.job import JobAnalysis
 from app.schemas.match import MatchReport, ProjectChallengeReport, ResumeOptimizationResult
 from app.schemas.report import FinalReport
@@ -60,6 +62,50 @@ class BriefFromSearchRequest(BaseModel):
     provider: str = "mock"
     limit: int = 5
     use_llm_jd: bool = False
+
+
+class BriefRunFromSearchRequest(BriefFromSearchRequest):
+    pass
+
+
+class BriefRunResponse(BaseModel):
+    run_id: str
+    brief: JobBriefReport
+
+
+class BriefRerankRequest(BaseModel):
+    require_full_jd: bool = False
+    exclude_external_link_only: bool = False
+    location_keywords: list[str] = Field(default_factory=list)
+    include_keywords: list[str] = Field(default_factory=list)
+    exclude_keywords: list[str] = Field(default_factory=list)
+    min_fit_score: float | None = None
+    limit: int | None = None
+
+
+class CreateJobImportCandidateFromBriefRequest(BaseModel):
+    run_id: str
+    item_id: int | None = None
+    rank: int | None = None
+
+
+class UpdateJobImportCandidateRequest(BaseModel):
+    title: str | None = None
+    company: str | None = None
+    location: str | None = None
+    job_type: str | None = None
+    education: str | None = None
+    deadline: str | None = None
+    status: str | None = None
+    user_notes: str | None = None
+
+
+class JobImportCandidateResponse(BaseModel):
+    candidate: JobImportCandidate
+
+
+class ListJobImportCandidatesResponse(BaseModel):
+    candidates: list[JobImportCandidate] = Field(default_factory=list)
 
 
 class ResumeParseRequest(BaseModel):

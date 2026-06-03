@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse
 from app.api.routes_analyze import router as analyze_router
 from app.api.routes_applications import router as applications_router
 from app.api.routes_brief import router as brief_router
+from app.api.routes_job_import_candidates import router as job_import_candidates_router
 from app.api.routes_jobs import router as jobs_router
 from app.api.routes_match import router as match_router
 from app.api.routes_records import router as records_router
@@ -38,12 +39,13 @@ def create_app() -> FastAPI:
         exc: JobAgentError,
     ) -> JSONResponse:
         return JSONResponse(
-            status_code=400,
+            status_code=exc.status_code,
             content={"detail": exc.message, "error_code": exc.error_code},
         )
 
     api.include_router(analyze_router)
     api.include_router(brief_router)
+    api.include_router(job_import_candidates_router)
     api.include_router(resume_router)
     api.include_router(jobs_router)
     api.include_router(search_router)
