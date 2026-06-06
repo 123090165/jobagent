@@ -47,11 +47,16 @@ class CUHKSZLiveProvider(SearchProvider):
         candidate_items = _select_detail_candidates(list_items, query, limit)
 
         results: list[SearchResultItem] = []
+        warnings: list[str] = []
+        detail_success = 0
+        detail_failed = 0
         for index, item in enumerate(candidate_items):
             try:
                 detail_html = fetch_public_html(item.detail_url, timeout_seconds=self._timeout_seconds)
                 detail = self._parser.parse_detail(detail_html, item)
             except Exception:
+                detail_failed += 1
+                warnings.append(f"detail_fetch_or_parse_failed:{item.detail_url}")
                 if index < len(candidate_items) - 1 and self._detail_request_sleep_seconds > 0:
                     time.sleep(self._detail_request_sleep_seconds)
                 continue
@@ -60,13 +65,27 @@ class CUHKSZLiveProvider(SearchProvider):
                 save_public_job_post(detail, database_path=self._database_path)
 
             results.append(_detail_to_search_result(detail))
+            detail_success += 1
             if len(results) >= limit:
                 break
 
             if index < len(candidate_items) - 1 and self._detail_request_sleep_seconds > 0:
                 time.sleep(self._detail_request_sleep_seconds)
 
-        return SearchResultSet(query=query, provider=self.name, items=results)
+        metadata = {
+            "list_items_found": len(list_items),
+            "detail_candidates": len(candidate_items),
+            "detail_success": detail_success,
+            "detail_failed": detail_failed,
+            "returned_count": len(results),
+        }
+        return SearchResultSet(
+            query=query,
+            provider=self.name,
+            items=results,
+            warnings=warnings,
+            metadata=metadata,
+        )
 
 
 def _select_detail_candidates(

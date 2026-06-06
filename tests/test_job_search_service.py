@@ -52,6 +52,8 @@ def test_search_jobs_returns_search_result_set_from_mock_provider() -> None:
     assert result.items[0].jd_text is not None
     assert result.items[0].is_full_jd is True
     assert result.items[0].confidence > 0
+    assert result.warnings == []
+    assert isinstance(result.metadata, dict)
 
 
 def test_search_jobs_respects_limit() -> None:
@@ -71,6 +73,8 @@ def test_search_jobs_supports_local_db_provider(tmp_path, monkeypatch) -> None:
     assert len(result.items) == 1
     assert result.items[0].source == "cuhksz_career"
     assert result.items[0].skills == ["Python", "FastAPI", "SQL"]
+    assert result.warnings == []
+    assert isinstance(result.metadata, dict)
 
 
 def test_search_jobs_supports_cuhksz_live_provider(monkeypatch) -> None:
@@ -99,6 +103,14 @@ def test_search_jobs_supports_cuhksz_live_provider(monkeypatch) -> None:
                     query=query,
                     provider="cuhksz_live",
                     items=[fake_item],
+                    warnings=[],
+                    metadata={
+                        "list_items_found": 2,
+                        "detail_candidates": 1,
+                        "detail_success": 1,
+                        "detail_failed": 0,
+                        "returned_count": 1,
+                    },
                 ),
             },
         )(),
@@ -109,6 +121,7 @@ def test_search_jobs_supports_cuhksz_live_provider(monkeypatch) -> None:
     assert result.provider == "cuhksz_live"
     assert len(result.items) == 1
     assert result.items[0].source == "cuhksz_career"
+    assert result.metadata["returned_count"] == 1
 
 
 def test_search_jobs_rejects_empty_query() -> None:

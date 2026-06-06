@@ -42,6 +42,12 @@ def test_cuhksz_live_provider_returns_search_results(monkeypatch) -> None:
     assert result.items[0].title == "AI 平台实习生"
     assert result.items[0].jd_text
     assert result.items[0].quality_label == "full_jd"
+    assert result.warnings == []
+    assert result.metadata["list_items_found"] == 2
+    assert result.metadata["detail_candidates"] == 2
+    assert result.metadata["detail_success"] == 1
+    assert result.metadata["detail_failed"] == 0
+    assert result.metadata["returned_count"] == 1
 
 
 def test_cuhksz_live_provider_raises_on_list_fetch_failure(monkeypatch) -> None:
@@ -77,6 +83,11 @@ def test_cuhksz_live_provider_skips_failed_detail_and_continues(monkeypatch) -> 
 
     assert len(result.items) == 1
     assert result.items[0].title == "数据工程师"
+    assert result.metadata["detail_failed"] == 1
+    assert result.metadata["detail_success"] == 1
+    assert result.metadata["returned_count"] == 1
+    assert result.warnings
+    assert "detail_fetch_or_parse_failed" in result.warnings[0]
 
 
 def test_cuhksz_live_provider_can_save_to_local_db_without_duplicates(tmp_path, monkeypatch) -> None:

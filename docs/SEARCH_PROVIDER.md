@@ -61,6 +61,8 @@ Response:
 {
   "query": "python backend llm",
   "provider": "mock",
+  "warnings": [],
+  "metadata": {},
   "items": [
     {
       "title": "AI Agent Developer",
@@ -86,6 +88,23 @@ Response:
   ]
 }
 ```
+
+Provider-level observability fields:
+
+- `SearchResultSet.warnings`
+  - provider-level warnings that do not stop the main request
+- `SearchResultSet.metadata`
+  - provider execution statistics for debugging and observability
+
+For `cuhksz_live`, `metadata` includes:
+
+- `list_items_found`
+- `detail_candidates`
+- `detail_success`
+- `detail_failed`
+- `returned_count`
+
+These fields are used for debugging and observability only. They do not change the downstream brief or analysis workflow behavior.
 
 Business errors still use the shared JobAgent error shape:
 
