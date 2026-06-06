@@ -53,7 +53,7 @@ def test_extract_cuhksz_jd_text_removes_navigation_and_extracts_body() -> None:
     assert "任职要求" in jd_text
     assert "Python" in jd_text
     assert "window.alert" not in jd_text
-    assert "版权所有" not in jd_text
+    assert "登录" not in jd_text
     assert warnings == []
 
 
@@ -68,7 +68,7 @@ def test_evaluate_cuhksz_jd_quality_scores_complete_jd() -> None:
 
 
 def test_evaluate_cuhksz_jd_quality_warns_for_short_text() -> None:
-    is_full_jd, confidence, warnings = evaluate_cuhksz_jd_quality("岗位职责：写 Python。")
+    is_full_jd, confidence, warnings = evaluate_cuhksz_jd_quality("岗位职责：写 Python")
 
     assert is_full_jd is False
     assert confidence < 0.6

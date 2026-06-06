@@ -32,7 +32,8 @@ JobAgent 是一个面向求职者的本地求职准备工作台，核心目标�
 - JD Quality Gate MVP：对本地岗位 JD 做 `full_jd / partial_jd / external_link_only / snippet_only / invalid` 质量分类，并把质量信号接入 `local_db` 排序和 Batch Job Brief 展示。
 - BriefRun / rerank MVP：支持把一轮 Batch Job Brief 保存为 `brief_run`，并在不重新搜索、不重新采集、不重跑 workflow 的前提下，对已保存推荐结果做 rerank 和过滤。
 - JobImportCandidate MVP：支持把 `brief_run` 中的推荐岗位转成用户可确认的候选岗位，并做轻量状态管理，为后续接 tracker 或单岗位深度分析做准备。
-- SearchProvider 抽象层：当前通过 `POST /search/jobs` 暴露 `mock`、`local_db` 和实验性的 `gemini_cli` provider，为后续 Gemini CLI / RAG / MCP 接入预留 provider 边界。
+- Live Job Provider Framework + `cuhksz_live`：新增 `app/services/live_job/` 通用框架，把 CUHKSZ 的公开页面抓取、解析、质量评估和结果归一化拆成可复用的 fetcher + parser + provider，并新增实时 `provider="cuhksz_live"`。
+- SearchProvider 抽象层：当前通过 `POST /search/jobs` 暴露 `mock`、`local_db`、`cuhksz_live` 和实验性的 `gemini_cli` provider，为后续 Gemini CLI / RAG / MCP 接入预留 provider 边界。
 - GeminiCLIProvider experimental：`provider="gemini_cli"` 默认关闭，只有显式设置环境变量后才会调用本机 Gemini CLI，而且只传搜索 query，不传简历全文、API key 或本地敏感信息；当前会尽量返回更丰富的 JD-like 字段，例如 `responsibilities`、`requirements`、`skills`、`jd_text`、`is_full_jd` 和 `confidence`，但仍不保证一定拿到完整 JD。
 - Batch Job Brief MVP：输入一份简历文本和一个搜索 query，先通过 `SearchProvider` 获取多个岗位，再逐个复用现有 workflow 生成 `match_report`，最后按 `fit_score` 排序输出推荐岗位 brief；当前演示版开放 `provider="mock"` 和 `provider="local_db"`。
 - 统一业务错误：文件解析等业务错误通过 `detail` 和 `error_code` 返回，方便 API 调用方和页面展示。
@@ -43,7 +44,7 @@ JobAgent 是一个面向求职者的本地求职准备工作台，核心目标�
 - LangGraph Workflow Prototype：新增并行原型 workflow，用 graph node + 条件分支验证迁移方向，但当前不替换默认 workflow。
 - FastAPI / Streamlit 实验入口：可选启用 `use_langgraph_workflow`，但默认仍然使用 Python workflow。
 - MissingInfoQuestionAgent：在 LangGraph prototype 中补充缺失信息检测节点，只生成澄清问题，不编造简历内容。
-- Job search API：当前支持 `mock`、`local_db` 和实验性的 `gemini_cli` provider；其中 Streamlit 只接入 `mock` 和 `local_db` 的 Batch Job Brief 演示入口。
+- Job search API：当前支持 `mock`、`local_db`、`cuhksz_live` 和实验性的 `gemini_cli` provider；其中 Streamlit 只接入 `mock` 和 `local_db` 的 Batch Job Brief 演示入口，`cuhksz_live` 当前保留在 API/service 层。
 - Agent 边界：ResumeParse、JDAnalysis、Match、ResumeOptimize、ProjectChallenge、Report 都有独立入口。
 - Agent Trace：每步记录 `mock`、`llm` 或 `fallback` 模式、fallback 原因、耗时和 guardrails。
 - 可选 LLM JDAnalysisAgent：调用失败或未配置 API key 时回退 mock。
@@ -212,8 +213,9 @@ $env:JOBAGENT_LLM_MODEL="gpt-4o-mini"
 
 说明：
 
-- 当前 `POST /search/jobs` 可直接访问 `mock`、`local_db` 和实验性的 `gemini_cli` provider。
+- 当前 `POST /search/jobs` 可直接访问 `mock`、`local_db`、`cuhksz_live` 和实验性的 `gemini_cli` provider。
 - `local_db` 会优先返回 `full_jd`，其次是 `partial_jd`，再往后是 `external_link_only` 和 `snippet_only`。
+- `provider="cuhksz_live"` 会实时抓取 CUHKSZ 当前公开列表页，再按 query 对少量候选岗位抓详情页；可选 `save_to_local_db=True` 写回 `public_job_posts`，但当前不接入 Streamlit。
 - `provider="gemini_cli"` 是实验功能，默认关闭，返回结果不会自动入库、不会自动触发 JD 导入，也不会自动进入分析流程。
 - `provider="gemini_cli"` 当前会尽量返回更丰富的 JD 摘要字段，但这些字段仍需要用户确认；如果 `is_full_jd = false` 或 `confidence` 较低，应优先让用户复核原始链接或继续手动粘贴 JD。
 - Streamlit 当前只在 Batch Job Brief 页面开放 `mock` 和 `local_db`，不开放实验性的联网 provider 入口。
@@ -252,7 +254,7 @@ CUHKSZ Career Collector dry-run 示例：
 }
 ```
 
-更多说明见 [CUHKSZ Career Collector](docs/CUHKSZ_CAREER_COLLECTOR.md)。
+更多说明见 [CUHKSZ Career Collector](docs/CUHKSZ_CAREER_COLLECTOR.md) 和 [Live Job Provider](docs/LIVE_JOB_PROVIDER.md)。
 
 Real Local Job Brief Demo 示例：
 
@@ -382,9 +384,10 @@ $env:JOBAGENT_MAX_RESUME_FILE_BYTES="1048576"
 | Phase 29 | JD Quality Gate | 已完成 |
 | Phase 30 | BriefRun / rerank MVP | 已完成 |
 | Phase 31 | JobImportCandidate MVP | 已完成 |
-| Phase 32 | Candidate -> Tracker | 后续 |
-| Phase 33 | Candidate -> Single Job Deep Analysis | 后续 |
-| Phase 34 | SearchRun async prototype | 后续 |
+| Phase 32 | Live Job Provider Framework + CUHKSZLiveProvider | 已完成 |
+| Phase 33 | Candidate -> Tracker | 后续 |
+| Phase 34 | Candidate -> Single Job Deep Analysis | 后续 |
+| Phase 35 | SearchRun async prototype | 后续 |
 
 ## 面试讲述版
 
@@ -521,6 +524,7 @@ docs/
 - [Batch Job Brief](docs/BATCH_JOB_BRIEF.md)
 - [Public Job Source Provider](docs/PUBLIC_JOB_SOURCE_PROVIDER.md)
 - [CUHKSZ Career Collector](docs/CUHKSZ_CAREER_COLLECTOR.md)
+- [Live Job Provider](docs/LIVE_JOB_PROVIDER.md)
 - [Real Local Job Brief Demo](docs/REAL_LOCAL_JOB_BRIEF_DEMO.md)
 - [JD Quality Gate](docs/JD_QUALITY_GATE.md)
 - [BriefRun And Rerank](docs/BRIEF_RUN_AND_RERANK.md)

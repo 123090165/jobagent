@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from app.schemas.cuhksz_career import CUHKSZJobDetail
+from app.services.live_job.base import RawJobDetail
 from app.storage.database import get_connection
 
 
@@ -20,7 +21,7 @@ def ensure_public_job_posts_table(*, database_path: str | Path | None = None) ->
 
 
 def save_public_job_post(
-    detail: CUHKSZJobDetail,
+    detail: CUHKSZJobDetail | RawJobDetail,
     *,
     database_path: str | Path | None = None,
 ) -> int:
@@ -121,7 +122,7 @@ def _ensure_public_job_posts_table(connection: sqlite3.Connection) -> None:
     connection.commit()
 
 
-def _save_public_job_post(connection: sqlite3.Connection, detail: CUHKSZJobDetail) -> int:
+def _save_public_job_post(connection: sqlite3.Connection, detail: CUHKSZJobDetail | RawJobDetail) -> int:
     item = detail.list_item
     now = _utc_now()
     content_hash = _build_content_hash(detail)
@@ -254,7 +255,7 @@ def _save_public_job_post(connection: sqlite3.Connection, detail: CUHKSZJobDetai
 
 
 def _detail_to_parameters(
-    detail: CUHKSZJobDetail,
+    detail: CUHKSZJobDetail | RawJobDetail,
     content_hash: str,
     *,
     fetched_at: str,
@@ -287,7 +288,7 @@ def _detail_to_parameters(
     )
 
 
-def _build_content_hash(detail: CUHKSZJobDetail) -> str:
+def _build_content_hash(detail: CUHKSZJobDetail | RawJobDetail) -> str:
     item = detail.list_item
     source_text = "\0".join(
         [

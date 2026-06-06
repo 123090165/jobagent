@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 import pytest
 
 from app.schemas.cuhksz_career import CUHKSZJobDetail, CUHKSZJobListItem
-from app.schemas.search import SearchResultSet
+from app.schemas.search import SearchResultItem, SearchResultSet
+from app.services import job_search_service
 from app.services.errors import JobAgentError
 from app.services.job_search_service import search_jobs
 from app.services.public_job_storage_service import save_public_job_post
@@ -68,6 +71,44 @@ def test_search_jobs_supports_local_db_provider(tmp_path, monkeypatch) -> None:
     assert len(result.items) == 1
     assert result.items[0].source == "cuhksz_career"
     assert result.items[0].skills == ["Python", "FastAPI", "SQL"]
+
+
+def test_search_jobs_supports_cuhksz_live_provider(monkeypatch) -> None:
+    fake_item = SearchResultItem(
+        title="AI 平台实习生",
+        company="深圳示例科技有限公司",
+        location="深圳",
+        url="https://career.cuhk.edu.cn/job/view/id/468293",
+        snippet="岗位职责：使用 Python 和 FastAPI。",
+        source="cuhksz_career",
+        retrieved_at=datetime.now(timezone.utc),
+        jd_text="岗位职责：使用 Python 和 FastAPI。",
+        quality_label="partial_jd",
+        confidence=0.55,
+    )
+
+    monkeypatch.setitem(
+        job_search_service._PROVIDERS,
+        "cuhksz_live",
+        type(
+            "FakeCUHKSZLiveProvider",
+            (),
+            {
+                "name": "cuhksz_live",
+                "search_jobs": lambda self, query, limit=5: SearchResultSet(
+                    query=query,
+                    provider="cuhksz_live",
+                    items=[fake_item],
+                ),
+            },
+        )(),
+    )
+
+    result = search_jobs("Python", provider="cuhksz_live", limit=1)
+
+    assert result.provider == "cuhksz_live"
+    assert len(result.items) == 1
+    assert result.items[0].source == "cuhksz_career"
 
 
 def test_search_jobs_rejects_empty_query() -> None:
