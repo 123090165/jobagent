@@ -20,6 +20,11 @@ from app.services.search_providers.base import SearchProvider
 DEFAULT_DETAIL_REQUEST_SLEEP_SECONDS = 0.2
 DEFAULT_DETAIL_CANDIDATE_MULTIPLIER = 2
 MAX_DETAIL_CANDIDATES = 10
+FULL_JD_RERANK_BONUS = 2.0
+PARTIAL_JD_RERANK_BONUS = 0.75
+EXTERNAL_LINK_ONLY_RERANK_BONUS = -0.5
+SNIPPET_ONLY_RERANK_BONUS = -1.0
+INVALID_RERANK_BONUS = -2.0
 
 
 class CUHKSZLiveProvider(SearchProvider):
@@ -46,9 +51,8 @@ class CUHKSZLiveProvider(SearchProvider):
         list_items = self._parser.parse_list(list_html, self._list_url)
         candidate_items = _select_detail_candidates(list_items, query, limit)
 
-        results: list[SearchResultItem] = []
+        details: list[RawJobDetail] = []
         warnings: list[str] = []
-        detail_success = 0
         detail_failed = 0
         for index, item in enumerate(candidate_items):
             try:
@@ -64,20 +68,22 @@ class CUHKSZLiveProvider(SearchProvider):
             if self._save_to_local_db:
                 save_public_job_post(detail, database_path=self._database_path)
 
-            results.append(_detail_to_search_result(detail))
-            detail_success += 1
-            if len(results) >= limit:
-                break
+            details.append(detail)
 
             if index < len(candidate_items) - 1 and self._detail_request_sleep_seconds > 0:
                 time.sleep(self._detail_request_sleep_seconds)
 
+        ranked_details = _rerank_details(details, query)
+        selected_details = ranked_details[: max(1, int(limit))]
+        results = [_detail_to_search_result(detail) for detail in selected_details]
+
         metadata = {
             "list_items_found": len(list_items),
             "detail_candidates": len(candidate_items),
-            "detail_success": detail_success,
+            "detail_success": len(details),
             "detail_failed": detail_failed,
             "returned_count": len(results),
+            "rerank_applied": True,
         }
         return SearchResultSet(
             query=query,
@@ -107,9 +113,7 @@ def _select_detail_candidates(
 
 
 def _build_list_item_score(item: RawJobListItem, query: str) -> float:
-    query_terms = [term.strip().lower() for term in str(query or "").split() if term.strip()]
-    if not query_terms and str(query or "").strip():
-        query_terms = [str(query).strip().lower()]
+    query_terms = _build_query_terms(query)
 
     title = (item.title or "").lower()
     haystacks = [
@@ -131,6 +135,77 @@ def _build_list_item_score(item: RawJobListItem, query: str) -> float:
             score += 1.5
 
     return score
+
+
+def _rerank_details(details: list[RawJobDetail], query: str) -> list[RawJobDetail]:
+    return sorted(
+        details,
+        key=lambda detail: (
+            _build_detail_score(detail, query),
+            float(detail.confidence),
+            detail.list_item.external_id,
+        ),
+        reverse=True,
+    )
+
+
+def _build_detail_score(detail: RawJobDetail, query: str) -> float:
+    query_terms = _build_query_terms(query)
+    if not query_terms:
+        return _quality_bonus(detail) + float(detail.confidence)
+
+    item = detail.list_item
+    title = (item.title or "").lower()
+    company = (item.company or "").lower()
+    location = (item.location or "").lower()
+    job_type = (item.job_type or "").lower()
+    education = (item.education or "").lower()
+    jd_text = (detail.jd_text or "").lower()
+    responsibilities = "\n".join(_extract_section_lines(detail.jd_text or "", RESPONSIBILITY_HEADINGS)).lower()
+    requirements = "\n".join(_extract_section_lines(detail.jd_text or "", REQUIREMENT_HEADINGS)).lower()
+    skills = "\n".join(_extract_skills(detail.jd_text or "")).lower()
+
+    score = 0.0
+    for term in query_terms:
+        if term in title:
+            score += 5.0
+        score += min(jd_text.count(term), 5) * 2.0
+        if term in company:
+            score += 1.0
+        if term in location:
+            score += 1.0
+        if term in job_type:
+            score += 1.0
+        if term in education:
+            score += 1.0
+        if term in responsibilities:
+            score += 1.5
+        if term in requirements:
+            score += 1.5
+        if term in skills:
+            score += 1.5
+
+    return score + _quality_bonus(detail) + float(detail.confidence)
+
+
+def _quality_bonus(detail: RawJobDetail) -> float:
+    if detail.quality_label == "full_jd":
+        return FULL_JD_RERANK_BONUS
+    if detail.quality_label == "partial_jd":
+        return PARTIAL_JD_RERANK_BONUS
+    if detail.quality_label == "external_link_only":
+        return EXTERNAL_LINK_ONLY_RERANK_BONUS
+    if detail.quality_label == "snippet_only":
+        return SNIPPET_ONLY_RERANK_BONUS
+    if detail.quality_label == "invalid":
+        return INVALID_RERANK_BONUS
+    return 0.0
+
+
+def _build_query_terms(query: str) -> list[str]:
+    return [term.strip().lower() for term in str(query or "").split() if term.strip()] or (
+        [str(query).strip().lower()] if str(query or "").strip() else []
+    )
 
 
 def _detail_to_search_result(detail: RawJobDetail) -> SearchResultItem:

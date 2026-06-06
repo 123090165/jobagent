@@ -116,6 +116,15 @@ Current `cuhksz_live` is not full-site full-text real-time search.
 
 因此，如果关键词只出现在详情页正文而没有出现在列表页字段中，当前版本可能无法优先命中。后续可以通过 scheduler + `local_db` 缓存、详情页索引或 `GenericHtmlParser` 改进。
 
+`cuhksz_live` uses two-stage ranking:
+
+1. list-page ranking: `title`, `company`, `location`, `job_type`, and `education` are used to pick a small candidate set
+2. detail rerank: after fetching detail pages, `jd_text` and extracted sections are used to rerank successful details before returning top results
+
+This improves queries where the keyword appears only in the detail JD text, but it is still not full-site full-text search because only a small candidate set is fetched.
+
+注意：二次排序只能够在已抓取的候选详情页中生效，不能替代全站索引。
+
 ## 6. Safety Boundary
 
 - public `http/https` pages only

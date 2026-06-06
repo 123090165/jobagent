@@ -45,9 +45,88 @@ def test_cuhksz_live_provider_returns_search_results(monkeypatch) -> None:
     assert result.warnings == []
     assert result.metadata["list_items_found"] == 2
     assert result.metadata["detail_candidates"] == 2
-    assert result.metadata["detail_success"] == 1
+    assert result.metadata["detail_success"] == 2
     assert result.metadata["detail_failed"] == 0
     assert result.metadata["returned_count"] == 1
+    assert result.metadata["rerank_applied"] is True
+
+
+def test_cuhksz_live_provider_reranks_by_detail_jd_text(monkeypatch) -> None:
+    list_html = """
+    <html>
+      <body>
+        <div class="sousuo_list">
+          <ul>
+            <li>
+              <div class="sousuo_list_com">
+                <a href="/company/view/id/1001">Example One</a>
+              </div>
+              <div class="sousuo_list_xx">
+                <a class="f18" href="/job/view/id/468293">General Operations Intern</a>
+                <div class="mt10 mb10">Shenzhen ｜ Intern ｜ Bachelor</div>
+              </div>
+              <div class="sousuo_list_time">发布时间：2026-06-01 截止时间：2026-07-01</div>
+            </li>
+            <li>
+              <div class="sousuo_list_com">
+                <a href="/company/view/id/1002">Example Two</a>
+              </div>
+              <div class="sousuo_list_xx">
+                <a class="f18" href="/job/view/id/468294">Research Internship</a>
+                <div class="mt10 mb10">Shenzhen ｜ Intern ｜ Bachelor</div>
+              </div>
+              <div class="sousuo_list_time">发布时间：2026-06-01 截止时间：2026-07-01</div>
+            </li>
+          </ul>
+        </div>
+      </body>
+    </html>
+    """
+    detail_html_1 = """
+    <html>
+      <body>
+        <div class="content">
+          岗位职责
+          负责日常运营支持和文档整理。
+          任职要求
+          细心认真，沟通顺畅。
+        </div>
+      </body>
+    </html>
+    """
+    detail_html_2 = """
+    <html>
+      <body>
+        <div class="content">
+          岗位职责
+          负责 Python 数据处理、Python 模型实验和 Python 服务脚本开发。
+          任职要求
+          熟悉 Python、FastAPI 和 SQL。
+        </div>
+      </body>
+    </html>
+    """
+
+    def fake_fetch(url: str, timeout_seconds: int = 15) -> str:
+        if url == LIST_URL:
+            return list_html
+        if url == DETAIL_URL_1:
+            return detail_html_1
+        if url == DETAIL_URL_2:
+            return detail_html_2
+        raise AssertionError(f"unexpected url: {url}")
+
+    monkeypatch.setattr("app.services.live_job.provider.fetch_public_html", fake_fetch)
+    monkeypatch.setattr("app.services.live_job.provider.time.sleep", lambda seconds: None)
+
+    provider = CUHKSZLiveProvider(list_url=LIST_URL, detail_request_sleep_seconds=0)
+    result = provider.search_jobs("Python", limit=1)
+
+    assert len(result.items) == 1
+    assert result.items[0].title == "Research Internship"
+    assert result.metadata["rerank_applied"] is True
+    assert result.metadata["detail_success"] >= 1
+    assert result.metadata["returned_count"] == len(result.items)
 
 
 def test_cuhksz_live_provider_raises_on_list_fetch_failure(monkeypatch) -> None:
@@ -118,5 +197,5 @@ def test_cuhksz_live_provider_can_save_to_local_db_without_duplicates(tmp_path, 
 
     assert len(first_result.items) == 1
     assert len(second_result.items) == 1
-    assert len(stored_jobs) == 1
-    assert stored_jobs[0]["external_id"] == "468293"
+    assert len(stored_jobs) == 2
+    assert {row["external_id"] for row in stored_jobs} == {"468293", "468294"}
