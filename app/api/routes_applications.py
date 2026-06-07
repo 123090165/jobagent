@@ -8,7 +8,9 @@ from app.schemas.application import (
     ApplicationUpdateRequest,
     ApplicationStatus,
 )
+from app.schemas.api import ApplicationAnalyzeRequest, ApplicationAnalyzeResponse
 from app.services.application_service import (
+    analyze_application,
     list_applications,
     load_application,
     save_application,
@@ -73,3 +75,20 @@ def patch_application(
         )
         raise HTTPException(status_code=404, detail=detail)
     return ApplicationRecordResponse.model_validate(record)
+
+
+@router.post(
+    "/applications/{application_id}/analyze",
+    response_model=ApplicationAnalyzeResponse,
+)
+def analyze_application_record(
+    application_id: int,
+    request: ApplicationAnalyzeRequest,
+) -> ApplicationAnalyzeResponse:
+    result = analyze_application(
+        application_id,
+        resume_text=request.resume_text,
+        resume_version_id=request.resume_version_id,
+        mode=request.mode,
+    )
+    return ApplicationAnalyzeResponse.model_validate(result)

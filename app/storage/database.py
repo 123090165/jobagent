@@ -62,6 +62,7 @@ def init_database(connection: sqlite3.Connection) -> None:
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             resume_record_id INTEGER NOT NULL,
             job_posting_id INTEGER NOT NULL,
+            application_id INTEGER,
             match_report_id INTEGER NOT NULL,
             project_challenge_id INTEGER NOT NULL,
             optimization_json TEXT NOT NULL,
@@ -69,6 +70,7 @@ def init_database(connection: sqlite3.Connection) -> None:
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (resume_record_id) REFERENCES resume_records(id),
             FOREIGN KEY (job_posting_id) REFERENCES job_postings(id),
+            FOREIGN KEY (application_id) REFERENCES application_records(id),
             FOREIGN KEY (match_report_id) REFERENCES match_reports(id),
             FOREIGN KEY (project_challenge_id) REFERENCES project_challenges(id)
         );
@@ -118,6 +120,7 @@ def init_database(connection: sqlite3.Connection) -> None:
         );
         """
     )
+    _ensure_column(connection, "analysis_records", "application_id", "INTEGER")
     _ensure_column(connection, "application_records", "resume_version_id", "INTEGER")
     _ensure_column(connection, "workflow_step_traces", "workflow_run_id", "TEXT")
     _ensure_column(connection, "workflow_step_traces", "duration_ms", "REAL")

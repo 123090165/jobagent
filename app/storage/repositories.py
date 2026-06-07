@@ -15,6 +15,7 @@ def save_analysis_record(
     connection: sqlite3.Connection,
     report: FinalReport,
     *,
+    application_id: int | None = None,
     workflow_steps: list[dict[str, Any]] | None = None,
 ) -> int:
     init_database(connection)
@@ -66,16 +67,18 @@ def save_analysis_record(
             INSERT INTO analysis_records (
                 resume_record_id,
                 job_posting_id,
+                application_id,
                 match_report_id,
                 project_challenge_id,
                 optimization_json,
                 markdown_report
             )
-            VALUES (?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 resume_id,
                 job_id,
+                application_id,
                 match_id,
                 challenge_id,
                 _model_to_json(report.optimization_result),
@@ -92,6 +95,7 @@ def get_analysis_record(connection: sqlite3.Connection, record_id: int) -> dict[
         """
         SELECT
             ar.id,
+            ar.application_id,
             ar.created_at,
             ar.markdown_report,
             rr.profile_json,
@@ -113,6 +117,7 @@ def get_analysis_record(connection: sqlite3.Connection, record_id: int) -> dict[
     workflow_steps = list_workflow_steps(connection, record_id=record_id)
     return {
         "id": row["id"],
+        "application_id": row["application_id"],
         "created_at": row["created_at"],
         "resume_profile": json.loads(row["profile_json"]),
         "job_analysis": json.loads(row["analysis_json"]),
@@ -525,7 +530,8 @@ def list_application_records(
             app.created_at,
             app.updated_at,
             jp.job_title,
-            jp.company
+            jp.company,
+            jp.raw_jd
         FROM application_records app
         JOIN job_postings jp ON app.job_posting_id = jp.id
         LEFT JOIN resume_versions rv ON app.resume_version_id = rv.id
@@ -584,7 +590,8 @@ def get_application_record(connection: sqlite3.Connection, application_id: int) 
             app.created_at,
             app.updated_at,
             jp.job_title,
-            jp.company
+            jp.company,
+            jp.raw_jd
         FROM application_records app
         JOIN job_postings jp ON app.job_posting_id = jp.id
         LEFT JOIN resume_versions rv ON app.resume_version_id = rv.id
@@ -760,6 +767,7 @@ def _application_row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
         "resume_version_label": row["resume_version_label"],
         "job_title": row["job_title"],
         "company": row["company"],
+        "raw_jd": row["raw_jd"] if "raw_jd" in row.keys() else None,
         "created_at": row["created_at"],
         "updated_at": row["updated_at"],
     }

@@ -17,12 +17,18 @@ from app.storage.repositories import (
 def save_final_report(
     report: FinalReport,
     *,
+    application_id: int | None = None,
     workflow_steps: list[dict[str, Any]] | None = None,
     database_path: str | Path | None = None,
 ) -> int:
     connection = get_connection(database_path)
     try:
-        return save_analysis_record(connection, report, workflow_steps=workflow_steps)
+        return save_analysis_record(
+            connection,
+            report,
+            application_id=application_id,
+            workflow_steps=workflow_steps,
+        )
     finally:
         connection.close()
 

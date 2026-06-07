@@ -10,8 +10,11 @@ from app.main import app
 from app.schemas.brief import JobBriefReport, JobRecommendationItem
 from app.schemas.match import MatchReport
 from app.schemas.search import SearchResultItem
+from app.services.application_service import save_application
 from app.services.brief_run_storage_service import save_brief_run
 from app.services.jd_url_service import JDUrlImportError
+from app.services.storage_service import load_analysis_record
+from app.storage.database import get_connection, init_database
 from app.workflows.job_analysis_workflow import WorkflowStepTrace, run_job_analysis_workflow
 from tests.test_mock_pipeline import SAMPLE_JD, SAMPLE_RESUME
 
@@ -658,3 +661,97 @@ def test_application_tracker_rejects_missing_job(tmp_path, monkeypatch) -> None:
 
     assert response.status_code == 404
     assert response.json()["detail"] == "job not found"
+
+
+def test_application_analyze_api_flow(tmp_path, monkeypatch) -> None:
+    database_path = tmp_path / "application-analyze.sqlite3"
+    monkeypatch.setenv("JOBAGENT_DB_PATH", str(database_path))
+
+    save_response = client.post(
+        "/analyze/full",
+        json={
+            "resume_text": SAMPLE_RESUME,
+            "jd_text": SAMPLE_JD,
+            "save_result": True,
+        },
+    )
+    assert save_response.status_code == 200
+
+    jobs_response = client.get("/jobs")
+    job_id = jobs_response.json()[0]["id"]
+
+    application_response = client.post(
+        "/applications",
+        json={
+            "job_id": job_id,
+            "status": "interested",
+            "notes": "Focus on backend API depth.",
+        },
+    )
+    assert application_response.status_code == 200
+    application = application_response.json()
+
+    analyze_response = client.post(
+        f"/applications/{application['id']}/analyze",
+        json={"resume_text": SAMPLE_RESUME, "mode": "mock"},
+    )
+    assert analyze_response.status_code == 200
+    payload = analyze_response.json()
+
+    assert payload["application_id"] == application["id"]
+    assert payload["application"]["id"] == application["id"]
+    assert payload["record_id"] > 0
+    assert payload["match_report"]["overall_score"] > 0
+
+    record = load_analysis_record(payload["record_id"], database_path=database_path)
+    assert record is not None
+    assert record["application_id"] == application["id"]
+
+
+def test_application_analyze_returns_404_for_missing_application(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("JOBAGENT_DB_PATH", str(tmp_path / "missing-application-analyze.sqlite3"))
+
+    response = client.post(
+        "/applications/999/analyze",
+        json={"resume_text": SAMPLE_RESUME, "mode": "mock"},
+    )
+
+    assert response.status_code == 404
+    payload = response.json()
+    assert payload["detail"] == "application not found"
+    assert payload["error_code"] == "application_not_found"
+
+
+def test_application_analyze_returns_error_when_job_description_missing(tmp_path, monkeypatch) -> None:
+    database_path = tmp_path / "missing-jd.sqlite3"
+    monkeypatch.setenv("JOBAGENT_DB_PATH", str(database_path))
+
+    baseline = run_job_analysis_workflow(SAMPLE_RESUME, SAMPLE_JD)
+    with get_connection(database_path) as connection:
+        init_database(connection)
+        connection.execute(
+            """
+            INSERT INTO job_postings (raw_jd, analysis_json, job_title, company)
+            VALUES (?, ?, ?, ?)
+            """,
+            (
+                "   ",
+                baseline.final_report.job_analysis.model_dump_json(),
+                "Backend Engineer",
+                "Example Co",
+            ),
+        )
+        job_id = int(connection.execute("SELECT last_insert_rowid() AS id").fetchone()["id"])
+
+    application = save_application(job_id=job_id, status="interested", database_path=database_path)
+    assert application is not None
+
+    response = client.post(
+        f"/applications/{application['id']}/analyze",
+        json={"resume_text": SAMPLE_RESUME, "mode": "mock"},
+    )
+
+    assert response.status_code == 400
+    payload = response.json()
+    assert payload["detail"] == "application job description is missing"
+    assert payload["error_code"] == "application_job_description_missing"

@@ -167,6 +167,7 @@ class MarkdownReportResponse(BaseModel):
 
 class AnalysisRecordResponse(FullAnalysisResponse):
     id: int
+    application_id: int | None = None
     created_at: str
 
 
@@ -193,3 +194,16 @@ class JobPostingResponse(BaseModel):
     raw_jd: str
     job_analysis: JobAnalysis
     analysis_count: int = 0
+
+
+class ApplicationAnalyzeRequest(BaseModel):
+    resume_text: str
+    mode: str = "mock"
+    resume_version_id: int | None = None
+
+
+class ApplicationAnalyzeResponse(FinalReport):
+    application: ApplicationRecordResponse
+    application_id: int
+    record_id: int
+    workflow_steps: list[WorkflowStepTraceResponse] = Field(default_factory=list)

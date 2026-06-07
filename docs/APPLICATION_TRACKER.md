@@ -110,3 +110,25 @@ PATCH /applications/{application_id}
 - `JobImportCandidate` is the review layer, not the tracker itself.
 - The candidate import endpoint creates a minimal `job_postings` record when the job only exists in brief results.
 - The tracker remains local and deterministic; it does not invoke LLM-only logic or any auto-apply flow.
+
+## Deep Analysis
+
+Run the existing job workflow from one saved application and keep the saved analysis linked back to that application:
+
+```json
+POST /applications/{application_id}/analyze
+{
+  "resume_text": "candidate resume text",
+  "mode": "mock"
+}
+```
+
+Success returns:
+- `application`
+- `application_id`
+- `record_id`
+- workflow report fields and `workflow_steps`
+
+Common error codes:
+- `application_not_found`
+- `application_job_description_missing`

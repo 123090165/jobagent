@@ -3,12 +3,14 @@ from __future__ import annotations
 from pathlib import Path
 
 from app.services.application_service import (
+    analyze_application,
     list_applications,
     load_application,
     save_application,
     update_application,
 )
 from app.services.mock_pipeline import run_mock_pipeline
+from app.services.storage_service import load_analysis_record
 from app.storage.database import get_connection
 from app.storage.repositories import count_application_records, list_job_postings, save_analysis_record
 from tests.test_mock_pipeline import SAMPLE_JD, SAMPLE_RESUME
@@ -78,3 +80,23 @@ def test_application_tracker_returns_none_for_missing_job(tmp_path: Path) -> Non
     created = save_application(job_id=999, database_path=database_path)
 
     assert created is None
+
+
+def test_application_tracker_can_run_analysis_and_link_record(tmp_path: Path) -> None:
+    database_path = tmp_path / "tracker.sqlite3"
+    job_id = _saved_job_id(database_path)
+    application = save_application(job_id=job_id, status="interested", database_path=database_path)
+
+    assert application is not None
+
+    result = analyze_application(
+        application["id"],
+        resume_text=SAMPLE_RESUME,
+        database_path=database_path,
+    )
+    record = load_analysis_record(result["record_id"], database_path=database_path)
+
+    assert result["application_id"] == application["id"]
+    assert result["record_id"] > 0
+    assert record is not None
+    assert record["application_id"] == application["id"]
