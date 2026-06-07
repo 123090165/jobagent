@@ -3,13 +3,17 @@ from __future__ import annotations
 from fastapi import APIRouter
 
 from app.schemas.api import (
+    CandidateApplicationResponse,
+    CreateApplicationFromCandidateRequest,
     CreateJobImportCandidateFromBriefRequest,
     JobImportCandidateResponse,
     ListJobImportCandidatesResponse,
     UpdateJobImportCandidateRequest,
 )
+from app.schemas.application import ApplicationRecordResponse
 from app.services.errors import JobAgentError
 from app.services.job_import_candidate_service import (
+    create_application_from_candidate,
     create_candidate_from_brief_run,
     get_candidate,
     list_candidates,
@@ -71,3 +75,25 @@ def patch_job_candidate(
         user_notes=request.user_notes,
     )
     return JobImportCandidateResponse(candidate=candidate)
+
+
+@router.post(
+    "/job-candidates/{candidate_id}/create-application",
+    response_model=CandidateApplicationResponse,
+)
+def create_tracker_application_from_candidate(
+    candidate_id: str,
+    request: CreateApplicationFromCandidateRequest,
+) -> CandidateApplicationResponse:
+    application, candidate = create_application_from_candidate(
+        candidate_id,
+        status=request.status,
+        notes=request.notes,
+        next_action=request.next_action,
+        resume_version_id=request.resume_version_id,
+        resume_version_label=request.resume_version_label,
+    )
+    return CandidateApplicationResponse(
+        candidate=candidate,
+        application=ApplicationRecordResponse.model_validate(application),
+    )

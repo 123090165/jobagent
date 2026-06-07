@@ -4,20 +4,22 @@
 
 `JobImportCandidate` is the bridge between a saved `BriefRun` recommendation and a user-confirmed job target.
 
-It lets us turn a ranked recommendation into a small editable candidate record before we connect it to:
+It gives us one lightweight, editable record before we decide to:
 
-- tracker
-- single-job deep analysis
-
-This round only builds the preparation layer.
+- push the job into the application tracker
+- trigger later single-job analysis work
 
 ## Data Flow
 
 ```text
-BriefRun recommended item
+SearchResultItem / BriefRun item
   -> JobImportCandidate
-  -> reviewed / ready_for_tracker / ready_for_analysis / rejected
+  -> reviewed / ready_for_tracker / ready_for_analysis / imported / rejected
+  -> ApplicationRecord
 ```
+
+`SearchResultItem` and `BriefRun` recommendations are ranking outputs. They are not tracker records.
+`JobImportCandidate` is the confirmation layer where the user can review fields, keep notes, and decide whether the job should enter the tracker.
 
 ## API
 
@@ -67,34 +69,37 @@ Example:
 ```json
 {
   "status": "ready_for_tracker",
-  "user_notes": "Reviewed and ready for manual tracker import."
+  "user_notes": "Reviewed and ready for tracker import."
 }
 ```
 
-## Streamlit
+Create an application record from a confirmed candidate:
 
-In the `岗位批量推荐 / Job Brief` page:
-
-1. Generate and save a brief run.
-2. Click `Save as Candidate` on a recommended job.
-3. Check the `Job Candidates` section.
-4. Update status to:
-   - `reviewed`
-   - `ready_for_tracker`
-   - `ready_for_analysis`
-   - `rejected`
-
-The page only shows lightweight job fields and `jd_text_preview`.
-
-## Demo Script
-
-```powershell
-python scripts/demo_job_import_candidate.py --run-id <RUN_ID> --rank 1 --status reviewed --publish-sanitized
+```http
+POST /job-candidates/{candidate_id}/create-application
 ```
+
+Example:
+
+```json
+{
+  "status": "interested",
+  "notes": "Import candidate into tracker",
+  "next_action": "Tailor resume"
+}
+```
+
+This endpoint:
+
+1. creates a minimal `job_postings` entry from the candidate if needed
+2. creates or reuses an `ApplicationRecord`
+3. marks the candidate as `imported`
+
+Repeated calls are idempotent for the same candidate and return the existing tracker record instead of creating duplicates.
 
 ## Current Limits
 
 - Does not auto-apply to jobs.
-- Does not write into tracker yet.
-- Does not trigger deep analysis yet.
-- By default does not expose full `jd_text` in API or docs demo outputs.
+- Does not trigger deep analysis automatically.
+- Does not add a complex state machine around candidate import.
+- By default does not expose full `jd_text` in API or sanitized demo outputs.

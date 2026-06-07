@@ -9,6 +9,7 @@ JobImportCandidateStatus = Literal[
     "reviewed",
     "ready_for_tracker",
     "ready_for_analysis",
+    "imported",
     "rejected",
 ]
 

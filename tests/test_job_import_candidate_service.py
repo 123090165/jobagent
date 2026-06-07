@@ -12,11 +12,14 @@ from app.schemas.search import SearchResultItem
 from app.services.brief_run_storage_service import save_brief_run
 from app.services.errors import JobAgentError
 from app.services.job_import_candidate_service import (
+    create_application_from_candidate,
     create_candidate_from_brief_run,
     get_candidate,
     list_candidates,
     update_candidate,
 )
+from app.storage.database import get_connection
+from app.storage.repositories import count_application_records
 
 
 def _build_report() -> JobBriefReport:
@@ -181,3 +184,59 @@ def test_get_candidate_returns_none_for_missing_candidate(tmp_path: Path, monkey
     monkeypatch.setenv("JOBAGENT_DB_PATH", str(tmp_path / "job-candidates.sqlite3"))
 
     assert get_candidate("missing-candidate") is None
+
+
+def test_create_application_from_candidate_creates_tracker_record(tmp_path: Path, monkeypatch) -> None:
+    database_path, run_id = _prepare_run(tmp_path, monkeypatch)
+    created = create_candidate_from_brief_run(run_id, rank=1)
+
+    application, imported_candidate = create_application_from_candidate(
+        created.candidate_id,
+        status="interested",
+        notes="Import into tracker",
+        next_action="Tailor resume",
+    )
+
+    assert application["status"] == "interested"
+    assert application["job_title"] == "AI Platform Engineer"
+    assert application["company"] == "Example Tech"
+    assert application["notes"] == "Import into tracker"
+    assert imported_candidate.candidate_id == created.candidate_id
+    assert imported_candidate.status == "imported"
+
+    with get_connection(database_path) as connection:
+        assert count_application_records(connection) == 1
+
+
+def test_create_application_from_candidate_is_idempotent(tmp_path: Path, monkeypatch) -> None:
+    database_path, run_id = _prepare_run(tmp_path, monkeypatch)
+    created = create_candidate_from_brief_run(run_id, rank=1)
+
+    first_application, first_candidate = create_application_from_candidate(
+        created.candidate_id,
+        status="interested",
+        notes="First import",
+    )
+    second_application, second_candidate = create_application_from_candidate(
+        created.candidate_id,
+        status="applied",
+        notes="Should not overwrite existing tracker record",
+    )
+
+    assert first_application["id"] == second_application["id"]
+    assert second_application["status"] == "interested"
+    assert second_application["notes"] == "First import"
+    assert first_candidate.status == "imported"
+    assert second_candidate.status == "imported"
+
+    with get_connection(database_path) as connection:
+        assert count_application_records(connection) == 1
+
+
+def test_create_application_from_candidate_rejects_missing_candidate(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("JOBAGENT_DB_PATH", str(tmp_path / "job-candidates.sqlite3"))
+
+    with pytest.raises(JobAgentError) as exc_info:
+        create_application_from_candidate("missing-candidate")
+
+    assert exc_info.value.error_code == "job_import_candidate_not_found"

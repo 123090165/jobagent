@@ -158,3 +158,57 @@ def test_job_candidate_routes_return_not_found_errors(tmp_path: Path, monkeypatc
     assert create_response.json()["error_code"] == "brief_run_not_found"
     assert get_response.status_code == 404
     assert get_response.json()["error_code"] == "job_import_candidate_not_found"
+
+
+def test_post_create_application_from_candidate_returns_tracker_record(tmp_path: Path, monkeypatch) -> None:
+    run_id = _prepare_run(tmp_path, monkeypatch)
+    create_candidate_response = client.post(
+        "/job-candidates/from-brief-run",
+        json={"run_id": run_id, "rank": 1},
+    )
+    candidate_id = create_candidate_response.json()["candidate"]["candidate_id"]
+
+    response = client.post(
+        f"/job-candidates/{candidate_id}/create-application",
+        json={
+            "status": "interested",
+            "notes": "Import into tracker",
+            "next_action": "Tailor resume",
+        },
+    )
+    duplicate_response = client.post(
+        f"/job-candidates/{candidate_id}/create-application",
+        json={
+            "status": "applied",
+            "notes": "Should not create a duplicate application",
+            "next_action": "Wait for response",
+        },
+    )
+
+    assert response.status_code == 200
+    assert duplicate_response.status_code == 200
+    payload = response.json()
+    duplicate_payload = duplicate_response.json()
+    assert payload["candidate"]["candidate_id"] == candidate_id
+    assert payload["candidate"]["status"] == "imported"
+    assert payload["application"]["status"] == "interested"
+    assert payload["application"]["job_title"] == "AI Platform Engineer"
+    assert payload["application"]["company"] == "Example Tech"
+    assert payload["application"]["notes"] == "Import into tracker"
+    assert duplicate_payload["candidate"]["candidate_id"] == candidate_id
+    assert duplicate_payload["candidate"]["status"] == "imported"
+    assert duplicate_payload["application"]["id"] == payload["application"]["id"]
+    assert duplicate_payload["application"]["status"] == "interested"
+    assert duplicate_payload["application"]["notes"] == "Import into tracker"
+
+
+def test_post_create_application_from_candidate_returns_not_found(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("JOBAGENT_DB_PATH", str(tmp_path / "job-candidate-routes.sqlite3"))
+
+    response = client.post(
+        "/job-candidates/missing-candidate/create-application",
+        json={"status": "interested"},
+    )
+
+    assert response.status_code == 404
+    assert response.json()["error_code"] == "job_import_candidate_not_found"

@@ -3,6 +3,7 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 from app.schemas.brief import JobBriefReport
+from app.schemas.application import ApplicationRecordResponse, ApplicationStatus
 from app.schemas.job_import_candidate import JobImportCandidate
 from app.schemas.job import JobAnalysis
 from app.schemas.match import MatchReport, ProjectChallengeReport, ResumeOptimizationResult
@@ -100,12 +101,25 @@ class UpdateJobImportCandidateRequest(BaseModel):
     user_notes: str | None = None
 
 
+class CreateApplicationFromCandidateRequest(BaseModel):
+    status: ApplicationStatus = "interested"
+    notes: str | None = None
+    next_action: str | None = None
+    resume_version_id: int | None = None
+    resume_version_label: str | None = None
+
+
 class JobImportCandidateResponse(BaseModel):
     candidate: JobImportCandidate
 
 
 class ListJobImportCandidatesResponse(BaseModel):
     candidates: list[JobImportCandidate] = Field(default_factory=list)
+
+
+class CandidateApplicationResponse(BaseModel):
+    candidate: JobImportCandidate
+    application: ApplicationRecordResponse
 
 
 class ResumeParseRequest(BaseModel):

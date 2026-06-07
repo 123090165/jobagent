@@ -1,43 +1,46 @@
 # Application Tracker
 
-> 用途：记录 JobAgent 的投递跟进最小状态机。当前 tracker 只管理本地岗位的求职状态，不做自动投递。
+`ApplicationRecord` is the minimal tracker layer for jobs that the user actually wants to follow.
 
-## 1. 当前目标
+The tracker is intentionally narrow:
 
-把岗位库中的岗位推进到求职跟进流程：
+- it records local application status
+- it does not auto-apply
+- it does not log into job sites
+- it does not manage reminders or calendars yet
+
+## Data Flow
+
+The tracker now supports two entry paths:
 
 ```text
-job_posting -> application_record -> status / notes / next_action
+job_posting -> application_record
 ```
 
-如果已经保存了简历版本，也可以形成更完整的链路：
+and
 
 ```text
-job_posting + resume_version -> application_record
+SearchResultItem / BriefRun item
+  -> JobImportCandidate
+  -> ApplicationRecord
 ```
 
-当前不做：
+The second path is useful when a recommendation comes from search or brief generation first, and only later becomes a real target job for tracking.
 
-- 不做自动投递。
-- 不做招聘网站登录。
-- 不做验证码处理。
-- 不做日历提醒。
-- 不做多用户权限。
+## Statuses
 
-## 2. 状态定义
+Current application statuses:
 
-当前支持 6 个状态：
+- `interested`
+- `applied`
+- `interviewing`
+- `rejected`
+- `offer`
+- `archived`
 
-- `interested`：感兴趣，准备评估或定制简历。
-- `applied`：已投递。
-- `interviewing`：面试中。
-- `rejected`：已拒绝。
-- `offer`：已拿 offer。
-- `archived`：归档，不再跟进。
+## Stored Fields
 
-## 3. 数据字段
-
-每条跟进记录包含：
+Each tracker record includes:
 
 - `job_id`
 - `status`
@@ -48,63 +51,62 @@ job_posting + resume_version -> application_record
 - `created_at`
 - `updated_at`
 
-当前一个岗位只保留一条 tracker 记录。重复保存同一 `job_id` 会更新原记录。
+One `job_posting` keeps one tracker record. Saving the same `job_id` again updates the existing record instead of creating a duplicate.
 
-`resume_version_id` 用于关联真实简历版本；`resume_version_label` 保留为轻量标签和旧数据兼容字段。
+## APIs
 
-## 4. API
+Create or update directly from a job posting:
 
-创建或更新跟进记录：
+```http
+POST /applications
+```
+
+Example:
 
 ```json
-POST /applications
 {
   "job_id": 1,
   "status": "interested",
-  "notes": "岗位匹配度不错",
-  "next_action": "定制简历",
+  "notes": "Good fit for backend and AI platform work.",
+  "next_action": "Tailor resume",
   "resume_version_id": 1,
   "resume_version_label": "v1-fastapi-backend"
 }
 ```
 
-更新跟进状态：
+Create from a confirmed candidate:
+
+```http
+POST /job-candidates/{candidate_id}/create-application
+```
+
+Example:
 
 ```json
-PATCH /applications/1
 {
-  "status": "applied",
-  "next_action": "等待反馈"
+  "status": "interested",
+  "notes": "Import candidate into tracker",
+  "next_action": "Tailor resume"
 }
 ```
 
-列表：
+List and detail:
 
 ```text
 GET /applications
 GET /applications?status=applied
 GET /applications?keyword=FastAPI
+GET /applications/{application_id}
 ```
 
-详情：
+Update:
 
-```text
-GET /applications/1
+```http
+PATCH /applications/{application_id}
 ```
 
-## 5. 开发难点
+## Notes
 
-- tracker 要依附岗位库，不能凭空创建岗位。
-- 状态要有明确枚举，不要随手写自由字符串。
-- 简历版本应该通过 `resume_version_id` 结构化关联，不能只靠备注文本。
-- route 只负责请求响应，状态保存逻辑放 service/repository。
-- 当前不做复杂状态转移限制，先保证本地跟进闭环。
-
-## 6. 面试官可能追问
-
-- 为什么 tracker 依赖 `job_posting_id`？
-- 当前状态机为什么只有 6 个状态？
-- 为什么一个岗位只保留一条 tracker 记录？
-- 如果未来多用户，表结构要怎么改？
-- 为什么不做自动投递？
-- 为什么既保留 `resume_version_id`，又保留 `resume_version_label`？
+- `JobImportCandidate` is the review layer, not the tracker itself.
+- The candidate import endpoint creates a minimal `job_postings` record when the job only exists in brief results.
+- The tracker remains local and deterministic; it does not invoke LLM-only logic or any auto-apply flow.

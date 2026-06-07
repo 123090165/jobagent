@@ -7,16 +7,20 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from app.schemas.application import ApplicationStatus
+from app.schemas.job import JobAnalysis
 from app.schemas.job_import_candidate import JobImportCandidate, JobImportCandidateStatus
 from app.services.brief_run_storage_service import JD_TEXT_PREVIEW_MAX_CHARS, ensure_brief_run_tables
 from app.services.errors import JobAgentError
-from app.storage.database import get_connection
+from app.storage.database import get_connection, init_database
+from app.storage.repositories import get_application_record, upsert_application_record
 
 VALID_STATUSES: set[str] = {
     "draft",
     "reviewed",
     "ready_for_tracker",
     "ready_for_analysis",
+    "imported",
     "rejected",
 }
 
@@ -158,6 +162,72 @@ def update_candidate(
             (candidate_id,),
         ).fetchone()
         return sanitize_candidate_for_response(_row_to_candidate(updated))
+    finally:
+        connection.close()
+
+
+def create_application_from_candidate(
+    candidate_id: str,
+    *,
+    status: ApplicationStatus = "interested",
+    notes: str | None = None,
+    next_action: str | None = None,
+    resume_version_id: int | None = None,
+    resume_version_label: str | None = None,
+    database_path: str | Path | None = None,
+) -> tuple[dict[str, Any], JobImportCandidate]:
+    connection = get_connection(database_path)
+    try:
+        init_database(connection)
+        _ensure_job_import_candidates_table(connection)
+        existing = connection.execute(
+            "SELECT * FROM job_import_candidates WHERE candidate_id = ?",
+            (candidate_id,),
+        ).fetchone()
+        if existing is None:
+            raise JobAgentError(
+                "Job import candidate not found",
+                "job_import_candidate_not_found",
+                status_code=404,
+            )
+
+        tracker_application_id = existing["tracker_application_id"]
+        if tracker_application_id is not None:
+            existing_application = get_application_record(connection, int(tracker_application_id))
+            if existing_application is not None:
+                candidate = _mark_candidate_imported(connection, candidate_id=candidate_id)
+                return existing_application, candidate
+
+        candidate = _row_to_candidate(existing)
+        job_id = _get_or_create_job_posting_for_candidate(connection, candidate)
+        application = upsert_application_record(
+            connection,
+            job_id=job_id,
+            status=status,
+            notes=notes,
+            next_action=next_action,
+            resume_version_id=resume_version_id,
+            resume_version_label=resume_version_label,
+        )
+        if application is None:
+            if resume_version_id is not None:
+                raise JobAgentError(
+                    "resume version not found",
+                    "resume_version_not_found",
+                    status_code=404,
+                )
+            raise JobAgentError(
+                "job not found",
+                "job_not_found",
+                status_code=404,
+            )
+
+        updated_candidate = _mark_candidate_imported(
+            connection,
+            candidate_id=candidate_id,
+            tracker_application_id=int(application["id"]),
+        )
+        return application, updated_candidate
     finally:
         connection.close()
 
@@ -357,11 +427,13 @@ def _ensure_job_import_candidates_table(connection: sqlite3.Connection) -> None:
             risk_points TEXT,
             status TEXT NOT NULL,
             user_notes TEXT,
+            tracker_application_id INTEGER,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
         );
         """
     )
+    _ensure_column(connection, "job_import_candidates", "tracker_application_id", "INTEGER")
     connection.commit()
 
 
@@ -490,6 +562,128 @@ def _json_loads_list(value: Any) -> list[str]:
 
 def _json_dumps(value: Any) -> str:
     return json.dumps(value or [], ensure_ascii=False)
+
+
+def _mark_candidate_imported(
+    connection: sqlite3.Connection,
+    *,
+    candidate_id: str,
+    tracker_application_id: int | None = None,
+) -> JobImportCandidate:
+    current = connection.execute(
+        "SELECT tracker_application_id FROM job_import_candidates WHERE candidate_id = ?",
+        (candidate_id,),
+    ).fetchone()
+    if current is None:
+        raise JobAgentError(
+            "Job import candidate not found",
+            "job_import_candidate_not_found",
+            status_code=404,
+        )
+    stored_application_id = (
+        tracker_application_id
+        if tracker_application_id is not None
+        else current["tracker_application_id"]
+    )
+    updated_at = _utc_now()
+    with connection:
+        connection.execute(
+            """
+            UPDATE job_import_candidates
+            SET status = ?, tracker_application_id = ?, updated_at = ?
+            WHERE candidate_id = ?
+            """,
+            ("imported", stored_application_id, updated_at, candidate_id),
+        )
+    row = connection.execute(
+        "SELECT * FROM job_import_candidates WHERE candidate_id = ?",
+        (candidate_id,),
+    ).fetchone()
+    return sanitize_candidate_for_response(_row_to_candidate(row))
+
+
+def _get_or_create_job_posting_for_candidate(
+    connection: sqlite3.Connection,
+    candidate: JobImportCandidate,
+) -> int:
+    raw_jd = _build_candidate_raw_jd(candidate)
+    existing = connection.execute(
+        "SELECT id FROM job_postings WHERE raw_jd = ? ORDER BY id ASC LIMIT 1",
+        (raw_jd,),
+    ).fetchone()
+    if existing is not None:
+        return int(existing["id"])
+
+    job_analysis = JobAnalysis(
+        raw_jd=raw_jd,
+        job_title=candidate.title,
+        company=candidate.company,
+        location=candidate.location,
+        education_requirements=[candidate.education] if candidate.education else [],
+        keywords=_build_candidate_keywords(candidate),
+        job_category=candidate.job_type,
+    )
+    cursor = connection.execute(
+        """
+        INSERT INTO job_postings (raw_jd, analysis_json, job_title, company)
+        VALUES (?, ?, ?, ?)
+        """,
+        (
+            raw_jd,
+            json.dumps(job_analysis.model_dump(mode="json"), ensure_ascii=False),
+            candidate.title,
+            candidate.company,
+        ),
+    )
+    return int(cursor.lastrowid)
+
+
+def _build_candidate_raw_jd(candidate: JobImportCandidate) -> str:
+    raw_jd = _coalesce_string(candidate.jd_text, candidate.jd_text_preview, candidate.snippet)
+    if raw_jd:
+        return raw_jd
+
+    parts = [
+        f"Title: {candidate.title}",
+        f"Company: {candidate.company}" if candidate.company else None,
+        f"Location: {candidate.location}" if candidate.location else None,
+        f"Job Type: {candidate.job_type}" if candidate.job_type else None,
+        f"Education: {candidate.education}" if candidate.education else None,
+        f"Source URL: {candidate.source_url}" if candidate.source_url else None,
+    ]
+    return "\n".join(part for part in parts if part)
+
+
+def _build_candidate_keywords(candidate: JobImportCandidate) -> list[str]:
+    values = [
+        candidate.title,
+        candidate.company,
+        candidate.location,
+        candidate.job_type,
+        candidate.education,
+    ]
+    keywords: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        normalized = _coalesce_string(value)
+        if normalized and normalized not in seen:
+            keywords.append(normalized)
+            seen.add(normalized)
+    return keywords
+
+
+def _ensure_column(
+    connection: sqlite3.Connection,
+    table_name: str,
+    column_name: str,
+    column_definition: str,
+) -> None:
+    columns = {
+        row["name"]
+        for row in connection.execute(f"PRAGMA table_info({table_name})").fetchall()
+    }
+    if column_name not in columns:
+        connection.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_definition}")
 
 
 def _utc_now() -> str:
