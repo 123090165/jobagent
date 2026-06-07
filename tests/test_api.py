@@ -121,6 +121,7 @@ def test_full_analysis_endpoint_returns_report() -> None:
     assert payload["job_analysis"]["required_skills"]
     assert payload["match_report"]["overall_score"] > 0
     assert payload["match_report"]["requirement_matches"]
+    assert payload["optimization_result"]["rewrite_suggestions"]
     assert "匹配度总览" in payload["markdown_report"]
     assert len(payload["workflow_steps"]) == 6
     assert payload["workflow_steps"][0]["mode"] == "mock"

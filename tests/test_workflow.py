@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 
 from app.agents.match_agent import run_match_agent
+from app.agents.resume_optimize_agent import run_resume_optimize_agent
 from app.schemas.job import JobAnalysis
 from app.schemas.resume import ProjectExperience, ResumeProfile
 from app.services.llm_service import LLMServiceError
@@ -93,6 +94,7 @@ def test_job_analysis_workflow_records_step_trace() -> None:
     assert all(step.workflow_run_id == result.state.workflow_run_id for step in result.state.steps)
     assert all(step.duration_ms >= 0 for step in result.state.steps)
     assert result.final_report.match_report.requirement_matches
+    assert result.final_report.optimization_result.rewrite_suggestions
 
 
 def test_match_agent_builds_requirement_matches_with_evidence() -> None:
@@ -140,6 +142,65 @@ def test_match_agent_marks_missing_requirement_with_gap_and_hint() -> None:
     assert kubernetes_match.match_level == "missing"
     assert kubernetes_match.gap_reason
     assert kubernetes_match.improvement_hint
+
+
+def test_resume_optimize_agent_builds_evidence_based_rewrite_suggestions() -> None:
+    resume_profile = ResumeProfile(
+        raw_text="Python FastAPI SQLite backend project",
+        skills=["Python", "FastAPI"],
+        projects=[
+            ProjectExperience(
+                name="Tracker API",
+                description="Built backend APIs with FastAPI and SQLite.",
+                technologies=["FastAPI", "SQLite"],
+                highlights=["Designed REST endpoints for application tracking."],
+                raw_text="Built backend APIs with FastAPI and SQLite.",
+            )
+        ],
+    )
+    job_analysis = JobAnalysis(
+        raw_jd="Need FastAPI and SQL experience.",
+        required_skills=["FastAPI", "SQL"],
+        keywords=["FastAPI", "SQL"],
+    )
+    match_report = run_match_agent(resume_profile, job_analysis).output
+
+    result = run_resume_optimize_agent(
+        resume_profile.raw_text,
+        resume_profile,
+        job_analysis,
+        match_report,
+    ).output
+
+    assert result.rewrite_suggestions
+    fastapi_item = next(item for item in result.rewrite_suggestions if "FastAPI" in item.linked_requirement)
+    assert "FastAPI" in fastapi_item.suggested_bullet
+    assert fastapi_item.evidence_source
+
+
+def test_resume_optimize_agent_keeps_missing_requirement_as_gap() -> None:
+    resume_profile = ResumeProfile(
+        raw_text="Python FastAPI backend project",
+        skills=["Python", "FastAPI"],
+    )
+    job_analysis = JobAnalysis(
+        raw_jd="Need Kubernetes experience.",
+        required_skills=["Kubernetes"],
+        keywords=["Kubernetes"],
+    )
+    match_report = run_match_agent(resume_profile, job_analysis).output
+
+    result = run_resume_optimize_agent(
+        resume_profile.raw_text,
+        resume_profile,
+        job_analysis,
+        match_report,
+    ).output
+
+    k8s_item = next(item for item in result.rewrite_suggestions if "Kubernetes" in item.linked_requirement)
+    assert k8s_item.match_level == "missing"
+    assert ("If" in k8s_item.suggested_bullet) or ("如果" in k8s_item.suggested_bullet)
+    assert not k8s_item.evidence_source
 
 
 def test_mock_pipeline_delegates_to_workflow_without_changing_contract() -> None:

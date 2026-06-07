@@ -35,9 +35,15 @@ class MatchReport(BaseModel):
 
 
 class RewriteSuggestion(BaseModel):
-    original: str
-    suggestion: str
+    original: str = ""
+    suggestion: str = ""
     reason: str
+    target_section: str = "summary"
+    linked_requirement: str = ""
+    match_level: MatchLevel = "partial"
+    original_issue: str = ""
+    suggested_bullet: str = ""
+    evidence_source: list[str] = Field(default_factory=list)
 
 
 class ResumeOptimizationResult(BaseModel):
@@ -45,6 +51,7 @@ class ResumeOptimizationResult(BaseModel):
     keywords_to_add: list[str] = Field(default_factory=list)
     skills_section_suggestions: list[str] = Field(default_factory=list)
     project_rewrite_suggestions: list[RewriteSuggestion] = Field(default_factory=list)
+    rewrite_suggestions: list[RewriteSuggestion] = Field(default_factory=list)
     jd_targeted_bullets: list[str] = Field(default_factory=list)
     do_not_exaggerate: list[str] = Field(default_factory=list)
     missing_info_needed: list[str] = Field(default_factory=list)
