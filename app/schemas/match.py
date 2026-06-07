@@ -1,6 +1,21 @@
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel, Field
+
+
+MatchLevel = Literal["matched", "partial", "missing"]
+
+
+class RequirementMatch(BaseModel):
+    requirement: str
+    category: str = "general"
+    importance: str = "must"
+    match_level: MatchLevel
+    resume_evidence: list[str] = Field(default_factory=list)
+    gap_reason: str | None = None
+    improvement_hint: str | None = None
 
 
 class MatchReport(BaseModel):
@@ -16,6 +31,7 @@ class MatchReport(BaseModel):
     apply_recommendation: str
     short_term_suggestions: list[str] = Field(default_factory=list)
     long_term_suggestions: list[str] = Field(default_factory=list)
+    requirement_matches: list[RequirementMatch] = Field(default_factory=list)
 
 
 class RewriteSuggestion(BaseModel):

@@ -153,3 +153,6 @@ from app.workflows.graph_spec import get_job_analysis_graph_spec
 - 增加更友好的 trace 查询、过滤和摘要展示。
 - 在 LangGraph 版本中把当前 step 字段映射成 node 执行元信息。
 - 在 LangGraph 版本中复用当前 state 字段和步骤名称。
+## 9. Match Evidence
+
+`MatchAgent` now adds `match_report.requirement_matches` in the deterministic path. Each item keeps one small JD requirement, its match level, the resume evidence used, and a gap or improvement hint when evidence is partial or missing.
