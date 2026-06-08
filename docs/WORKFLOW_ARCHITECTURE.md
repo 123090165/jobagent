@@ -1,5 +1,7 @@
 # Workflow Architecture
 
+For the full project-level architecture, see [docs/ARCHITECTURE_OVERVIEW.md](ARCHITECTURE_OVERVIEW.md).
+
 > 用途：记录 JobAgent 当前的显式工作流编排层。它是从普通 service pipeline 迁移到 LangGraph 之前的过渡层，用来稳定步骤边界、状态结构和可观察性。
 
 ## 1. 当前目标

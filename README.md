@@ -1,5 +1,16 @@
 # JobAgent
 
+JobAgent 是一个面向求职准备场景的本地工作台，不是单纯聊天机器人，也不是通用爬虫。
+它当前聚焦一条可复盘的核心闭环：`job source -> candidate -> tracker -> application analysis -> evidence report`。
+项目重点是把岗位发现、候选确认、投递跟踪、深度分析、简历证据匹配、简历改写建议和项目追问串成稳定、可测试、可解释的流程。
+
+推荐先阅读：
+
+- [Project Architecture Overview](docs/ARCHITECTURE_OVERVIEW.md)
+- [Workflow Architecture](docs/WORKFLOW_ARCHITECTURE.md)
+- [Live Job Provider](docs/LIVE_JOB_PROVIDER.md)
+- [Application Tracker](docs/APPLICATION_TRACKER.md)
+
 JobAgent 是一个面向求职者的本地求职准备工作台，核心目标是把“简历和 JD 是否匹配、应该怎么改、面试会被怎么追问、投递进展到哪一步”变成可结构化记录和复盘的流程。
 
 当前版本已经从 Mock MVP 推进到可运行的本地工作台：支持 Streamlit Demo、FastAPI 后端、SQLite 分析记录、岗位库查询、txt/md 简历文件解析、安全版 JD URL 导入、CUHKSZ Career Collector MVP、`local_db` 本地公开岗位 provider、SearchProvider 抽象层与 MockSearchProvider、实验性的 GeminiCLIProvider、Batch Job Brief MVP、统一业务错误返回、可选 LLM JD 分析、可选 LLM 简历优化、可选 LLM 项目追问、workflow 执行轨迹持久化，以及投递 tracker 最小状态机。
