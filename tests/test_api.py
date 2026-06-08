@@ -378,6 +378,92 @@ def test_resume_parse_endpoint_returns_error_code_for_empty_text() -> None:
     assert payload["error_code"] == "resume_text_empty"
 
 
+def test_resume_profile_review_endpoint_returns_parsed_profile() -> None:
+    response = client.post(
+        "/resume/profile-review",
+        json={"resume_text": SAMPLE_RESUME},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["parsed_profile"]
+    assert "confidence_label" in payload
+    assert payload["confidence_label"] in {"strong", "medium", "limited", "weak"}
+    assert isinstance(payload["quality_warnings"], list)
+    assert isinstance(payload["missing_info_questions"], list)
+    assert isinstance(payload["suggested_edits"], list)
+    assert isinstance(payload["editable_sections"], list)
+
+
+def test_resume_profile_review_warns_when_project_evidence_is_missing() -> None:
+    response = client.post(
+        "/resume/profile-review",
+        json={"resume_text": "Skills: Python, FastAPI, SQL"},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert "resume profile has no project evidence" in payload["quality_warnings"]
+    assert payload["confidence_label"] in {"limited", "weak"}
+
+
+def test_resume_profile_review_asks_for_target_roles() -> None:
+    response = client.post(
+        "/resume/profile-review",
+        json={"resume_text": SAMPLE_RESUME},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert any("target roles" in question.lower() for question in payload["missing_info_questions"])
+
+
+def test_resume_profile_review_does_not_ask_target_roles_when_provided() -> None:
+    response = client.post(
+        "/resume/profile-review",
+        json={
+            "resume_text": SAMPLE_RESUME,
+            "target_roles": ["AI Agent Engineer", "Backend Engineer"],
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert "target role is not explicit" not in payload["quality_warnings"]
+    assert not any("target roles" in question.lower() for question in payload["missing_info_questions"])
+
+
+def test_resume_profile_review_returns_stable_editable_sections() -> None:
+    response = client.post(
+        "/resume/profile-review",
+        json={"resume_text": SAMPLE_RESUME},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    expected_sections = [
+        "target_roles",
+        "skills",
+        "projects",
+        "work_experiences",
+        "education",
+        "constraints",
+    ]
+    for section in expected_sections:
+        assert section in payload["editable_sections"]
+
+
+def test_resume_profile_review_rejects_empty_resume_text() -> None:
+    response = client.post(
+        "/resume/profile-review",
+        json={"resume_text": "   "},
+    )
+
+    assert response.status_code == 400
+    payload = response.json()
+    assert payload["error_code"] == "resume_text_required"
+
+
 def test_resume_parse_file_endpoint_accepts_txt() -> None:
     response = client.post(
         "/resume/parse-file",

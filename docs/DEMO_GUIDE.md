@@ -1,5 +1,18 @@
 # Demo Guide
 
+## Resume Profile Review API
+
+The Slate-like flow now starts with:
+
+```text
+resume upload/text -> profile review -> later search / analysis
+```
+
+For this phase, demo only `POST /resume/profile-review`. It returns a parsed
+profile draft with deterministic warnings, missing-info questions, suggested
+edits, editable sections, and a confidence label. It does not demo a confirm
+API, UI, persistence, or search integration.
+
 适用对象：
 
 - 面试官
