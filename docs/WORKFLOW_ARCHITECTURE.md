@@ -158,3 +158,5 @@ from app.workflows.graph_spec import get_job_analysis_graph_spec
 `MatchAgent` now adds `match_report.requirement_matches` in the deterministic path. Each item keeps one small JD requirement, its match level, the resume evidence used, and a gap or improvement hint when evidence is partial or missing.
 
 `ResumeOptimizeAgent` now consumes those requirement matches and emits `optimization_result.rewrite_suggestions`, keeping 3-6 deterministic rewrite ideas tied to real resume evidence or, when evidence is missing, an explicit preparation-gap suggestion instead of an invented claim.
+
+`ProjectChallengeAgent` now consumes the same requirement matches and emits `project_challenge_report.grounded_questions`, keeping 4-8 deterministic follow-up questions tied to JD requirements, resume evidence, and explicit gap handling.

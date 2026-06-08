@@ -140,6 +140,7 @@ def run_job_analysis_workflow(
     challenge_result = run_project_challenge_agent(
         state.resume_profile,
         state.job_analysis,
+        match_report=state.match_report,
         use_llm=use_llm_project_challenge,
         service=project_challenge_llm_service,
     )

@@ -28,6 +28,7 @@ def test_run_mock_pipeline_returns_structured_report() -> None:
     assert result.match_report.overall_score > 0
     assert result.match_report.requirement_matches
     assert result.optimization_result.rewrite_suggestions
+    assert result.project_challenge_report.grounded_questions
     assert "匹配度总览" in result.markdown_report
     assert "项目拷打问题" in result.markdown_report
 

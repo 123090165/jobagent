@@ -63,10 +63,21 @@ class ChallengeQuestion(BaseModel):
     answer_framework: str
 
 
+class GroundedChallengeQuestion(BaseModel):
+    question: str
+    linked_requirement: str
+    match_level: MatchLevel
+    why_asked: str
+    related_resume_evidence: list[str] = Field(default_factory=list)
+    expected_answer_points: list[str] = Field(default_factory=list)
+    risk_level: str = "medium"
+
+
 class ProjectChallengeReport(BaseModel):
     basic_questions: list[ChallengeQuestion] = Field(default_factory=list)
     technical_deep_dive_questions: list[ChallengeQuestion] = Field(default_factory=list)
     architecture_questions: list[ChallengeQuestion] = Field(default_factory=list)
     tradeoff_questions: list[ChallengeQuestion] = Field(default_factory=list)
+    grounded_questions: list[GroundedChallengeQuestion] = Field(default_factory=list)
     interviewer_concerns: list[str] = Field(default_factory=list)
     improvement_suggestions: list[str] = Field(default_factory=list)
