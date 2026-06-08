@@ -78,6 +78,9 @@ def test_job_analysis_workflow_records_step_trace() -> None:
     result = run_job_analysis_workflow(SAMPLE_RESUME, SAMPLE_JD)
 
     assert result.final_report.markdown_report
+    assert result.final_report.analysis_quality
+    assert result.final_report.analysis_quality.overall_quality_label in {"strong", "medium", "limited", "weak"}
+    assert "Analysis Quality" in result.final_report.markdown_report
     assert "JD-Resume Evidence Chain" in result.final_report.markdown_report
     assert "### Requirement:" in result.final_report.markdown_report
     assert result.state.resume_profile is not None
@@ -204,7 +207,7 @@ def test_resume_optimize_agent_keeps_missing_requirement_as_gap() -> None:
 
     k8s_item = next(item for item in result.rewrite_suggestions if "Kubernetes" in item.linked_requirement)
     assert k8s_item.match_level == "missing"
-    assert ("If" in k8s_item.suggested_bullet) or ("濡傛灉" in k8s_item.suggested_bullet)
+    assert "If" in k8s_item.suggested_bullet
     assert not k8s_item.evidence_source
 
 
@@ -318,6 +321,23 @@ def test_generate_report_renders_evidence_chain_with_linked_rewrite_and_challeng
     assert "- Rewrite suggestion:" in markdown_report
     assert "- Interview challenge:" in markdown_report
     assert "Not found" in markdown_report
+
+
+def test_analysis_quality_warns_when_resume_lacks_project_and_work_evidence() -> None:
+    sparse_resume = "Skills: Python, FastAPI"
+    result = run_job_analysis_workflow(sparse_resume, SAMPLE_JD).final_report
+
+    assert "resume has no project evidence" in result.analysis_quality.warnings
+    assert "resume has no work experience evidence" in result.analysis_quality.warnings
+    assert result.analysis_quality.resume_quality_label in {"limited", "weak"}
+
+
+def test_analysis_quality_warns_when_jd_is_too_short() -> None:
+    short_jd = "Backend Engineer"
+    result = run_job_analysis_workflow(SAMPLE_RESUME, short_jd).final_report
+
+    assert result.analysis_quality.jd_quality_label in {"limited", "weak"}
+    assert any("JD" in warning or "jd" in warning for warning in result.analysis_quality.warnings)
 
 
 def test_mock_pipeline_delegates_to_workflow_without_changing_contract() -> None:

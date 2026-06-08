@@ -29,6 +29,10 @@ def test_run_mock_pipeline_returns_structured_report() -> None:
     assert result.match_report.requirement_matches
     assert result.optimization_result.rewrite_suggestions
     assert result.project_challenge_report.grounded_questions
+    assert result.analysis_quality
+    assert result.analysis_quality.overall_quality_label in {"strong", "medium", "limited", "weak"}
+    assert "Analysis Quality" in result.markdown_report
+    assert "Overall quality" in result.markdown_report
     assert "JD-Resume Evidence Chain" in result.markdown_report
     assert "### Requirement:" in result.markdown_report
     assert "- Rewrite suggestion:" in result.markdown_report

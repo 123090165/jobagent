@@ -123,7 +123,10 @@ def test_full_analysis_endpoint_returns_report() -> None:
     assert payload["match_report"]["requirement_matches"]
     assert payload["optimization_result"]["rewrite_suggestions"]
     assert payload["project_challenge_report"]["grounded_questions"]
+    assert payload["analysis_quality"]
+    assert payload["analysis_quality"]["overall_quality_label"] in {"strong", "medium", "limited", "weak"}
     assert "JD-Resume Evidence Chain" in payload["markdown_report"]
+    assert "Analysis Quality" in payload["markdown_report"]
     assert "### Requirement:" in payload["markdown_report"]
     assert "- Rewrite suggestion:" in payload["markdown_report"]
     assert "- Interview challenge:" in payload["markdown_report"]
@@ -321,6 +324,7 @@ def test_stepwise_api_flow() -> None:
 
     assert report_response.status_code == 200
     assert "markdown_report" in report_response.json()
+    assert "Analysis Quality" in report_response.json()["markdown_report"]
     assert "JD-Resume Evidence Chain" in report_response.json()["markdown_report"]
     assert "- Rewrite suggestion:" in report_response.json()["markdown_report"]
     assert "Project Challenge Questions" in report_response.json()["markdown_report"]

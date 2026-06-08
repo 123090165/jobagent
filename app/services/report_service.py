@@ -10,6 +10,7 @@ from app.schemas.match import (
     ResumeOptimizationResult,
     RewriteSuggestion,
 )
+from app.schemas.report import AnalysisQualityReport
 from app.schemas.resume import ResumeProfile
 
 
@@ -28,6 +29,94 @@ def _question_list(items: list[ChallengeQuestion]) -> str:
         lines.append(f"  - Evaluates: {item.evaluates}")
         lines.append(f"  - Answer framework: {item.answer_framework}")
     return "\n".join(lines)
+
+
+def build_analysis_quality_report(
+    resume_profile: ResumeProfile,
+    job_analysis: JobAnalysis,
+    match_report: MatchReport,
+) -> AnalysisQualityReport:
+    missing_resume_sections: list[str] = []
+    warnings: list[str] = []
+    confidence_notes: list[str] = []
+
+    has_project_evidence = _has_explicit_project_evidence(resume_profile)
+    has_work_evidence = _has_explicit_work_evidence(resume_profile)
+
+    if not resume_profile.skills:
+        missing_resume_sections.append("skills")
+        warnings.append("resume has no skills evidence")
+    if not has_project_evidence:
+        missing_resume_sections.append("projects")
+        warnings.append("resume has no project evidence")
+    if not has_work_evidence:
+        missing_resume_sections.append("work_experiences")
+        warnings.append("resume has no work experience evidence")
+    if not resume_profile.highlights:
+        missing_resume_sections.append("highlights")
+        warnings.append("resume has no quantified or highlight evidence")
+    if len(resume_profile.missing_info) >= 3:
+        warnings.append("resume is missing multiple core details")
+
+    resume_quality_label = _derive_resume_quality_label(
+        resume_profile,
+        missing_resume_sections,
+        has_project_evidence=has_project_evidence,
+        has_work_evidence=has_work_evidence,
+    )
+
+    missing_jd_sections: list[str] = []
+    raw_jd_length = len(job_analysis.raw_jd.strip())
+    if not (job_analysis.job_title or "").strip():
+        missing_jd_sections.append("job_title")
+        warnings.append("JD has no job title")
+    if not job_analysis.required_skills:
+        missing_jd_sections.append("required_skills")
+        warnings.append("JD has no required skills")
+    if not job_analysis.responsibilities:
+        missing_jd_sections.append("responsibilities")
+        warnings.append("JD has no clear responsibilities")
+    if not job_analysis.experience_requirements:
+        missing_jd_sections.append("experience_requirements")
+        warnings.append("JD has no clear experience requirements")
+    if raw_jd_length < 80:
+        warnings.append("JD is very short")
+        if "raw_jd" not in missing_jd_sections:
+            missing_jd_sections.append("raw_jd")
+
+    jd_quality_label = _derive_jd_quality_label(job_analysis, missing_jd_sections, raw_jd_length)
+
+    requirement_matches = match_report.requirement_matches
+    evidence_backed_matches = [item for item in requirement_matches if item.resume_evidence]
+    if not requirement_matches or len(evidence_backed_matches) <= max(1, len(requirement_matches) // 3):
+        warnings.append("requirement-level match evidence is sparse")
+        confidence_notes.append("Match score may be less reliable because requirement-level evidence is sparse.")
+
+    if match_report.keyword_coverage < 35:
+        confidence_notes.append("Keyword coverage is low, so the match score may underrepresent true fit.")
+
+    if resume_quality_label in {"limited", "weak"}:
+        confidence_notes.append("Resume evidence is incomplete, so downstream optimization and interview prep may be partial.")
+    if jd_quality_label in {"limited", "weak"}:
+        confidence_notes.append("JD detail is incomplete, so requirement interpretation may be less precise.")
+
+    overall_quality_label = _derive_overall_quality_label(
+        resume_quality_label=resume_quality_label,
+        jd_quality_label=jd_quality_label,
+        warnings=warnings,
+        requirement_matches=requirement_matches,
+        evidence_backed_matches=evidence_backed_matches,
+    )
+
+    return AnalysisQualityReport(
+        resume_quality_label=resume_quality_label,
+        jd_quality_label=jd_quality_label,
+        overall_quality_label=overall_quality_label,
+        warnings=warnings,
+        missing_resume_sections=missing_resume_sections,
+        missing_jd_sections=missing_jd_sections,
+        confidence_notes=confidence_notes,
+    )
 
 
 def _normalize_requirement(value: str) -> str:
@@ -120,6 +209,119 @@ def _render_evidence_chain_section(
     return "\n\n".join(lines)
 
 
+def _render_analysis_quality_section(analysis_quality: AnalysisQualityReport) -> str:
+    warning_lines = _bullet_list(analysis_quality.warnings)
+    confidence_lines = _bullet_list(analysis_quality.confidence_notes)
+    return "\n".join(
+        [
+            "## Analysis Quality",
+            "",
+            f"- Overall quality: {analysis_quality.overall_quality_label}",
+            f"- Resume quality: {analysis_quality.resume_quality_label}",
+            f"- JD quality: {analysis_quality.jd_quality_label}",
+            "- Warnings:",
+            warning_lines,
+            "- Confidence notes:",
+            confidence_lines,
+        ]
+    )
+
+
+def _derive_resume_quality_label(
+    resume_profile: ResumeProfile,
+    missing_resume_sections: list[str],
+    *,
+    has_project_evidence: bool,
+    has_work_evidence: bool,
+) -> str:
+    has_experience_evidence = has_project_evidence or has_work_evidence
+    missing_info_count = len(resume_profile.missing_info)
+    if not resume_profile.skills and not has_experience_evidence:
+        return "weak"
+    if resume_profile.skills and has_experience_evidence and missing_info_count <= 1 and resume_profile.highlights:
+        return "strong"
+    if resume_profile.skills and has_experience_evidence and len(missing_resume_sections) <= 2:
+        return "medium"
+    if resume_profile.skills:
+        return "limited"
+    return "weak"
+
+
+def _has_explicit_project_evidence(resume_profile: ResumeProfile) -> bool:
+    raw_text = resume_profile.raw_text.lower()
+    if any(marker in raw_text for marker in ["project", "projects", "项目"]):
+        return True
+    if (
+        len(resume_profile.projects) == 1
+        and resume_profile.projects[0].description.strip() == resume_profile.raw_text.strip()
+        and not resume_profile.projects[0].highlights
+    ):
+        return False
+    return any(
+        (project.name and project.name.strip() and project.description.strip() != resume_profile.raw_text.strip())
+        or project.highlights
+        for project in resume_profile.projects
+    )
+
+
+def _has_explicit_work_evidence(resume_profile: ResumeProfile) -> bool:
+    raw_text = resume_profile.raw_text.lower()
+    if any(marker in raw_text for marker in ["experience", "work", "intern", "实习", "工作"]):
+        return True
+    return any(
+        (experience.company and experience.company.strip())
+        or (experience.role and experience.role.strip())
+        or len(experience.technologies) >= 2
+        for experience in resume_profile.work_experiences
+    )
+
+
+def _derive_jd_quality_label(
+    job_analysis: JobAnalysis,
+    missing_jd_sections: list[str],
+    raw_jd_length: int,
+) -> str:
+    has_core_detail = bool(job_analysis.required_skills or job_analysis.responsibilities)
+    has_full_detail = bool(
+        (job_analysis.job_title or "").strip()
+        and job_analysis.required_skills
+        and job_analysis.responsibilities
+        and job_analysis.experience_requirements
+        and raw_jd_length >= 120
+    )
+    if raw_jd_length < 30 and not has_core_detail:
+        return "weak"
+    if has_full_detail:
+        return "strong"
+    if has_core_detail and len(missing_jd_sections) <= 2 and raw_jd_length >= 80:
+        return "medium"
+    if has_core_detail or raw_jd_length >= 30:
+        return "limited"
+    return "weak"
+
+
+def _derive_overall_quality_label(
+    *,
+    resume_quality_label: str,
+    jd_quality_label: str,
+    warnings: list[str],
+    requirement_matches: list[RequirementMatch],
+    evidence_backed_matches: list[RequirementMatch],
+) -> str:
+    label_order = {"weak": 0, "limited": 1, "medium": 2, "strong": 3}
+    reverse_order = {value: key for key, value in label_order.items()}
+    score = min(label_order.get(resume_quality_label, 1), label_order.get(jd_quality_label, 1))
+
+    if not requirement_matches or len(evidence_backed_matches) <= max(1, len(requirement_matches) // 3):
+        score = min(score, label_order["limited"])
+    if len(warnings) >= 4:
+        score = min(score, label_order["limited"])
+    if len(warnings) >= 6:
+        score = min(score, label_order["weak"])
+
+    return reverse_order[score]
+
+
 def generate_markdown_report(
     *,
     resume_profile: ResumeProfile,
@@ -129,6 +331,11 @@ def generate_markdown_report(
     project_challenge_report: ProjectChallengeReport,
 ) -> str:
     """Generate a readable Markdown report from structured analysis objects."""
+    analysis_quality = build_analysis_quality_report(
+        resume_profile=resume_profile,
+        job_analysis=job_analysis,
+        match_report=match_report,
+    )
     job_title = job_analysis.job_title or "Target Role"
     job_category = job_analysis.job_category or "Unknown"
     skills = ", ".join(resume_profile.skills) if resume_profile.skills else "Not detected"
@@ -151,6 +358,8 @@ def generate_markdown_report(
 - Job category: {job_category}
 - Required skills: {required_skills}
 - Preferred skills: {preferred_skills}
+
+{_render_analysis_quality_section(analysis_quality)}
 
 ## 3. Match Overview
 

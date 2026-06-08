@@ -15,9 +15,10 @@ from app.agents.resume_parse_agent import run_resume_parse_agent
 from app.agents.types import AgentExecutionMode, AgentRunMetadata
 from app.schemas.job import JobAnalysis
 from app.schemas.match import MatchReport, ProjectChallengeReport, ResumeOptimizationResult
-from app.schemas.report import FinalReport
+from app.schemas.report import AnalysisQualityReport, FinalReport
 from app.schemas.resume import ResumeProfile
 from app.services.llm_service import LLMService
+from app.services.report_service import build_analysis_quality_report
 
 WorkflowStepStatus = Literal["completed"]
 
@@ -45,6 +46,7 @@ class JobAnalysisWorkflowState(BaseModel):
     match_report: MatchReport | None = None
     optimization_result: ResumeOptimizationResult | None = None
     project_challenge_report: ProjectChallengeReport | None = None
+    analysis_quality: AnalysisQualityReport = Field(default_factory=AnalysisQualityReport)
     markdown_report: str | None = None
     steps: list[WorkflowStepTrace] = Field(default_factory=list)
 
@@ -152,6 +154,12 @@ def run_job_analysis_workflow(
         duration_ms=_elapsed_ms(step_started_at),
     )
 
+    state.analysis_quality = build_analysis_quality_report(
+        state.resume_profile,
+        state.job_analysis,
+        state.match_report,
+    )
+
     step_started_at = perf_counter()
     report_result = run_report_agent(
         resume_profile=state.resume_profile,
@@ -174,6 +182,7 @@ def run_job_analysis_workflow(
         match_report=state.match_report,
         optimization_result=state.optimization_result,
         project_challenge_report=state.project_challenge_report,
+        analysis_quality=state.analysis_quality,
         markdown_report=state.markdown_report,
     )
     return JobAnalysisWorkflowResult(final_report=final_report, state=state)

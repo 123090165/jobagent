@@ -172,3 +172,12 @@ The section is intentionally small:
 - include one linked rewrite suggestion when available
 - include one linked interview challenge when available
 - degrade gracefully when rewrite or challenge data is missing
+
+## 11. Analysis Quality Gate
+
+The workflow now builds a deterministic `analysis_quality` object before generating the final Markdown report.
+
+- inputs: `ResumeProfile`, `JobAnalysis`, `MatchReport`
+- output labels: `strong`, `medium`, `limited`, `weak`
+- warns when resume evidence is thin, JD structure is incomplete, or requirement-level evidence is sparse
+- keeps the quality signal in both `FinalReport.analysis_quality` and the `## Analysis Quality` Markdown section
