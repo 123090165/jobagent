@@ -7,6 +7,7 @@ JobAgent 是一个面向求职准备场景的本地工作台，不是单纯聊�
 推荐先阅读：
 
 - [Project Architecture Overview](docs/ARCHITECTURE_OVERVIEW.md)
+- [Demo Guide](docs/DEMO_GUIDE.md)
 - [Workflow Architecture](docs/WORKFLOW_ARCHITECTURE.md)
 - [Live Job Provider](docs/LIVE_JOB_PROVIDER.md)
 - [Application Tracker](docs/APPLICATION_TRACKER.md)

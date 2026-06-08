@@ -1,252 +1,236 @@
-# JobAgent Demo Guide
+# Demo Guide
 
-> 用途：把 JobAgent 演示讲成一个完整工程故事，而不是只展示页面按钮。适合 GitHub 展示、面试讲解、毕业设计答辩和阶段复盘。
+适用对象：
 
-## 1. 当前阶段目标
+- 面试官
+- 课程项目 reviewer
+- 未来回看项目的自己
 
-这一阶段的目标是增强 README 和 Demo 展示材料，让外部读者能快速理解：
+## 1. Demo Goal
 
-- JobAgent 解决什么问题。
-- 当前已经能跑哪些功能。
-- 系统如何分层。
-- 为什么先做本地求职准备工作台，而不是自动投递工具。
-- 如何通过测试证明核心流程可用。
-
-## 2. 演示前准备
-
-确认依赖已经安装：
-
-```powershell
-.venv\Scripts\python.exe -m pip install -r requirements.txt
-```
-
-运行测试：
-
-```powershell
-.venv\Scripts\python.exe -m pytest
-```
-
-启动 Streamlit：
-
-```powershell
-.venv\Scripts\python.exe -m streamlit run frontend/streamlit_app.py
-```
-
-可选启动 FastAPI：
-
-```powershell
-.venv\Scripts\python.exe -m uvicorn app.main:app --reload
-```
-
-样例数据：
-
-- `data/samples/sample_resume.md`
-- `data/jd_examples/sample_jd.md`
-
-## 3. 推荐演示路径
-
-### Step 1：生成报告
-
-操作：
-
-- 打开 Streamlit 的“生成报告”页面。
-- 粘贴样例简历和样例 JD。
-- 保持 LLM 关闭，先展示 mock pipeline 的稳定闭环。
-- 勾选“保存本次分析”。
-- 点击生成报告。
-- 在结构化结果里查看 workflow 执行轨迹。
-
-讲解重点：
-
-- 第一版先追求结构化闭环，不追求模型效果。
-- mock 输出也走同一套 Pydantic schema，后续替换 LLM 不影响下游。
-- 报告来自结构化对象，而不是直接在页面里拼一段文本。
-- 执行轨迹会显示每个 Agent 的 `mock`、`llm` 或 `fallback` 模式。
-- 执行轨迹还会显示本次 `workflow_run_id`、总耗时和 fallback 数。
-
-### Step 2：查看历史记录
-
-操作：
-
-- 切到“历史记录”页面。
-- 查看刚保存的分析记录。
-- 展开 Markdown 报告、执行轨迹和结构化详情。
-
-讲解重点：
-
-- 保存原始文本和结构化结果，方便复盘。
-- 保存 workflow step trace，方便解释某次分析是否使用了 LLM 或发生 fallback。
-- step 耗时可以帮助说明当前只是轻量 observability，后续迁移 LangGraph 时可继续复用这些字段。
-- 列表页只展示摘要，详情页再展示完整内容。
-- 测试使用临时数据库，不污染真实本地数据。
-
-### Step 3：查看岗位库
-
-操作：
-
-- 切到“岗位库”页面。
-- 搜索样例 JD 的关键词。
-- 查看岗位原始 JD、结构化分析和分析次数。
-
-讲解重点：
-
-- 岗位库来自用户保存过的 JD，不做外部招聘站抓取。
-- 当前去重规则是 `raw_jd` 完全一致则复用岗位记录。
-- 语义去重、标签和 URL 提取属于后续阶段。
-
-### Step 4：生成 Job Brief
-
-操作：
-- 切到 Streamlit 的“岗位批量推荐”页签。
-- 继续使用样例简历文本。
-- 输入一个 query，例如 `python backend llm jobs`。
-- 保持 `provider=mock`。
-- 点击“生成 Job Brief”。
-- 展示排序后的推荐岗位、`scoring_quality`、风险点和 Markdown Brief。
-
-讲解重点：
-- 这是批量推荐 brief，不是自动投递。
-- 第一版明确只开放 `provider="mock"`，避免把演示数据说成真实联网搜索。
-- 每个岗位的 `fit_score` 仍然来自现有 workflow 里的 `match_report.overall_score`。
-- `scoring_quality` 用来提醒输入材料完整度，而不是岗位本身好坏。
-- `snippet_only` 的岗位应该先补完整 JD，再决定是否投入大量定制成本。
-
-### Step 5：创建简历版本
-
-操作：
-
-- 切到“简历版本”页面。
-- 保存一个针对目标岗位的简历版本。
-- 确认版本详情中保留了原始简历和定制后文本。
-
-讲解重点：
-
-- 简历版本是独立数据，不只是 tracker 里的备注。
-- 原始简历不会被覆盖，定制版本需要用户确认。
-- 当前不自动生成或编造经历，只保存用户提供的真实文本。
-
-### Step 6：创建投递跟进
-
-操作：
-
-- 切到“投递跟进”页面。
-- 从岗位库选择目标岗位。
-- 设置状态为 `interested` 或 `applied`。
-- 关联已保存的简历版本。
-- 填写备注和下一步行动。
-
-讲解重点：
-
-- tracker 只记录本地求职状态，不执行自动投递。
-- 状态是明确枚举，而不是任意字符串。
-- 当前一个岗位对应一条 tracker 记录，重复保存同一岗位会更新原记录。
-
-### Step 7：展示 FastAPI
-
-操作：
-
-- 打开 `http://127.0.0.1:8000/docs`。
-- 展示 `/analyze/full`、`/jobs`、`/applications` 等接口。
-
-讲解重点：
-
-- Streamlit 是 Demo 层，FastAPI 是可复用后端边界。
-- route 保持很薄，核心逻辑在 service。
-- 后续迁移到 Web 前端时，service 和 API 可以继续复用。
-
-### Step 8：展示测试
-
-操作：
-
-- 在终端运行 `pytest`。
-- 说明当前覆盖的测试模块。
-
-讲解重点：
-
-- 不是只靠手动点页面证明功能可用。
-- API、存储、LLM fallback、tracker、简历版本、workflow 步骤都有最小测试保护。
-- deprecation warning 来自依赖链，不影响当前功能正确性。
-
-### Step 9：讲解 Workflow 编排
-
-操作：
-
-- 打开 `docs/WORKFLOW_ARCHITECTURE.md`。
-- 展示主流程步骤：ResumeParseAgent -> JDAnalysisAgent -> MatchAgent -> ResumeOptimizeAgent -> ProjectInterviewAgent -> ReportAgent。
-- 说明 `run_mock_pipeline` 仍然是兼容入口，但内部已委托给 workflow。
-
-讲解重点：
-
-- 当前还没有直接上 LangGraph，是先稳定状态和步骤边界。
-- workflow state 记录中间结果，step trace 记录执行顺序和摘要。
-- workflow 调用 Agent 外壳，不直接调用底层 mock 函数。
-- step trace 会记录 `mock`、`llm` 或 `fallback`，便于说明 LLM 是否真的参与。
-- 保存分析记录时，step trace 会写入 SQLite，并在历史记录详情中展示。
-- `workflow_run_id` 标识一次执行，`analysis_record_id` 标识保存后的历史记录。
-- 后续 LangGraph 可以按这些步骤迁移成 node。
-
-## 4. 面试讲述版
-
-可以这样讲：
+这个 demo 展示的不是一个“聊天机器人”，而是一个求职准备闭环：
 
 ```text
-我把 JobAgent 定位为求职准备工作台，而不是自动投递工具。
-第一阶段先用 mock pipeline 跑通简历、JD、匹配、优化、追问和报告生成。
-这样做的好处是先稳定 schema 和数据流，再逐步替换真实 LLM。
-
-后续我接入了 FastAPI 和 SQLite，把一次性页面工具升级成可复盘的本地系统。
-用户可以保存分析记录、沉淀岗位库，并用 tracker 管理投递进展。
-整个过程中我保持边界清晰：不登录招聘网站，不处理验证码，不做自动投递，也不允许简历优化编造经历。
+job source
+-> search result
+-> import candidate
+-> application tracker
+-> application deep analysis
+-> evidence-based report
 ```
 
-## 5. 当前开发重点
+当前 demo 的重点亮点：
 
-- README 要能让别人快速跑起来。
-- 架构图要能说明 UI、API、service、agent、storage 的边界。
-- Demo 路径要展示完整闭环，而不是只展示一个页面。
-- 面试介绍要讲清取舍，不只罗列技术名词。
-- 测试结果要作为演示证据。
+- provider metadata / warnings
+- candidate-to-tracker
+- application deep analysis
+- requirement-level evidence matching
+- evidence-based resume rewrite suggestions
+- grounded project challenge questions
+- JD-Resume Evidence Chain
+- Analysis Quality Gate
 
-## 6. 难点和取舍
+## 2. Before You Start
 
-- README 不能只写命令，还要解释项目边界和工程价值。
-- Demo 不能依赖真实隐私数据，应使用样例简历和样例 JD。
-- 当前 LLM 只替换 JDAnalysisAgent，是为了降低不稳定输出对主链路的影响。
-- tracker 不做自动投递，是为了规避平台风险和合规问题。
-- SQLite 足够支撑本地 MVP，多用户和权限系统放到后续阶段。
+开始前建议确认：
 
-## 7. 关键知识点
+- Python virtualenv 已安装依赖
+- FastAPI 可运行
+- 本地 SQLite 可用
+- 可使用 `mock` / `local_db` provider
+- `cuhksz_live` 可选，不作为 demo 必须依赖
 
-- 技术叙事：把需求、边界、架构、验证串成故事。
-- 分层架构：UI、API、service、agent、storage 分工清晰。
-- Schema-first：先稳定结构化数据，再替换模型能力。
-- Fallback：LLM 失败时回退 mock，保证可用性。
-- Repository pattern：集中管理 SQLite 访问。
-- 状态机：用枚举管理投递状态。
+推荐 demo 使用 `mock` / `local_db`，保证稳定。`cuhksz_live` 可以作为 live provider 补充展示，但不要依赖外网稳定性。
 
-## 8. 面试官可能追问
+## 3. Recommended Demo Path
 
-- 为什么不直接做自动投递？
-- 为什么第一版先 mock，而不是直接接 LLM？
-- LLM 输出不符合 schema 怎么处理？
-- 为什么 tracker 依赖岗位库？
-- 岗位去重为什么先用完全匹配？
-- 后续如果做多用户，需要改哪些表结构？
-- 如何证明系统不是 prompt demo？
-- 如果要迁移到 LangGraph，当前哪些模块可以复用？
+推荐用一条 3-5 分钟路径讲清当前闭环。
 
-## 9. 验收清单
+### Step 1: Run backend / prepare environment
 
-- README 包含架构图。
-- README 包含运行说明。
-- README 包含阶段路线。
-- README 包含面试讲述版项目介绍。
-- Demo Guide 包含演示路径和讲解重点。
-- 简历版本页面能保存原始简历和定制文本。
-- tracker 能关联已保存的简历版本。
-- Workflow 层能记录 6 个主流程步骤。
-- Agent trace 能记录执行模式、fallback 原因和 guardrails。
-- Workflow trace 能随分析记录持久化，并通过 API/Streamlit 读取。
-- Workflow trace 能展示 run id、步骤耗时和 fallback 摘要。
-- `pytest` 通过。
-- 不新增自动投递、招聘网站登录、验证码处理、复杂爬虫或多用户权限能力。
+你在演示什么：
+- 项目是一个可运行的本地工作台，不只是文档或原型图
+
+为什么这个步骤存在：
+- 先建立“系统已经能跑通”的前提
+
+该看哪个输出：
+- FastAPI `/docs`
+- 本地数据库可用
+
+### Step 2: Search jobs through provider
+
+你在演示什么：
+- 通过 `mock` 或 `local_db` 获取岗位搜索结果
+
+为什么这个步骤存在：
+- 闭环必须先有岗位来源，后续 candidate、tracker、analysis 都依赖这里
+
+该看哪个输出：
+- `SearchResultItem`
+- provider 名称
+- metadata / warnings
+
+### Step 3: Review SearchResultItem / metadata / warnings
+
+你在演示什么：
+- 搜索结果不是只有标题和链接，还保留 provider 的解释信号
+
+为什么这个步骤存在：
+- 说明系统不是盲目抓取，而是保留来源质量和不确定性
+
+该看哪个输出：
+- result metadata
+- warnings
+- JD 完整度或质量信号
+
+### Step 4: Create or review JobImportCandidate
+
+你在演示什么：
+- 搜索结果先进入 `JobImportCandidate`，作为用户确认缓冲层
+
+为什么这个步骤存在：
+- 搜索结果是临时对象，不应该直接进入 tracker
+
+该看哪个输出：
+- `JobImportCandidate`
+- 候选岗位状态
+- 从 search / brief 到 candidate 的转换结果
+
+### Step 5: Import candidate into ApplicationRecord
+
+你在演示什么：
+- 把确认后的 candidate 导入 `ApplicationRecord`
+
+为什么这个步骤存在：
+- `ApplicationRecord` 才是正式跟踪对象，负责状态、备注、下一步动作和简历版本关联
+
+该看哪个输出：
+- `ApplicationRecord`
+- `status`
+- `notes`
+- `next_action`
+
+### Step 6: Run application deep analysis
+
+你在演示什么：
+- 对已进入 tracker 的 application 运行完整分析 workflow
+
+为什么这个步骤存在：
+- 说明 tracker 不是终点，而是驱动单岗位深度分析的入口
+
+该看哪个输出：
+- `POST /applications/{application_id}/analyze`
+- `record_id`
+- `application_id`
+- `workflow_steps`
+
+### Step 7: Open final Markdown report
+
+你在演示什么：
+- 最终报告把匹配、改写建议、项目追问和质量信号串成一个可读结果
+
+为什么这个步骤存在：
+- 把结构化分析落成真正可复盘的产物
+
+该看哪个输出：
+- final Markdown report
+- `requirement_matches`
+- `rewrite_suggestions`
+- `grounded_questions`
+
+### Step 8: Explain Evidence Chain and Analysis Quality
+
+你在演示什么：
+- 报告不是只给分，而是解释证据链和质量边界
+
+为什么这个步骤存在：
+- 这是 JobAgent 和普通 JD 分析工具的关键区别
+
+该看哪个输出：
+- `JD-Resume Evidence Chain`
+- `Analysis Quality`
+
+## 4. What To Highlight During Demo
+
+讲解时建议明确说清：
+
+1. `SearchResultItem` 不直接进入 tracker
+2. `JobImportCandidate` 是缓冲层
+3. `ApplicationRecord` 是正式跟踪对象
+4. `AnalysisRecord` 关联 `application_id`
+5. `MatchAgent` 生成 `requirement_matches`
+6. `ResumeOptimizeAgent` 消费 `requirement_matches` 生成 `rewrite_suggestions`
+7. `ProjectChallengeAgent` 消费 `requirement_matches` 生成 `grounded_questions`
+8. `ReportAgent` 把 requirement / evidence / rewrite / challenge 串成 evidence chain
+9. `Analysis Quality Gate` 提醒输入质量和分析可信度
+
+## 5. Suggested Demo Script
+
+这个项目解决的不是“能不能聊几句”的问题，而是把求职准备里最核心的一条链路做扎实：岗位从哪里来，为什么值得跟进，进入 tracker 之后怎么做单岗位深度分析，最后怎么把 JD 要求、简历证据、改写建议和项目追问串成一个可复盘的报告。
+
+所以它不是一个单纯 chatbot。搜索结果不会直接进 tracker，而是先经过 `JobImportCandidate` 这个确认层，再进入 `ApplicationRecord`。这样用户真正跟踪的是确认过的目标岗位，而不是一堆临时搜索结果。后面的 deep analysis 也不是只给一个分数，而是要求每条关键 requirement 都尽量找到 resume evidence，再往下生成 rewrite suggestion 和 grounded question，最后在报告里形成 evidence chain。
+
+我还加了 quality gate，因为很多分析工具的问题不是“不会输出”，而是会在输入不完整时给出看起来很像真的结论。这里会明确提示 JD、resume 或 evidence coverage 的质量边界，让结果更可信，也更适合演示和复盘。
+
+## 6. Stable Demo Mode
+
+稳定演示建议：
+
+- 首选 `mock` / `local_db`
+- 避免 live site 网络波动
+- 避免依赖真实 LLM key
+- LLM 是 optional enhancement
+- deterministic core 可以保证测试和演示稳定
+
+最稳的 demo 讲法是：先展示 deterministic core 已经能把核心闭环跑通，再说明 LLM 和 live provider 是增强项，而不是主链路前提。
+
+## 7. Optional Live Provider Demo
+
+如果你想补充展示 `cuhksz_live`，建议只把它当作 optional live provider：
+
+- 展示它是定制 live provider
+- 展示 metadata / warnings
+- 展示 detail rerank
+- 明确它不是通用爬虫，也不是全网搜索
+
+不建议把它写成必须执行步骤，也不建议把整个 demo 成败压在外部站点可用性上。
+
+## 8. Common Reviewer Questions
+
+**Q: 为什么不直接把搜索结果放进 tracker？**  
+A: 因为 `SearchResultItem` 是临时结果，`JobImportCandidate` 作为用户确认缓冲层，`ApplicationRecord` 才是正式跟踪对象。
+
+**Q: 为什么不直接做全网爬虫？**  
+A: 当前重点是稳定闭环和可解释分析，不是爬虫规模。live provider 先做可观测和可测试的定制源。
+
+**Q: LLM 不稳定怎么办？**  
+A: 主链路是 mock-first / deterministic-first，LLM 是 optional enhancement，并且有 fallback。
+
+**Q: 如何避免简历优化胡编？**  
+A: `rewrite_suggestions` 绑定 `resume_evidence`，缺失 requirement 只生成 gap guidance，不伪造经历。
+
+**Q: 这个项目和普通 JD 分析工具有什么区别？**  
+A: 它把岗位来源、候选确认、tracker、深度分析、证据链报告串成一个可复盘工作台。
+
+## 9. What Not To Demo Yet
+
+当前不要把下面这些当成已完成 demo 能力：
+
+- AI Interview session
+- RAG question bank
+- multi-site generic crawler
+- auto apply
+- email/calendar reminder
+- multi-user auth
+- PDF/DOCX export
+
+这些可以作为后续方向提到，但不是当前 demo 的重点。
+
+## 10. Related Docs
+
+- [Architecture Overview](ARCHITECTURE_OVERVIEW.md)
+- [Workflow Architecture](WORKFLOW_ARCHITECTURE.md)
+- [Live Job Provider](LIVE_JOB_PROVIDER.md)
+- [Application Tracker](APPLICATION_TRACKER.md)
+- [Job Import Candidate](JOB_IMPORT_CANDIDATE.md)
