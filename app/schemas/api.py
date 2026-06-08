@@ -7,6 +7,7 @@ from app.schemas.application import ApplicationRecordResponse, ApplicationStatus
 from app.schemas.job_import_candidate import JobImportCandidate
 from app.schemas.job import JobAnalysis
 from app.schemas.match import MatchReport, ProjectChallengeReport, ResumeOptimizationResult
+from app.schemas.profile_review import ProfileSearchContext
 from app.schemas.report import FinalReport
 from app.schemas.resume import ResumeProfile
 
@@ -63,6 +64,7 @@ class BriefFromSearchRequest(BaseModel):
     provider: str = "mock"
     limit: int = 5
     use_llm_jd: bool = False
+    profile_context: ProfileSearchContext | None = None
 
 
 class BriefRunFromSearchRequest(BriefFromSearchRequest):

@@ -9,9 +9,12 @@ from app.api import routes_analyze, routes_jobs
 from app.main import app
 from app.schemas.brief import JobBriefReport, JobRecommendationItem
 from app.schemas.match import MatchReport
+from app.schemas.profile_review import ProfileSearchContext, ResumeProfileUserEdits
+from app.schemas.resume import ResumeProfile
 from app.schemas.search import SearchResultItem
 from app.services.application_service import save_application
 from app.services.brief_run_storage_service import save_brief_run
+from app.services.batch_brief_service import build_profile_enhanced_query
 from app.services.jd_url_service import JDUrlImportError
 from app.services.storage_service import load_analysis_record
 from app.storage.database import get_connection, init_database
@@ -19,6 +22,40 @@ from app.workflows.job_analysis_workflow import WorkflowStepTrace, run_job_analy
 from tests.test_mock_pipeline import SAMPLE_JD, SAMPLE_RESUME
 
 client = TestClient(app)
+
+
+def _build_profile_search_context(
+    *,
+    skills: list[str] | None = None,
+    target_roles: list[str] | None = None,
+    preferred_locations: list[str] | None = None,
+    additional_skills: list[str] | None = None,
+    constraints: list[str] | None = None,
+) -> ProfileSearchContext:
+    return ProfileSearchContext(
+        confirmed_profile=ResumeProfile(
+            raw_text="Profile context test resume",
+            skills=skills if skills is not None else ["Python", "FastAPI"],
+        ),
+        user_confirmed_data=ResumeProfileUserEdits(
+            target_roles=(
+                target_roles
+                if target_roles is not None
+                else ["AI Agent Engineer"]
+            ),
+            preferred_locations=(
+                preferred_locations
+                if preferred_locations is not None
+                else ["Shenzhen"]
+            ),
+            additional_skills=(
+                additional_skills
+                if additional_skills is not None
+                else ["LangGraph"]
+            ),
+            constraints=constraints if constraints is not None else [],
+        ),
+    )
 
 
 def _build_fake_langgraph_workflow_result():
@@ -107,6 +144,52 @@ def test_health_endpoint() -> None:
 
     assert response.status_code == 200
     assert response.json()["status"] == "ok"
+
+
+def test_profile_enhanced_query_preserves_original_query() -> None:
+    profile_context = _build_profile_search_context(
+        skills=["Python", "FastAPI"],
+        target_roles=["AI Agent Engineer"],
+        preferred_locations=["Shenzhen"],
+        additional_skills=["LangGraph"],
+    )
+
+    effective = build_profile_enhanced_query("backend internship", profile_context)
+
+    assert effective.startswith("backend internship")
+    assert "AI Agent Engineer" in effective
+    assert "Shenzhen" in effective
+    assert "LangGraph" in effective
+    assert "Python" in effective
+    assert "FastAPI" in effective
+
+
+def test_profile_enhanced_query_can_be_generated_from_profile_context() -> None:
+    profile_context = _build_profile_search_context(
+        skills=["Python", "FastAPI"],
+        target_roles=["AI Agent Engineer"],
+    )
+
+    effective = build_profile_enhanced_query("", profile_context)
+
+    assert "AI Agent Engineer" in effective
+    assert "Python" in effective
+
+
+def test_profile_enhanced_query_dedupes_and_limits_length() -> None:
+    profile_context = _build_profile_search_context(
+        skills=["Python", "python", "FastAPI"],
+        target_roles=[],
+        preferred_locations=[],
+        additional_skills=["FastAPI"],
+        constraints=["backend " * 120],
+    )
+
+    effective = build_profile_enhanced_query("Python backend", profile_context)
+
+    assert effective.lower().count("python") == 1
+    assert effective.lower().count("fastapi") == 1
+    assert len(effective) <= 300
 
 
 def test_full_analysis_endpoint_returns_report() -> None:
@@ -588,6 +671,42 @@ def test_resume_profile_confirm_without_user_edits_stays_conservative() -> None:
     payload = response.json()
     assert payload["confidence_label"] in {"limited", "weak", "medium"}
     assert payload["remaining_warnings"]
+
+
+def test_brief_from_search_accepts_profile_context() -> None:
+    review_response = client.post(
+        "/resume/profile-review",
+        json={"resume_text": SAMPLE_RESUME},
+    )
+    parsed_profile = review_response.json()["parsed_profile"]
+    confirm_response = client.post(
+        "/resume/profile-review/confirm",
+        json={
+            "parsed_profile": parsed_profile,
+            "user_edits": {
+                "target_roles": ["AI Agent Engineer"],
+                "preferred_locations": ["Shenzhen"],
+                "additional_skills": ["LangGraph"],
+            },
+        },
+    )
+    confirmed_payload = confirm_response.json()
+
+    response = client.post(
+        "/brief/from-search",
+        json={
+            "resume_text": SAMPLE_RESUME,
+            "query": "backend internship",
+            "provider": "mock",
+            "limit": 1,
+            "profile_context": {
+                "confirmed_profile": confirmed_payload["confirmed_profile"],
+                "user_confirmed_data": confirmed_payload["user_confirmed_data"],
+            },
+        },
+    )
+
+    assert response.status_code == 200
 
 
 def test_resume_parse_file_endpoint_accepts_txt() -> None:

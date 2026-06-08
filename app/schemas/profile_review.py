@@ -49,3 +49,10 @@ class ConfirmedResumeProfileResult(BaseModel):
     confirmation_summary: ResumeProfileConfirmationSummary
     remaining_warnings: list[str] = Field(default_factory=list)
     confidence_label: str = "medium"
+
+
+class ProfileSearchContext(BaseModel):
+    confirmed_profile: ResumeProfile
+    user_confirmed_data: ResumeProfileUserEdits = Field(
+        default_factory=ResumeProfileUserEdits
+    )

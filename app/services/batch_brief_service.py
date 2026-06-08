@@ -4,6 +4,7 @@ from collections import Counter
 
 from app.schemas.brief import JobBriefReport, JobRecommendationItem
 from app.schemas.match import MatchReport
+from app.schemas.profile_review import ProfileSearchContext
 from app.schemas.search import SearchResultItem
 from app.services.errors import JobAgentError
 from app.services.job_search_service import search_jobs
@@ -11,6 +12,8 @@ from app.workflows.job_analysis_workflow import run_job_analysis_workflow
 
 MIN_BRIEF_LIMIT = 1
 MAX_BRIEF_LIMIT = 10
+MAX_PROFILE_QUERY_TERMS = 20
+MAX_PROFILE_QUERY_LENGTH = 300
 
 
 def build_brief_from_search(
@@ -19,13 +22,14 @@ def build_brief_from_search(
     provider: str = "mock",
     limit: int = 5,
     use_llm_jd: bool = False,
+    profile_context: ProfileSearchContext | None = None,
 ) -> JobBriefReport:
     normalized_resume = resume_text.strip()
     if not normalized_resume:
         raise JobAgentError("Resume text cannot be empty", "brief_resume_empty")
 
-    normalized_query = query.strip()
-    if not normalized_query:
+    effective_query = build_profile_enhanced_query(query, profile_context)
+    if not effective_query:
         raise JobAgentError("Search query cannot be empty", "brief_query_empty")
 
     if limit < MIN_BRIEF_LIMIT or limit > MAX_BRIEF_LIMIT:
@@ -34,14 +38,43 @@ def build_brief_from_search(
             "brief_limit_invalid",
         )
 
-    search_result = search_jobs(normalized_query, provider=provider, limit=limit)
+    search_result = search_jobs(effective_query, provider=provider, limit=limit)
     return build_brief_from_jobs(
         resume_text=normalized_resume,
-        query=normalized_query,
+        query=effective_query,
         provider=search_result.provider,
         jobs=search_result.items,
         use_llm_jd=use_llm_jd,
     )
+
+
+def build_profile_enhanced_query(
+    query: str,
+    profile_context: ProfileSearchContext | None,
+) -> str:
+    normalized_query = query.strip()
+    terms: list[str] = []
+    seen: set[str] = set()
+
+    if normalized_query:
+        _append_query_term(terms, seen, normalized_query)
+
+    if profile_context is not None:
+        confirmed_data = profile_context.user_confirmed_data
+        profile = profile_context.confirmed_profile
+        for candidates in [
+            confirmed_data.target_roles,
+            confirmed_data.preferred_locations,
+            confirmed_data.additional_skills,
+            profile.skills,
+            confirmed_data.constraints,
+        ]:
+            for candidate in candidates:
+                _append_query_term(terms, seen, candidate)
+                if len(terms) >= MAX_PROFILE_QUERY_TERMS:
+                    return _truncate_query(" ".join(terms))
+
+    return _truncate_query(" ".join(terms))
 
 
 def build_brief_from_jobs(
@@ -218,3 +251,29 @@ def _dedupe_list(items: list[str]) -> list[str]:
         if normalized_item and normalized_item not in deduped:
             deduped.append(normalized_item)
     return deduped
+
+
+def _append_query_term(terms: list[str], seen: set[str], term: str) -> None:
+    normalized_term = " ".join(term.strip().split())
+    if not normalized_term:
+        return
+
+    key = normalized_term.lower()
+    if key in seen:
+        return
+
+    terms.append(normalized_term)
+    seen.add(key)
+    for token in normalized_term.split():
+        seen.add(token.lower())
+
+
+def _truncate_query(query: str) -> str:
+    normalized_query = query.strip()
+    if len(normalized_query) <= MAX_PROFILE_QUERY_LENGTH:
+        return normalized_query
+
+    truncated = normalized_query[:MAX_PROFILE_QUERY_LENGTH].rstrip()
+    if " " in truncated:
+        return truncated.rsplit(" ", 1)[0].strip()
+    return truncated

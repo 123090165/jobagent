@@ -32,6 +32,13 @@ API request
   -> SearchResultSet
 ```
 
+For the Slate-like profile flow, `POST /brief/from-search` can also accept a
+`profile_context` that combines `confirmed_profile` and `user_confirmed_data`.
+The brief service uses it to build an effective query that preserves the
+user's explicit query and appends confirmed target roles, preferred locations,
+skills, and constraints. This does not change provider internals, live provider
+parsers, tracker integration, or persistence behavior.
+
 ## Files
 
 - `app/schemas/search.py`

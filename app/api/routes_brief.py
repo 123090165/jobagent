@@ -25,6 +25,7 @@ def generate_brief_from_search(request: BriefFromSearchRequest) -> JobBriefRepor
         provider=request.provider,
         limit=request.limit,
         use_llm_jd=request.use_llm_jd,
+        profile_context=request.profile_context,
     )
 
 
@@ -36,6 +37,7 @@ def generate_brief_run_from_search(request: BriefRunFromSearchRequest) -> BriefR
         provider=request.provider,
         limit=request.limit,
         use_llm_jd=request.use_llm_jd,
+        profile_context=request.profile_context,
     )
     run_id = save_brief_run(brief, request.resume_text)
     return BriefRunResponse(run_id=run_id, brief=brief)

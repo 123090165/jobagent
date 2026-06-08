@@ -17,6 +17,12 @@ persist a `review_id`, and merges user-provided edits/answers into a confirmed
 profile result for later search/analysis phases. Do not demo UI, persistence,
 search integration, or profile versioning for this phase.
 
+v1.9 lets `POST /brief/from-search` accept `profile_context`, which combines
+`confirmed_profile` and `user_confirmed_data`. The context enhances the search
+query without replacing the user's explicit query, creating the first minimal
+bridge from Profile Review to Search/Brief. Do not demo persistence, tracker
+integration, multi-provider ranking changes, or live provider internals.
+
 适用对象：
 
 - 面试官
