@@ -3,28 +3,121 @@ from __future__ import annotations
 from app.schemas.job import JobAnalysis
 from app.schemas.match import (
     ChallengeQuestion,
+    GroundedChallengeQuestion,
     MatchReport,
     ProjectChallengeReport,
+    RequirementMatch,
     ResumeOptimizationResult,
+    RewriteSuggestion,
 )
 from app.schemas.resume import ResumeProfile
 
 
 def _bullet_list(items: list[str]) -> str:
     if not items:
-        return "- 暂无明确内容"
+        return "- None"
     return "\n".join(f"- {item}" for item in items)
 
 
 def _question_list(items: list[ChallengeQuestion]) -> str:
     if not items:
-        return "- 暂无明确问题"
+        return "- None"
     lines: list[str] = []
     for item in items:
-        lines.append(f"- **问题**：{item.question}")
-        lines.append(f"  - 考察点：{item.evaluates}")
-        lines.append(f"  - 回答框架：{item.answer_framework}")
+        lines.append(f"- **Question**: {item.question}")
+        lines.append(f"  - Evaluates: {item.evaluates}")
+        lines.append(f"  - Answer framework: {item.answer_framework}")
     return "\n".join(lines)
+
+
+def _normalize_requirement(value: str) -> str:
+    return value.strip().lower()
+
+
+def _index_rewrite_suggestions(items: list[RewriteSuggestion]) -> dict[str, RewriteSuggestion]:
+    indexed: dict[str, RewriteSuggestion] = {}
+    for item in items:
+        key = _normalize_requirement(item.linked_requirement)
+        if key and key not in indexed:
+            indexed[key] = item
+    return indexed
+
+
+def _index_grounded_questions(
+    items: list[GroundedChallengeQuestion],
+) -> dict[str, GroundedChallengeQuestion]:
+    indexed: dict[str, GroundedChallengeQuestion] = {}
+    for item in items:
+        key = _normalize_requirement(item.linked_requirement)
+        if key and key not in indexed:
+            indexed[key] = item
+    return indexed
+
+
+def _render_evidence_list(evidence: list[str]) -> str:
+    if not evidence:
+        return "  - Not found"
+    return "\n".join(f"  - {item}" for item in evidence[:3])
+
+
+def _render_gap_hint(match: RequirementMatch) -> str:
+    parts = [part for part in (match.gap_reason, match.improvement_hint) if part]
+    if not parts:
+        return "No additional gap or improvement note."
+    return " | ".join(parts)
+
+
+def _render_requirement_chain(
+    *,
+    match: RequirementMatch,
+    rewrite: RewriteSuggestion | None,
+    challenge: GroundedChallengeQuestion | None,
+) -> str:
+    rewrite_text = "No linked rewrite suggestion."
+    if rewrite is not None:
+        rewrite_text = rewrite.suggested_bullet or rewrite.suggestion or rewrite.reason
+
+    challenge_text = "No linked interview challenge."
+    if challenge is not None:
+        challenge_text = challenge.question
+
+    return "\n".join(
+        [
+            f"### Requirement: {match.requirement}",
+            f"- Match level: {match.match_level}",
+            "- Resume evidence:",
+            _render_evidence_list(match.resume_evidence),
+            f"- Gap / hint: {_render_gap_hint(match)}",
+            f"- Rewrite suggestion: {rewrite_text}",
+            f"- Interview challenge: {challenge_text}",
+        ]
+    )
+
+
+def _render_evidence_chain_section(
+    *,
+    match_report: MatchReport,
+    optimization_result: ResumeOptimizationResult,
+    project_challenge_report: ProjectChallengeReport,
+) -> str:
+    requirement_matches = match_report.requirement_matches[:5]
+    if not requirement_matches:
+        return "- No requirement-level evidence is available."
+
+    rewrite_by_requirement = _index_rewrite_suggestions(optimization_result.rewrite_suggestions)
+    challenge_by_requirement = _index_grounded_questions(project_challenge_report.grounded_questions)
+
+    lines: list[str] = []
+    for match in requirement_matches:
+        requirement_key = _normalize_requirement(match.requirement)
+        lines.append(
+            _render_requirement_chain(
+                match=match,
+                rewrite=rewrite_by_requirement.get(requirement_key),
+                challenge=challenge_by_requirement.get(requirement_key),
+            )
+        )
+    return "\n\n".join(lines)
 
 
 def generate_markdown_report(
@@ -36,100 +129,107 @@ def generate_markdown_report(
     project_challenge_report: ProjectChallengeReport,
 ) -> str:
     """Generate a readable Markdown report from structured analysis objects."""
-    job_title = job_analysis.job_title or "目标岗位"
-    skills = "、".join(resume_profile.skills) if resume_profile.skills else "暂未识别到明确技能"
-    required_skills = (
-        "、".join(job_analysis.required_skills)
-        if job_analysis.required_skills
-        else "暂未识别到明确必备技能"
-    )
+    job_title = job_analysis.job_title or "Target Role"
+    job_category = job_analysis.job_category or "Unknown"
+    skills = ", ".join(resume_profile.skills) if resume_profile.skills else "Not detected"
+    required_skills = ", ".join(job_analysis.required_skills) if job_analysis.required_skills else "Not detected"
+    preferred_skills = ", ".join(job_analysis.preferred_skills) if job_analysis.preferred_skills else "None"
+    missing_info = ", ".join(resume_profile.missing_info) if resume_profile.missing_info else "None"
 
-    return f"""# JobAgent 求职分析报告
+    return f"""# JobAgent Analysis Report
 
-## 1. 用户画像摘要
+## 1. Resume Summary
 
-- 识别技能：{skills}
-- 项目数量：{len(resume_profile.projects)}
-- 工作/实习经历数量：{len(resume_profile.work_experiences)}
-- 信息缺失：{", ".join(resume_profile.missing_info) if resume_profile.missing_info else "暂无明显缺失"}
+- Detected skills: {skills}
+- Project count: {len(resume_profile.projects)}
+- Work experience count: {len(resume_profile.work_experiences)}
+- Missing information: {missing_info}
 
-## 2. 目标岗位摘要
+## 2. Job Summary
 
-- 岗位名称：{job_title}
-- 岗位类别：{job_analysis.job_category or "暂未判断"}
-- 必备技能：{required_skills}
-- 加分技能：{", ".join(job_analysis.preferred_skills) if job_analysis.preferred_skills else "暂未识别到明确加分项"}
+- Job title: {job_title}
+- Job category: {job_category}
+- Required skills: {required_skills}
+- Preferred skills: {preferred_skills}
 
-## 3. 匹配度总览
+## 3. Match Overview
 
-- 总匹配分：{match_report.overall_score:.1f} / 100
-- 技能匹配分：{match_report.skill_score:.1f} / 100
-- 项目匹配分：{match_report.project_score:.1f} / 100
-- 经验匹配分：{match_report.experience_score:.1f} / 100
-- 关键词覆盖率：{match_report.keyword_coverage:.1f}%
-- 投递建议：{match_report.apply_recommendation}
+- Overall score: {match_report.overall_score:.1f} / 100
+- Skill score: {match_report.skill_score:.1f} / 100
+- Project score: {match_report.project_score:.1f} / 100
+- Experience score: {match_report.experience_score:.1f} / 100
+- Keyword coverage: {match_report.keyword_coverage:.1f}%
+- Apply recommendation: {match_report.apply_recommendation}
 
-## 4. 匹配优势
+## 4. Strengths
 
 {_bullet_list(match_report.matched_points)}
 
-## 5. 短板和风险
+## 5. Gaps and Risks
 
-### 缺失能力
+### Missing points
 
 {_bullet_list(match_report.missing_points)}
 
-### 风险点
+### Risks
 
 {_bullet_list(match_report.risks)}
 
-## 6. 简历优化建议
+## 6. Resume Optimization
 
-### 整体问题
+### Overall issues
 
 {_bullet_list(optimization_result.overall_issues)}
 
-### 建议补充或强化的关键词
+### Keywords to add
 
 {_bullet_list(optimization_result.keywords_to_add)}
 
-### 技能栏建议
+### Skills section suggestions
 
 {_bullet_list(optimization_result.skills_section_suggestions)}
 
-### 针对该 JD 的 bullet 建议
+### JD-targeted bullets
 
 {_bullet_list(optimization_result.jd_targeted_bullets)}
 
-### 不能夸大的部分
+### Do not exaggerate
 
 {_bullet_list(optimization_result.do_not_exaggerate)}
 
-## 7. 项目拷打问题
+## 7. JD-Resume Evidence Chain
 
-### 基础问题
+{_render_evidence_chain_section(
+    match_report=match_report,
+    optimization_result=optimization_result,
+    project_challenge_report=project_challenge_report,
+)}
+
+## 8. Project Challenge Questions
+
+### Basic questions
 
 {_question_list(project_challenge_report.basic_questions)}
 
-### 技术细节追问
+### Technical deep dive questions
 
 {_question_list(project_challenge_report.technical_deep_dive_questions)}
 
-### 架构与取舍追问
+### Architecture and tradeoff questions
 
 {_question_list(project_challenge_report.architecture_questions + project_challenge_report.tradeoff_questions)}
 
-## 8. 一周行动计划
+## 9. One-Week Action Plan
 
-- 第 1 天：补全简历中缺失的项目背景、个人职责和结果指标。
-- 第 2 天：围绕 JD 必备技能重排技能栏，避免堆无关技术名词。
-- 第 3 天：把最相关项目改成“问题 -> 方案 -> 技术 -> 结果”的表达。
-- 第 4 天：回答本报告中的项目追问，记录答不上来的问题。
-- 第 5 天：补一个最小 demo、测试或文档证据，支撑项目真实性。
-- 第 6 天：根据岗位关键词生成一版定制简历。
-- 第 7 天：复盘匹配分和短板，决定是否投递或先补强。
+- Day 1: fill in missing project context, ownership, and result signals.
+- Day 2: reorder the skills section around the JD's must-have skills.
+- Day 3: rewrite the most relevant project bullets as problem -> approach -> tech -> result.
+- Day 4: rehearse the challenge questions in this report and mark weak answers.
+- Day 5: add one real demo, test artifact, or document that supports project credibility.
+- Day 6: tailor one resume version directly against the JD keywords.
+- Day 7: review the match gaps and decide whether to apply now or close the gap first.
 
-## 9. 证据
+## 10. Evidence
 
 {_bullet_list(match_report.evidence)}
 """

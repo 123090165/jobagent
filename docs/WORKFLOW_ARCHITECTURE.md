@@ -160,3 +160,15 @@ from app.workflows.graph_spec import get_job_analysis_graph_spec
 `ResumeOptimizeAgent` now consumes those requirement matches and emits `optimization_result.rewrite_suggestions`, keeping 3-6 deterministic rewrite ideas tied to real resume evidence or, when evidence is missing, an explicit preparation-gap suggestion instead of an invented claim.
 
 `ProjectChallengeAgent` now consumes the same requirement matches and emits `project_challenge_report.grounded_questions`, keeping 4-8 deterministic follow-up questions tied to JD requirements, resume evidence, and explicit gap handling.
+
+## 10. Report Evidence Chain
+
+`ReportAgent` now renders a deterministic `JD-Resume Evidence Chain` section in the final Markdown report. It uses `match_report.requirement_matches` as the base list, then links each requirement to the first matching `optimization_result.rewrite_suggestions[*].linked_requirement` and `project_challenge_report.grounded_questions[*].linked_requirement`.
+
+The section is intentionally small:
+
+- render at most 5 requirement chains
+- show match level, resume evidence, gap or improvement hint
+- include one linked rewrite suggestion when available
+- include one linked interview challenge when available
+- degrade gracefully when rewrite or challenge data is missing

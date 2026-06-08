@@ -4,6 +4,7 @@ import pytest
 
 from app.agents.match_agent import run_match_agent
 from app.agents.project_challenge_agent import run_project_challenge_agent
+from app.agents.report_agent import generate_report
 from app.agents.resume_optimize_agent import run_resume_optimize_agent
 from app.schemas.job import JobAnalysis
 from app.schemas.resume import ProjectExperience, ResumeProfile
@@ -21,19 +22,19 @@ class FailingLLMService:
 class ResumeOptimizeLLMService:
     def chat_completion_json(self, *, system_prompt: str, user_prompt: str):
         return {
-            "overall_issues": ["需要更明确地对齐 JD 的 API 能力。"],
+            "overall_issues": ["Need clearer API alignment to the JD."],
             "keywords_to_add": ["REST API"],
-            "skills_section_suggestions": ["把 FastAPI 和 REST API 放在技能栏前半部分。"],
+            "skills_section_suggestions": ["Move FastAPI and REST API higher in the skills section."],
             "project_rewrite_suggestions": [
                 {
-                    "original": "JobAgent 求职分析工具",
-                    "suggestion": "基于已有 JobAgent 项目强调 API、schema 和测试职责。",
-                    "reason": "只改写已有项目表达，不新增事实。",
+                    "original": "JobAgent analysis tool",
+                    "suggestion": "Emphasize API, schema, and testing responsibilities in the existing JobAgent project.",
+                    "reason": "Rewrite existing evidence only.",
                 }
             ],
-            "jd_targeted_bullets": ["基于已有项目补充 API 设计和测试覆盖说明。"],
-            "do_not_exaggerate": ["不要新增没有真实使用过的技术栈。"],
-            "missing_info_needed": ["如有真实数据，可补充测试数量或接口数量。"],
+            "jd_targeted_bullets": ["Highlight API design and test coverage from the existing project."],
+            "do_not_exaggerate": ["Do not add tools you have not actually used."],
+            "missing_info_needed": ["Add real metrics if you have them."],
         }
 
 
@@ -42,34 +43,34 @@ class ProjectChallengeLLMService:
         return {
             "basic_questions": [
                 {
-                    "question": "JobAgent 解决的核心问题是什么？",
-                    "evaluates": "是否能讲清项目背景。",
-                    "answer_framework": "按问题、目标用户、方案来回答。",
+                    "question": "What problem does JobAgent solve?",
+                    "evaluates": "Whether the candidate can explain the project context.",
+                    "answer_framework": "Answer with problem, user, and solution.",
                 }
             ],
             "technical_deep_dive_questions": [
                 {
-                    "question": "你在 JobAgent 里如何组织 FastAPI、Pydantic 和 workflow？",
-                    "evaluates": "是否理解项目中的数据流。",
-                    "answer_framework": "从 schema、service、agent、storage 角度回答。",
+                    "question": "How did you combine FastAPI, Pydantic, and the workflow in JobAgent?",
+                    "evaluates": "Whether the candidate understands data flow.",
+                    "answer_framework": "Answer from schema, service, agent, and storage angles.",
                 }
             ],
             "architecture_questions": [
                 {
-                    "question": "如果分析步骤继续增加，你会怎么保持 workflow 可维护？",
-                    "evaluates": "是否具备架构演进意识。",
-                    "answer_framework": "从状态、trace 和测试三方面回答。",
+                    "question": "If the analysis steps keep growing, how would you keep the workflow maintainable?",
+                    "evaluates": "Whether the candidate can discuss architecture evolution.",
+                    "answer_framework": "Answer from state, trace, and tests.",
                 }
             ],
             "tradeoff_questions": [
                 {
-                    "question": "为什么现在保留 mock fallback？",
-                    "evaluates": "是否理解稳定性和可用性的取舍。",
-                    "answer_framework": "从可用性、成本和失败恢复说明。",
+                    "question": "Why keep the mock fallback right now?",
+                    "evaluates": "Whether the candidate understands stability tradeoffs.",
+                    "answer_framework": "Explain usability, cost, and failure recovery.",
                 }
             ],
-            "interviewer_concerns": ["项目是否缺少真实输入输出约束。"],
-            "improvement_suggestions": ["准备真实样例演示结构化输入和 trace。"],
+            "interviewer_concerns": ["The project may lack real input and output constraints."],
+            "improvement_suggestions": ["Prepare a real sample showing structured input and trace output."],
         }
 
 
@@ -77,6 +78,8 @@ def test_job_analysis_workflow_records_step_trace() -> None:
     result = run_job_analysis_workflow(SAMPLE_RESUME, SAMPLE_JD)
 
     assert result.final_report.markdown_report
+    assert "JD-Resume Evidence Chain" in result.final_report.markdown_report
+    assert "### Requirement:" in result.final_report.markdown_report
     assert result.state.resume_profile is not None
     assert result.state.job_analysis is not None
     assert result.state.match_report is not None
@@ -201,7 +204,7 @@ def test_resume_optimize_agent_keeps_missing_requirement_as_gap() -> None:
 
     k8s_item = next(item for item in result.rewrite_suggestions if "Kubernetes" in item.linked_requirement)
     assert k8s_item.match_level == "missing"
-    assert ("If" in k8s_item.suggested_bullet) or ("如果" in k8s_item.suggested_bullet)
+    assert ("If" in k8s_item.suggested_bullet) or ("濡傛灉" in k8s_item.suggested_bullet)
     assert not k8s_item.evidence_source
 
 
@@ -262,9 +265,59 @@ def test_project_challenge_agent_keeps_missing_requirement_as_honest_gap() -> No
     assert (
         "honest" in k8s_item.question.lower()
         or "experience boundary" in k8s_item.question.lower()
-        or "璇氬疄" in k8s_item.question
     )
     assert k8s_item.expected_answer_points
+
+
+def test_generate_report_renders_evidence_chain_with_linked_rewrite_and_challenge() -> None:
+    resume_profile = ResumeProfile(
+        raw_text="Python FastAPI SQLite backend project",
+        skills=["Python", "FastAPI"],
+        projects=[
+            ProjectExperience(
+                name="Tracker API",
+                description="Built backend APIs with FastAPI and SQLite.",
+                technologies=["FastAPI", "SQLite"],
+                highlights=["Designed REST endpoints for application tracking."],
+                raw_text="Built backend APIs with FastAPI and SQLite.",
+            )
+        ],
+    )
+    job_analysis = JobAnalysis(
+        raw_jd="Need FastAPI and Kubernetes experience.",
+        required_skills=["FastAPI", "Kubernetes"],
+        responsibilities=["Build backend APIs"],
+        keywords=["FastAPI", "Kubernetes"],
+    )
+    match_report = run_match_agent(resume_profile, job_analysis).output
+    optimization_result = run_resume_optimize_agent(
+        resume_profile.raw_text,
+        resume_profile,
+        job_analysis,
+        match_report,
+    ).output
+    project_challenge_report = run_project_challenge_agent(
+        resume_profile,
+        job_analysis,
+        match_report=match_report,
+    ).output
+
+    markdown_report = generate_report(
+        resume_profile=resume_profile,
+        job_analysis=job_analysis,
+        match_report=match_report,
+        optimization_result=optimization_result,
+        project_challenge_report=project_challenge_report,
+    )
+
+    assert "JD-Resume Evidence Chain" in markdown_report
+    assert "### Requirement: FastAPI" in markdown_report
+    assert "### Requirement: Kubernetes" in markdown_report
+    assert "- Match level: matched" in markdown_report
+    assert "- Match level: missing" in markdown_report
+    assert "- Rewrite suggestion:" in markdown_report
+    assert "- Interview challenge:" in markdown_report
+    assert "Not found" in markdown_report
 
 
 def test_mock_pipeline_delegates_to_workflow_without_changing_contract() -> None:
@@ -293,7 +346,7 @@ def test_job_analysis_workflow_records_llm_fallback_metadata() -> None:
     jd_step = next(step for step in result.state.steps if step.name == "JDAnalysisAgent")
     assert jd_step.mode == "fallback"
     assert jd_step.fallback_reason == "LLMServiceError"
-    assert "回退 mock" in jd_step.summary
+    assert "mock" in jd_step.summary
     assert result.final_report.job_analysis.required_skills
 
 
@@ -308,7 +361,7 @@ def test_job_analysis_workflow_records_resume_optimize_llm_metadata() -> None:
     optimize_step = next(step for step in result.state.steps if step.name == "ResumeOptimizeAgent")
     assert optimize_step.mode == "llm"
     assert optimize_step.fallback_reason is None
-    assert "使用 LLM 简历优化" in optimize_step.summary
+    assert "LLM" in optimize_step.summary
     assert result.final_report.optimization_result.keywords_to_add == ["REST API"]
 
 
@@ -323,7 +376,7 @@ def test_job_analysis_workflow_records_resume_optimize_fallback_metadata() -> No
     optimize_step = next(step for step in result.state.steps if step.name == "ResumeOptimizeAgent")
     assert optimize_step.mode == "fallback"
     assert optimize_step.fallback_reason == "LLMServiceError"
-    assert "简历优化失败，已回退 mock" in optimize_step.summary
+    assert "mock" in optimize_step.summary
     assert result.final_report.optimization_result.jd_targeted_bullets
 
 
@@ -338,7 +391,7 @@ def test_job_analysis_workflow_records_project_challenge_llm_metadata() -> None:
     challenge_step = next(step for step in result.state.steps if step.name == "ProjectInterviewAgent")
     assert challenge_step.mode == "llm"
     assert challenge_step.fallback_reason is None
-    assert "使用 LLM 项目追问" in challenge_step.summary
+    assert "LLM" in challenge_step.summary
     assert result.final_report.project_challenge_report.basic_questions
 
 
@@ -353,5 +406,5 @@ def test_job_analysis_workflow_records_project_challenge_fallback_metadata() -> 
     challenge_step = next(step for step in result.state.steps if step.name == "ProjectInterviewAgent")
     assert challenge_step.mode == "fallback"
     assert challenge_step.fallback_reason == "LLMServiceError"
-    assert "项目追问失败，已回退 mock" in challenge_step.summary
+    assert "mock" in challenge_step.summary
     assert result.final_report.project_challenge_report.technical_deep_dive_questions

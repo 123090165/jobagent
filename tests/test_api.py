@@ -123,7 +123,11 @@ def test_full_analysis_endpoint_returns_report() -> None:
     assert payload["match_report"]["requirement_matches"]
     assert payload["optimization_result"]["rewrite_suggestions"]
     assert payload["project_challenge_report"]["grounded_questions"]
-    assert "匹配度总览" in payload["markdown_report"]
+    assert "JD-Resume Evidence Chain" in payload["markdown_report"]
+    assert "### Requirement:" in payload["markdown_report"]
+    assert "- Rewrite suggestion:" in payload["markdown_report"]
+    assert "- Interview challenge:" in payload["markdown_report"]
+    assert "Match Overview" in payload["markdown_report"]
     assert len(payload["workflow_steps"]) == 6
     assert payload["workflow_steps"][0]["mode"] == "mock"
     assert payload["workflow_steps"][0]["workflow_run_id"]
@@ -317,7 +321,9 @@ def test_stepwise_api_flow() -> None:
 
     assert report_response.status_code == 200
     assert "markdown_report" in report_response.json()
-    assert "项目拷打问题" in report_response.json()["markdown_report"]
+    assert "JD-Resume Evidence Chain" in report_response.json()["markdown_report"]
+    assert "- Rewrite suggestion:" in report_response.json()["markdown_report"]
+    assert "Project Challenge Questions" in report_response.json()["markdown_report"]
 
 
 def test_import_jd_url_endpoint_returns_extracted_text(monkeypatch) -> None:
