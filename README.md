@@ -1,543 +1,151 @@
 # JobAgent
 
-JobAgent 是一个面向求职准备场景的本地工作台，不是单纯聊天机器人，也不是通用爬虫。
-它当前聚焦一条可复盘的核心闭环：`job source -> candidate -> tracker -> application analysis -> evidence report`。
-项目重点是把岗位发现、候选确认、投递跟踪、深度分析、简历证据匹配、简历改写建议和项目追问串成稳定、可测试、可解释的流程。
+## What Is JobAgent?
 
-推荐先阅读：
+JobAgent 是一个面向求职准备场景的本地工作台，用来把岗位来源、候选岗位、投递 tracker、单岗位深度分析和 evidence-based report 串成可复盘流程。
 
-- [Project Architecture Overview](docs/ARCHITECTURE_OVERVIEW.md)
-- [Demo Guide](docs/DEMO_GUIDE.md)
-- [Workflow Architecture](docs/WORKFLOW_ARCHITECTURE.md)
-- [Live Job Provider](docs/LIVE_JOB_PROVIDER.md)
-- [Application Tracker](docs/APPLICATION_TRACKER.md)
+它不是一个单纯的 chatbot，也不是一个通用爬虫项目。当前重点是把求职闭环做扎实、做可测试、做可解释。
 
-JobAgent 是一个面向求职者的本地求职准备工作台，核心目标是把“简历和 JD 是否匹配、应该怎么改、面试会被怎么追问、投递进展到哪一步”变成可结构化记录和复盘的流程。
-
-当前版本已经从 Mock MVP 推进到可运行的本地工作台：支持 Streamlit Demo、FastAPI 后端、SQLite 分析记录、岗位库查询、txt/md 简历文件解析、安全版 JD URL 导入、CUHKSZ Career Collector MVP、`local_db` 本地公开岗位 provider、SearchProvider 抽象层与 MockSearchProvider、实验性的 GeminiCLIProvider、Batch Job Brief MVP、统一业务错误返回、可选 LLM JD 分析、可选 LLM 简历优化、可选 LLM 项目追问、workflow 执行轨迹持久化，以及投递 tracker 最小状态机。
+## Core Loop
 
 ```text
-简历文本或 .txt/.md 简历文件 + JD 文本
-  -> 简历文件转纯文本（可选）
-  -> 结构化简历解析
-  -> JD 分析
-  -> 匹配报告
-  -> 简历优化建议
-  -> 项目面试追问
-  -> Markdown 报告 + 执行轨迹
-  -> 可选保存到 SQLite / 历史复盘 / 加入投递跟进
+Job Source
+  -> SearchResultItem
+  -> JobImportCandidate
+  -> ApplicationRecord
+  -> Application Deep Analysis
+  -> Evidence-based Final Report
 ```
 
-## 项目边界
+## Key Features
 
-当前重点是求职准备、复盘和展示，不做平台自动化。
+- Search providers: `mock` / `local_db` / `gemini_cli` / `cuhksz_live`
+- Candidate-to-tracker workflow
+- Application deep analysis
+- Requirement-level evidence matching
+- Evidence-based resume rewrite suggestions
+- Grounded project challenge questions
+- JD-Resume Evidence Chain report
+- Analysis Quality Gate
+- Optional LLM enhancement with fallback
+- SQLite persistence and workflow trace
 
-已完成：
+## Quick Start
 
-- Streamlit 页面：生成报告、历史记录、岗位库、简历版本、投递跟进和执行轨迹展示。
-- FastAPI 后端：分析、简历解析、JD 分析、匹配、报告、记录、岗位、投递 tracker API。
-- 简历文件解析：支持 `.txt` / `.md` UTF-8 文件转纯文本，默认最大 1MB，并复用 `ResumeParseAgent` 输出 `ResumeProfile`。
-- 安全版 JD URL 导入：只对公开 `http/https` 页面做一次性文本提取，不登录、不执行 JavaScript、不绕过反爬，失败时提示用户手动粘贴 JD。
-- CUHKSZ Career Collector MVP：从港中深公开招聘列表页采集当前页前 N 条岗位，抓取公开详情页，抽取清洗后的 `jd_text`，并 upsert 到独立的 `public_job_posts` 表。
-- `local_db` Public Job Provider：把本地 `public_job_posts` 暴露为现有 `SearchProvider`，支持 `POST /search/jobs` 和 `POST /brief/from-search` 直接检索采集入库的公开岗位。
-- Real Local Job Brief Demo：支持基于 `provider="local_db"` 对已采集真实岗位生成批量推荐 brief，并输出本地 raw 结果和 docs/demo_runs 脱敏产物。
-- JD Quality Gate MVP：对本地岗位 JD 做 `full_jd / partial_jd / external_link_only / snippet_only / invalid` 质量分类，并把质量信号接入 `local_db` 排序和 Batch Job Brief 展示。
-- BriefRun / rerank MVP：支持把一轮 Batch Job Brief 保存为 `brief_run`，并在不重新搜索、不重新采集、不重跑 workflow 的前提下，对已保存推荐结果做 rerank 和过滤。
-- JobImportCandidate MVP：支持把 `brief_run` 中的推荐岗位转成用户可确认的候选岗位，并做轻量状态管理，为后续接 tracker 或单岗位深度分析做准备。
-- Live Job Provider Framework + `cuhksz_live`：新增 `app/services/live_job/` 通用框架，把 CUHKSZ 的公开页面抓取、解析、质量评估和结果归一化拆成可复用的 fetcher + parser + provider，并新增实时 `provider="cuhksz_live"`。
-- SearchProvider 抽象层：当前通过 `POST /search/jobs` 暴露 `mock`、`local_db`、`cuhksz_live` 和实验性的 `gemini_cli` provider，为后续 Gemini CLI / RAG / MCP 接入预留 provider 边界。
-- GeminiCLIProvider experimental：`provider="gemini_cli"` 默认关闭，只有显式设置环境变量后才会调用本机 Gemini CLI，而且只传搜索 query，不传简历全文、API key 或本地敏感信息；当前会尽量返回更丰富的 JD-like 字段，例如 `responsibilities`、`requirements`、`skills`、`jd_text`、`is_full_jd` 和 `confidence`，但仍不保证一定拿到完整 JD。
-- Batch Job Brief MVP：输入一份简历文本和一个搜索 query，先通过 `SearchProvider` 获取多个岗位，再逐个复用现有 workflow 生成 `match_report`，最后按 `fit_score` 排序输出推荐岗位 brief；当前演示版开放 `provider="mock"` 和 `provider="local_db"`。
-- 统一业务错误：文件解析等业务错误通过 `detail` 和 `error_code` 返回，方便 API 调用方和页面展示。
-- Pydantic schema：稳定 Agent、service、API、UI 之间的数据流。
-- Mock pipeline：不依赖真实 LLM 也能端到端运行。
-- Workflow 编排层：记录主链路步骤、Agent 模式和 guardrails，为后续 LangGraph 迁移做准备。
-- LangGraph 迁移准备：用 `WorkflowGraphSpec` 固定 node、edge、state reads/writes 和迁移契约。
-- LangGraph Workflow Prototype：新增并行原型 workflow，用 graph node + 条件分支验证迁移方向，但当前不替换默认 workflow。
-- FastAPI / Streamlit 实验入口：可选启用 `use_langgraph_workflow`，但默认仍然使用 Python workflow。
-- MissingInfoQuestionAgent：在 LangGraph prototype 中补充缺失信息检测节点，只生成澄清问题，不编造简历内容。
-- Job search API：当前支持 `mock`、`local_db`、`cuhksz_live` 和实验性的 `gemini_cli` provider；其中 Streamlit 只接入 `mock` 和 `local_db` 的 Batch Job Brief 演示入口，`cuhksz_live` 当前保留在 API/service 层。
-- Agent 边界：ResumeParse、JDAnalysis、Match、ResumeOptimize、ProjectChallenge、Report 都有独立入口。
-- Agent Trace：每步记录 `mock`、`llm` 或 `fallback` 模式、fallback 原因、耗时和 guardrails。
-- 可选 LLM JDAnalysisAgent：调用失败或未配置 API key 时回退 mock。
-- 可选 LLM ResumeOptimizeAgent：只基于已有简历、JD 和匹配报告给优化建议，失败或校验不通过时回退 mock。
-- 可选 LLM ProjectChallengeAgent：只基于已有简历项目和目标 JD 生成面试追问，失败或校验不通过时回退 mock。
-- SQLite 存储：保存分析记录、岗位 JD、匹配报告、项目追问、带 run id/耗时的 workflow step trace、简历版本和 tracker。
-- 简历版本管理：保存原始简历、定制后文本，并可关联目标岗位和投递记录。
-- pytest 测试：覆盖 mock pipeline、API、存储、LLM fallback、workflow trace 持久化、简历版本和投递 tracker。
-
-明确不做：
-
-- 自动投递。
-- CUHKSZ collector 当前页前 N 条与 JD URL 导入之外的复杂爬虫或批量抓取。
-- 招聘网站登录。
-- 验证码处理。
-- 复杂爬虫和反爬绕过。
-- 多用户权限系统。
-- 编造简历经历、公司、项目、数据或技术栈。
-- PDF/DOCX 简历解析（后续计划，当前不引入大型文档解析依赖）。
-
-## 架构图
-
-```mermaid
-flowchart TD
-    User["求职者"] --> UI["Streamlit Demo"]
-    User --> APIClient["API Client / Docs"]
-
-    UI --> Services["Service Layer"]
-    APIClient --> FastAPI["FastAPI Routes"]
-    FastAPI --> Services
-
-    Services --> Workflow["Workflow Orchestration"]
-    Workflow --> Resume["ResumeParseAgent<br/>Mock"]
-    Workflow --> JD["JDAnalysisAgent<br/>Mock or optional LLM"]
-    Workflow --> Match["MatchAgent<br/>Mock"]
-    Workflow --> Optimize["ResumeOptimizeAgent<br/>Mock or optional LLM"]
-    Workflow --> Challenge["ProjectInterviewAgent<br/>Mock or optional LLM"]
-    Workflow --> Report["ReportAgent<br/>Mock"]
-    Workflow --> Trace["WorkflowStepTrace"]
-    Services --> AppTracker["Application Tracker Service"]
-
-    JD --> LLM["OpenAI-compatible LLM<br/>optional"]
-    Optimize --> LLM
-    Challenge --> LLM
-    Services --> Schemas["Pydantic Schemas"]
-    Services --> Storage["SQLite Repository"]
-    Trace --> Storage
-
-    Storage --> Records["analysis_records"]
-    Storage --> StepTraces["workflow_step_traces"]
-    Storage --> Jobs["job_postings"]
-    Storage --> ResumeVersions["resume_versions"]
-    Storage --> Applications["application_records"]
-```
-
-分层原则：
-
-- `frontend/` 只做展示和触发，不写核心业务逻辑。
-- `app/api/` 只做请求响应和 schema 边界。
-- `app/services/` 负责编排业务流程。
-- `app/agents/` 放可替换的 Agent 能力。
-- `app/storage/` 集中处理 SQLite 连接和 repository。
-- `app/schemas/` 用 Pydantic 约束所有核心结构。
-
-## 快速运行
-
-### 1. 安装依赖
+Create and set up the virtual environment:
 
 ```powershell
-pip install -r requirements.txt
-```
-
-如果使用项目虚拟环境：
-
-```powershell
+python -m venv .venv
 .venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
 
-### 2. 启动 Streamlit Demo
-
-```powershell
-.venv\Scripts\python.exe -m streamlit run frontend/streamlit_app.py
-```
-
-页面包含：
-
-- 生成报告：粘贴简历文本，或上传 `.txt` / `.md` 简历文件，再输入 JD，输出 Markdown 报告和执行轨迹。
-- 岗位批量推荐：输入简历文本和搜索 query，基于 `provider="mock"` 或 `provider="local_db"` 批量生成推荐岗位 brief、风险点和投递策略。
-- 生成报告页支持输入公开 JD URL，并将提取结果填入现有 JD 文本框；导入失败时继续手动粘贴。
-- 侧边栏可选“启用 LangGraph 原型 workflow”：当前为实验模式，不替换默认 workflow，会使用 graph node 和 match score 条件分支。
-- 历史记录：查看已保存的分析结果和每次 workflow step trace。
-- 岗位库：查看保存过的 JD 和结构化分析。
-- 简历版本：保存针对不同岗位定制的简历版本。
-- 投递跟进：对岗位记录状态、备注、下一步行动和简历版本。
-
-### 3. 启动 FastAPI 后端
-
-```powershell
-.venv\Scripts\python.exe -m uvicorn app.main:app --reload
-```
-
-打开接口文档：
-
-```text
-http://127.0.0.1:8000/docs
-```
-
-常用接口：
-
-```text
-GET  /health
-POST /analyze/full
-POST /brief/from-search
-POST /job-candidates/from-brief-run
-POST /search/jobs
-POST /search/queries/from-resume
-POST /jobs/import-url
-POST /resume/parse-file
-GET  /records
-GET  /jobs
-GET  /resume-versions
-GET  /applications
-POST /resume-versions
-POST /applications
-PATCH /applications/{application_id}
-```
-
-Job Brief 请求示例：
-
-```json
-{
-  "resume_text": "Python FastAPI SQL LLM ...",
-  "query": "python backend llm jobs",
-  "provider": "local_db",
-  "limit": 5,
-  "use_llm_jd": false
-}
-```
-
-Search Query Generator Request Example:
-```json
-{
-  "resume_text": "Python FastAPI SQL LLM ...",
-  "max_queries": 5
-}
-```
-
-The Streamlit Batch Job Brief page now supports generating a few resume-based queries first, then letting the user choose one query before running either the `provider="mock"` or `provider="local_db"` brief flow.
-
-### 4. 可选启用 LLM Agent
-
-当前 `JDAnalysisAgent`、`ResumeOptimizeAgent` 和 `ProjectChallengeAgent` 支持可选 LLM。未配置 API key、调用失败、返回非法 JSON 或 schema 校验失败时，系统自动回退 mock。
-
-```powershell
-$env:JOBAGENT_LLM_API_KEY="your-api-key"
-$env:JOBAGENT_LLM_BASE_URL="https://api.openai.com/v1"
-$env:JOBAGENT_LLM_MODEL="gpt-4o-mini"
-```
-
-然后在 Streamlit 侧边栏按需勾选：
-
-- “启用 LLM JD 分析”
-- “启用 LLM 简历优化”
-- “启用 LLM 项目追问”
-- “启用 LangGraph 原型 workflow”
-
-说明：
-
-- 当前 `POST /search/jobs` 可直接访问 `mock`、`local_db`、`cuhksz_live` 和实验性的 `gemini_cli` provider。
-- `local_db` 会优先返回 `full_jd`，其次是 `partial_jd`，再往后是 `external_link_only` 和 `snippet_only`。
-- `provider="cuhksz_live"` 会实时抓取 CUHKSZ 当前公开列表页，再按 query 对少量候选岗位抓详情页；可选 `save_to_local_db=True` 写回 `public_job_posts`，但当前不接入 Streamlit。
-- `provider="gemini_cli"` 是实验功能，默认关闭，返回结果不会自动入库、不会自动触发 JD 导入，也不会自动进入分析流程。
-- `provider="gemini_cli"` 当前会尽量返回更丰富的 JD 摘要字段，但这些字段仍需要用户确认；如果 `is_full_jd = false` 或 `confidence` 较低，应优先让用户复核原始链接或继续手动粘贴 JD。
-- Streamlit 当前只在 Batch Job Brief 页面开放 `mock` 和 `local_db`，不开放实验性的联网 provider 入口。
-
-默认情况下 `use_langgraph_workflow = false`，系统继续走现有 Python workflow；只有显式开启实验入口时才会调用 LangGraph prototype。
-
-JD URL 导入示例：
-
-```json
-{
-  "url": "https://example.com/job"
-}
-```
-
-如果导入失败，系统不会做登录、验证码处理或反爬绕过，而是返回清晰错误并提示手动粘贴 JD。
-
-CUHKSZ Career Collector dry-run 示例：
-
-```powershell
-.venv\Scripts\python.exe scripts\collect_cuhksz_jobs.py --limit 3 --dry-run
-```
-
-真实采集默认列表页前 3 条并写入 `data/jobagent.sqlite3` 的 `public_job_posts` 表：
-
-```powershell
-.venv\Scripts\python.exe scripts\collect_cuhksz_jobs.py --limit 3
-```
-
-采集完成后，可直接通过 `local_db` provider 搜索本地公开岗位：
-
-```json
-{
-  "query": "AI Platform",
-  "provider": "local_db",
-  "limit": 5
-}
-```
-
-更多说明见 [CUHKSZ Career Collector](docs/CUHKSZ_CAREER_COLLECTOR.md) 和 [Live Job Provider](docs/LIVE_JOB_PROVIDER.md)。
-
-Real Local Job Brief Demo 示例：
-
-```powershell
-.venv\Scripts\python.exe scripts\demo_real_local_job_brief.py --resume-file data/samples/sample_resume.md --query "AI PyTorch 生理信号 深圳" --limit 5 --save-run --publish-sanitized
-```
-
-这会输出：
-
-```text
-demo_runs/real_local_job_brief/<timestamp>/
-docs/demo_runs/real_local_job_brief_<timestamp>/
-```
-
-更多说明见 [Real Local Job Brief Demo](docs/REAL_LOCAL_JOB_BRIEF_DEMO.md)。
-JD 质量规则说明见 [JD Quality Gate](docs/JD_QUALITY_GATE.md)。
-BriefRun / rerank 说明见 [BriefRun And Rerank](docs/BRIEF_RUN_AND_RERANK.md)。
-JobImportCandidate 说明见 [JobImportCandidate](docs/JOB_IMPORT_CANDIDATE.md)。
-
-通过 API 调用完整分析时，可传：
-
-```json
-{
-  "use_langgraph_workflow": false,
-  "use_llm_jd": true,
-  "use_llm_resume_optimize": true,
-  "use_llm_project_challenge": true
-}
-```
-
-- 简历优化的 LLM prompt 明确禁止编造经历、公司、项目、数据或技术栈；缺少量化指标时只能建议用户补充真实数据。
-- 项目追问的 LLM prompt 明确禁止追问简历中不存在的项目、公司或技术栈，也不能编造项目背景、数据和指标。
-
-### 5. 可选调整简历文件大小限制
-
-`.txt` / `.md` 简历文件默认最大 1MB。可以通过环境变量覆盖：
-
-```powershell
-$env:JOBAGENT_MAX_RESUME_FILE_BYTES="1048576"
-```
-
-超出限制时，API 返回：
-
-```json
-{
-  "detail": "resume file is too large",
-  "error_code": "resume_file_too_large"
-}
-```
-
-### 6. 运行测试
+Run tests:
 
 ```powershell
 .venv\Scripts\python.exe -m pytest
 ```
 
-当前验证重点：
+Start FastAPI:
 
-- Mock pipeline 是否能端到端产出报告。
-- LLM JDAnalysisAgent、ResumeOptimizeAgent 和 ProjectChallengeAgent 是否能失败回退。
-- FastAPI route 是否保持薄封装。
-- SQLite 存储是否使用临时库测试。
-- Application tracker 是否能创建、筛选和更新状态。
-- Workflow step trace 是否能随分析记录保存并在详情中读取。
-
-## Demo 展示路径
-
-推荐演示顺序：
-
-1. 在“生成报告”页粘贴样例简历和 JD。
-2. 勾选“保存本次分析”，生成 Markdown 报告，并展示每个 Agent 的执行轨迹。
-3. 进入“历史记录”，展示同一次分析可以被检索、查看报告和复盘 workflow trace。
-4. 进入“岗位库”，展示 JD 已被结构化保存，并保留原始 JD。
-5. 进入“简历版本”，保存一个针对目标岗位的定制版本。
-6. 进入“投递跟进”，把目标岗位标记为 `interested` 或 `applied`，并关联简历版本。
-7. 打开 FastAPI `/docs`，展示同一套能力已经可以通过 API 调用。
-8. 运行 `pytest`，说明核心流程由测试保护，而不是只靠手动点击页面。
-
-样例数据：
-
-- `data/samples/sample_resume.md`
-- `data/jd_examples/sample_jd.md`
-
-更完整的演示脚本见 [Demo Guide](docs/DEMO_GUIDE.md)。
-
-展示与答辩材料：
-
-- [Demo Script](docs/DEMO_SCRIPT.md)
-- [Demo Gemini Search Flow](docs/DEMO_GEMINI_SEARCH_FLOW.md)
-- [Real Gemini JD Experiments](docs/REAL_GEMINI_JD_EXPERIMENTS.md)
-- [Portfolio Pitch](docs/PORTFOLIO_PITCH.md)
-- [Screenshot Guide](docs/SCREENSHOT_GUIDE.md)
-
-## 阶段路线
-
-| 阶段 | 目标 | 状态 |
-| --- | --- | --- |
-| Phase 0 | 文档层、项目边界、AI 辅助开发规则 | 已完成 |
-| Phase 1 | Mock MVP，跑通简历 + JD 到报告的主链路 | 已完成 |
-| Phase 2 | 可选 LLM JDAnalysisAgent，失败回退 mock | 已完成 |
-| Phase 3 | FastAPI 后端，拆出可复用 API 层 | 已完成 |
-| Phase 4 | SQLite 分析记录、岗位库基础查询 | 已完成 |
-| Phase 5 | Streamlit 历史记录、岗位库、投递 tracker | 已完成 |
-| Phase 6 | README、Demo、架构图、作品集展示材料 | 已完成 |
-| Phase 7 | 简历版本管理，关联岗位和 tracker | 已完成 |
-| Phase 8 | 显式 Workflow 编排层，为 LangGraph 做准备 | 已完成 |
-| Phase 9 | Workflow trace 持久化，支持历史记录复盘每个 Agent 步骤 | 已完成 |
-| Phase 10 | Workflow observability cleanup，补 run id、耗时和 trace 摘要展示 | 已完成 |
-| Phase 11 | LangGraph migration prep，固定 node 映射和迁移契约 | 已完成 |
-| Phase 12 | Resume File Parser MVP，支持 txt/md 简历文件转纯文本并复用 ResumeParseAgent | 已完成 |
-| Phase 13 | Stability and Demo Materials，补文件大小限制、统一错误返回、演示脚本和答辩材料 | 已完成 |
-| Phase 14 | ResumeOptimizeAgent LLM Mode，可选 LLM 简历优化并失败回退 mock | 已完成 |
-| Phase 15 | ProjectChallengeAgent LLM Mode，可选 LLM 项目追问并失败回退 mock | 已完成 |
-| Phase 16 | LangGraph Workflow Prototype，新增并行 graph workflow 和低匹配条件分支，但不替换默认 workflow | 已完成 |
-| Phase 17 | Safe JD URL Import，支持公开 JD 页面文本提取并保留手动粘贴兜底 | 已完成 |
-| Phase 18 | MissingInfoQuestionAgent，在 LangGraph prototype 中增加缺失信息澄清节点 | 已完成 |
-| Phase 19 | SearchProvider Interface，增加 API-only 的 MockSearchProvider 和 `POST /search/jobs` | 已完成 |
-| Phase 20 | GeminiCLIProvider experimental，增加默认关闭的 `provider="gemini_cli"` | 已完成 |
-| Phase 21 | Gemini Search Demo Script，增加安全的 CLI-to-API 自动化演示脚本和脱敏产物发布路径 | 已完成 |
-| Phase 22 | GeminiCLIProvider JD Prompt Upgrade，增强 JD-like 字段提取与兼容解析 | 已完成 |
-| Phase 23 | Real Gemini JD Experiment Runner，批量运行真实 Gemini JD 搜索实验并生成总览报告 | 已完成 |
-| Phase 24 | Batch Job Brief MVP，批量搜索 mock 岗位并按匹配分生成推荐 brief | 已完成 |
-| Phase 25 | Resume Search Query Generator | 已完成 |
-| Phase 26 | CUHKSZ Career Collector MVP | 已完成 |
-| Phase 27 | LocalPublicJobProvider | 已完成 |
-| Phase 28 | Real Local Job Brief Demo | 已完成 |
-| Phase 29 | JD Quality Gate | 已完成 |
-| Phase 30 | BriefRun / rerank MVP | 已完成 |
-| Phase 31 | JobImportCandidate MVP | 已完成 |
-| Phase 32 | Live Job Provider Framework + CUHKSZLiveProvider | 已完成 |
-| Phase 33 | Candidate -> Tracker | 后续 |
-| Phase 34 | Candidate -> Single Job Deep Analysis | 后续 |
-| Phase 35 | SearchRun async prototype | 后续 |
-
-## 面试讲述版
-
-可以这样介绍这个项目：
-
-```text
-JobAgent 是一个求职准备工作台。我没有一开始做自动投递，而是先解决更核心的问题：
-求职者如何判断自己的简历和目标 JD 的差距，并把每次分析、优化和投递动作记录下来。
-
-技术上我先用 Pydantic schema 固定输入输出，再用 mock pipeline 跑通端到端闭环。
-这样即使没有真实 LLM，系统也能稳定生成匹配报告、简历优化建议和项目追问。
-之后我先把 JDAnalysisAgent 替换成可选 LLM，再为 ResumeOptimizeAgent 增加可选 LLM 模式，并保留 mock fallback，避免模型输出不稳定影响主流程。
-
-工程上我把 UI、API、service、agent、storage 分层。
-Streamlit 负责 Demo 展示，FastAPI 负责接口，SQLite 负责本地持久化，
-tracker 负责记录求职状态，但不碰招聘网站登录、验证码和自动投递。
-同时每次端到端分析都会保存 workflow step trace，可以回看每个 Agent 使用的是 mock、LLM 还是 fallback，
-也能看到同一次 workflow run 的 ID 和每个步骤耗时，
-这让系统不只是能生成结果，也能解释结果是怎么来的。
-
-这个项目的重点不是堆概念，而是展示一个 AI 应用从需求边界、结构化数据流、
-可替换 Agent、失败回退、存储复盘到测试验证的完整工程过程。
+```powershell
+.venv\Scripts\python.exe -m uvicorn app.main:app --reload
 ```
 
-面试官可能追问：
-
-- 为什么第一版不用 LangGraph？
-- 为什么 LLM 只先替换 JDAnalysisAgent？
-- 如何防止简历优化时编造经历？
-- API route 和 service 的边界是什么？
-- SQLite 为什么适合作为当前阶段存储？
-- tracker 为什么依赖岗位库，而不是手动新建任意岗位？
-- 如何证明某次分析真的用了 LLM，或者发生了 fallback？
-- 为什么先做 `WorkflowGraphSpec`，而不是直接把主流程替换成 LangGraph？
-- 后续如果多用户化，需要改哪些表和接口？
-
-## 目录结构
+Open API docs:
 
 ```text
-app/
-  main.py
-  agents/
-    jd_analysis_agent.py
-    match_agent.py
-    project_challenge_agent.py
-    report_agent.py
-    resume_optimize_agent.py
-    resume_parse_agent.py
-    types.py
-  api/
-    routes_analyze.py
-    routes_applications.py
-    routes_jobs.py
-    routes_match.py
-    routes_records.py
-    routes_reports.py
-    routes_resume.py
-    routes_resume_versions.py
-    routes_search.py
-  schemas/
-    api.py
-    application.py
-    job.py
-    match.py
-    report.py
-    resume.py
-    resume_version.py
-    search.py
-  services/
-    application_service.py
-    errors.py
-    job_search_service.py
-    llm_service.py
-    mock_pipeline.py
-    report_service.py
-    resume_file_service.py
-    resume_version_service.py
-    search_providers/
-    storage_service.py
-  storage/
-    database.py
-    repositories.py
-  workflows/
-    job_analysis_workflow.py
-frontend/
-  streamlit_app.py
-scripts/
-  demo_gemini_search_flow.py
-tests/
-  test_api.py
-  test_agents.py
-  test_application_tracker.py
-  test_demo_gemini_search_flow.py
-  test_jd_analysis_agent.py
-  test_mock_pipeline.py
-  test_resume_file_service.py
-  test_resume_optimize_agent.py
-  test_project_challenge_agent.py
-  test_resume_versions.py
-  test_storage.py
-data/
-  samples/
-  jd_examples/
-docs/
-.ai/
+http://127.0.0.1:8000/docs
 ```
 
-## 关键文档
+Optional: start the Streamlit demo:
 
-- [Development Review Guide](docs/DEVELOPMENT_REVIEW_GUIDE.md)
-- [Demo Guide](docs/DEMO_GUIDE.md)
-- [Demo Script](docs/DEMO_SCRIPT.md)
-- [Demo Gemini Search Flow](docs/DEMO_GEMINI_SEARCH_FLOW.md)
-- [Real Gemini JD Experiments](docs/REAL_GEMINI_JD_EXPERIMENTS.md)
-- [Portfolio Pitch](docs/PORTFOLIO_PITCH.md)
-- [Screenshot Guide](docs/SCREENSHOT_GUIDE.md)
-- [Agent Boundaries](docs/AGENT_BOUNDARIES.md)
-- [Agent Trace](docs/AGENT_TRACE.md)
-- [Git Workflow](docs/GIT_WORKFLOW.md)
-- [API](docs/API.md)
-- [SQLite Storage](docs/STORAGE.md)
-- [Streamlit App](docs/STREAMLIT_APP.md)
-- [Application Tracker](docs/APPLICATION_TRACKER.md)
-- [Resume Versioning](docs/RESUME_VERSIONING.md)
-- [Resume File Parser](docs/RESUME_FILE_PARSER.md)
+```powershell
+.venv\Scripts\python.exe -m streamlit run frontend/streamlit_app.py
+```
+
+Stable demo mode recommendation:
+
+- prefer `mock` or `local_db`
+- treat `cuhksz_live` as optional live demo only
+- treat LLM as optional enhancement, not main-path dependency
+
+## Demo Path
+
+Recommended 3-5 minute walkthrough:
+
+1. Run the backend and open `/docs`
+2. Search jobs through `mock` or `local_db`
+3. Review `SearchResultItem` metadata and warnings
+4. Create or review `JobImportCandidate`
+5. Import the candidate into `ApplicationRecord`
+6. Run `POST /applications/{application_id}/analyze`
+7. Open the final report and explain the evidence chain plus analysis quality
+
+More detail: [Demo Guide](docs/DEMO_GUIDE.md)
+
+## Project Architecture
+
+Main directories:
+
+- `app/api`: FastAPI route layer and API boundaries
+- `app/agents`: resume, JD, match, optimization, challenge, and report agents
+- `app/services`: business orchestration and provider-facing services
+- `app/workflows`: explicit workflow orchestration and trace handling
+- `app/schemas`: shared Pydantic contracts
+- `app/storage`: SQLite connection and repositories
+- `tests`: unit and integration coverage
+- `docs`: architecture, demo, workflow, and boundary docs
+
+Architecture docs:
+
+- [Architecture Overview](docs/ARCHITECTURE_OVERVIEW.md)
 - [Workflow Architecture](docs/WORKFLOW_ARCHITECTURE.md)
-- [Workflow Trace Persistence](docs/WORKFLOW_TRACE_PERSISTENCE.md)
-- [LangGraph Migration Prep](docs/LANGGRAPH_MIGRATION_PREP.md)
-- [LangGraph Workflow Prototype](docs/LANGGRAPH_WORKFLOW_PROTOTYPE.md)
-- [JD URL Import](docs/JD_URL_IMPORT.md)
-- [Missing Info Agent](docs/MISSING_INFO_AGENT.md)
-- [LLM Integration](docs/LLM_INTEGRATION.md)
-- [Search Provider](docs/SEARCH_PROVIDER.md)
-- [Batch Job Brief](docs/BATCH_JOB_BRIEF.md)
-- [Public Job Source Provider](docs/PUBLIC_JOB_SOURCE_PROVIDER.md)
-- [CUHKSZ Career Collector](docs/CUHKSZ_CAREER_COLLECTOR.md)
+
+## Documentation
+
+Core docs:
+
+- [Demo Guide](docs/DEMO_GUIDE.md)
+- [Architecture Overview](docs/ARCHITECTURE_OVERVIEW.md)
+- [Workflow Architecture](docs/WORKFLOW_ARCHITECTURE.md)
 - [Live Job Provider](docs/LIVE_JOB_PROVIDER.md)
-- [Real Local Job Brief Demo](docs/REAL_LOCAL_JOB_BRIEF_DEMO.md)
-- [JD Quality Gate](docs/JD_QUALITY_GATE.md)
-- [BriefRun And Rerank](docs/BRIEF_RUN_AND_RERANK.md)
-- [JobImportCandidate](docs/JOB_IMPORT_CANDIDATE.md)
+- [Application Tracker](docs/APPLICATION_TRACKER.md)
+- [Job Import Candidate](docs/JOB_IMPORT_CANDIDATE.md)
+- [Search Provider](docs/SEARCH_PROVIDER.md)
+
+## Current Boundaries
+
+Current non-goals:
+
+- AI Interview session
+- RAG question bank
+- multi-site generic crawler
+- auto apply
+- email/calendar reminders
+- multi-user auth
+- PDF/DOCX export
+
+Also intentionally out of scope for the current phase:
+
+- login flows
+- captcha handling
+- browser automation
+- unsupported resume fabrication
+
+## Development Notes
+
+- deterministic core first
+- mock-first and testable
+- LLM optional / fallback
+- schema-first
+- no unsupported resume fabrication
+
+## Notes For Reviewers
+
+What this project should be judged on:
+
+- whether the core loop is clear and runnable
+- whether the analysis result is evidence-based instead of score-only
+- whether tracker and analysis boundaries are explicit
+- whether the system remains useful without real-time LLM dependencies
+- whether the behavior is testable and locally reproducible
