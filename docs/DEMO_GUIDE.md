@@ -8,10 +8,14 @@ The Slate-like flow now starts with:
 resume upload/text -> profile review -> later search / analysis
 ```
 
-For this phase, demo only `POST /resume/profile-review`. It returns a parsed
-profile draft with deterministic warnings, missing-info questions, suggested
-edits, editable sections, and a confidence label. It does not demo a confirm
-API, UI, persistence, or search integration.
+Demo `POST /resume/profile-review` first. It returns a parsed profile draft
+with deterministic warnings, missing-info questions, suggested edits, editable
+sections, and a confidence label.
+
+v1.8 adds `POST /resume/profile-review/confirm`. It is stateless, does not
+persist a `review_id`, and merges user-provided edits/answers into a confirmed
+profile result for later search/analysis phases. Do not demo UI, persistence,
+search integration, or profile versioning for this phase.
 
 适用对象：
 

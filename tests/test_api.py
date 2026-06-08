@@ -464,6 +464,132 @@ def test_resume_profile_review_rejects_empty_resume_text() -> None:
     assert payload["error_code"] == "resume_text_required"
 
 
+def test_resume_profile_confirm_endpoint_returns_confirmed_profile() -> None:
+    review_response = client.post(
+        "/resume/profile-review",
+        json={"resume_text": SAMPLE_RESUME},
+    )
+    parsed_profile = review_response.json()["parsed_profile"]
+
+    response = client.post(
+        "/resume/profile-review/confirm",
+        json={
+            "parsed_profile": parsed_profile,
+            "user_edits": {
+                "target_roles": ["AI Agent Engineer", "Backend Engineer"],
+                "preferred_locations": ["Shenzhen", "Hangzhou"],
+                "additional_skills": ["LangGraph", "Pydantic"],
+                "project_clarifications": [
+                    "JobAgent project: designed FastAPI routes and an evidence-based analysis workflow."
+                ],
+                "constraints": ["Prefer backend or AI application roles"],
+                "notes": "Focus on undergraduate project experience.",
+            },
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["confirmed_profile"]
+    assert payload["user_confirmed_data"]
+    assert payload["confirmation_summary"]
+    assert payload["confidence_label"] in {"strong", "medium", "limited", "weak"}
+
+
+def test_resume_profile_confirm_merges_additional_skills() -> None:
+    review_response = client.post(
+        "/resume/profile-review",
+        json={"resume_text": SAMPLE_RESUME},
+    )
+    parsed_profile = review_response.json()["parsed_profile"]
+
+    response = client.post(
+        "/resume/profile-review/confirm",
+        json={
+            "parsed_profile": parsed_profile,
+            "user_edits": {
+                "additional_skills": ["LangGraph", "Pydantic"],
+            },
+        },
+    )
+
+    assert response.status_code == 200
+    skills = response.json()["confirmed_profile"]["skills"]
+    assert "LangGraph" in skills
+    assert "Pydantic" in skills
+
+
+def test_resume_profile_confirm_returns_target_roles_in_summary() -> None:
+    review_response = client.post(
+        "/resume/profile-review",
+        json={"resume_text": SAMPLE_RESUME},
+    )
+    parsed_profile = review_response.json()["parsed_profile"]
+
+    response = client.post(
+        "/resume/profile-review/confirm",
+        json={
+            "parsed_profile": parsed_profile,
+            "user_edits": {
+                "target_roles": ["AI Agent Engineer"],
+            },
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["user_confirmed_data"]["target_roles"] == ["AI Agent Engineer"]
+    assert "target_roles" in payload["confirmation_summary"]["confirmed_sections"]
+    assert payload["confirmation_summary"]["added_target_roles"] == ["AI Agent Engineer"]
+
+
+def test_resume_profile_confirm_softens_missing_project_warning_with_clarification() -> None:
+    review_response = client.post(
+        "/resume/profile-review",
+        json={"resume_text": "Skills: Python, FastAPI, SQL"},
+    )
+    parsed_profile = review_response.json()["parsed_profile"]
+
+    response = client.post(
+        "/resume/profile-review/confirm",
+        json={
+            "parsed_profile": parsed_profile,
+            "user_edits": {
+                "target_roles": ["Backend Engineer"],
+                "project_clarifications": [
+                    "Course project: built a FastAPI demo with SQLite persistence."
+                ],
+            },
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert "resume profile has no project evidence" not in payload["remaining_warnings"]
+    assert any(
+        "user clarification" in warning.lower()
+        for warning in payload["remaining_warnings"]
+    )
+
+
+def test_resume_profile_confirm_without_user_edits_stays_conservative() -> None:
+    review_response = client.post(
+        "/resume/profile-review",
+        json={"resume_text": "Skills: Python, FastAPI, SQL"},
+    )
+    parsed_profile = review_response.json()["parsed_profile"]
+
+    response = client.post(
+        "/resume/profile-review/confirm",
+        json={"parsed_profile": parsed_profile},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["confidence_label"] in {"limited", "weak", "medium"}
+    assert payload["remaining_warnings"]
+
+
 def test_resume_parse_file_endpoint_accepts_txt() -> None:
     response = client.post(
         "/resume/parse-file",

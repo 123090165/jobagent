@@ -17,3 +17,35 @@ class ResumeProfileReviewResult(BaseModel):
     suggested_edits: list[str] = Field(default_factory=list)
     editable_sections: list[str] = Field(default_factory=list)
     confidence_label: str = "medium"
+
+
+class ResumeProfileUserEdits(BaseModel):
+    target_roles: list[str] = Field(default_factory=list)
+    preferred_locations: list[str] = Field(default_factory=list)
+    additional_skills: list[str] = Field(default_factory=list)
+    project_clarifications: list[str] = Field(default_factory=list)
+    work_experience_clarifications: list[str] = Field(default_factory=list)
+    constraints: list[str] = Field(default_factory=list)
+    notes: str | None = None
+
+
+class ResumeProfileConfirmRequest(BaseModel):
+    parsed_profile: ResumeProfile
+    user_edits: ResumeProfileUserEdits = Field(default_factory=ResumeProfileUserEdits)
+
+
+class ResumeProfileConfirmationSummary(BaseModel):
+    confirmed_sections: list[str] = Field(default_factory=list)
+    added_target_roles: list[str] = Field(default_factory=list)
+    added_skills: list[str] = Field(default_factory=list)
+    added_project_clarifications_count: int = 0
+    added_work_experience_clarifications_count: int = 0
+    constraints_count: int = 0
+
+
+class ConfirmedResumeProfileResult(BaseModel):
+    confirmed_profile: ResumeProfile
+    user_confirmed_data: ResumeProfileUserEdits
+    confirmation_summary: ResumeProfileConfirmationSummary
+    remaining_warnings: list[str] = Field(default_factory=list)
+    confidence_label: str = "medium"

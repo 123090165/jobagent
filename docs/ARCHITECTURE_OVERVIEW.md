@@ -8,10 +8,14 @@ Resume Profile Review API is the first step of the Slate-like flow:
 resume upload/text -> profile review -> later search / analysis
 ```
 
-This phase only exposes `POST /resume/profile-review` to parse `resume_text`
+The first phase exposes `POST /resume/profile-review` to parse `resume_text`
 into a draft `ResumeProfile` plus deterministic warnings, questions,
-suggested edits, editable sections, and a confidence label. It does not add a
-confirm API, UI, persistence, or search integration.
+suggested edits, editable sections, and a confidence label.
+
+v1.8 adds `POST /resume/profile-review/confirm`. It is stateless, does not
+persist a `review_id`, and merges user-provided edits/answers into a confirmed
+profile result for later search/analysis phases. It still does not add UI,
+persistence, search integration, or profile versioning.
 
 ## 1. Project Goal
 
