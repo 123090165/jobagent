@@ -39,6 +39,13 @@ user's explicit query and appends confirmed target roles, preferred locations,
 skills, and constraints. This does not change provider internals, live provider
 parsers, tracker integration, or persistence behavior.
 
+v2.0 adds `ProfileSearchPlan`, so profile context is normalized into
+`role_terms`, `skill_terms`, `location_terms`, `constraint_terms`, `warnings`,
+and `effective_query` instead of being treated as a flat append only.
+`brief/from-search` still sends only `effective_query` into providers, so this
+does not add provider-specific query planning, multi-provider ranking changes,
+or live provider parser changes.
+
 ## Files
 
 - `app/schemas/search.py`

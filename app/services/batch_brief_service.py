@@ -4,7 +4,7 @@ from collections import Counter
 
 from app.schemas.brief import JobBriefReport, JobRecommendationItem
 from app.schemas.match import MatchReport
-from app.schemas.profile_review import ProfileSearchContext
+from app.schemas.profile_review import ProfileSearchContext, ProfileSearchPlan
 from app.schemas.search import SearchResultItem
 from app.services.errors import JobAgentError
 from app.services.job_search_service import search_jobs
@@ -14,6 +14,8 @@ MIN_BRIEF_LIMIT = 1
 MAX_BRIEF_LIMIT = 10
 MAX_PROFILE_QUERY_TERMS = 20
 MAX_PROFILE_QUERY_LENGTH = 300
+MAX_CONSTRAINT_TERMS = 3
+MAX_CONSTRAINT_LENGTH = 80
 
 
 def build_brief_from_search(
@@ -28,7 +30,8 @@ def build_brief_from_search(
     if not normalized_resume:
         raise JobAgentError("Resume text cannot be empty", "brief_resume_empty")
 
-    effective_query = build_profile_enhanced_query(query, profile_context)
+    search_plan = build_profile_search_plan(query, profile_context)
+    effective_query = search_plan.effective_query
     if not effective_query:
         raise JobAgentError("Search query cannot be empty", "brief_query_empty")
 
@@ -52,29 +55,66 @@ def build_profile_enhanced_query(
     query: str,
     profile_context: ProfileSearchContext | None,
 ) -> str:
-    normalized_query = query.strip()
-    terms: list[str] = []
-    seen: set[str] = set()
+    return build_profile_search_plan(query, profile_context).effective_query
 
-    if normalized_query:
-        _append_query_term(terms, seen, normalized_query)
+
+def build_profile_search_plan(
+    query: str,
+    profile_context: ProfileSearchContext | None,
+) -> ProfileSearchPlan:
+    original_query = _normalize_term(query)
+    warnings: list[str] = []
+    role_terms: list[str] = []
+    skill_terms: list[str] = []
+    location_terms: list[str] = []
+    constraint_terms: list[str] = []
 
     if profile_context is not None:
         confirmed_data = profile_context.user_confirmed_data
-        profile = profile_context.confirmed_profile
-        for candidates in [
-            confirmed_data.target_roles,
-            confirmed_data.preferred_locations,
-            confirmed_data.additional_skills,
-            profile.skills,
-            confirmed_data.constraints,
-        ]:
-            for candidate in candidates:
-                _append_query_term(terms, seen, candidate)
-                if len(terms) >= MAX_PROFILE_QUERY_TERMS:
-                    return _truncate_query(" ".join(terms))
+        role_terms = _normalize_terms(confirmed_data.target_roles)
+        location_terms = _normalize_terms(confirmed_data.preferred_locations)
+        skill_terms = _normalize_terms(
+            [
+                *confirmed_data.additional_skills,
+                *profile_context.confirmed_profile.skills,
+            ]
+        )
+        constraint_terms = _normalize_constraints(confirmed_data.constraints)
 
-    return _truncate_query(" ".join(terms))
+        if not any([role_terms, location_terms, skill_terms, constraint_terms]):
+            warnings.append("profile_context is empty")
+        if not role_terms:
+            warnings.append("profile_context has no target roles")
+        if not location_terms:
+            warnings.append("profile_context has no preferred locations")
+        if not skill_terms:
+            warnings.append("profile_context has no skills")
+
+    effective_terms = _build_effective_query_terms(
+        original_query=original_query,
+        role_terms=role_terms,
+        location_terms=location_terms,
+        skill_terms=skill_terms,
+        constraint_terms=constraint_terms,
+    )
+    effective_query, was_truncated = _truncate_query(" ".join(effective_terms))
+    if was_truncated:
+        warnings.append("effective query was truncated to 300 characters")
+    if not original_query and effective_query:
+        warnings.append("effective query was generated only from profile context")
+
+    return ProfileSearchPlan(
+        original_query=original_query,
+        effective_query=effective_query,
+        role_terms=role_terms,
+        skill_terms=skill_terms,
+        location_terms=location_terms,
+        constraint_terms=constraint_terms,
+        warnings=warnings,
+        profile_context_used=bool(
+            role_terms or location_terms or skill_terms or constraint_terms
+        ),
+    )
 
 
 def build_brief_from_jobs(
@@ -253,8 +293,66 @@ def _dedupe_list(items: list[str]) -> list[str]:
     return deduped
 
 
-def _append_query_term(terms: list[str], seen: set[str], term: str) -> None:
-    normalized_term = " ".join(term.strip().split())
+def _normalize_term(term: str) -> str:
+    return " ".join(term.strip().split())
+
+
+def _normalize_terms(terms: list[str]) -> list[str]:
+    normalized_terms: list[str] = []
+    seen: set[str] = set()
+    for term in terms:
+        normalized_term = _normalize_term(term)
+        key = normalized_term.lower()
+        if not normalized_term or key in seen:
+            continue
+        normalized_terms.append(normalized_term)
+        seen.add(key)
+    return normalized_terms
+
+
+def _normalize_constraints(constraints: list[str]) -> list[str]:
+    normalized_constraints: list[str] = []
+    seen: set[str] = set()
+    for constraint in constraints:
+        normalized_constraint = _normalize_term(constraint)
+        if len(normalized_constraint) > MAX_CONSTRAINT_LENGTH:
+            normalized_constraint = _truncate_at_word_boundary(
+                normalized_constraint,
+                MAX_CONSTRAINT_LENGTH,
+            )
+        key = normalized_constraint.lower()
+        if not normalized_constraint or key in seen:
+            continue
+        normalized_constraints.append(normalized_constraint)
+        seen.add(key)
+        if len(normalized_constraints) >= MAX_CONSTRAINT_TERMS:
+            break
+    return normalized_constraints
+
+
+def _build_effective_query_terms(
+    *,
+    original_query: str,
+    role_terms: list[str],
+    location_terms: list[str],
+    skill_terms: list[str],
+    constraint_terms: list[str],
+) -> list[str]:
+    effective_terms: list[str] = []
+    seen: set[str] = set()
+    if original_query:
+        _append_effective_query_term(effective_terms, seen, original_query)
+
+    for terms in [role_terms, location_terms, skill_terms, constraint_terms]:
+        for term in terms:
+            _append_effective_query_term(effective_terms, seen, term)
+            if len(effective_terms) >= MAX_PROFILE_QUERY_TERMS:
+                return effective_terms
+    return effective_terms
+
+
+def _append_effective_query_term(terms: list[str], seen: set[str], term: str) -> None:
+    normalized_term = _normalize_term(term)
     if not normalized_term:
         return
 
@@ -268,12 +366,16 @@ def _append_query_term(terms: list[str], seen: set[str], term: str) -> None:
         seen.add(token.lower())
 
 
-def _truncate_query(query: str) -> str:
+def _truncate_query(query: str) -> tuple[str, bool]:
     normalized_query = query.strip()
     if len(normalized_query) <= MAX_PROFILE_QUERY_LENGTH:
-        return normalized_query
+        return normalized_query, False
 
-    truncated = normalized_query[:MAX_PROFILE_QUERY_LENGTH].rstrip()
+    return _truncate_at_word_boundary(normalized_query, MAX_PROFILE_QUERY_LENGTH), True
+
+
+def _truncate_at_word_boundary(text: str, max_length: int) -> str:
+    truncated = text[:max_length].rstrip()
     if " " in truncated:
         return truncated.rsplit(" ", 1)[0].strip()
     return truncated

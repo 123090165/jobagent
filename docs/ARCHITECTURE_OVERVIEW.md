@@ -24,6 +24,12 @@ the first minimal bridge from Profile Review to Search/Brief, without UI,
 persistence, tracker integration, multi-provider ranking changes, or live
 provider internals changes.
 
+v2.0 adds `ProfileSearchPlan`. `profile_context` is no longer treated as a flat
+query append only; it is normalized into role terms, skill terms, location
+terms, constraint terms, warnings, and `effective_query`. `brief/from-search`
+still sends only `effective_query` into providers, so provider internals remain
+unchanged.
+
 ## 1. Project Goal
 
 JobAgent 不是一个单纯的聊天机器人，也不是一个通用爬虫项目。它更像一个面向求职准备场景的本地工作台，用来把“找岗位、判断匹配度、改简历、准备面试、记录投递进展”串成一个可复盘的流程。

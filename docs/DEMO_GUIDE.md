@@ -23,6 +23,12 @@ query without replacing the user's explicit query, creating the first minimal
 bridge from Profile Review to Search/Brief. Do not demo persistence, tracker
 integration, multi-provider ranking changes, or live provider internals.
 
+v2.0 turns that enhancement into `ProfileSearchPlan`: original query, effective
+query, role terms, skill terms, location terms, constraint terms, warnings, and
+whether profile context was used. `brief/from-search` still passes only the
+effective query to providers, so do not demo provider-specific planning, UI,
+persistence, tracker integration, or live provider parser changes.
+
 适用对象：
 
 - 面试官

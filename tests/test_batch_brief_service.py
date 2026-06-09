@@ -6,10 +6,14 @@ from types import SimpleNamespace
 import pytest
 
 from app.schemas.match import MatchReport
+from app.schemas.profile_review import ProfileSearchContext, ResumeProfileUserEdits
+from app.schemas.resume import ResumeProfile
 from app.schemas.search import SearchResultItem, SearchResultSet
 from app.services.batch_brief_service import (
     build_brief_from_jobs,
     build_brief_from_search,
+    build_profile_enhanced_query,
+    build_profile_search_plan,
 )
 from app.services.errors import JobAgentError
 
@@ -63,6 +67,140 @@ def _fake_workflow_result(score: float, *, label: str):
             match_report=_build_match_report(score, label=label),
         )
     )
+
+
+def _build_profile_context(
+    *,
+    skills: list[str] | None = None,
+    target_roles: list[str] | None = None,
+    preferred_locations: list[str] | None = None,
+    additional_skills: list[str] | None = None,
+    constraints: list[str] | None = None,
+) -> ProfileSearchContext:
+    return ProfileSearchContext(
+        confirmed_profile=ResumeProfile(
+            raw_text="profile context test resume",
+            skills=skills if skills is not None else ["Python", "FastAPI"],
+        ),
+        user_confirmed_data=ResumeProfileUserEdits(
+            target_roles=(
+                target_roles
+                if target_roles is not None
+                else ["AI Agent Engineer"]
+            ),
+            preferred_locations=(
+                preferred_locations
+                if preferred_locations is not None
+                else ["Shenzhen"]
+            ),
+            additional_skills=(
+                additional_skills
+                if additional_skills is not None
+                else ["LangGraph"]
+            ),
+            constraints=constraints if constraints is not None else [],
+        ),
+    )
+
+
+def test_profile_search_plan_preserves_query_and_separates_terms() -> None:
+    profile_context = _build_profile_context(
+        skills=["Python", "FastAPI"],
+        target_roles=["AI Agent Engineer"],
+        preferred_locations=["Shenzhen"],
+        additional_skills=["LangGraph"],
+    )
+
+    plan = build_profile_search_plan(" backend   internship ", profile_context)
+
+    assert plan.original_query == "backend internship"
+    assert plan.effective_query.startswith("backend internship")
+    assert plan.role_terms == ["AI Agent Engineer"]
+    assert plan.location_terms == ["Shenzhen"]
+    assert "LangGraph" in plan.skill_terms
+    assert "Python" in plan.skill_terms
+    assert plan.profile_context_used is True
+
+
+def test_profile_search_plan_prioritizes_additional_skills() -> None:
+    profile_context = _build_profile_context(
+        skills=["Python", "FastAPI", "SQLite"],
+        additional_skills=["LangGraph", "FastAPI"],
+    )
+
+    plan = build_profile_search_plan("backend internship", profile_context)
+
+    assert plan.skill_terms == ["LangGraph", "FastAPI", "Python", "SQLite"]
+
+
+def test_profile_search_plan_can_use_profile_context_without_query() -> None:
+    profile_context = _build_profile_context(
+        skills=["Python"],
+        target_roles=["AI Agent Engineer"],
+    )
+
+    plan = build_profile_search_plan("", profile_context)
+
+    assert plan.original_query == ""
+    assert "AI Agent Engineer" in plan.effective_query
+    assert "effective query was generated only from profile context" in plan.warnings
+
+
+def test_profile_search_plan_without_context_keeps_old_query() -> None:
+    plan = build_profile_search_plan("backend internship", None)
+
+    assert plan.original_query == "backend internship"
+    assert plan.effective_query == "backend internship"
+    assert plan.profile_context_used is False
+
+
+def test_profile_search_plan_empty_query_without_context_is_empty() -> None:
+    plan = build_profile_search_plan("", None)
+
+    assert plan.effective_query == ""
+    assert plan.profile_context_used is False
+
+
+def test_profile_search_plan_warns_for_missing_profile_context_sections() -> None:
+    profile_context = _build_profile_context(
+        skills=[],
+        target_roles=[],
+        preferred_locations=[],
+        additional_skills=[],
+    )
+
+    plan = build_profile_search_plan("backend internship", profile_context)
+
+    assert "profile_context is empty" in plan.warnings
+    assert "profile_context has no target roles" in plan.warnings
+    assert "profile_context has no preferred locations" in plan.warnings
+    assert "profile_context has no skills" in plan.warnings
+
+
+def test_profile_search_plan_warns_when_effective_query_is_truncated() -> None:
+    profile_context = _build_profile_context(
+        constraints=[
+            "backend " * 30,
+            "ai application " * 30,
+            "platform engineering " * 30,
+        ],
+    )
+
+    plan = build_profile_search_plan("x" * 280, profile_context)
+
+    assert len(plan.effective_query) <= 300
+    assert "effective query was truncated to 300 characters" in plan.warnings
+
+
+def test_profile_enhanced_query_delegates_to_profile_search_plan() -> None:
+    profile_context = _build_profile_context()
+
+    effective = build_profile_enhanced_query("backend internship", profile_context)
+
+    assert effective == build_profile_search_plan(
+        "backend internship",
+        profile_context,
+    ).effective_query
 
 
 def test_build_brief_from_search_returns_job_brief_report(monkeypatch) -> None:

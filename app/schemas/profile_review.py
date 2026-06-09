@@ -56,3 +56,14 @@ class ProfileSearchContext(BaseModel):
     user_confirmed_data: ResumeProfileUserEdits = Field(
         default_factory=ResumeProfileUserEdits
     )
+
+
+class ProfileSearchPlan(BaseModel):
+    original_query: str = ""
+    effective_query: str = ""
+    role_terms: list[str] = Field(default_factory=list)
+    skill_terms: list[str] = Field(default_factory=list)
+    location_terms: list[str] = Field(default_factory=list)
+    constraint_terms: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+    profile_context_used: bool = False
