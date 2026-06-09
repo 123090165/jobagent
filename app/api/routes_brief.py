@@ -7,14 +7,24 @@ from app.schemas.api import (
     BriefRerankRequest,
     BriefRunFromSearchRequest,
     BriefRunResponse,
+    ProfileSearchPlanRequest,
 )
 from app.schemas.brief import JobBriefReport
-from app.services.batch_brief_service import build_brief_from_search
+from app.schemas.profile_review import ProfileSearchPlan
+from app.services.batch_brief_service import build_brief_from_search, build_profile_search_plan
 from app.services.brief_rerank_service import rerank_brief_run
 from app.services.brief_run_storage_service import get_brief_run, save_brief_run
 from app.services.errors import JobAgentError
 
 router = APIRouter(tags=["brief"])
+
+
+@router.post("/brief/search-plan", response_model=ProfileSearchPlan)
+def preview_profile_search_plan(request: ProfileSearchPlanRequest) -> ProfileSearchPlan:
+    return build_profile_search_plan(
+        request.query,
+        request.profile_context,
+    )
 
 
 @router.post("/brief/from-search", response_model=JobBriefReport)

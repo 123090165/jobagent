@@ -29,6 +29,11 @@ whether profile context was used. `brief/from-search` still passes only the
 effective query to providers, so do not demo provider-specific planning, UI,
 persistence, tracker integration, or live provider parser changes.
 
+v2.1 adds `POST /brief/search-plan` as a preview-only endpoint. Demo it as the
+middle state between confirmed profile and `brief/from-search` when you want to
+show how query planning becomes visible without calling providers, persisting
+data, changing `JobBriefReport`, or adding UI.
+
 适用对象：
 
 - 面试官

@@ -30,6 +30,11 @@ terms, constraint terms, warnings, and `effective_query`. `brief/from-search`
 still sends only `effective_query` into providers, so provider internals remain
 unchanged.
 
+v2.1 adds `POST /brief/search-plan`. It previews `ProfileSearchPlan` before any
+provider search runs, which supports a Slate-like middle state:
+`confirmed profile -> search plan -> brief/from-search`. The endpoint does not
+call providers, does not persist data, and does not change `JobBriefReport`.
+
 ## 1. Project Goal
 
 JobAgent 不是一个单纯的聊天机器人，也不是一个通用爬虫项目。它更像一个面向求职准备场景的本地工作台，用来把“找岗位、判断匹配度、改简历、准备面试、记录投递进展”串成一个可复盘的流程。

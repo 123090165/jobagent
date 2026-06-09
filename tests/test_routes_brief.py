@@ -4,6 +4,7 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 from app.schemas.cuhksz_career import CUHKSZJobDetail, CUHKSZJobListItem
+from app.services import batch_brief_service
 from app.services.public_job_storage_service import save_public_job_post
 
 client = TestClient(app)
@@ -53,6 +54,100 @@ def test_brief_from_search_endpoint_returns_job_brief_report() -> None:
     assert payload["provider"] == "mock"
     assert payload["total_jobs"] == 3
     assert len(payload["recommended_jobs"]) == 3
+
+
+def test_brief_search_plan_endpoint_returns_structured_plan() -> None:
+    response = client.post(
+        "/brief/search-plan",
+        json={
+            "query": "backend internship",
+            "profile_context": {
+                "confirmed_profile": {
+                    "raw_text": "profile context test resume",
+                    "skills": ["Python", "FastAPI"],
+                },
+                "user_confirmed_data": {
+                    "target_roles": ["AI Agent Engineer"],
+                    "preferred_locations": ["Shenzhen"],
+                    "additional_skills": ["LangGraph"],
+                    "constraints": ["Prefer backend roles"],
+                },
+            },
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["original_query"] == "backend internship"
+    assert payload["effective_query"].startswith("backend internship")
+    assert payload["profile_context_used"] is True
+    assert payload["role_terms"] == ["AI Agent Engineer"]
+    assert payload["location_terms"] == ["Shenzhen"]
+    assert "LangGraph" in payload["skill_terms"]
+    assert "Python" in payload["skill_terms"]
+
+
+def test_brief_search_plan_endpoint_supports_empty_query_with_profile_context() -> None:
+    response = client.post(
+        "/brief/search-plan",
+        json={
+            "query": "",
+            "profile_context": {
+                "confirmed_profile": {
+                    "raw_text": "profile context test resume",
+                    "skills": ["Python"],
+                },
+                "user_confirmed_data": {
+                    "target_roles": ["AI Agent Engineer"],
+                },
+            },
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["original_query"] == ""
+    assert payload["effective_query"]
+    assert "effective query was generated only from profile context" in payload["warnings"]
+
+
+def test_brief_search_plan_endpoint_without_profile_context_keeps_query() -> None:
+    response = client.post(
+        "/brief/search-plan",
+        json={"query": "backend internship"},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["effective_query"] == "backend internship"
+    assert payload["profile_context_used"] is False
+
+
+def test_brief_search_plan_endpoint_allows_empty_query_without_context() -> None:
+    response = client.post(
+        "/brief/search-plan",
+        json={"query": ""},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["effective_query"] == ""
+    assert payload["profile_context_used"] is False
+
+
+def test_brief_search_plan_endpoint_does_not_call_provider(monkeypatch) -> None:
+    def fail_search_jobs(*args, **kwargs):
+        raise AssertionError("search_jobs should not be called by /brief/search-plan")
+
+    monkeypatch.setattr(batch_brief_service, "search_jobs", fail_search_jobs)
+
+    response = client.post(
+        "/brief/search-plan",
+        json={"query": "backend internship"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["effective_query"] == "backend internship"
 
 
 def test_brief_from_search_endpoint_returns_recommended_jobs() -> None:

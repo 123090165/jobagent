@@ -71,6 +71,11 @@ class BriefRunFromSearchRequest(BriefFromSearchRequest):
     pass
 
 
+class ProfileSearchPlanRequest(BaseModel):
+    query: str = ""
+    profile_context: ProfileSearchContext | None = None
+
+
 class BriefRunResponse(BaseModel):
     run_id: str
     brief: JobBriefReport

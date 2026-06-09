@@ -46,6 +46,12 @@ and `effective_query` instead of being treated as a flat append only.
 does not add provider-specific query planning, multi-provider ranking changes,
 or live provider parser changes.
 
+v2.1 adds `POST /brief/search-plan` as a preview endpoint for that planner.
+It returns `ProfileSearchPlan` before any provider search runs. The endpoint
+does not call providers, does not persist data, does not add provider-specific
+planning, and does not change `JobBriefReport` or the `/brief/from-search`
+response schema.
+
 ## Files
 
 - `app/schemas/search.py`
