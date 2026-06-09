@@ -35,6 +35,11 @@ provider search runs, which supports a Slate-like middle state:
 `confirmed profile -> search plan -> brief/from-search`. The endpoint does not
 call providers, does not persist data, and does not change `JobBriefReport`.
 
+v2.2 adds a minimal Streamlit panel that visualizes the same middle state:
+`resume input -> profile review -> profile confirm -> search plan preview -> brief/from-search`.
+It reuses existing APIs only. It does not add persistence, tracker integration,
+provider internals changes, or new backend logic.
+
 ## 1. Project Goal
 
 JobAgent 不是一个单纯的聊天机器人，也不是一个通用爬虫项目。它更像一个面向求职准备场景的本地工作台，用来把“找岗位、判断匹配度、改简历、准备面试、记录投递进展”串成一个可复盘的流程。

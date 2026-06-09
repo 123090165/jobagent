@@ -34,6 +34,11 @@ middle state between confirmed profile and `brief/from-search` when you want to
 show how query planning becomes visible without calling providers, persisting
 data, changing `JobBriefReport`, or adding UI.
 
+v2.2 adds a minimal Streamlit panel for the same flow:
+`Resume input -> Profile Review -> Profile Confirm -> Search Plan Preview -> Brief From Search`.
+This UI is only a demo panel. It does not add persistence, tracker integration,
+provider internals changes, or new backend logic.
+
 适用对象：
 
 - 面试官
