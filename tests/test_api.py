@@ -894,6 +894,10 @@ def test_application_tracker_api_flow(tmp_path, monkeypatch) -> None:
     application = create_response.json()
     assert application["status"] == "interested"
     assert application["job_id"] == job_id
+    assert application["analysis_summary"]["analysis_count"] == 0
+    assert application["analysis_summary"]["has_analysis"] is False
+    assert application["analysis_summary"]["latest_analysis_record_id"] is None
+    assert application["analysis_summary"]["last_match_score"] is None
 
     patch_response = client.patch(
         f"/applications/{application['id']}",
@@ -905,9 +909,11 @@ def test_application_tracker_api_flow(tmp_path, monkeypatch) -> None:
     list_response = client.get("/applications", params={"status": "applied"})
     assert list_response.status_code == 200
     assert len(list_response.json()) == 1
+    assert list_response.json()[0]["analysis_summary"]["has_analysis"] is False
 
     detail_response = client.get(f"/applications/{application['id']}")
     assert detail_response.status_code == 200
+    assert detail_response.json()["analysis_summary"]["analysis_count"] == 0
     assert detail_response.json()["next_action"] == "等待反馈"
 
 
@@ -1046,10 +1052,21 @@ def test_application_analyze_api_flow(tmp_path, monkeypatch) -> None:
     assert payload["application"]["id"] == application["id"]
     assert payload["record_id"] > 0
     assert payload["match_report"]["overall_score"] > 0
+    assert payload["application"]["analysis_summary"]["has_analysis"] is True
+    assert payload["application"]["analysis_summary"]["analysis_count"] == 1
+    assert payload["application"]["analysis_summary"]["latest_analysis_record_id"] == payload["record_id"]
 
     record = load_analysis_record(payload["record_id"], database_path=database_path)
     assert record is not None
     assert record["application_id"] == application["id"]
+
+    detail_response = client.get(f"/applications/{application['id']}")
+    assert detail_response.status_code == 200
+    summary = detail_response.json()["analysis_summary"]
+    assert summary["has_analysis"] is True
+    assert summary["analysis_count"] >= 1
+    assert summary["latest_analysis_record_id"] == payload["record_id"]
+    assert summary["last_match_score"] is None or isinstance(summary["last_match_score"], (int, float))
 
 
 def test_application_analyze_returns_404_for_missing_application(tmp_path, monkeypatch) -> None:

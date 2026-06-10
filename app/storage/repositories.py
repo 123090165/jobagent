@@ -206,6 +206,41 @@ def list_analysis_records(
     ]
 
 
+def list_analysis_records_for_application(
+    connection: sqlite3.Connection,
+    application_id: int,
+) -> list[dict[str, Any]]:
+    init_database(connection)
+    rows = connection.execute(
+        """
+        SELECT
+            ar.id,
+            ar.created_at,
+            jp.job_title,
+            jp.company,
+            mr.overall_score,
+            mr.report_json
+        FROM analysis_records ar
+        JOIN job_postings jp ON ar.job_posting_id = jp.id
+        JOIN match_reports mr ON ar.match_report_id = mr.id
+        WHERE ar.application_id = ?
+        ORDER BY ar.created_at DESC, ar.id DESC
+        """,
+        (application_id,),
+    ).fetchall()
+    return [
+        {
+            "id": row["id"],
+            "created_at": row["created_at"],
+            "job_title": row["job_title"],
+            "company": row["company"],
+            "overall_score": row["overall_score"],
+            "match_report": json.loads(row["report_json"]),
+        }
+        for row in rows
+    ]
+
+
 def list_job_postings(
     connection: sqlite3.Connection,
     *,

@@ -253,6 +253,14 @@ AnalysisRecord 关联 application_id
   - 保存一次具体分析的输出
   - 可以回放 workflow trace 和 markdown report
 
+v2.4 adds `ApplicationAnalysisSummary` as a lightweight read-side summary for
+`ApplicationRecord` responses. Applications now expose `analysis_count`,
+`latest_analysis_record_id`, `last_match_score`, `last_analysis_quality`,
+`last_analyzed_at`, and `has_analysis` when possible by reading existing linked
+`analysis_records`. This lets tracker/application views reflect deep analysis
+progress without adding a dashboard, analysis diff, multi-run comparison UI, or
+database-heavy history view.
+
 ## 7. Engineering Principles
 
 当前项目的工程原则可以概括为：

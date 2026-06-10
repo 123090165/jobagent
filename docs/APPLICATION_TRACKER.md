@@ -132,3 +132,27 @@ Success returns:
 Common error codes:
 - `application_not_found`
 - `application_job_description_missing`
+
+## Analysis Summary
+
+v2.4 adds `ApplicationAnalysisSummary` to application API responses.
+`GET /applications` and `GET /applications/{application_id}` now include:
+
+- `analysis_count`
+- `latest_analysis_record_id`
+- `last_analyzed_at`
+- `last_match_score`
+- `last_analysis_quality`
+- `latest_report_title`
+- `has_analysis`
+
+Applications without linked analysis records return an empty summary with
+`analysis_count: 0` and `has_analysis: false`. This lets tracker/application
+views reflect deep analysis progress without adding a dashboard or UI.
+
+This version intentionally does not add:
+
+- Streamlit tracker dashboard
+- analysis diff
+- multi-run comparison UI
+- database-heavy history view
