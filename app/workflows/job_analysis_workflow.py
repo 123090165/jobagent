@@ -32,6 +32,11 @@ class WorkflowStepTrace(BaseModel):
     duration_ms: float = 0.0
     fallback_reason: str | None = None
     guardrails: list[str] = Field(default_factory=list)
+    quality_warnings: list[str] = Field(default_factory=list)
+    llm_success_count: int | None = None
+    fallback_count: int | None = None
+    item_fallback_reasons: list[str] = Field(default_factory=list)
+    prompt_version: str | None = None
 
 
 class JobAnalysisWorkflowState(BaseModel):
@@ -205,6 +210,11 @@ def _record_step(
             duration_ms=duration_ms,
             fallback_reason=metadata.fallback_reason,
             guardrails=metadata.guardrails,
+            quality_warnings=metadata.quality_warnings,
+            llm_success_count=metadata.llm_success_count,
+            fallback_count=metadata.fallback_count,
+            item_fallback_reasons=metadata.item_fallback_reasons,
+            prompt_version=metadata.prompt_version,
         )
     )
 

@@ -8,6 +8,7 @@ from app.agents.project_challenge_agent import (
     generate_project_challenges,
     run_project_challenge_agent,
 )
+from app.agents.match_agent import run_match_agent
 from app.agents.resume_parse_agent import parse_resume
 from app.schemas.match import ProjectChallengeReport
 from app.services.llm_service import LLMServiceError
@@ -66,6 +67,16 @@ def _valid_llm_payload() -> dict[str, Any]:
     }
 
 
+def _valid_small_question_payload() -> dict[str, Any]:
+    return {
+        "question": "How did you use the provided evidence in the project?",
+        "why_asked": "It validates whether the candidate can explain real implementation evidence.",
+        "expected_answer_points": ["implementation detail", "personal ownership"],
+        "risk_level": "medium",
+        "question_type": "technical",
+    }
+
+
 def test_generate_project_challenges_mock_mode_returns_result() -> None:
     resume_profile, job_analysis = _sample_inputs()
 
@@ -92,18 +103,21 @@ def test_run_project_challenge_agent_defaults_to_mock_mode() -> None:
 
 def test_run_project_challenge_agent_uses_llm_for_valid_payload() -> None:
     resume_profile, job_analysis = _sample_inputs()
-    service = FakeLLMService(_valid_llm_payload())
+    match_report = run_match_agent(resume_profile, job_analysis).output
+    service = FakeLLMService(_valid_small_question_payload())
 
     result = run_project_challenge_agent(
         resume_profile,
         job_analysis,
+        match_report=match_report,
         use_llm=True,
         service=service,  # type: ignore[arg-type]
     )
 
     assert result.metadata.mode == "llm"
     assert result.metadata.fallback_reason is None
-    assert result.output.basic_questions[0].question.startswith("JobAgent")
+    assert result.metadata.llm_success_count
+    assert result.output.grounded_questions
 
 
 def test_generate_project_challenge_with_llm_validates_structured_output() -> None:
@@ -123,10 +137,12 @@ def test_generate_project_challenge_with_llm_validates_structured_output() -> No
 def test_run_project_challenge_agent_falls_back_when_llm_unconfigured(monkeypatch) -> None:
     monkeypatch.delenv("JOBAGENT_LLM_API_KEY", raising=False)
     resume_profile, job_analysis = _sample_inputs()
+    match_report = run_match_agent(resume_profile, job_analysis).output
 
     result = run_project_challenge_agent(
         resume_profile,
         job_analysis,
+        match_report=match_report,
         use_llm=True,
     )
 
@@ -137,11 +153,13 @@ def test_run_project_challenge_agent_falls_back_when_llm_unconfigured(monkeypatc
 
 def test_run_project_challenge_agent_falls_back_when_llm_raises() -> None:
     resume_profile, job_analysis = _sample_inputs()
+    match_report = run_match_agent(resume_profile, job_analysis).output
     service = FakeLLMService(should_fail=True)
 
     result = run_project_challenge_agent(
         resume_profile,
         job_analysis,
+        match_report=match_report,
         use_llm=True,
         service=service,  # type: ignore[arg-type]
     )
@@ -153,6 +171,7 @@ def test_run_project_challenge_agent_falls_back_when_llm_raises() -> None:
 
 def test_run_project_challenge_agent_falls_back_when_llm_schema_invalid() -> None:
     resume_profile, job_analysis = _sample_inputs()
+    match_report = run_match_agent(resume_profile, job_analysis).output
     service = FakeLLMService(
         {
             "basic_questions": [
@@ -166,6 +185,7 @@ def test_run_project_challenge_agent_falls_back_when_llm_schema_invalid() -> Non
     result = run_project_challenge_agent(
         resume_profile,
         job_analysis,
+        match_report=match_report,
         use_llm=True,
         service=service,  # type: ignore[arg-type]
     )

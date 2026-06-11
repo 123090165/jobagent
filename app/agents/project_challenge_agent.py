@@ -5,69 +5,29 @@ from typing import Any
 
 from pydantic import ValidationError
 
+from app.agents.schemas import GeneratedGroundedQuestionDraft
 from app.agents.types import AgentExecutionMode, AgentRunMetadata, AgentRunResult
 from app.schemas.job import JobAnalysis
-from app.schemas.match import GroundedChallengeQuestion, MatchReport, ProjectChallengeReport
+from app.schemas.match import ChallengeQuestion, GroundedChallengeQuestion, MatchReport, ProjectChallengeReport
 from app.schemas.resume import ResumeProfile
 from app.services.llm_service import LLMService, LLMServiceError
+from app.services.project_challenge_planner import ChallengeRequirement, select_challenge_requirements
+from app.services.project_question_generation import (
+    PROJECT_QUESTION_GENERATOR_PROMPT_VERSION,
+    generate_grounded_question_with_llm,
+)
 
 
 PROJECT_CHALLENGE_SYSTEM_PROMPT = """You are JobAgent's ProjectChallengeAgent.
 
 Task:
-Generate one JSON object that matches this shape:
-{
-  "basic_questions": [
-    {
-      "question": string,
-      "evaluates": string,
-      "answer_framework": string
-    }
-  ],
-  "technical_deep_dive_questions": [
-    {
-      "question": string,
-      "evaluates": string,
-      "answer_framework": string
-    }
-  ],
-  "architecture_questions": [
-    {
-      "question": string,
-      "evaluates": string,
-      "answer_framework": string
-    }
-  ],
-  "tradeoff_questions": [
-    {
-      "question": string,
-      "evaluates": string,
-      "answer_framework": string
-    }
-  ],
-  "grounded_questions": [
-    {
-      "question": string,
-      "linked_requirement": string,
-      "match_level": string,
-      "why_asked": string,
-      "related_resume_evidence": string[],
-      "expected_answer_points": string[],
-      "risk_level": string
-    }
-  ],
-  "interviewer_concerns": string[],
-  "improvement_suggestions": string[]
-}
+Generate one JSON object that matches the existing ProjectChallengeReport schema.
 
 Rules:
 - Only use information from ResumeProfile and JobAnalysis.
 - Do not ask about projects that are not present in the resume.
 - Do not assume the user has experience with companies, internships, projects, or technologies not provided.
 - Do not invent project background, metrics, numbers, results, or tech stacks.
-- You may ask realistic interview follow-up questions about existing projects, technical details, architecture, tradeoffs, risks, and improvements.
-- Questions should be specific, concrete, and suitable for a real interview.
-- If information is missing, keep lists short and focus on clarifying what is actually present.
 - Return JSON only. No Markdown.
 """
 
@@ -98,7 +58,7 @@ def run_project_challenge_agent(
     use_llm: bool = False,
     service: LLMService | None = None,
 ) -> AgentRunResult[ProjectChallengeReport]:
-    """Generate interview challenge questions with metadata."""
+    """Generate project interview challenges with per-question LLM fallback."""
     if not use_llm:
         return AgentRunResult(
             output=_with_grounded_questions(
@@ -111,32 +71,78 @@ def run_project_challenge_agent(
         )
 
     try:
-        return AgentRunResult(
-            output=_with_grounded_questions(
-                generate_project_challenge_with_llm(
-                    resume_profile,
-                    job_analysis,
-                    service=service,
-                ),
-                resume_profile,
-                job_analysis,
-                match_report,
-            ),
-            metadata=_metadata(mode="llm"),
+        selected_requirements = (
+            select_challenge_requirements(
+                resume_profile=resume_profile,
+                job_analysis=job_analysis,
+                match_report=match_report,
+            )
+            if match_report is not None
+            else []
         )
-    except (LLMServiceError, ValidationError, ValueError, TypeError) as exc:
-        return AgentRunResult(
-            output=_with_grounded_questions(
-                _mock_project_challenge(resume_profile, job_analysis),
-                resume_profile,
-                job_analysis,
-                match_report,
-            ),
-            metadata=_metadata(
-                mode="fallback",
-                fallback_reason=type(exc).__name__,
-            ),
+    except (ValueError, TypeError) as exc:
+        return _whole_report_fallback(
+            resume_profile,
+            job_analysis,
+            match_report,
+            fallback_reason=type(exc).__name__,
+            fallback_count=0,
+            llm_success_count=0,
         )
+
+    if not selected_requirements:
+        return _whole_report_fallback(
+            resume_profile,
+            job_analysis,
+            match_report,
+            fallback_reason="NoChallengeRequirements",
+            fallback_count=0,
+            llm_success_count=0,
+        )
+
+    llm_service = service or LLMService()
+    generated_items: list[tuple[ChallengeRequirement, GeneratedGroundedQuestionDraft]] = []
+    item_fallback_reasons: list[str] = []
+    llm_success_count = 0
+    fallback_count = 0
+
+    for requirement in selected_requirements:
+        try:
+            generated = generate_grounded_question_with_llm(
+                llm_service=llm_service,
+                requirement=requirement,
+                job_title=job_analysis.job_title,
+                job_category=job_analysis.job_category,
+            )
+            llm_success_count += 1
+        except (LLMServiceError, ValidationError, ValueError, TypeError) as exc:
+            generated = build_fallback_grounded_question(requirement)
+            fallback_count += 1
+            item_fallback_reasons.append(f"{requirement.requirement}: {type(exc).__name__}")
+        generated_items.append((requirement, generated))
+
+    if llm_success_count == 0:
+        fallback_reason = item_fallback_reasons[0].split(": ", 1)[-1] if item_fallback_reasons else "LLMServiceError"
+        return _whole_report_fallback(
+            resume_profile,
+            job_analysis,
+            match_report,
+            fallback_reason=fallback_reason,
+            fallback_count=fallback_count,
+            llm_success_count=llm_success_count,
+            item_fallback_reasons=item_fallback_reasons,
+        )
+
+    return AgentRunResult(
+        output=_assemble_project_challenge_report(generated_items),
+        metadata=_metadata(
+            mode="llm",
+            fallback_count=fallback_count,
+            llm_success_count=llm_success_count,
+            item_fallback_reasons=item_fallback_reasons,
+            prompt_version=PROJECT_QUESTION_GENERATOR_PROMPT_VERSION,
+        ),
+    )
 
 
 def generate_project_challenge_with_llm(
@@ -145,7 +151,11 @@ def generate_project_challenge_with_llm(
     *,
     service: LLMService | None = None,
 ) -> ProjectChallengeReport:
-    """Generate interview challenge questions with an LLM and validate output."""
+    """Generate a legacy full report with an LLM and validate output.
+
+    The agent workflow now uses small-step question generation. This helper is
+    retained for direct callers that still validate full ProjectChallengeReport payloads.
+    """
     llm_service = service or LLMService()
     payload = llm_service.chat_completion_json(
         system_prompt=PROJECT_CHALLENGE_SYSTEM_PROMPT,
@@ -157,6 +167,147 @@ def generate_project_challenge_with_llm(
         ),
     )
     return _validate_project_challenge(payload)
+
+
+def build_fallback_grounded_question(requirement: ChallengeRequirement) -> GeneratedGroundedQuestionDraft:
+    """Build one deterministic grounded question for a selected requirement."""
+    if requirement.match_level == "matched":
+        return GeneratedGroundedQuestionDraft(
+            question=(
+                f"You listed evidence related to {requirement.requirement}. Can you explain how you used it "
+                "in the project and what design decision you made?"
+            ),
+            why_asked="The resume already has related evidence, so the interviewer will validate depth and ownership.",
+            expected_answer_points=[
+                "where the evidence appears in the project or work context",
+                "what implementation choice the candidate personally made",
+                "what tradeoff or constraint shaped the decision",
+            ],
+            risk_level="medium",
+            question_type="technical",
+        )
+
+    if requirement.match_level == "partial":
+        return GeneratedGroundedQuestionDraft(
+            question=(
+                f"Your resume partially matches {requirement.requirement}. Which part have you actually implemented, "
+                "and what would you still need to learn?"
+            ),
+            why_asked="The evidence is related but incomplete, so the interviewer will probe the real boundary.",
+            expected_answer_points=[
+                "which part has been implemented",
+                "which part is adjacent but not yet demonstrated",
+                "how the candidate would close the gap honestly",
+            ],
+            risk_level="medium",
+            question_type="basic",
+        )
+
+    return GeneratedGroundedQuestionDraft(
+        question=(
+            f"This role expects {requirement.requirement}, but your resume does not show strong evidence. "
+            "How would you approach learning or demonstrating it before the interview?"
+        ),
+        why_asked="The JD requirement is important but the resume lacks direct evidence.",
+        expected_answer_points=[
+            "state the current experience boundary",
+            "connect to adjacent skills if real evidence exists",
+            "describe a concrete preparation or demonstration plan",
+        ],
+        risk_level="high",
+        question_type="basic",
+    )
+
+
+def _assemble_project_challenge_report(
+    items: list[tuple[ChallengeRequirement, GeneratedGroundedQuestionDraft]],
+) -> ProjectChallengeReport:
+    report = ProjectChallengeReport()
+    for requirement, generated in items:
+        question = ChallengeQuestion(
+            question=generated.question,
+            evaluates=generated.why_asked,
+            answer_framework="; ".join(generated.expected_answer_points),
+        )
+        if generated.question_type == "basic":
+            report.basic_questions.append(question)
+        elif generated.question_type == "technical":
+            report.technical_deep_dive_questions.append(question)
+        elif generated.question_type == "architecture":
+            report.architecture_questions.append(question)
+        else:
+            report.tradeoff_questions.append(question)
+
+        report.grounded_questions.append(
+            GroundedChallengeQuestion(
+                question=generated.question,
+                linked_requirement=requirement.requirement,
+                match_level=requirement.match_level,
+                why_asked=generated.why_asked,
+                related_resume_evidence=requirement.related_resume_evidence,
+                expected_answer_points=generated.expected_answer_points,
+                risk_level=generated.risk_level,
+            )
+        )
+
+    report.interviewer_concerns = _build_interviewer_concerns(items)
+    report.improvement_suggestions = _build_improvement_suggestions(items)
+    return report
+
+
+def _whole_report_fallback(
+    resume_profile: ResumeProfile,
+    job_analysis: JobAnalysis,
+    match_report: MatchReport | None,
+    *,
+    fallback_reason: str,
+    fallback_count: int | None,
+    llm_success_count: int | None,
+    item_fallback_reasons: list[str] | None = None,
+) -> AgentRunResult[ProjectChallengeReport]:
+    return AgentRunResult(
+        output=_with_grounded_questions(
+            _mock_project_challenge(resume_profile, job_analysis),
+            resume_profile,
+            job_analysis,
+            match_report,
+        ),
+        metadata=_metadata(
+            mode="fallback",
+            fallback_reason=fallback_reason,
+            fallback_count=fallback_count,
+            llm_success_count=llm_success_count,
+            item_fallback_reasons=item_fallback_reasons or [],
+            prompt_version=PROJECT_QUESTION_GENERATOR_PROMPT_VERSION,
+        ),
+    )
+
+
+def _build_interviewer_concerns(
+    items: list[tuple[ChallengeRequirement, GeneratedGroundedQuestionDraft]],
+) -> list[str]:
+    concerns: list[str] = []
+    if any(requirement.match_level == "partial" for requirement, _ in items):
+        concerns.append("Some JD requirements are only partially supported, so interviewers may probe exact scope.")
+    if any(requirement.match_level == "missing" for requirement, _ in items):
+        concerns.append("Some expected requirements lack direct resume evidence and should be handled as preparation gaps.")
+    if any(not requirement.related_resume_evidence for requirement, _ in items):
+        concerns.append("At least one question has weak resume evidence, so answers should avoid unsupported claims.")
+    return concerns[:3]
+
+
+def _build_improvement_suggestions(
+    items: list[tuple[ChallengeRequirement, GeneratedGroundedQuestionDraft]],
+) -> list[str]:
+    suggestions: list[str] = []
+    for requirement, _ in items:
+        if requirement.match_level in {"matched", "partial"} and requirement.related_resume_evidence:
+            suggestions.append(f"Prepare a concrete project walkthrough for {requirement.requirement}.")
+        elif requirement.match_level == "missing":
+            suggestions.append(f"Prepare an honest learning or demo plan for {requirement.requirement}.")
+        if len(suggestions) >= 3:
+            break
+    return suggestions
 
 
 def _validate_project_challenge(payload: dict[str, Any]) -> ProjectChallengeReport:
@@ -288,16 +439,24 @@ def _metadata(
     *,
     mode: AgentExecutionMode,
     fallback_reason: str | None = None,
+    fallback_count: int | None = None,
+    llm_success_count: int | None = None,
+    item_fallback_reasons: list[str] | None = None,
+    prompt_version: str | None = None,
 ) -> AgentRunMetadata:
     return AgentRunMetadata(
         agent_name="ProjectInterviewAgent",
         mode=mode,
         fallback_reason=fallback_reason,
         guardrails=[
-            "追问必须基于简历项目和目标 JD",
-            "不追问简历里不存在的项目、公司或技术栈",
-            "不编造项目背景、数据、指标或技术栈",
-            "暴露短板时给出可执行补强方向",
-            "LLM 输出必须通过 ProjectChallengeReport schema 校验",
+            "Questions must be grounded in resume projects and the target JD.",
+            "Do not ask about projects, companies, or tech stacks absent from the resume.",
+            "Do not invent project background, metrics, or achievements.",
+            "Expose gaps with actionable preparation directions.",
+            "LLM output must pass the small GeneratedGroundedQuestionDraft schema.",
         ],
+        llm_success_count=llm_success_count,
+        fallback_count=fallback_count,
+        item_fallback_reasons=item_fallback_reasons or [],
+        prompt_version=prompt_version,
     )

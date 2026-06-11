@@ -163,6 +163,8 @@ from app.workflows.graph_spec import get_job_analysis_graph_spec
 
 `ProjectChallengeAgent` now consumes the same requirement matches and emits `project_challenge_report.grounded_questions`, keeping 4-8 deterministic follow-up questions tied to JD requirements, resume evidence, and explicit gap handling.
 
+In LLM mode, `ProjectChallengeAgent` now uses decomposition instead of full-report generation. It selects challenge requirements, binds resume evidence, asks the LLM for one small question draft per requirement, validates each draft independently, applies per-question fallback when needed, and assembles the existing `ProjectChallengeReport` shape in code. This keeps small local model failures local to one question.
+
 ## 10. Report Evidence Chain
 
 `ReportAgent` now renders a deterministic `JD-Resume Evidence Chain` section in the final Markdown report. It uses `match_report.requirement_matches` as the base list, then links each requirement to the first matching `optimization_result.rewrite_suggestions[*].linked_requirement` and `project_challenge_report.grounded_questions[*].linked_requirement`.

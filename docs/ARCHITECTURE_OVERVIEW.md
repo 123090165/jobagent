@@ -145,6 +145,8 @@ ResumeParseAgent
 - `Markdown JD-Resume Evidence Chain`
   - 在最终报告里串起 requirement -> evidence -> rewrite -> challenge
 
+ProjectChallengeAgent LLM mode is decomposed: code selects requirements and binds evidence, the LLM generates one small grounded question draft at a time, and code assembles the unchanged `ProjectChallengeReport` schema. A failed question uses local fallback without forcing the whole agent to fallback unless every item fails or no requirements can be selected.
+
 ## 4. Code Structure
 
 项目主目录可以按下面理解：
