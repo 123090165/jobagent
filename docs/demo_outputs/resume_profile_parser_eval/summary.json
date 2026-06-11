@@ -1,0 +1,189 @@
+{
+  "total_cases": 5,
+  "strong_cases": 4,
+  "medium_cases": 0,
+  "limited_cases": 1,
+  "weak_cases": 0,
+  "cases": [
+    {
+      "case_id": "ai_agent_backend_mixed",
+      "title": "AI Agent / Backend mixed-language resume",
+      "confidence_label": "strong",
+      "passed_checks": [
+        "skills_any_match",
+        "skills_all_match",
+        "project_count_min",
+        "work_experience_count_min",
+        "education_keyword_match",
+        "highlight_keyword_match",
+        "expected_warning_match",
+        "confidence_label_allowed",
+        "missing_info_questions_present_when_warnings_exist"
+      ],
+      "failed_checks": [],
+      "warnings": [],
+      "missing_info_questions": [],
+      "skill_hits": [
+        "Python",
+        "FastAPI",
+        "Pydantic",
+        "Streamlit",
+        "SQL",
+        "Git"
+      ],
+      "missing_expected_skills": [],
+      "project_count": 3,
+      "work_experience_count": 1,
+      "education_count": 1,
+      "highlight_count": 4,
+      "overall_label": "strong"
+    },
+    {
+      "case_id": "embedded_stm32_chinese",
+      "title": "Embedded / STM32 Chinese resume",
+      "confidence_label": "strong",
+      "passed_checks": [
+        "skills_any_match",
+        "skills_all_match",
+        "project_count_min",
+        "work_experience_count_min",
+        "education_keyword_match",
+        "highlight_keyword_match",
+        "expected_warning_match",
+        "confidence_label_allowed",
+        "missing_info_questions_present_when_warnings_exist"
+      ],
+      "failed_checks": [],
+      "warnings": [
+        "project evidence may be too thin for matching"
+      ],
+      "missing_info_questions": [
+        "For your strongest project, what exactly did you build, which technologies did you use, and what measurable result can you show?"
+      ],
+      "skill_hits": [
+        "STM32",
+        "USART",
+        "GPIO",
+        "FreeRTOS",
+        "C"
+      ],
+      "missing_expected_skills": [],
+      "project_count": 2,
+      "work_experience_count": 1,
+      "education_count": 3,
+      "highlight_count": 1,
+      "overall_label": "strong"
+    },
+    {
+      "case_id": "ml_research_english",
+      "title": "ML / Research English resume",
+      "confidence_label": "strong",
+      "passed_checks": [
+        "skills_any_match",
+        "skills_all_match",
+        "project_count_min",
+        "work_experience_count_min",
+        "education_keyword_match",
+        "highlight_keyword_match",
+        "expected_warning_match",
+        "confidence_label_allowed",
+        "missing_info_questions_present_when_warnings_exist"
+      ],
+      "failed_checks": [],
+      "warnings": [],
+      "missing_info_questions": [],
+      "skill_hits": [
+        "PyTorch",
+        "NumPy",
+        "Pandas",
+        "scikit-learn"
+      ],
+      "missing_expected_skills": [],
+      "project_count": 2,
+      "work_experience_count": 2,
+      "education_count": 2,
+      "highlight_count": 2,
+      "overall_label": "strong"
+    },
+    {
+      "case_id": "weak_resume_sparse",
+      "title": "Weak resume with sparse information",
+      "confidence_label": "limited",
+      "passed_checks": [
+        "skills_any_match",
+        "skills_all_match",
+        "project_count_min",
+        "expected_warning_match",
+        "confidence_label_allowed",
+        "missing_info_questions_present_when_warnings_exist"
+      ],
+      "failed_checks": [
+        "work_experience_count_min",
+        "education_keyword_match",
+        "highlight_keyword_match"
+      ],
+      "warnings": [
+        "resume profile has no project evidence",
+        "resume profile has no work experience evidence",
+        "target role is not explicit",
+        "resume profile has no highlights or measurable outcomes"
+      ],
+      "missing_info_questions": [
+        "What target roles should this profile prioritize, such as AI Agent Engineer, Backend Engineer, or Embedded Software Engineer?",
+        "Which project best demonstrates your target role fit? Please add project goal, technologies, your responsibilities, and outcomes.",
+        "Do you have internship, lab, research, or course project experience that should be treated as work-like evidence?",
+        "Can you add measurable outcomes, such as number of APIs, tests passed, latency, users, dataset size, or accuracy?"
+      ],
+      "skill_hits": [
+        "Python"
+      ],
+      "missing_expected_skills": [],
+      "project_count": 1,
+      "work_experience_count": 0,
+      "education_count": 0,
+      "highlight_count": 0,
+      "overall_label": "limited"
+    },
+    {
+      "case_id": "rich_resume_full_profile",
+      "title": "Rich resume with education, internship, projects, certificate, and metrics",
+      "confidence_label": "strong",
+      "passed_checks": [
+        "skills_any_match",
+        "skills_all_match",
+        "project_count_min",
+        "work_experience_count_min",
+        "education_keyword_match",
+        "highlight_keyword_match",
+        "expected_warning_match",
+        "confidence_label_allowed",
+        "missing_info_questions_present_when_warnings_exist"
+      ],
+      "failed_checks": [],
+      "warnings": [],
+      "missing_info_questions": [],
+      "skill_hits": [
+        "Python",
+        "FastAPI",
+        "Pydantic",
+        "Streamlit",
+        "SQL",
+        "Git"
+      ],
+      "missing_expected_skills": [],
+      "project_count": 1,
+      "work_experience_count": 2,
+      "education_count": 2,
+      "highlight_count": 4,
+      "overall_label": "strong"
+    }
+  ],
+  "known_limitations": [
+    "Project title extraction is improved, but multi-line project grouping remains shallow.",
+    "Embedded vocabulary is covered, but embedded project evidence may still be thin without measurable outcomes.",
+    "English research experience is detected, but title and evidence lines may become separate work items.",
+    "Highlights are still keyword and metric based rather than semantically ranked.",
+    "Fallback project detection can create a project-shaped object from very short text, so project count alone is not enough.",
+    "Education school, degree, and major extraction is lightweight and still preserves raw text as source evidence."
+  ]
+}

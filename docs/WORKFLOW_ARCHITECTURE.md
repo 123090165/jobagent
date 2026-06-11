@@ -187,3 +187,15 @@ The workflow now builds a deterministic `analysis_quality` object before generat
 - output labels: `strong`, `medium`, `limited`, `weak`
 - warns when resume evidence is thin, JD structure is incomplete, or requirement-level evidence is sparse
 - keeps the quality signal in both `FinalReport.analysis_quality` and the `## Analysis Quality` Markdown section
+
+## 12. Resume Profile Parser Evaluation
+
+v3.2 adds a Resume Profile Parser Evaluation Baseline before the downstream
+workflow. The baseline evaluates profile extraction from `/resume/profile-review`
+so parser limitations are visible before matching, optimization, and project
+challenge generation.
+
+v3.3 adds section-based deterministic parsing before profile review. The parser
+extracts section-specific skills, education, work experience, projects, and
+highlights, then falls back to the older heuristic path when structure is
+unclear.
