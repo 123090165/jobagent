@@ -43,6 +43,7 @@ from app.workflows.job_analysis_workflow import run_job_analysis_workflow
 这样旧测试和兼容入口不需要改调用方式。FastAPI 和 Streamlit 的端到端分析入口已经直接调用 `run_job_analysis_workflow`，以便拿到 `workflow_steps` 并保存。
 
 当前 workflow 调用 `app/agents/` 中的 Agent 外壳，而不是直接调用底层 mock 函数。
+`JDAnalysisAgent` 在 LLM 模式下会从 prompt registry 加载 system prompt，并在 schema validation 后运行 JD quality gate；如果 required skills 等关键信息看起来不可信，会 fallback 到 deterministic baseline。
 
 LangGraph 迁移准备层：
 
@@ -66,6 +67,7 @@ from app.workflows.graph_spec import get_job_analysis_graph_spec
 - `duration_ms`
 - `fallback_reason`
 - `guardrails`
+- `quality_warnings`
 
 ### JobAnalysisWorkflowState
 

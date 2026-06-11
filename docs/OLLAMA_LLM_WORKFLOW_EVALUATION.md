@@ -76,3 +76,7 @@ LLM is not configured. Set JOBAGENT_LLM_BASE_URL, JOBAGENT_LLM_API_KEY, JOBAGENT
 - estimated_total_tokens_all_llm: 9568
 - main_observation: qwen2.5:1.5b with the local 8k-context setup produced schema-valid output for JDAnalysisAgent and ResumeOptimizeAgent. ProjectInterviewAgent still failed: it returned ValidationError in the isolated project-challenge mode and LLMServiceError in the all-LLM chain, so the workflow relied on fallback for interview challenge generation.
 - recommendation: qwen2.5:1.5b is promising for JD analysis and resume optimization evaluation, but ProjectInterviewAgent needs JSON repair, stricter output shaping, or a larger model before local LLM mode is reliable end to end.
+
+## Follow-up: Why JD Quality Gates Are Needed
+
+The 1.5B local run showed that `JDAnalysisAgent` can produce schema-valid JSON while still extracting too few required skills. That changed downstream scoring sharply, so JobAgent now treats schema validation as necessary but insufficient. JDAnalysis LLM output must also pass a lightweight quality gate before it is trusted.
