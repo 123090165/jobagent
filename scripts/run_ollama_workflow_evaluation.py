@@ -18,6 +18,7 @@ from app.agents.project_challenge_agent import PROJECT_CHALLENGE_SYSTEM_PROMPT
 from app.agents.resume_optimize_agent import RESUME_OPTIMIZE_SYSTEM_PROMPT
 from app.schemas.report import FinalReport
 from app.services.llm_service import LLMConfig, LLMService, LLMServiceError, parse_json_object
+from app.services.project_question_generation import PROJECT_QUESTION_GENERATOR_PROMPT_VERSION
 from app.workflows.job_analysis_workflow import JobAnalysisWorkflowResult, run_job_analysis_workflow
 from scripts.run_workflow_quality_smoke import JD_TEXT, RESUME_TEXT
 
@@ -123,7 +124,10 @@ class TrackingLLMService(LLMService):
             "response_format": {"type": "json_object"},
         }
         raw_response = self._post_chat_completions(payload)
-        self.usage_records[self.agent_name] = extract_usage(raw_response)
+        self.usage_records[self.agent_name] = add_usage_records(
+            self.usage_records.get(self.agent_name, UsageRecord()),
+            extract_usage(raw_response),
+        )
         content = extract_message_content(raw_response)
         return parse_json_object(content)
 
@@ -236,7 +240,9 @@ def build_token_rows(
             "input": (
                 f"{PROJECT_CHALLENGE_SYSTEM_PROMPT}\n\n"
                 f"ResumeProfile JSON:\n{resume_profile_json}\n\n"
-                f"JobAnalysis JSON:\n{job_analysis_json}"
+                f"JobAnalysis JSON:\n{job_analysis_json}\n\n"
+                f"MatchReport JSON:\n{match_report_json}\n\n"
+                f"Small-step prompt version: {PROJECT_QUESTION_GENERATOR_PROMPT_VERSION}"
             ),
             "output": json.dumps(report.project_challenge_report.model_dump(), ensure_ascii=False),
         },
@@ -268,6 +274,8 @@ def build_mode_report(evaluation: ModeEvaluation) -> str:
     report = evaluation.final_report
     state = evaluation.workflow_result.state
     quality_notes = build_quality_notes(evaluation)
+    jd_metrics = get_jd_analysis_metrics(evaluation)
+    project_metrics = get_project_challenge_metrics(evaluation)
 
     return "\n".join(
         [
@@ -292,6 +300,9 @@ def build_mode_report(evaluation: ModeEvaluation) -> str:
             "",
             "## JDAnalysisAgent Output",
             "",
+            f"- step_mode: {jd_metrics['mode']}",
+            f"- fallback_reason: {jd_metrics['fallback_reason']}",
+            f"- quality_warnings: {jd_metrics['quality_warnings']}",
             f"- job_title: {report.job_analysis.job_title}",
             f"- company: {report.job_analysis.company}",
             f"- location: {report.job_analysis.location}",
@@ -309,6 +320,10 @@ def build_mode_report(evaluation: ModeEvaluation) -> str:
             "",
             "## ProjectChallengeAgent Output",
             "",
+            f"- llm_success_count: {project_metrics['llm_success_count']}",
+            f"- fallback_count: {project_metrics['fallback_count']}",
+            f"- item_fallback_reasons: {project_metrics['item_fallback_reasons']}",
+            f"- prompt_version: {project_metrics['prompt_version']}",
             f"- basic_questions_count: {len(report.project_challenge_report.basic_questions)}",
             f"- technical_deep_dive_questions_count: {len(report.project_challenge_report.technical_deep_dive_questions)}",
             f"- architecture_questions_count: {len(report.project_challenge_report.architecture_questions)}",
@@ -411,8 +426,9 @@ def build_summary_doc(evaluations: list[ModeEvaluation]) -> str:
             "",
             (
                 "This experiment compares the deterministic JobAgent workflow with selected local "
-                "Ollama-backed LLM modes. It is an evaluation harness only; it does not change "
-                "agent prompts, schemas, storage, workflow core, or product behavior."
+                "Ollama-backed LLM modes. JDAnalysisAgent uses a prompt registry plus quality gate, "
+                "and ProjectChallengeAgent uses small-step question generation so item-level fallback "
+                "can be inspected separately from full-agent fallback."
             ),
             "",
             "## Run Commands",
@@ -422,7 +438,7 @@ def build_summary_doc(evaluations: list[ModeEvaluation]) -> str:
             "```bash",
             "set JOBAGENT_LLM_BASE_URL=http://127.0.0.1:11434/v1",
             "set JOBAGENT_LLM_API_KEY=ollama",
-            "set JOBAGENT_LLM_MODEL=qwen2.5:0.5b",
+            "set JOBAGENT_LLM_MODEL=qwen2.5:1.5b",
             "set JOBAGENT_LLM_TEMPERATURE=0",
             "set JOBAGENT_LLM_TIMEOUT=120",
             "",
@@ -459,16 +475,20 @@ def build_summary_doc(evaluations: list[ModeEvaluation]) -> str:
             "## How To Read The Results",
             "",
             "- mode=mock means the deterministic fallback path ran intentionally.",
-            "- mode=llm means that agent returned a schema-valid LLM result.",
+            "- mode=llm means that agent returned schema-valid LLM result(s). ProjectChallengeAgent may still have item-level fallbacks.",
             "- mode=fallback means the LLM path was requested but failed and the agent used the deterministic fallback.",
             "- fallback_reason usually identifies validation, request, parsing, or service failures.",
+            "- JDAnalysisAgent quality_warnings come from the JD quality gate after schema validation.",
+            "- ProjectInterviewAgent llm_success_count and fallback_count are per-question decomposition metrics.",
             "- Token estimates use `max(1, round(len(text) / 4))` and are conservative approximations, not billing records.",
             "- Actual usage fields are included only when the OpenAI-compatible response contains usage metadata.",
             "",
             "## Experiment Limits",
             "",
-            "- Prompt text is not changed in this experiment.",
-            "- Small local models may fail JSON schema requirements even when the workflow remains stable through fallback.",
+            "- JDAnalysisAgent schema-valid output can still fall back when the quality gate detects weak extraction.",
+            "- ProjectChallengeAgent uses one-question prompts instead of one full-report prompt.",
+            "- Python validates LLM output and assembles final artifacts instead of trusting large LLM reports directly.",
+            "- Small local models may fail individual JSON objects even when the workflow remains stable through per-question fallback.",
             "- Token estimates approximate the prompt reconstruction inside each agent; they are useful for comparison, not exact accounting.",
             "- Running only `--mode mock` validates the harness but does not evaluate Ollama model quality.",
             "",
@@ -477,24 +497,34 @@ def build_summary_doc(evaluations: list[ModeEvaluation]) -> str:
             f"- generated_modes: {modes}",
             f"- generated_at: {evaluations[0].generated_at}",
             "",
+            "## Integrated LLM Control Surfaces",
+            "",
+            "- JDAnalysisAgent uses the prompt registry plus a quality gate.",
+            "- ProjectChallengeAgent uses decomposition, one-question generation, and per-question fallback.",
+            "- LLM output is validated and assembled by Python before becoming workflow artifacts.",
+            "",
         ]
     )
 
 
 def build_steps_table(steps: list[dict[str, Any]]) -> str:
     rows = [
-        "| step | agent_name | mode | fallback_reason | quality_warnings | duration_ms | summary |",
-        "| --- | --- | --- | --- | --- | ---: | --- |",
+        "| step | agent_name | mode | fallback_reason | quality_warnings | duration_ms | llm_success_count | fallback_count | prompt_version | item_fallback_reasons | summary |",
+        "| --- | --- | --- | --- | --- | ---: | ---: | ---: | --- | --- | --- |",
     ]
     for index, step in enumerate(steps, start=1):
         rows.append(
-            "| {step} | {agent} | {mode} | {fallback} | {quality_warnings} | {duration:.3f} | {summary} |".format(
+            "| {step} | {agent} | {mode} | {fallback} | {quality_warnings} | {duration:.3f} | {llm_success_count} | {fallback_count} | {prompt_version} | {item_fallback_reasons} | {summary} |".format(
                 step=index,
                 agent=escape_table_cell(step.get("name", "")),
                 mode=escape_table_cell(step.get("mode", "")),
                 fallback=escape_table_cell(step.get("fallback_reason") or ""),
                 quality_warnings=escape_table_cell(join_list(step.get("quality_warnings") or [])),
                 duration=float(step.get("duration_ms") or 0.0),
+                llm_success_count=format_optional_int(step.get("llm_success_count")),
+                fallback_count=format_optional_int(step.get("fallback_count")),
+                prompt_version=escape_table_cell(step.get("prompt_version") or ""),
+                item_fallback_reasons=escape_table_cell(", ".join(step.get("item_fallback_reasons") or [])),
                 summary=escape_table_cell(step.get("summary", "")),
             )
         )
@@ -645,7 +675,11 @@ def agent_specific_note(evaluation: ModeEvaluation, agent_name: str) -> str:
             f"jd_targeted_bullets={len(report.optimization_result.jd_targeted_bullets)}."
         )
     if agent_name == "ProjectInterviewAgent":
+        metrics = get_project_challenge_metrics(evaluation)
         return (
+            f"llm_success_count={metrics['llm_success_count']}, "
+            f"fallback_count={metrics['fallback_count']}, "
+            f"item_fallback_reasons={metrics['item_fallback_reasons']}, "
             f"grounded_questions={len(report.project_challenge_report.grounded_questions)}, "
             f"basic_questions={len(report.project_challenge_report.basic_questions)}."
         )
@@ -675,6 +709,25 @@ def find_step(workflow_result: JobAnalysisWorkflowResult, agent_name: str) -> di
     }
 
 
+def get_jd_analysis_metrics(evaluation: ModeEvaluation) -> dict[str, Any]:
+    step = find_step(evaluation.workflow_result, "JDAnalysisAgent")
+    return {
+        "mode": step.get("mode") or "",
+        "fallback_reason": step.get("fallback_reason") or "",
+        "quality_warnings": step.get("quality_warnings") or [],
+    }
+
+
+def get_project_challenge_metrics(evaluation: ModeEvaluation) -> dict[str, Any]:
+    step = find_step(evaluation.workflow_result, "ProjectInterviewAgent")
+    return {
+        "llm_success_count": step.get("llm_success_count"),
+        "fallback_count": step.get("fallback_count"),
+        "item_fallback_reasons": step.get("item_fallback_reasons") or [],
+        "prompt_version": step.get("prompt_version") or "",
+    }
+
+
 def extract_usage(raw_response: dict[str, Any]) -> UsageRecord:
     usage = raw_response.get("usage")
     if not isinstance(usage, dict):
@@ -684,6 +737,22 @@ def extract_usage(raw_response: dict[str, Any]) -> UsageRecord:
         completion_tokens=normalize_optional_int(usage.get("completion_tokens")),
         total_tokens=normalize_optional_int(usage.get("total_tokens")),
     )
+
+
+def add_usage_records(left: UsageRecord, right: UsageRecord) -> UsageRecord:
+    return UsageRecord(
+        prompt_tokens=add_optional_ints(left.prompt_tokens, right.prompt_tokens),
+        completion_tokens=add_optional_ints(left.completion_tokens, right.completion_tokens),
+        total_tokens=add_optional_ints(left.total_tokens, right.total_tokens),
+    )
+
+
+def add_optional_ints(left: int | None, right: int | None) -> int | None:
+    if left is None:
+        return right
+    if right is None:
+        return left
+    return left + right
 
 
 def extract_message_content(response: dict[str, Any]) -> str:

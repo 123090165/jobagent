@@ -109,36 +109,11 @@ class ResumeOptimizeLLMService:
 class ProjectChallengeLLMService:
     def chat_completion_json(self, *, system_prompt: str, user_prompt: str):
         return {
-            "basic_questions": [
-                {
-                    "question": "JobAgent 解决的核心问题是什么？",
-                    "evaluates": "是否能讲清项目背景。",
-                    "answer_framework": "按问题、目标用户、方案来回答。",
-                }
-            ],
-            "technical_deep_dive_questions": [
-                {
-                    "question": "你在 JobAgent 里如何组织 FastAPI、Pydantic 和 workflow？",
-                    "evaluates": "是否理解数据流。",
-                    "answer_framework": "从 schema、service、agent、storage 角度说明。",
-                }
-            ],
-            "architecture_questions": [
-                {
-                    "question": "如果分析步骤继续增加，你会怎么保持 workflow 可维护？",
-                    "evaluates": "是否具备架构演进意识。",
-                    "answer_framework": "从状态、trace 和测试三方面回答。",
-                }
-            ],
-            "tradeoff_questions": [
-                {
-                    "question": "为什么现在仍保留 mock fallback？",
-                    "evaluates": "是否理解稳定性和可用性的取舍。",
-                    "answer_framework": "从可用性、成本和失败恢复说明。",
-                }
-            ],
-            "interviewer_concerns": ["项目是否缺少真实输入输出约束。"],
-            "improvement_suggestions": ["准备真实样例输入输出和 trace 展示。"],
+            "question": "How did you use the provided evidence to satisfy this requirement?",
+            "why_asked": "It validates whether the candidate can explain real project evidence.",
+            "expected_answer_points": ["implementation detail", "personal ownership"],
+            "risk_level": "medium",
+            "question_type": "technical",
         }
 
 

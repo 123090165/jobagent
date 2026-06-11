@@ -15,10 +15,11 @@ class PromptPathError(ValueError):
 
 def load_prompt(relative_path: str) -> str:
     """Load a UTF-8 prompt from app/prompts with basic path restrictions."""
-    if not relative_path or Path(relative_path).is_absolute():
+    path = Path(relative_path)
+    if not relative_path or path.is_absolute():
         raise PromptPathError("Prompt path must be a relative path inside app/prompts.")
 
-    candidate = (PROMPTS_ROOT / relative_path).resolve()
+    candidate = (PROMPTS_ROOT / path).resolve()
     try:
         candidate.relative_to(PROMPTS_ROOT)
     except ValueError as exc:

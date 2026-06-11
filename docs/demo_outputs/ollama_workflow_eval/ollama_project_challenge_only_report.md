@@ -5,31 +5,34 @@
 - model: qwen2.5:1.5b
 - base_url: http://127.0.0.1:11434/v1
 - temperature: 0.0
-- timeout: 180.0
+- timeout: 300.0
 - mode: ollama-project-challenge-only
-- generated_at: 2026-06-11T00:32:02+00:00
+- generated_at: 2026-06-11T05:18:36+00:00
 
 ## Workflow Steps
 
-| step | agent_name | mode | fallback_reason | duration_ms | summary |
-| --- | --- | --- | --- | ---: | --- |
-| 1 | ResumeParseAgent | mock |  | 0.228 | 识别技能 12 个，项目 2 个。 |
-| 2 | JDAnalysisAgent | mock |  | 0.196 | 使用 mock JD 规则分析 必备技能 9 个。 |
-| 3 | MatchAgent | mock |  | 0.765 | 生成匹配报告，总分 77.0。 |
-| 4 | ResumeOptimizeAgent | mock |  | 0.129 | 使用 mock 简历优化 生成 2 条 JD 定向建议。 |
-| 5 | ProjectInterviewAgent | fallback | ValidationError | 101461.015 | LLM 项目追问失败，已回退 mock（ValidationError） |
-| 6 | ReportAgent | mock |  | 0.128 | 聚合结构化结果并生成 Markdown 报告。 |
+| step | agent_name | mode | fallback_reason | quality_warnings | duration_ms | llm_success_count | fallback_count | prompt_version | item_fallback_reasons | summary |
+| --- | --- | --- | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 1 | ResumeParseAgent | mock |  | None | 1.385 |  |  |  |  | 识别技能 12 个，项目 2 个。 |
+| 2 | JDAnalysisAgent | mock |  | None | 2.874 |  |  |  |  | 使用 mock JD 规则分析 必备技能 9 个。 |
+| 3 | MatchAgent | mock |  | None | 2.338 |  |  |  |  | 生成匹配报告，总分 77.0。 |
+| 4 | ResumeOptimizeAgent | mock |  | None | 0.399 |  |  |  |  | 使用 mock 简历优化 生成 2 条 JD 定向建议。 |
+| 5 | ProjectInterviewAgent | llm |  | None | 38549.408 | 6 | 0 | project_question_generator_v1 |  | 使用 LLM 项目追问 |
+| 6 | ReportAgent | mock |  | None | 0.240 |  |  |  |  | 聚合结构化结果并生成 Markdown 报告。 |
 
 ## Token Estimate
 
 | agent | estimated_input_tokens | estimated_output_tokens | estimated_total_tokens | mode | fallback_reason | actual_prompt_tokens | actual_completion_tokens | actual_total_tokens |
 | --- | ---: | ---: | ---: | --- | --- | ---: | ---: | ---: |
-| JDAnalysisAgent | 456 | 401 | 857 | mock |  |  |  |  |
+| JDAnalysisAgent | 768 | 401 | 1169 | mock |  |  |  |  |
 | ResumeOptimizeAgent | 2259 | 1166 | 3425 | mock |  |  |  |  |
-| ProjectInterviewAgent | 1284 | 1495 | 2779 | fallback | ValidationError | 1210 | 1497 | 2707 |
+| ProjectInterviewAgent | 1779 | 1430 | 3209 | llm |  | 1336 | 603 | 1939 |
 
 ## JDAnalysisAgent Output
 
+- step_mode: mock
+- fallback_reason: 
+- quality_warnings: []
 - job_title: Role: AI Agent Backend Intern
 - company: None
 - location: None
@@ -47,10 +50,14 @@
 
 ## ProjectChallengeAgent Output
 
-- basic_questions_count: 2
-- technical_deep_dive_questions_count: 3
-- architecture_questions_count: 1
-- grounded_questions_count: 8
+- llm_success_count: 6
+- fallback_count: 0
+- item_fallback_reasons: []
+- prompt_version: project_question_generator_v1
+- basic_questions_count: 1
+- technical_deep_dive_questions_count: 5
+- architecture_questions_count: 0
+- grounded_questions_count: 6
 
 ## Final Report Summary
 
@@ -59,20 +66,21 @@
 - project_count: 2
 - work_experience_count: 0
 - rewrite_suggestions_count: 6
-- grounded_questions_count: 8
+- grounded_questions_count: 6
 
 ## Output Quality Notes
 
-- Workflow ran with 1 fallback step(s).
+- Workflow ran with 0 fallback step(s).
 - JDAnalysisAgent extracted 9 required skills and 9 keywords.
+- JDAnalysisAgent quality warnings: None.
 - Check required_skills for preferred-skill leakage; the report lists preferred_skills separately for manual review.
 - ResumeOptimizeAgent produced 6 rewrite suggestions and 2 JD-targeted bullets.
 - 0 non-missing rewrite suggestions lack explicit evidence sources.
-- ProjectChallengeAgent produced 8 grounded questions.
+- ProjectChallengeAgent produced 6 grounded questions.
 - Missing requirements surfaced by MatchAgent: None.
-- Estimated total tokens for the three LLM-capable agents: 7061.
+- Estimated total tokens for the three LLM-capable agents: 7803.
 - Quality warnings: resume has no quantified or highlight evidence, JD has no clear experience requirements.
-- At least one requested LLM step fell back, so quality should be judged as fallback output for those agents.
+- Requested LLM steps returned schema-valid outputs; compare specificity against the mock baseline.
 
 ## Final Markdown Report
 
@@ -170,7 +178,7 @@
   - Skill: Python
 - Gap / hint: No additional gap or improvement note.
 - Rewrite suggestion: Core skill: Python, highlighted directly against the JD requirement for Python.
-- Interview challenge: You have resume evidence for Python. Walk through the specific project or work context, the key implementation choices, the tradeoffs you made, and the result.
+- Interview challenge: Can you walk me through a project where you used Python to develop an AI backend solution?
 
 ### Requirement: FastAPI
 - Match level: matched
@@ -178,7 +186,7 @@
   - Skill: FastAPI
 - Gap / hint: No additional gap or improvement note.
 - Rewrite suggestion: Core skill: FastAPI, highlighted directly against the JD requirement for FastAPI.
-- Interview challenge: You have resume evidence for FastAPI. Walk through the specific project or work context, the key implementation choices, the tradeoffs you made, and the result.
+- Interview challenge: Can you walk me through how you've used FastAPI in a previous project, and what benefits it brought to the team?
 
 ### Requirement: Pydantic
 - Match level: matched
@@ -186,7 +194,7 @@
   - Skill: Pydantic
 - Gap / hint: No additional gap or improvement note.
 - Rewrite suggestion: Core skill: Pydantic, highlighted directly against the JD requirement for Pydantic.
-- Interview challenge: You have resume evidence for Pydantic. Walk through the specific project or work context, the key implementation choices, the tradeoffs you made, and the result.
+- Interview challenge: Can you explain how Pydantic can be used to validate and enforce the structure of your backend API responses, ensuring data integrity and consistency?
 
 ### Requirement: LangGraph
 - Match level: matched
@@ -194,7 +202,7 @@
   - Skill: LangGraph
 - Gap / hint: No additional gap or improvement note.
 - Rewrite suggestion: Core skill: LangGraph, highlighted directly against the JD requirement for LangGraph.
-- Interview challenge: You have resume evidence for LangGraph. Walk through the specific project or work context, the key implementation choices, the tradeoffs you made, and the result.
+- Interview challenge: Could you walk me through how LangGraph is used in the backend development of an AI project, and explain its significance compared to other graph databases?
 
 ### Requirement: LLM
 - Match level: matched
@@ -202,39 +210,37 @@
   - Skill: LLM
 - Gap / hint: No additional gap or improvement note.
 - Rewrite suggestion: Core skill: LLM, highlighted directly against the JD requirement for LLM.
-- Interview challenge: You have resume evidence for LLM. Walk through the specific project or work context, the key implementation choices, the tradeoffs you made, and the result.
+- Interview challenge: Can you walk me through a project where you utilized an LLM to solve a specific problem, and how did the model's performance compare to human judgment in terms of accuracy and efficiency?
 
 ## 8. Project Challenge Questions
 
 ### Basic questions
 
-- **Question**: 项目 1 解决的真实问题是什么？为什么需要做这个项目？
-  - Evaluates: 项目背景是否真实，是否能讲清楚需求来源。
-  - Answer framework: 先讲使用场景，再讲痛点，最后讲你的目标和边界。
-- **Question**: 这个项目中你个人负责了哪一部分？哪些不是你做的？
-  - Evaluates: 个人贡献边界是否清楚，是否存在夸大风险。
-  - Answer framework: 按模块列出个人负责内容，并诚实说明协作或参考部分。
+- **Question**: Can you explain how Pydantic can be used to validate and enforce the structure of your backend API responses, ensuring data integrity and consistency?
+  - Evaluates: To assess your understanding of using Pydantic for validating backend API responses.
+  - Answer framework: Understanding of Pydantic's role in enforcing data structures
 
 ### Technical deep dive questions
 
-- **Question**: 你在项目中如何体现 Python？具体用在什么模块？
-  - Evaluates: 技能是否只是写在简历上，还是有真实使用场景。
-  - Answer framework: 说明使用位置、输入输出、关键实现和遇到的问题。
-- **Question**: 你在项目中如何体现 FastAPI？具体用在什么模块？
-  - Evaluates: 技能是否只是写在简历上，还是有真实使用场景。
-  - Answer framework: 说明使用位置、输入输出、关键实现和遇到的问题。
-- **Question**: 你在项目中如何体现 Pydantic？具体用在什么模块？
-  - Evaluates: 技能是否只是写在简历上，还是有真实使用场景。
-  - Answer framework: 说明使用位置、输入输出、关键实现和遇到的问题。
+- **Question**: 请描述你在项目 1 中如何实现一个基于目标匹配的简历/JD匹配系统，该系统旨在帮助前端工程师快速找到合适的职位。
+  - Evaluates: 通过这个问题，我们可以了解你对AI技术在简历匹配中的应用理解和实际操作能力。
+  - Answer framework: 简历匹配系统的功能描述; 使用的技术和工具; 实现过程中的挑战与解决方案
+- **Question**: Can you walk me through a project where you used Python to develop an AI backend solution?
+  - Evaluates: To assess your experience and proficiency with Python in the context of developing AI backend solutions.
+  - Answer framework: Project details; Python code snippets; Explanation of key algorithms or models
+- **Question**: Can you walk me through how you've used FastAPI in a previous project, and what benefits it brought to the team?
+  - Evaluates: To assess your practical experience with FastAPI and its ability to contribute to the development of an AI backend.
+  - Answer framework: Explain the setup process; Describe the integration with other components; Discuss any performance improvements or scalability benefits
+- **Question**: Could you walk me through how LangGraph is used in the backend development of an AI project, and explain its significance compared to other graph databases?
+  - Evaluates: To assess your understanding of LangGraph's capabilities and its role within a larger system.
+  - Answer framework: Explanation of LangGraph's features; Comparison with traditional graph databases
+- **Question**: Can you walk me through a project where you utilized an LLM to solve a specific problem, and how did the model's performance compare to human judgment in terms of accuracy and efficiency?
+  - Evaluates: To assess your ability to apply AI technology effectively and understand its limitations.
+  - Answer framework: Project description; Problem statement; Model selection; Performance comparison with human judgment
 
 ### Architecture and tradeoff questions
 
-- **Question**: 如果这个项目用户量增加 10 倍，你会先改哪一层？
-  - Evaluates: 是否理解架构瓶颈和扩展优先级。
-  - Answer framework: 从数据流、存储、接口、异步任务和监控几个角度分析。
-- **Question**: 当时为什么选择这种技术方案？有没有更简单或更稳定的替代方案？
-  - Evaluates: 是否具备技术选型和取舍意识。
-  - Answer framework: 讲清楚约束、备选方案、选择理由和后续改进。
+- None
 
 ## 9. One-Week Action Plan
 
