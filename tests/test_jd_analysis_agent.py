@@ -66,6 +66,54 @@ def test_run_jd_analysis_agent_reports_fallback_metadata() -> None:
     assert result.metadata.fallback_reason == "LLMServiceError"
 
 
+def test_run_jd_analysis_agent_falls_back_when_llm_output_fails_quality_gate() -> None:
+    service = FakeLLMService(
+        {
+            "job_title": "AI 应用开发工程师",
+            "responsibilities": ["负责 Python 后端开发"],
+            "required_skills": ["Python"],
+            "preferred_skills": [],
+            "keywords": ["Python"],
+            "job_category": "AI / LLM 应用开发",
+        }
+    )
+
+    result = run_jd_analysis_agent(SAMPLE_JD, use_llm=True, service=service)  # type: ignore[arg-type]
+
+    assert result.metadata.mode == "fallback"
+    assert result.metadata.fallback_reason == "quality_gate_failed"
+    assert "LLM required_skills are much fewer than deterministic baseline" in result.metadata.quality_warnings
+    assert "FastAPI" in result.output.required_skills
+
+
+def test_run_jd_analysis_agent_keeps_good_llm_output() -> None:
+    service = FakeLLMService(
+        {
+            "job_title": "AI 应用开发工程师",
+            "responsibilities": ["负责 Python 后端开发", "设计 REST API", "参与 LLM 应用建设"],
+            "required_skills": ["Python", "FastAPI", "SQL", "Pydantic", "Git"],
+            "preferred_skills": ["RAG", "LangGraph", "Docker"],
+            "keywords": ["Python", "FastAPI", "SQL", "Pydantic", "Git", "RAG", "LangGraph", "Docker"],
+            "job_category": "AI / LLM 应用开发",
+        }
+    )
+
+    result = run_jd_analysis_agent(SAMPLE_JD, use_llm=True, service=service)  # type: ignore[arg-type]
+
+    assert result.metadata.mode == "llm"
+    assert result.metadata.fallback_reason is None
+    assert result.metadata.quality_warnings == []
+    assert result.output.required_skills == ["Python", "FastAPI", "SQL", "Pydantic", "Git"]
+
+
+def test_run_jd_analysis_agent_mock_mode_unchanged() -> None:
+    result = run_jd_analysis_agent(SAMPLE_JD, use_llm=False)
+
+    assert result.metadata.mode == "mock"
+    assert result.metadata.quality_warnings == []
+    assert "Python" in result.output.required_skills
+
+
 def test_parse_json_object_accepts_markdown_fenced_json() -> None:
     payload = parse_json_object('```json\n{"job_title": "Backend Engineer"}\n```')
 

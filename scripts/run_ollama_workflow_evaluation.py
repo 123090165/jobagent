@@ -483,16 +483,17 @@ def build_summary_doc(evaluations: list[ModeEvaluation]) -> str:
 
 def build_steps_table(steps: list[dict[str, Any]]) -> str:
     rows = [
-        "| step | agent_name | mode | fallback_reason | duration_ms | summary |",
-        "| --- | --- | --- | --- | ---: | --- |",
+        "| step | agent_name | mode | fallback_reason | quality_warnings | duration_ms | summary |",
+        "| --- | --- | --- | --- | --- | ---: | --- |",
     ]
     for index, step in enumerate(steps, start=1):
         rows.append(
-            "| {step} | {agent} | {mode} | {fallback} | {duration:.3f} | {summary} |".format(
+            "| {step} | {agent} | {mode} | {fallback} | {quality_warnings} | {duration:.3f} | {summary} |".format(
                 step=index,
                 agent=escape_table_cell(step.get("name", "")),
                 mode=escape_table_cell(step.get("mode", "")),
                 fallback=escape_table_cell(step.get("fallback_reason") or ""),
+                quality_warnings=escape_table_cell(join_list(step.get("quality_warnings") or [])),
                 duration=float(step.get("duration_ms") or 0.0),
                 summary=escape_table_cell(step.get("summary", "")),
             )
@@ -555,10 +556,11 @@ def compare_agent_modes(evaluations: list[ModeEvaluation], agent_name: str, pref
         step = find_step(evaluation.workflow_result, agent_name)
         token_row = next(row for row in evaluation.token_rows if row["agent"] == agent_name)
         lines.append(
-            "- {mode}: step_mode={step_mode}, fallback_reason={fallback}, estimated_total_tokens={tokens}. {note}".format(
+            "- {mode}: step_mode={step_mode}, fallback_reason={fallback}, quality_warnings={quality_warnings}, estimated_total_tokens={tokens}. {note}".format(
                 mode=mode,
                 step_mode=step.get("mode", ""),
                 fallback=step.get("fallback_reason") or "none",
+                quality_warnings=join_list(step.get("quality_warnings") or []),
                 tokens=token_row["estimated_total_tokens"],
                 note=agent_specific_note(evaluation, agent_name),
             )
@@ -584,6 +586,7 @@ def build_quality_notes(evaluation: ModeEvaluation) -> list[str]:
     notes = [
         f"Workflow ran with {evaluation.fallback_count} fallback step(s).",
         f"JDAnalysisAgent extracted {len(jd.required_skills)} required skills and {len(jd.keywords)} keywords.",
+        f"JDAnalysisAgent quality warnings: {join_list(find_step(evaluation.workflow_result, 'JDAnalysisAgent').get('quality_warnings') or [])}.",
         "Check required_skills for preferred-skill leakage; the report lists preferred_skills separately for manual review.",
         f"ResumeOptimizeAgent produced {len(optimization.rewrite_suggestions)} rewrite suggestions and {len(optimization.jd_targeted_bullets)} JD-targeted bullets.",
         f"{len(unsupported_rewrites)} non-missing rewrite suggestions lack explicit evidence sources.",
@@ -662,7 +665,14 @@ def find_step(workflow_result: JobAnalysisWorkflowResult, agent_name: str) -> di
     for step in workflow_result.state.steps:
         if step.name == agent_name:
             return step.model_dump()
-    return {"name": agent_name, "mode": "", "fallback_reason": "", "duration_ms": 0.0, "summary": ""}
+    return {
+        "name": agent_name,
+        "mode": "",
+        "fallback_reason": "",
+        "quality_warnings": [],
+        "duration_ms": 0.0,
+        "summary": "",
+    }
 
 
 def extract_usage(raw_response: dict[str, Any]) -> UsageRecord:

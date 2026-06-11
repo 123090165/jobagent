@@ -15,6 +15,7 @@ class AgentRunMetadata(BaseModel):
     mode: AgentExecutionMode
     fallback_reason: str | None = None
     guardrails: list[str] = Field(default_factory=list)
+    quality_warnings: list[str] = Field(default_factory=list)
 
 
 @dataclass(frozen=True)
