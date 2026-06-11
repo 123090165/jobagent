@@ -1,4 +1,4 @@
-# Ollama Workflow Evaluation - mock
+# Ollama Workflow Evaluation - ollama-project-challenge-only
 
 ## Config
 
@@ -6,19 +6,19 @@
 - base_url: http://127.0.0.1:11434/v1
 - temperature: 0.0
 - timeout: 180.0
-- mode: mock
+- mode: ollama-project-challenge-only
 - generated_at: 2026-06-11T00:32:02+00:00
 
 ## Workflow Steps
 
 | step | agent_name | mode | fallback_reason | duration_ms | summary |
 | --- | --- | --- | --- | ---: | --- |
-| 1 | ResumeParseAgent | mock |  | 1.849 | 识别技能 12 个，项目 2 个。 |
-| 2 | JDAnalysisAgent | mock |  | 0.503 | 使用 mock JD 规则分析 必备技能 9 个。 |
-| 3 | MatchAgent | mock |  | 0.682 | 生成匹配报告，总分 77.0。 |
-| 4 | ResumeOptimizeAgent | mock |  | 0.220 | 使用 mock 简历优化 生成 2 条 JD 定向建议。 |
-| 5 | ProjectInterviewAgent | mock |  | 0.086 | 使用 mock 项目追问 |
-| 6 | ReportAgent | mock |  | 0.099 | 聚合结构化结果并生成 Markdown 报告。 |
+| 1 | ResumeParseAgent | mock |  | 0.228 | 识别技能 12 个，项目 2 个。 |
+| 2 | JDAnalysisAgent | mock |  | 0.196 | 使用 mock JD 规则分析 必备技能 9 个。 |
+| 3 | MatchAgent | mock |  | 0.765 | 生成匹配报告，总分 77.0。 |
+| 4 | ResumeOptimizeAgent | mock |  | 0.129 | 使用 mock 简历优化 生成 2 条 JD 定向建议。 |
+| 5 | ProjectInterviewAgent | fallback | ValidationError | 101461.015 | LLM 项目追问失败，已回退 mock（ValidationError） |
+| 6 | ReportAgent | mock |  | 0.128 | 聚合结构化结果并生成 Markdown 报告。 |
 
 ## Token Estimate
 
@@ -26,7 +26,7 @@
 | --- | ---: | ---: | ---: | --- | --- | ---: | ---: | ---: |
 | JDAnalysisAgent | 456 | 401 | 857 | mock |  |  |  |  |
 | ResumeOptimizeAgent | 2259 | 1166 | 3425 | mock |  |  |  |  |
-| ProjectInterviewAgent | 1284 | 1495 | 2779 | mock |  |  |  |  |
+| ProjectInterviewAgent | 1284 | 1495 | 2779 | fallback | ValidationError | 1210 | 1497 | 2707 |
 
 ## JDAnalysisAgent Output
 
@@ -63,7 +63,7 @@
 
 ## Output Quality Notes
 
-- Workflow ran with 0 fallback step(s).
+- Workflow ran with 1 fallback step(s).
 - JDAnalysisAgent extracted 9 required skills and 9 keywords.
 - Check required_skills for preferred-skill leakage; the report lists preferred_skills separately for manual review.
 - ResumeOptimizeAgent produced 6 rewrite suggestions and 2 JD-targeted bullets.
@@ -72,7 +72,7 @@
 - Missing requirements surfaced by MatchAgent: None.
 - Estimated total tokens for the three LLM-capable agents: 7061.
 - Quality warnings: resume has no quantified or highlight evidence, JD has no clear experience requirements.
-- This run is a deterministic baseline; token counts are estimates only and not actual LLM usage.
+- At least one requested LLM step fell back, so quality should be judged as fallback output for those agents.
 
 ## Final Markdown Report
 

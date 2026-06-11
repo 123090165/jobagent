@@ -1,4 +1,4 @@
-# Ollama Workflow Evaluation - mock
+# Ollama Workflow Evaluation - ollama-resume-optimize-only
 
 ## Config
 
@@ -6,26 +6,26 @@
 - base_url: http://127.0.0.1:11434/v1
 - temperature: 0.0
 - timeout: 180.0
-- mode: mock
+- mode: ollama-resume-optimize-only
 - generated_at: 2026-06-11T00:32:02+00:00
 
 ## Workflow Steps
 
 | step | agent_name | mode | fallback_reason | duration_ms | summary |
 | --- | --- | --- | --- | ---: | --- |
-| 1 | ResumeParseAgent | mock |  | 1.849 | 识别技能 12 个，项目 2 个。 |
-| 2 | JDAnalysisAgent | mock |  | 0.503 | 使用 mock JD 规则分析 必备技能 9 个。 |
-| 3 | MatchAgent | mock |  | 0.682 | 生成匹配报告，总分 77.0。 |
-| 4 | ResumeOptimizeAgent | mock |  | 0.220 | 使用 mock 简历优化 生成 2 条 JD 定向建议。 |
-| 5 | ProjectInterviewAgent | mock |  | 0.086 | 使用 mock 项目追问 |
-| 6 | ReportAgent | mock |  | 0.099 | 聚合结构化结果并生成 Markdown 报告。 |
+| 1 | ResumeParseAgent | mock |  | 0.223 | 识别技能 12 个，项目 2 个。 |
+| 2 | JDAnalysisAgent | mock |  | 0.209 | 使用 mock JD 规则分析 必备技能 9 个。 |
+| 3 | MatchAgent | mock |  | 0.834 | 生成匹配报告，总分 77.0。 |
+| 4 | ResumeOptimizeAgent | llm |  | 40029.974 | 使用 LLM 简历优化 生成 1 条 JD 定向建议。 |
+| 5 | ProjectInterviewAgent | mock |  | 0.165 | 使用 mock 项目追问 |
+| 6 | ReportAgent | mock |  | 0.147 | 聚合结构化结果并生成 Markdown 报告。 |
 
 ## Token Estimate
 
 | agent | estimated_input_tokens | estimated_output_tokens | estimated_total_tokens | mode | fallback_reason | actual_prompt_tokens | actual_completion_tokens | actual_total_tokens |
 | --- | ---: | ---: | ---: | --- | --- | ---: | ---: | ---: |
 | JDAnalysisAgent | 456 | 401 | 857 | mock |  |  |  |  |
-| ResumeOptimizeAgent | 2259 | 1166 | 3425 | mock |  |  |  |  |
+| ResumeOptimizeAgent | 2259 | 1083 | 3342 | llm |  | 2370 | 170 | 2540 |
 | ProjectInterviewAgent | 1284 | 1495 | 2779 | mock |  |  |  |  |
 
 ## JDAnalysisAgent Output
@@ -41,9 +41,9 @@
 ## ResumeOptimizeAgent Output
 
 - rewrite_suggestions_count: 6
-- jd_targeted_bullets_count: 2
-- missing_info_needed: 缺少结果或量化亮点
-- do_not_exaggerate: 不要编造没有做过的公司、项目、数据指标或技术栈。, 没有量化数据时，只写“建议补充指标”，不要直接生成虚假百分比。
+- jd_targeted_bullets_count: 1
+- missing_info_needed: 需要补充量化成果和项目细节
+- do_not_exaggerate: 避免夸大其词
 
 ## ProjectChallengeAgent Output
 
@@ -66,13 +66,13 @@
 - Workflow ran with 0 fallback step(s).
 - JDAnalysisAgent extracted 9 required skills and 9 keywords.
 - Check required_skills for preferred-skill leakage; the report lists preferred_skills separately for manual review.
-- ResumeOptimizeAgent produced 6 rewrite suggestions and 2 JD-targeted bullets.
+- ResumeOptimizeAgent produced 6 rewrite suggestions and 1 JD-targeted bullets.
 - 0 non-missing rewrite suggestions lack explicit evidence sources.
 - ProjectChallengeAgent produced 8 grounded questions.
 - Missing requirements surfaced by MatchAgent: None.
-- Estimated total tokens for the three LLM-capable agents: 7061.
+- Estimated total tokens for the three LLM-capable agents: 6978.
 - Quality warnings: resume has no quantified or highlight evidence, JD has no clear experience requirements.
-- This run is a deterministic baseline; token counts are estimates only and not actual LLM usage.
+- Requested LLM steps returned schema-valid outputs; compare specificity against the mock baseline.
 
 ## Final Markdown Report
 
@@ -140,27 +140,33 @@
 
 ### Overall issues
 
-- 当前简历需要更明确地对齐目标 JD 的必备技能。
-- 项目经历应补充问题背景、技术方案、个人贡献和结果指标。
+- 简历中缺少量化成果和项目细节
 
 ### Keywords to add
 
-- None
+- Python
+- FastAPI
+- Pydantic
+- LangGraph
+- LLM API integration
+- Docker
+- GitHub Actions
+- REST API design
+- Git
+- Markdown documentation
 
 ### Skills section suggestions
 
-- 把与 JD 直接相关的技能放在技能栏前半部分。
-- 技能不要只罗列名词，项目中也要出现对应使用场景。
+- 在技能栏中添加更多相关技术栈，如：
+- 在技能栏中添加更多相关技术栈，如：
 
 ### JD-targeted bullets
 
-- 基于已有项目，补充与目标 JD 技能相关的模块、接口、数据流或评估方式。
-- 如果确实使用过相关技术，写清楚使用位置、解决的问题和结果；没有使用过则不要硬写。
+- 简历中的项目描述应与JD要求相匹配
 
 ### Do not exaggerate
 
-- 不要编造没有做过的公司、项目、数据指标或技术栈。
-- 没有量化数据时，只写“建议补充指标”，不要直接生成虚假百分比。
+- 避免夸大其词
 
 ## 7. JD-Resume Evidence Chain
 

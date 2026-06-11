@@ -63,5 +63,16 @@ LLM is not configured. Set JOBAGENT_LLM_BASE_URL, JOBAGENT_LLM_API_KEY, JOBAGENT
 
 ## Latest Local Run
 
-- generated_modes: mock
-- generated_at: 2026-06-10T14:17:27+00:00
+- generated_modes: mock, ollama-jd-only, ollama-resume-optimize-only, ollama-project-challenge-only, ollama-all-llm
+- generated_at: 2026-06-11T00:32:02+00:00
+
+## Local Ollama 8k 1.5B Run Summary
+
+- actual_model: qwen2.5:1.5b
+- base_url: http://127.0.0.1:11434/v1
+- modes_run: mock, ollama-jd-only, ollama-resume-optimize-only, ollama-project-challenge-only, ollama-all-llm
+- modes_with_llm_success: ollama-jd-only, ollama-resume-optimize-only, ollama-all-llm (JDAnalysisAgent and ResumeOptimizeAgent)
+- modes_with_fallback: ollama-project-challenge-only, ollama-all-llm (ProjectInterviewAgent)
+- estimated_total_tokens_all_llm: 9568
+- main_observation: qwen2.5:1.5b with the local 8k-context setup produced schema-valid output for JDAnalysisAgent and ResumeOptimizeAgent. ProjectInterviewAgent still failed: it returned ValidationError in the isolated project-challenge mode and LLMServiceError in the all-LLM chain, so the workflow relied on fallback for interview challenge generation.
+- recommendation: qwen2.5:1.5b is promising for JD analysis and resume optimization evaluation, but ProjectInterviewAgent needs JSON repair, stricter output shaping, or a larger model before local LLM mode is reliable end to end.
