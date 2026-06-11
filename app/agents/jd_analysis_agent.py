@@ -5,38 +5,14 @@ from typing import Any
 from pydantic import ValidationError
 
 from app.agents.types import AgentExecutionMode, AgentRunMetadata, AgentRunResult
+from app.prompts.loader import load_prompt
 from app.schemas.job import JobAnalysis
+from app.services.jd_analysis_quality import evaluate_jd_analysis_quality
 from app.services.llm_service import LLMService, LLMServiceError
 
 
-JD_ANALYSIS_SYSTEM_PROMPT = """You are JobAgent's JDAnalysisAgent.
-
-Task:
-Analyze a job description and return one JSON object that matches this shape:
-{
-  "raw_jd": string,
-  "job_title": string or null,
-  "company": string or null,
-  "location": string or null,
-  "responsibilities": string[],
-  "required_skills": string[],
-  "preferred_skills": string[],
-  "experience_requirements": string[],
-  "education_requirements": string[],
-  "soft_skills": string[],
-  "implicit_requirements": string[],
-  "keywords": string[],
-  "job_category": string or null
-}
-
-Rules:
-- Do not invent facts that are not in the JD.
-- Do not treat preferred skills as required skills.
-- Keep technical keywords concise and normalized.
-- If information is missing, use null or an empty list.
-- Preserve the original JD language where helpful.
-- Return JSON only. No Markdown.
-"""
+JD_ANALYSIS_PROMPT_VERSION = "jd_analysis_v2"
+JD_ANALYSIS_SYSTEM_PROMPT = load_prompt("jd_analysis/system.md")
 
 
 def analyze_jd(
@@ -70,14 +46,30 @@ def run_jd_analysis_agent(
             metadata=_metadata(mode="mock"),
         )
 
+    baseline = _mock_jd_analysis(normalized_jd)
     try:
+        llm_output = analyze_jd_with_llm(normalized_jd, service=service)
+        quality = evaluate_jd_analysis_quality(
+            jd_text=normalized_jd,
+            llm_analysis=llm_output,
+            baseline_analysis=baseline,
+        )
+        if quality.fallback_recommended:
+            return AgentRunResult(
+                output=baseline,
+                metadata=_metadata(
+                    mode="fallback",
+                    fallback_reason="quality_gate_failed",
+                    quality_warnings=quality.warnings,
+                ),
+            )
         return AgentRunResult(
-            output=analyze_jd_with_llm(normalized_jd, service=service),
-            metadata=_metadata(mode="llm"),
+            output=llm_output,
+            metadata=_metadata(mode="llm", quality_warnings=quality.warnings),
         )
     except (LLMServiceError, ValidationError, ValueError, TypeError) as exc:
         return AgentRunResult(
-            output=_mock_jd_analysis(normalized_jd),
+            output=baseline,
             metadata=_metadata(
                 mode="fallback",
                 fallback_reason=type(exc).__name__,
@@ -122,14 +114,18 @@ def _metadata(
     *,
     mode: AgentExecutionMode,
     fallback_reason: str | None = None,
+    quality_warnings: list[str] | None = None,
 ) -> AgentRunMetadata:
     return AgentRunMetadata(
         agent_name="JDAnalysisAgent",
         mode=mode,
         fallback_reason=fallback_reason,
+        quality_warnings=quality_warnings or [],
         guardrails=[
             "不编造 JD 中不存在的信息",
             "不把加分项误判为必备项",
             "LLM 输出必须通过 JobAnalysis schema 校验",
+            "LLM JD 分析输出必须通过质量门禁",
+            f"prompt_version={JD_ANALYSIS_PROMPT_VERSION}",
         ],
     )

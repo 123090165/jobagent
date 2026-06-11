@@ -115,6 +115,7 @@ ResumeParseAgent
   - 输入：`jd_text`
   - 输出：`JobAnalysis`
   - 作用：提取岗位标题、required skills、responsibilities、experience requirements
+  - LLM 模式：从 prompt registry 加载 JDAnalysis prompt，并在 schema validation 后通过 JD quality gate 检查 required skills、responsibility metadata pollution、verbose skills/keywords 和 metadata grounding；风险过高时 fallback 到 deterministic baseline。
 - `MatchAgent`
   - 输入：`ResumeProfile` + `JobAnalysis`
   - 输出：`MatchReport`
@@ -144,6 +145,8 @@ ResumeParseAgent
   - 对 resume / JD / match evidence 的质量门禁
 - `Markdown JD-Resume Evidence Chain`
   - 在最终报告里串起 requirement -> evidence -> rewrite -> challenge
+
+ProjectChallengeAgent LLM mode is decomposed: Python selects requirements and binds evidence, the LLM generates one small grounded question draft at a time, and Python validates and assembles the unchanged `ProjectChallengeReport` schema. A failed question uses local fallback without forcing the whole agent to fallback unless every item fails or no requirements can be selected.
 
 ## 4. Code Structure
 

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This experiment compares the deterministic JobAgent workflow with selected local Ollama-backed LLM modes. It is an evaluation harness only; it does not change agent prompts, schemas, storage, workflow core, or product behavior.
+This experiment compares the deterministic JobAgent workflow with selected local Ollama-backed LLM modes. JDAnalysisAgent uses a prompt registry plus quality gate, and ProjectChallengeAgent uses small-step question generation so item-level fallback can be inspected separately from full-agent fallback.
 
 ## Run Commands
 
@@ -11,7 +11,7 @@ Local Ollama example:
 ```bash
 set JOBAGENT_LLM_BASE_URL=http://127.0.0.1:11434/v1
 set JOBAGENT_LLM_API_KEY=ollama
-set JOBAGENT_LLM_MODEL=qwen2.5:0.5b
+set JOBAGENT_LLM_MODEL=qwen2.5:1.5b
 set JOBAGENT_LLM_TEMPERATURE=0
 set JOBAGENT_LLM_TIMEOUT=120
 
@@ -48,31 +48,41 @@ LLM is not configured. Set JOBAGENT_LLM_BASE_URL, JOBAGENT_LLM_API_KEY, JOBAGENT
 ## How To Read The Results
 
 - mode=mock means the deterministic fallback path ran intentionally.
-- mode=llm means that agent returned a schema-valid LLM result.
+- mode=llm means that agent returned schema-valid LLM result(s). ProjectChallengeAgent may still have item-level fallbacks.
 - mode=fallback means the LLM path was requested but failed and the agent used the deterministic fallback.
 - fallback_reason usually identifies validation, request, parsing, or service failures.
+- JDAnalysisAgent quality_warnings come from the JD quality gate after schema validation.
+- ProjectInterviewAgent llm_success_count and fallback_count are per-question decomposition metrics.
 - Token estimates use `max(1, round(len(text) / 4))` and are conservative approximations, not billing records.
 - Actual usage fields are included only when the OpenAI-compatible response contains usage metadata.
 
 ## Experiment Limits
 
-- Prompt text is not changed in this experiment.
-- Small local models may fail JSON schema requirements even when the workflow remains stable through fallback.
+- JDAnalysisAgent schema-valid output can still fall back when the quality gate detects weak extraction.
+- ProjectChallengeAgent uses one-question prompts instead of one full-report prompt.
+- Python validates LLM output and assembles final artifacts instead of trusting large LLM reports directly.
+- Small local models may fail individual JSON objects even when the workflow remains stable through per-question fallback.
 - Token estimates approximate the prompt reconstruction inside each agent; they are useful for comparison, not exact accounting.
 - Running only `--mode mock` validates the harness but does not evaluate Ollama model quality.
 
 ## Latest Local Run
 
-- generated_modes: mock, ollama-jd-only, ollama-resume-optimize-only, ollama-project-challenge-only, ollama-all-llm
-- generated_at: 2026-06-11T00:32:02+00:00
+- generated_modes: ollama-project-challenge-only
+- generated_at: 2026-06-11T05:18:36+00:00
 
-## Local Ollama 8k 1.5B Run Summary
+## Integrated LLM Control Surfaces
+
+- JDAnalysisAgent uses the prompt registry plus a quality gate.
+- ProjectChallengeAgent uses decomposition, one-question generation, and per-question fallback.
+- LLM output is validated and assembled by Python before becoming workflow artifacts.
+
+## Local Ollama 8k 1.5B Integration Run
 
 - actual_model: qwen2.5:1.5b
-- base_url: http://127.0.0.1:11434/v1
-- modes_run: mock, ollama-jd-only, ollama-resume-optimize-only, ollama-project-challenge-only, ollama-all-llm
-- modes_with_llm_success: ollama-jd-only, ollama-resume-optimize-only, ollama-all-llm (JDAnalysisAgent and ResumeOptimizeAgent)
-- modes_with_fallback: ollama-project-challenge-only, ollama-all-llm (ProjectInterviewAgent)
-- estimated_total_tokens_all_llm: 9568
-- main_observation: qwen2.5:1.5b with the local 8k-context setup produced schema-valid output for JDAnalysisAgent and ResumeOptimizeAgent. ProjectInterviewAgent still failed: it returned ValidationError in the isolated project-challenge mode and LLMServiceError in the all-LLM chain, so the workflow relied on fallback for interview challenge generation.
-- recommendation: qwen2.5:1.5b is promising for JD analysis and resume optimization evaluation, but ProjectInterviewAgent needs JSON repair, stricter output shaping, or a larger model before local LLM mode is reliable end to end.
+- jd_only_step_mode: fallback
+- jd_only_fallback_reason: ValidationError
+- jd_only_quality_warnings: none because schema validation failed before the quality gate
+- project_challenge_step_mode: llm
+- project_challenge_llm_success_count: 6
+- project_challenge_item_fallback_count: 0
+- main_observation: JDAnalysisAgent fallback remained explicit and traceable, while ProjectInterviewAgent used the small-step path and reported per-question success/fallback metrics.

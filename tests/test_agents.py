@@ -38,7 +38,7 @@ def test_mock_agents_return_shared_schemas() -> None:
     assert isinstance(match_report, MatchReport)
     assert isinstance(optimization_result, ResumeOptimizationResult)
     assert isinstance(challenge_report, ProjectChallengeReport)
-    assert "匹配度总览" in markdown_report
+    assert "Match Overview" in markdown_report
 
 
 def test_resume_parse_agent_rejects_empty_resume() -> None:
@@ -60,4 +60,4 @@ def test_agent_run_metadata_records_mode_and_guardrails() -> None:
     assert resume_result.metadata.mode == "mock"
     assert match_result.metadata.agent_name == "MatchAgent"
     assert optimization_result.metadata.mode == "mock"
-    assert any("不编造" in item for item in optimization_result.metadata.guardrails)
+    assert any("ResumeOptimizationResult schema" in item for item in optimization_result.metadata.guardrails)

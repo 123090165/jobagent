@@ -41,36 +41,11 @@ class ResumeOptimizeLLMService:
 class ProjectChallengeLLMService:
     def chat_completion_json(self, *, system_prompt: str, user_prompt: str):
         return {
-            "basic_questions": [
-                {
-                    "question": "What problem does JobAgent solve?",
-                    "evaluates": "Whether the candidate can explain the project context.",
-                    "answer_framework": "Answer with problem, user, and solution.",
-                }
-            ],
-            "technical_deep_dive_questions": [
-                {
-                    "question": "How did you combine FastAPI, Pydantic, and the workflow in JobAgent?",
-                    "evaluates": "Whether the candidate understands data flow.",
-                    "answer_framework": "Answer from schema, service, agent, and storage angles.",
-                }
-            ],
-            "architecture_questions": [
-                {
-                    "question": "If the analysis steps keep growing, how would you keep the workflow maintainable?",
-                    "evaluates": "Whether the candidate can discuss architecture evolution.",
-                    "answer_framework": "Answer from state, trace, and tests.",
-                }
-            ],
-            "tradeoff_questions": [
-                {
-                    "question": "Why keep the mock fallback right now?",
-                    "evaluates": "Whether the candidate understands stability tradeoffs.",
-                    "answer_framework": "Explain usability, cost, and failure recovery.",
-                }
-            ],
-            "interviewer_concerns": ["The project may lack real input and output constraints."],
-            "improvement_suggestions": ["Prepare a real sample showing structured input and trace output."],
+            "question": "How did you use the provided evidence to satisfy this requirement?",
+            "why_asked": "It validates whether the candidate can explain real project evidence.",
+            "expected_answer_points": ["implementation detail", "personal ownership"],
+            "risk_level": "medium",
+            "question_type": "technical",
         }
 
 
@@ -412,7 +387,9 @@ def test_job_analysis_workflow_records_project_challenge_llm_metadata() -> None:
     assert challenge_step.mode == "llm"
     assert challenge_step.fallback_reason is None
     assert "LLM" in challenge_step.summary
-    assert result.final_report.project_challenge_report.basic_questions
+    assert challenge_step.llm_success_count
+    assert challenge_step.fallback_count == 0
+    assert result.final_report.project_challenge_report.grounded_questions
 
 
 def test_job_analysis_workflow_records_project_challenge_fallback_metadata() -> None:
