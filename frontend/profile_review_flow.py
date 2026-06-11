@@ -129,6 +129,46 @@ def render_profile_review_flow_tab(*, sample_resume: str) -> None:
         confidence_label = profile_review.get("confidence_label")
         if confidence_label:
             st.caption(f"Confidence: {confidence_label}")
+        if st.button(
+            "Run LLM Profile Enrichment",
+            key="profile_flow_run_enrichment",
+            use_container_width=True,
+        ):
+            try:
+                enrichment_result = request_resume_profile_enrichment_from_api(
+                    resume_text=resume_text,
+                    target_roles=_split_comma_list(
+                        st.session_state.get("profile_flow_initial_target_roles", "")
+                    ),
+                    use_llm=True,
+                )
+            except JobAgentError as exc:
+                st.error(str(exc))
+            else:
+                st.session_state["profile_enrichment_result"] = enrichment_result
+                st.success("Profile enrichment completed.")
+
+    profile_enrichment_result = st.session_state.get("profile_enrichment_result")
+    if profile_enrichment_result:
+        suggestions = profile_enrichment_result.get("enrichment_suggestions") or []
+        metrics = (
+            f"LLM success: {profile_enrichment_result.get('llm_success_count', 0)} | "
+            f"Fallback: {profile_enrichment_result.get('fallback_count', 0)} | "
+            f"Discarded: {profile_enrichment_result.get('discarded_suggestion_count', 0)}"
+        )
+        st.caption(metrics)
+        for warning in profile_enrichment_result.get("quality_warnings") or []:
+            st.warning(str(warning))
+        if suggestions:
+            with st.expander("Enrichment suggestions", expanded=True):
+                for suggestion in suggestions:
+                    st.write(
+                        f"- {suggestion.get('section')}[{suggestion.get('item_index')}]."
+                        f"{suggestion.get('field')}: {suggestion.get('suggested_value')}"
+                    )
+                    st.caption(f"Quote: {suggestion.get('source_quote')}")
+                    for warning in suggestion.get("warnings") or []:
+                        st.warning(str(warning))
 
     st.markdown("### 02 Profile Review")
     if profile_review:
@@ -343,6 +383,7 @@ def render_profile_review_flow_tab(*, sample_resume: str) -> None:
     ):
         for key in [
             "profile_review",
+            "profile_enrichment_result",
             "confirmed_profile_result",
             "profile_search_plan",
             "brief_result",
@@ -369,6 +410,28 @@ def request_resume_profile_review_from_api(
         timeout_seconds=timeout_seconds,
         unavailable_error_code="profile_review_api_unavailable",
         failure_error_code="profile_review_api_request_failed",
+    )
+
+
+def request_resume_profile_enrichment_from_api(
+    *,
+    resume_text: str,
+    target_roles: list[str],
+    use_llm: bool,
+    api_base_url: str = DEFAULT_API_BASE_URL,
+    timeout_seconds: int = DEFAULT_API_TIMEOUT_SECONDS,
+) -> dict[str, object]:
+    return _call_api(
+        "/resume/profile-enrichment",
+        {
+            "resume_text": resume_text,
+            "target_roles": target_roles,
+            "use_llm": use_llm,
+        },
+        api_base_url=api_base_url,
+        timeout_seconds=timeout_seconds,
+        unavailable_error_code="profile_enrichment_api_unavailable",
+        failure_error_code="profile_enrichment_api_request_failed",
     )
 
 

@@ -199,3 +199,15 @@ v3.3 adds section-based deterministic parsing before profile review. The parser
 extracts section-specific skills, education, work experience, projects, and
 highlights, then falls back to the older heuristic path when structure is
 unclear.
+
+v3.4 adds optional LLM-assisted profile enrichment after the deterministic
+profile review step. It does not change the main six-step job analysis workflow.
+The profile front half is now:
+
+```text
+section-based parser -> profile review -> optional LLM enrichment -> user confirmation
+```
+
+Each enrichment call receives one project, work, or education item. Pydantic
+schema validation and Python evidence checks keep suggestions grounded before
+they can be shown to the user.

@@ -38,6 +38,16 @@ improves embedded skill coverage, English research/internship experience
 detection, education extraction, project title extraction, and metric-based
 highlights without introducing LLM risk.
 
+v3.4 adds an optional enrichment layer after this baseline:
+
+```text
+section-based parser -> profile review -> optional LLM enrichment -> user confirmation
+```
+
+The evaluation baseline remains deterministic. LLM enrichment is tested
+separately as evidence-bound suggestions so parser expected results do not need
+to change.
+
 ## Evaluation Cases
 
 - AI Agent / Backend
@@ -90,4 +100,5 @@ docs/demo_outputs/resume_profile_parser_eval/summary.md
 
 ## Next Step
 
-v3.3 Section-based Resume Parser
+Profile Review UI can support accepting or rejecting evidence-bound enrichment
+suggestions.
