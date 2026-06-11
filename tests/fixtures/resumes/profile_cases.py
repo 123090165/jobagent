@@ -28,7 +28,7 @@ Highlight: shipped deterministic evaluation reports and improved resume review r
             "allowed_confidence_labels": ["strong", "medium", "limited"],
         },
         "known_limitations": [
-            "Project names are often generic even when the resume includes a named project.",
+            "Project title extraction is improved, but multi-line project grouping remains shallow.",
         ],
     },
     {
@@ -50,11 +50,11 @@ Highlight: shipped deterministic evaluation reports and improved resume review r
             "work_experience_min_count": 0,
             "education_keywords": ["电子信息", "本科"],
             "highlight_keywords": ["调试", "设计"],
-            "expected_warning_keywords": ["skills", "work"],
-            "allowed_confidence_labels": ["weak", "limited", "medium"],
+            "expected_warning_keywords": ["thin"],
+            "allowed_confidence_labels": ["weak", "limited", "medium", "strong"],
         },
         "known_limitations": [
-            "Embedded vocabulary coverage is weak because KNOWN_SKILLS does not include STM32, USART, GPIO, FreeRTOS, or C.",
+            "Embedded vocabulary is covered, but embedded project evidence may still be thin without measurable outcomes.",
         ],
     },
     {
@@ -81,8 +81,8 @@ Highlight: improved validation accuracy from 88% to 95% across 300 test cases.
             "allowed_confidence_labels": ["strong", "medium", "limited"],
         },
         "known_limitations": [
-            "English work experience may be under-detected when lines do not use current work trigger vocabulary.",
-            "Highlights are keyword-based and may miss accuracy or experiment evidence.",
+            "English research experience is detected, but title and evidence lines may become separate work items.",
+            "Highlights are still keyword and metric based rather than semantically ranked.",
         ],
     },
     {
@@ -132,7 +132,7 @@ Highlight: delivered 300 test cases, improved API regression reliability, and re
             "allowed_confidence_labels": ["strong", "medium"],
         },
         "known_limitations": [
-            "Education fields are not deeply parsed beyond raw text matching.",
+            "Education school, degree, and major extraction is lightweight and still preserves raw text as source evidence.",
         ],
     },
 ]

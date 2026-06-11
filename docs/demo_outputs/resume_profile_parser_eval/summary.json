@@ -1,8 +1,8 @@
 {
   "total_cases": 5,
-  "strong_cases": 2,
-  "medium_cases": 1,
-  "limited_cases": 2,
+  "strong_cases": 4,
+  "medium_cases": 0,
+  "limited_cases": 1,
   "weak_cases": 0,
   "cases": [
     {
@@ -32,10 +32,10 @@
         "Git"
       ],
       "missing_expected_skills": [],
-      "project_count": 2,
+      "project_count": 3,
       "work_experience_count": 1,
-      "education_count": 0,
-      "highlight_count": 2,
+      "education_count": 1,
+      "highlight_count": 4,
       "overall_label": "strong"
     },
     {
@@ -43,71 +43,67 @@
       "title": "Embedded / STM32 Chinese resume",
       "confidence_label": "strong",
       "passed_checks": [
+        "skills_any_match",
+        "skills_all_match",
         "project_count_min",
         "work_experience_count_min",
-        "education_keyword_match",
-        "highlight_keyword_match",
-        "missing_info_questions_present_when_warnings_exist"
-      ],
-      "failed_checks": [
-        "skills_any_match",
-        "skills_all_match",
-        "expected_warning_match",
-        "confidence_label_allowed"
-      ],
-      "warnings": [
-        "project evidence may be too thin for matching"
-      ],
-      "missing_info_questions": [
-        "For your strongest project, what exactly did you build, which technologies did you use, and what measurable result can you show?"
-      ],
-      "skill_hits": [],
-      "missing_expected_skills": [
-        "STM32",
-        "C"
-      ],
-      "project_count": 2,
-      "work_experience_count": 1,
-      "education_count": 1,
-      "highlight_count": 1,
-      "overall_label": "limited"
-    },
-    {
-      "case_id": "ml_research_english",
-      "title": "ML / Research English resume",
-      "confidence_label": "medium",
-      "passed_checks": [
-        "skills_any_match",
-        "skills_all_match",
-        "project_count_min",
         "education_keyword_match",
         "highlight_keyword_match",
         "expected_warning_match",
         "confidence_label_allowed",
         "missing_info_questions_present_when_warnings_exist"
       ],
-      "failed_checks": [
-        "work_experience_count_min"
-      ],
+      "failed_checks": [],
       "warnings": [
-        "resume profile has no work experience evidence",
-        "resume profile has no highlights or measurable outcomes"
+        "project evidence may be too thin for matching"
       ],
       "missing_info_questions": [
-        "Do you have internship, lab, research, or course project experience that should be treated as work-like evidence?",
-        "Can you add measurable outcomes, such as number of APIs, tests passed, latency, users, dataset size, or accuracy?"
+        "For your strongest project, what exactly did you build, which technologies did you use, and what measurable result can you show?"
       ],
       "skill_hits": [
+        "STM32",
+        "USART",
+        "GPIO",
+        "FreeRTOS",
+        "C"
+      ],
+      "missing_expected_skills": [],
+      "project_count": 2,
+      "work_experience_count": 1,
+      "education_count": 3,
+      "highlight_count": 1,
+      "overall_label": "strong"
+    },
+    {
+      "case_id": "ml_research_english",
+      "title": "ML / Research English resume",
+      "confidence_label": "strong",
+      "passed_checks": [
+        "skills_any_match",
+        "skills_all_match",
+        "project_count_min",
+        "work_experience_count_min",
+        "education_keyword_match",
+        "highlight_keyword_match",
+        "expected_warning_match",
+        "confidence_label_allowed",
+        "missing_info_questions_present_when_warnings_exist"
+      ],
+      "failed_checks": [],
+      "warnings": [],
+      "missing_info_questions": [],
+      "skill_hits": [
+        "PyTorch",
         "NumPy",
         "Pandas",
         "scikit-learn"
       ],
       "missing_expected_skills": [],
-      "project_count": 1,
-      "work_experience_count": 0,
-      "education_count": 0,
-      "highlight_count": 0,
-      "overall_label": "medium"
+      "project_count": 2,
+      "work_experience_count": 2,
+      "education_count": 2,
+      "highlight_count": 2,
+      "overall_label": "strong"
     },
     {
       "case_id": "weak_resume_sparse",
@@ -176,18 +172,18 @@
       ],
       "missing_expected_skills": [],
       "project_count": 1,
-      "work_experience_count": 1,
-      "education_count": 1,
-      "highlight_count": 2,
+      "work_experience_count": 2,
+      "education_count": 2,
+      "highlight_count": 4,
       "overall_label": "strong"
     }
   ],
   "known_limitations": [
-    "Project names are often generic even when the resume includes a named project.",
-    "Embedded vocabulary coverage is weak because KNOWN_SKILLS does not include STM32, USART, GPIO, FreeRTOS, or C.",
-    "English work experience may be under-detected when lines do not use current work trigger vocabulary.",
-    "Highlights are keyword-based and may miss accuracy or experiment evidence.",
+    "Project title extraction is improved, but multi-line project grouping remains shallow.",
+    "Embedded vocabulary is covered, but embedded project evidence may still be thin without measurable outcomes.",
+    "English research experience is detected, but title and evidence lines may become separate work items.",
+    "Highlights are still keyword and metric based rather than semantically ranked.",
     "Fallback project detection can create a project-shaped object from very short text, so project count alone is not enough.",
-    "Education fields are not deeply parsed beyond raw text matching."
+    "Education school, degree, and major extraction is lightweight and still preserves raw text as source evidence."
   ]
 }

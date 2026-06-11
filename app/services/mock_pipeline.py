@@ -12,6 +12,16 @@ from app.schemas.match import (
 )
 from app.schemas.report import FinalReport
 from app.schemas.resume import EducationItem, ProjectExperience, ResumeProfile, WorkExperience
+from app.services.resume_section_parser import (
+    KNOWN_RESUME_SKILLS,
+    extract_highlights_from_sections,
+    parse_certificates_from_sections,
+    parse_education_from_sections,
+    parse_projects_from_sections,
+    parse_skills_from_sections,
+    parse_work_experience_from_sections,
+    split_resume_sections,
+)
 
 
 KNOWN_SKILLS = [
@@ -44,6 +54,7 @@ KNOWN_SKILLS = [
     "机器学习",
     "数据分析",
 ]
+KNOWN_SKILLS = list(dict.fromkeys([*KNOWN_SKILLS, *KNOWN_RESUME_SKILLS]))
 
 
 def _clean_lines(text: str) -> list[str]:
@@ -100,17 +111,20 @@ def _first_reasonable_title(lines: list[str], fallback: str) -> str:
 def mock_resume_parse(resume_text: str) -> ResumeProfile:
     """Parse a resume with lightweight heuristics for the v0.1 mock pipeline."""
     lines = _clean_lines(resume_text)
-    skills = _extract_skills(resume_text)
+    sections = split_resume_sections(resume_text)
+    skills = parse_skills_from_sections(sections, resume_text) or _extract_skills(resume_text)
 
     education_lines = [
         line
         for line in lines
         if any(word in line for word in ["大学", "学院", "本科", "硕士", "博士", "计算机"])
     ][:3]
-    education = [EducationItem(raw_text=line) for line in education_lines]
+    education = parse_education_from_sections(sections) or [
+        EducationItem(raw_text=line) for line in education_lines
+    ]
 
     work_lines = [line for line in lines if any(word in line for word in ["实习", "工作", "公司", "负责"])]
-    work_experiences = [
+    work_experiences = parse_work_experience_from_sections(sections) or [
         WorkExperience(description=line, raw_text=line, technologies=_extract_skills(line))
         for line in work_lines[:3]
     ]
@@ -123,7 +137,7 @@ def mock_resume_parse(resume_text: str) -> ResumeProfile:
     if not project_lines and resume_text.strip():
         project_lines = [resume_text.strip()[:240]]
 
-    projects = [
+    projects = parse_projects_from_sections(sections) or [
         ProjectExperience(
             name=f"项目 {index + 1}",
             description=line,
@@ -139,12 +153,14 @@ def mock_resume_parse(resume_text: str) -> ResumeProfile:
         for line in lines
         if any(word in line for word in ["证书", "CET", "英语", "软考", "竞赛"])
     ][:5]
+    certificates = parse_certificates_from_sections(sections) or certificates
 
     highlights = [
         line
         for line in lines
         if any(word in line for word in ["优化", "提升", "负责", "独立", "落地", "上线"])
     ][:5]
+    highlights = extract_highlights_from_sections(sections, resume_text) or highlights
 
     missing_info: list[str] = []
     if not skills:

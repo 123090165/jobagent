@@ -44,6 +44,10 @@ v3.2 adds a Resume Profile Parser Evaluation Baseline. It evaluates the
 upstream profile extraction layer before downstream matching, optimization, and
 project challenge workflows consume `ResumeProfile`.
 
+v3.3 adds a section-based deterministic resume parser. `mock_resume_parse()`
+now detects skills, education, experience, projects, and certificates/awards
+sections before falling back to the older whole-text heuristics.
+
 ## 1. Project Goal
 
 JobAgent 不是一个单纯的聊天机器人，也不是一个通用爬虫项目。它更像一个面向求职准备场景的本地工作台，用来把“找岗位、判断匹配度、改简历、准备面试、记录投递进展”串成一个可复盘的流程。

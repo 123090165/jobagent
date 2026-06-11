@@ -52,7 +52,9 @@ def test_rich_resume_produces_useful_profile() -> None:
 
     assert result.skill_hits
     assert result.project_count > 0
-    assert result.education_count > 0 or result.work_experience_count > 0
+    assert result.education_count >= 1
+    assert result.work_experience_count >= 1
+    assert result.highlight_count >= 1
     assert result.confidence_label != "weak"
 
 
@@ -68,8 +70,16 @@ def test_evaluation_script_output_generation(tmp_path) -> None:
 
 def test_current_limitations_are_visible() -> None:
     result = evaluate_profile_review_suite(PROFILE_EVALUATION_CASES)
+    weak = next(case for case in result.cases if case.case_id == "weak_resume_sparse")
+
+    assert weak.failed_checks
+    assert result.known_limitations
+
+
+def test_section_parser_improves_embedded_and_research_cases() -> None:
+    result = evaluate_profile_review_suite(PROFILE_EVALUATION_CASES)
     embedded = next(case for case in result.cases if case.case_id == "embedded_stm32_chinese")
     research = next(case for case in result.cases if case.case_id == "ml_research_english")
 
-    assert embedded.failed_checks or research.failed_checks
-    assert result.known_limitations
+    assert {"STM32", "USART", "GPIO"} & set(embedded.skill_hits)
+    assert research.work_experience_count >= 1

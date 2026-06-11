@@ -194,3 +194,8 @@ v3.2 adds a Resume Profile Parser Evaluation Baseline before the downstream
 workflow. The baseline evaluates profile extraction from `/resume/profile-review`
 so parser limitations are visible before matching, optimization, and project
 challenge generation.
+
+v3.3 adds section-based deterministic parsing before profile review. The parser
+extracts section-specific skills, education, work experience, projects, and
+highlights, then falls back to the older heuristic path when structure is
+unclear.

@@ -12,6 +12,9 @@ This baseline evaluates resume profile parsing as an independent product capabil
 resume_text
 -> ResumeParseAgent
 -> mock_resume_parse
+-> section detection
+-> section-specific extraction
+-> old heuristic fallback
 -> ResumeProfile
 ```
 
@@ -28,6 +31,12 @@ resume_text
 ```
 
 The evaluation service calls `build_resume_profile_review()` directly, so it uses the same profile review contract as the API without requiring FastAPI, Ollama, or network access.
+
+v3.3 adds a section-based deterministic parser and uses this v3.2 evaluation
+baseline to compare the upstream profile extraction layer. The enhanced parser
+improves embedded skill coverage, English research/internship experience
+detection, education extraction, project title extraction, and metric-based
+highlights without introducing LLM risk.
 
 ## Evaluation Cases
 
@@ -59,12 +68,12 @@ else -> weak
 
 ## Known Limitations
 
-- skill extraction depends on `KNOWN_SKILLS`
-- English work experience may be under-detected
-- embedded vocabulary coverage is weak
-- project names are often generic
-- education fields are not deeply parsed
-- highlights are keyword-based
+- skill extraction still depends on a curated known-skill dictionary
+- multi-line experience grouping remains lightweight
+- embedded project evidence may still be thin without measurable outcomes
+- project grouping is shallow for dense multi-project sections
+- education parsing is heuristic and preserves raw text when uncertain
+- highlights are keyword and metric based
 
 ## How to Run
 
