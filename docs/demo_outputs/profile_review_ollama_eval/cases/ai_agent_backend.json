@@ -42,15 +42,15 @@
     ]
   },
   "enrichment_enabled": true,
-  "enrichment_suggestion_count": 1,
-  "enrichment_llm_success_count": 5,
-  "enrichment_fallback_count": 0,
-  "enrichment_discarded_suggestion_count": 1,
+  "enrichment_suggestion_count": 0,
+  "enrichment_llm_success_count": 0,
+  "enrichment_fallback_count": 5,
+  "enrichment_discarded_suggestion_count": 0,
   "enrichment_quality_warnings": [
-    "discarded ungrounded profile enrichment suggestion"
+    "LLM profile enrichment unavailable; using deterministic baseline only"
   ],
   "accepted_suggestion_count": 0,
-  "edited_suggestion_count": 1,
+  "edited_suggestion_count": 0,
   "rejected_suggestion_count": 0,
   "confirmed_confidence_label": "strong",
   "confirmed_skill_count": 10,
@@ -60,8 +60,7 @@
   "save_payload_ready": true,
   "quality_verdict": "strong",
   "reviewer_notes": [
-    "edited 1 suggestions before confirmation",
-    "discarded 1 unsupported enrichment suggestions"
+    "fallback_count=5"
   ],
   "save_payload_snapshot": {
     "raw_resume_text": "Li Ming\nTarget Roles: AI Agent Engineer / Backend Engineer\nSkills: Python, FastAPI, Streamlit, SQLite, LangGraph, LangChain, Pydantic, pytest, Git\nEducation: B.S. Computer Science, Shenzhen University\nProjects:\nJobAgent - built a FastAPI and Streamlit workflow for resume review, persistence, and evaluation artifacts.\n- Designed profile review endpoints and SQLite persistence payloads.\n- Shipped 20 APIs and completed 300 tests.\nAgentOps Demo Platform - built LangGraph agent orchestration with LLM evaluation reports.\nExperience:\nBackend Intern, Example AI Lab\n- Implemented API routes, fixed parser edge cases, and reviewed deterministic evaluation output.\nHighlights: Improved profile review reliability and released reproducible evaluation reports.",
@@ -275,19 +274,7 @@
       "remaining_warnings": [],
       "confidence_label": "strong"
     },
-    "suggestion_decisions": [
-      {
-        "section": "project",
-        "item_index": null,
-        "field": "description",
-        "suggested_value": "Designed profile review endpoints",
-        "source_quote": "Designed profile review endpoints",
-        "decision_status": "edited",
-        "confidence_label": "medium",
-        "warnings": [],
-        "edited_value": "Designed profile review endpoints"
-      }
-    ],
+    "suggestion_decisions": [],
     "missing_info_answers": [],
     "notes": null
   }

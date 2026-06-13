@@ -43,12 +43,12 @@
   },
   "enrichment_enabled": true,
   "enrichment_suggestion_count": 0,
-  "enrichment_llm_success_count": 3,
-  "enrichment_fallback_count": 0,
-  "enrichment_discarded_suggestion_count": 1,
+  "enrichment_llm_success_count": 0,
+  "enrichment_fallback_count": 3,
+  "enrichment_discarded_suggestion_count": 0,
   "enrichment_quality_warnings": [
     "resume profile has no work experience evidence",
-    "discarded ungrounded profile enrichment suggestion"
+    "LLM profile enrichment unavailable; using deterministic baseline only"
   ],
   "accepted_suggestion_count": 0,
   "edited_suggestion_count": 0,
@@ -63,7 +63,7 @@
   "save_payload_ready": true,
   "quality_verdict": "strong",
   "reviewer_notes": [
-    "discarded 1 unsupported enrichment suggestions"
+    "fallback_count=3"
   ],
   "save_payload_snapshot": {
     "raw_resume_text": "Wang Lei\nTarget Role: Embedded Software Engineer\nSkills: C, C++, STM32, USART, UART, GPIO, DMA, ADC, PWM, Keil, CubeMX, Git\nEducation: B.Eng. Electronic Information Engineering, South China University\nProjects:\nSTM32 Environment Monitor System\n- Used STM32, ADC, PWM, GPIO, and USART to collect sensor data and drive alarms.\n- Responsible for board bring-up, serial protocol design, and embedded driver debugging.\nLab Project: Smart Car Controller using UART, DMA, and CubeMX configuration.\nHighlights: Completed lab integration and improved hardware debugging efficiency.",

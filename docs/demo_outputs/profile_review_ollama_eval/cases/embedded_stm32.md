@@ -20,10 +20,10 @@
 ## LLM enrichment result
 - enrichment_enabled: True
 - enrichment_suggestion_count: 0
-- enrichment_llm_success_count: 3
-- enrichment_fallback_count: 0
-- enrichment_discarded_suggestion_count: 1
-- enrichment_quality_warnings: resume profile has no work experience evidence, discarded ungrounded profile enrichment suggestion
+- enrichment_llm_success_count: 0
+- enrichment_fallback_count: 3
+- enrichment_discarded_suggestion_count: 0
+- enrichment_quality_warnings: resume profile has no work experience evidence, LLM profile enrichment unavailable; using deterministic baseline only
 
 ## Simulated user decisions
 - accepted_suggestion_count: 0
@@ -44,4 +44,4 @@
 - quality_verdict: strong
 
 ## Reviewer notes
-- discarded 1 unsupported enrichment suggestions
+- fallback_count=3

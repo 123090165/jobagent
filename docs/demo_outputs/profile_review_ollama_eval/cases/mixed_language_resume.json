@@ -37,14 +37,14 @@
     ]
   },
   "enrichment_enabled": true,
-  "enrichment_suggestion_count": 1,
-  "enrichment_llm_success_count": 4,
-  "enrichment_fallback_count": 0,
-  "enrichment_discarded_suggestion_count": 2,
+  "enrichment_suggestion_count": 0,
+  "enrichment_llm_success_count": 0,
+  "enrichment_fallback_count": 4,
+  "enrichment_discarded_suggestion_count": 0,
   "enrichment_quality_warnings": [
-    "discarded ungrounded profile enrichment suggestion"
+    "LLM profile enrichment unavailable; using deterministic baseline only"
   ],
-  "accepted_suggestion_count": 1,
+  "accepted_suggestion_count": 0,
   "edited_suggestion_count": 0,
   "rejected_suggestion_count": 0,
   "confirmed_confidence_label": "strong",
@@ -55,8 +55,7 @@
   "save_payload_ready": true,
   "quality_verdict": "strong",
   "reviewer_notes": [
-    "accepted 1 grounded suggestions",
-    "discarded 2 unsupported enrichment suggestions"
+    "fallback_count=4"
   ],
   "save_payload_snapshot": {
     "raw_resume_text": "Liu Jia\nTarget Roles: Backend Engineer / Research Engineer\nEducation\nB.S. Software Engineering, Xidian University\nExperience\nResearch Assistant, Vision Lab\n- Built experiment tooling and dataset scripts in Python.\n项目经历\n图像检索系统：使用 FastAPI、SQLite 和 Streamlit 搭建 demo，负责接口设计与测试。\n技能\nPython, FastAPI, SQLite, Streamlit, Git\n亮点\n完成 120 tests，并整理 evaluation notes。",
@@ -227,20 +226,7 @@
       "remaining_warnings": [],
       "confidence_label": "strong"
     },
-    "suggestion_decisions": [
-      {
-        "section": "work",
-        "item_index": null,
-        "field": "skills",
-        "suggested_value": [
-          "Python"
-        ],
-        "source_quote": "Python",
-        "decision_status": "accepted",
-        "confidence_label": "medium",
-        "warnings": []
-      }
-    ],
+    "suggestion_decisions": [],
     "missing_info_answers": [],
     "notes": null
   }

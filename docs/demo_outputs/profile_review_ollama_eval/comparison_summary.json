@@ -4,11 +4,11 @@
     "deterministic_verdict": "strong",
     "llm_enriched_verdict": "strong",
     "skill_count_delta": 0,
-    "suggestion_count": 1,
+    "suggestion_count": 0,
     "warning_count_delta": 0,
     "confirmed_confidence_delta": null,
-    "improvement_summary": "LLM path produced usable suggestion decisions without increasing confirmed coverage.",
-    "risk_summary": "unsupported suggestions were discarded by grounding checks"
+    "improvement_summary": "No meaningful LLM improvement observed.",
+    "risk_summary": "one or more item enrichments fell back"
   },
   {
     "case_id": "embedded_stm32",
@@ -19,40 +19,40 @@
     "warning_count_delta": 0,
     "confirmed_confidence_delta": null,
     "improvement_summary": "No meaningful LLM improvement observed.",
-    "risk_summary": "unsupported suggestions were discarded by grounding checks"
+    "risk_summary": "one or more item enrichments fell back"
   },
   {
     "case_id": "ml_audio_asr",
     "deterministic_verdict": "strong",
     "llm_enriched_verdict": "strong",
     "skill_count_delta": 0,
-    "suggestion_count": 1,
+    "suggestion_count": 0,
     "warning_count_delta": 0,
     "confirmed_confidence_delta": null,
-    "improvement_summary": "LLM path produced usable suggestion decisions without increasing confirmed coverage.",
-    "risk_summary": "unsupported suggestions were discarded by grounding checks"
+    "improvement_summary": "No meaningful LLM improvement observed.",
+    "risk_summary": "one or more item enrichments fell back"
   },
   {
     "case_id": "finance_fa_analysis",
     "deterministic_verdict": "strong",
     "llm_enriched_verdict": "strong",
     "skill_count_delta": 0,
-    "suggestion_count": 2,
+    "suggestion_count": 0,
     "warning_count_delta": 0,
     "confirmed_confidence_delta": null,
-    "improvement_summary": "LLM path produced usable suggestion decisions without increasing confirmed coverage.",
-    "risk_summary": "No notable LLM-specific risk increase."
+    "improvement_summary": "No meaningful LLM improvement observed.",
+    "risk_summary": "one or more item enrichments fell back"
   },
   {
     "case_id": "mixed_language_resume",
     "deterministic_verdict": "strong",
     "llm_enriched_verdict": "strong",
     "skill_count_delta": 0,
-    "suggestion_count": 1,
+    "suggestion_count": 0,
     "warning_count_delta": 0,
     "confirmed_confidence_delta": null,
-    "improvement_summary": "LLM path produced usable suggestion decisions without increasing confirmed coverage.",
-    "risk_summary": "unsupported suggestions were discarded by grounding checks"
+    "improvement_summary": "No meaningful LLM improvement observed.",
+    "risk_summary": "one or more item enrichments fell back"
   },
   {
     "case_id": "weak_resume",
@@ -63,7 +63,7 @@
     "warning_count_delta": 0,
     "confirmed_confidence_delta": null,
     "improvement_summary": "No meaningful LLM improvement observed.",
-    "risk_summary": "No notable LLM-specific risk increase."
+    "risk_summary": "one or more item enrichments fell back"
   },
   {
     "case_id": "anker_ai_health_algorithm",
@@ -74,7 +74,7 @@
     "warning_count_delta": 0,
     "confirmed_confidence_delta": null,
     "improvement_summary": "No meaningful LLM improvement observed.",
-    "risk_summary": "No notable LLM-specific risk increase."
+    "risk_summary": "one or more item enrichments fell back"
   },
   {
     "case_id": "realistic_noisy_chinese_resume",
@@ -85,7 +85,7 @@
     "warning_count_delta": 0,
     "confirmed_confidence_delta": null,
     "improvement_summary": "No meaningful LLM improvement observed.",
-    "risk_summary": "unsupported suggestions were discarded by grounding checks"
+    "risk_summary": "one or more item enrichments fell back"
   },
   {
     "case_id": "realistic_business_resume_unstructured",
@@ -96,6 +96,6 @@
     "warning_count_delta": 0,
     "confirmed_confidence_delta": null,
     "improvement_summary": "No meaningful LLM improvement observed.",
-    "risk_summary": "unsupported suggestions were discarded by grounding checks"
+    "risk_summary": "one or more item enrichments fell back"
   }
 ]

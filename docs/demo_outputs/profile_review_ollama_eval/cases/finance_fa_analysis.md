@@ -19,15 +19,15 @@
 
 ## LLM enrichment result
 - enrichment_enabled: True
-- enrichment_suggestion_count: 2
-- enrichment_llm_success_count: 6
-- enrichment_fallback_count: 0
+- enrichment_suggestion_count: 0
+- enrichment_llm_success_count: 0
+- enrichment_fallback_count: 6
 - enrichment_discarded_suggestion_count: 0
-- enrichment_quality_warnings: -
+- enrichment_quality_warnings: LLM profile enrichment unavailable; using deterministic baseline only
 
 ## Simulated user decisions
-- accepted_suggestion_count: 1
-- edited_suggestion_count: 1
+- accepted_suggestion_count: 0
+- edited_suggestion_count: 0
 - rejected_suggestion_count: 0
 
 ## Confirmed profile result
@@ -44,5 +44,4 @@
 - quality_verdict: strong
 
 ## Reviewer notes
-- accepted 1 grounded suggestions
-- edited 1 suggestions before confirmation
+- fallback_count=6

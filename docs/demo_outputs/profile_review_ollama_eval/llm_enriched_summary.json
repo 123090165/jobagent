@@ -50,15 +50,15 @@
         ]
       },
       "enrichment_enabled": true,
-      "enrichment_suggestion_count": 1,
-      "enrichment_llm_success_count": 5,
-      "enrichment_fallback_count": 0,
-      "enrichment_discarded_suggestion_count": 1,
+      "enrichment_suggestion_count": 0,
+      "enrichment_llm_success_count": 0,
+      "enrichment_fallback_count": 5,
+      "enrichment_discarded_suggestion_count": 0,
       "enrichment_quality_warnings": [
-        "discarded ungrounded profile enrichment suggestion"
+        "LLM profile enrichment unavailable; using deterministic baseline only"
       ],
       "accepted_suggestion_count": 0,
-      "edited_suggestion_count": 1,
+      "edited_suggestion_count": 0,
       "rejected_suggestion_count": 0,
       "confirmed_confidence_label": "strong",
       "confirmed_skill_count": 10,
@@ -68,8 +68,7 @@
       "save_payload_ready": true,
       "quality_verdict": "strong",
       "reviewer_notes": [
-        "edited 1 suggestions before confirmation",
-        "discarded 1 unsupported enrichment suggestions"
+        "fallback_count=5"
       ],
       "save_payload_snapshot": {
         "raw_resume_text": "Li Ming\nTarget Roles: AI Agent Engineer / Backend Engineer\nSkills: Python, FastAPI, Streamlit, SQLite, LangGraph, LangChain, Pydantic, pytest, Git\nEducation: B.S. Computer Science, Shenzhen University\nProjects:\nJobAgent - built a FastAPI and Streamlit workflow for resume review, persistence, and evaluation artifacts.\n- Designed profile review endpoints and SQLite persistence payloads.\n- Shipped 20 APIs and completed 300 tests.\nAgentOps Demo Platform - built LangGraph agent orchestration with LLM evaluation reports.\nExperience:\nBackend Intern, Example AI Lab\n- Implemented API routes, fixed parser edge cases, and reviewed deterministic evaluation output.\nHighlights: Improved profile review reliability and released reproducible evaluation reports.",
@@ -283,19 +282,7 @@
           "remaining_warnings": [],
           "confidence_label": "strong"
         },
-        "suggestion_decisions": [
-          {
-            "section": "project",
-            "item_index": null,
-            "field": "description",
-            "suggested_value": "Designed profile review endpoints",
-            "source_quote": "Designed profile review endpoints",
-            "decision_status": "edited",
-            "confidence_label": "medium",
-            "warnings": [],
-            "edited_value": "Designed profile review endpoints"
-          }
-        ],
+        "suggestion_decisions": [],
         "missing_info_answers": [],
         "notes": null
       }
@@ -345,12 +332,12 @@
       },
       "enrichment_enabled": true,
       "enrichment_suggestion_count": 0,
-      "enrichment_llm_success_count": 3,
-      "enrichment_fallback_count": 0,
-      "enrichment_discarded_suggestion_count": 1,
+      "enrichment_llm_success_count": 0,
+      "enrichment_fallback_count": 3,
+      "enrichment_discarded_suggestion_count": 0,
       "enrichment_quality_warnings": [
         "resume profile has no work experience evidence",
-        "discarded ungrounded profile enrichment suggestion"
+        "LLM profile enrichment unavailable; using deterministic baseline only"
       ],
       "accepted_suggestion_count": 0,
       "edited_suggestion_count": 0,
@@ -365,7 +352,7 @@
       "save_payload_ready": true,
       "quality_verdict": "strong",
       "reviewer_notes": [
-        "discarded 1 unsupported enrichment suggestions"
+        "fallback_count=3"
       ],
       "save_payload_snapshot": {
         "raw_resume_text": "Wang Lei\nTarget Role: Embedded Software Engineer\nSkills: C, C++, STM32, USART, UART, GPIO, DMA, ADC, PWM, Keil, CubeMX, Git\nEducation: B.Eng. Electronic Information Engineering, South China University\nProjects:\nSTM32 Environment Monitor System\n- Used STM32, ADC, PWM, GPIO, and USART to collect sensor data and drive alarms.\n- Responsible for board bring-up, serial protocol design, and embedded driver debugging.\nLab Project: Smart Car Controller using UART, DMA, and CubeMX configuration.\nHighlights: Completed lab integration and improved hardware debugging efficiency.",
@@ -607,15 +594,15 @@
         ]
       },
       "enrichment_enabled": true,
-      "enrichment_suggestion_count": 1,
-      "enrichment_llm_success_count": 6,
-      "enrichment_fallback_count": 0,
-      "enrichment_discarded_suggestion_count": 1,
+      "enrichment_suggestion_count": 0,
+      "enrichment_llm_success_count": 0,
+      "enrichment_fallback_count": 6,
+      "enrichment_discarded_suggestion_count": 0,
       "enrichment_quality_warnings": [
-        "discarded ungrounded profile enrichment suggestion"
+        "LLM profile enrichment unavailable; using deterministic baseline only"
       ],
       "accepted_suggestion_count": 0,
-      "edited_suggestion_count": 1,
+      "edited_suggestion_count": 0,
       "rejected_suggestion_count": 0,
       "confirmed_confidence_label": "strong",
       "confirmed_skill_count": 15,
@@ -625,14 +612,13 @@
       "save_payload_ready": true,
       "quality_verdict": "strong",
       "reviewer_notes": [
-        "edited 1 suggestions before confirmation",
-        "discarded 1 unsupported enrichment suggestions"
+        "fallback_count=6"
       ],
       "save_payload_snapshot": {
         "raw_resume_text": "Alex Chen\nTarget Roles: Machine Learning Engineer / AI Engineer\nSkills: Python, PyTorch, Librosa, NumPy, Pandas, CNN, ResNet, VGG, MFCC, STFT\nEducation: M.S. Data Science, City University\nProjects:\nAudio Classification Benchmark\n- Built PyTorch CNN and ResNet models using MFCC and STFT features on an environmental sound dataset.\n- Reached 95% validation accuracy on 300 evaluation clips.\nASR Error Analysis Tool\n- Used Librosa and Pandas to inspect transcription failures and dataset labeling issues.\nExperience:\nResearch Assistant, Audio Intelligence Lab\n- Ran dataset experiments and compared VGG and CNN baselines for speech tasks.\nHighlights: Improved model accuracy and documented dataset quality issues.",
         "baseline_profile": {
           "raw_text": "Alex Chen\nTarget Roles: Machine Learning Engineer / AI Engineer\nSkills: Python, PyTorch, Librosa, NumPy, Pandas, CNN, ResNet, VGG, MFCC, STFT\nEducation: M.S. Data Science, City University\nProjects:\nAudio Classification Benchmark\n- Built PyTorch CNN and ResNet models using MFCC and STFT features on an environmental sound dataset.\n- Reached 95% validation accuracy on 300 evaluation clips.\nASR Error Analysis Tool\n- Used Librosa and Pandas to inspect transcription failures and dataset labeling issues.\nExperience:\nResearch Assistant, Audio Intelligence Lab\n- Ran dataset experiments and compared VGG and CNN baselines for speech tasks.\nHighlights: Improved model accuracy and documented dataset quality issues.",
-          "name": null,
+          "name": "Alex Chen",
           "education": [
             {
               "school": "City University",
@@ -732,7 +718,7 @@
         "confirmed_result": {
           "confirmed_profile": {
             "raw_text": "Alex Chen\nTarget Roles: Machine Learning Engineer / AI Engineer\nSkills: Python, PyTorch, Librosa, NumPy, Pandas, CNN, ResNet, VGG, MFCC, STFT\nEducation: M.S. Data Science, City University\nProjects:\nAudio Classification Benchmark\n- Built PyTorch CNN and ResNet models using MFCC and STFT features on an environmental sound dataset.\n- Reached 95% validation accuracy on 300 evaluation clips.\nASR Error Analysis Tool\n- Used Librosa and Pandas to inspect transcription failures and dataset labeling issues.\nExperience:\nResearch Assistant, Audio Intelligence Lab\n- Ran dataset experiments and compared VGG and CNN baselines for speech tasks.\nHighlights: Improved model accuracy and documented dataset quality issues.",
-            "name": null,
+            "name": "Alex Chen",
             "education": [
               {
                 "school": "City University",
@@ -899,23 +885,7 @@
           "remaining_warnings": [],
           "confidence_label": "strong"
         },
-        "suggestion_decisions": [
-          {
-            "section": "project",
-            "item_index": null,
-            "field": "highlights",
-            "suggested_value": [
-              "95% validation accuracy"
-            ],
-            "source_quote": "95% validation accuracy",
-            "decision_status": "edited",
-            "confidence_label": "medium",
-            "warnings": [],
-            "edited_value": [
-              "95% validation accuracy"
-            ]
-          }
-        ],
+        "suggestion_decisions": [],
         "missing_info_answers": [],
         "notes": null
       }
@@ -967,13 +937,15 @@
         ]
       },
       "enrichment_enabled": true,
-      "enrichment_suggestion_count": 2,
-      "enrichment_llm_success_count": 6,
-      "enrichment_fallback_count": 0,
+      "enrichment_suggestion_count": 0,
+      "enrichment_llm_success_count": 0,
+      "enrichment_fallback_count": 6,
       "enrichment_discarded_suggestion_count": 0,
-      "enrichment_quality_warnings": [],
-      "accepted_suggestion_count": 1,
-      "edited_suggestion_count": 1,
+      "enrichment_quality_warnings": [
+        "LLM profile enrichment unavailable; using deterministic baseline only"
+      ],
+      "accepted_suggestion_count": 0,
+      "edited_suggestion_count": 0,
       "rejected_suggestion_count": 0,
       "confirmed_confidence_label": "strong",
       "confirmed_skill_count": 13,
@@ -983,8 +955,7 @@
       "save_payload_ready": true,
       "quality_verdict": "strong",
       "reviewer_notes": [
-        "accepted 1 grounded suggestions",
-        "edited 1 suggestions before confirmation"
+        "fallback_count=6"
       ],
       "save_payload_snapshot": {
         "raw_resume_text": "Zhao Xin\nTarget Roles: Business Analyst / Investment Analyst\nSkills: Excel, PowerPoint, Wind, CRM, market research, competitor analysis\nEducation: B.A. Finance, CUHKSZ\nExperience:\nFA Intern, Horizon Capital\n- Used Wind and Qichacha for industry research, peer mapping, and deal memo support.\n- Prepared CRM updates, meeting notes, and competitor analysis summaries.\nProjects:\nNew Energy Sector Research\n- Analyzed market size, business models, and competitive landscape for listed companies.\nHighlights: Completed investor meeting notes and delivered structured research reports.",
@@ -1247,29 +1218,7 @@
           "remaining_warnings": [],
           "confidence_label": "strong"
         },
-        "suggestion_decisions": [
-          {
-            "section": "work",
-            "item_index": null,
-            "field": "description",
-            "suggested_value": "Prepared CRM updates and competitor analysis summaries",
-            "source_quote": "Prepared CRM updates, meeting notes, and competitor analysis summaries",
-            "decision_status": "accepted",
-            "confidence_label": "medium",
-            "warnings": []
-          },
-          {
-            "section": "work",
-            "item_index": null,
-            "field": "description",
-            "suggested_value": "Prepared CRM updates and competitor analysis summaries",
-            "source_quote": "Prepared CRM updates, meeting notes, and competitor analysis summaries",
-            "decision_status": "edited",
-            "confidence_label": "medium",
-            "warnings": [],
-            "edited_value": "Prepared CRM updates and competitor analysis summaries"
-          }
-        ],
+        "suggestion_decisions": [],
         "missing_info_answers": [],
         "notes": null
       }
@@ -1313,14 +1262,14 @@
         ]
       },
       "enrichment_enabled": true,
-      "enrichment_suggestion_count": 1,
-      "enrichment_llm_success_count": 4,
-      "enrichment_fallback_count": 0,
-      "enrichment_discarded_suggestion_count": 2,
+      "enrichment_suggestion_count": 0,
+      "enrichment_llm_success_count": 0,
+      "enrichment_fallback_count": 4,
+      "enrichment_discarded_suggestion_count": 0,
       "enrichment_quality_warnings": [
-        "discarded ungrounded profile enrichment suggestion"
+        "LLM profile enrichment unavailable; using deterministic baseline only"
       ],
-      "accepted_suggestion_count": 1,
+      "accepted_suggestion_count": 0,
       "edited_suggestion_count": 0,
       "rejected_suggestion_count": 0,
       "confirmed_confidence_label": "strong",
@@ -1331,8 +1280,7 @@
       "save_payload_ready": true,
       "quality_verdict": "strong",
       "reviewer_notes": [
-        "accepted 1 grounded suggestions",
-        "discarded 2 unsupported enrichment suggestions"
+        "fallback_count=4"
       ],
       "save_payload_snapshot": {
         "raw_resume_text": "Liu Jia\nTarget Roles: Backend Engineer / Research Engineer\nEducation\nB.S. Software Engineering, Xidian University\nExperience\nResearch Assistant, Vision Lab\n- Built experiment tooling and dataset scripts in Python.\n项目经历\n图像检索系统：使用 FastAPI、SQLite 和 Streamlit 搭建 demo，负责接口设计与测试。\n技能\nPython, FastAPI, SQLite, Streamlit, Git\n亮点\n完成 120 tests，并整理 evaluation notes。",
@@ -1503,20 +1451,7 @@
           "remaining_warnings": [],
           "confidence_label": "strong"
         },
-        "suggestion_decisions": [
-          {
-            "section": "work",
-            "item_index": null,
-            "field": "skills",
-            "suggested_value": [
-              "Python"
-            ],
-            "source_quote": "Python",
-            "decision_status": "accepted",
-            "confidence_label": "medium",
-            "warnings": []
-          }
-        ],
+        "suggestion_decisions": [],
         "missing_info_answers": [],
         "notes": null
       }
@@ -1555,14 +1490,15 @@
       },
       "enrichment_enabled": true,
       "enrichment_suggestion_count": 0,
-      "enrichment_llm_success_count": 1,
-      "enrichment_fallback_count": 0,
+      "enrichment_llm_success_count": 0,
+      "enrichment_fallback_count": 1,
       "enrichment_discarded_suggestion_count": 0,
       "enrichment_quality_warnings": [
         "resume profile has no project evidence",
         "resume profile has no work experience evidence",
         "target role is not explicit",
-        "resume profile has no highlights or measurable outcomes"
+        "resume profile has no highlights or measurable outcomes",
+        "LLM profile enrichment unavailable; using deterministic baseline only"
       ],
       "accepted_suggestion_count": 0,
       "edited_suggestion_count": 0,
@@ -1578,7 +1514,9 @@
       ],
       "save_payload_ready": true,
       "quality_verdict": "acceptable",
-      "reviewer_notes": [],
+      "reviewer_notes": [
+        "fallback_count=1"
+      ],
       "save_payload_snapshot": {
         "raw_resume_text": "I know Python and want an AI job.",
         "baseline_profile": {
@@ -1759,10 +1697,12 @@
       },
       "enrichment_enabled": true,
       "enrichment_suggestion_count": 0,
-      "enrichment_llm_success_count": 9,
-      "enrichment_fallback_count": 0,
+      "enrichment_llm_success_count": 0,
+      "enrichment_fallback_count": 9,
       "enrichment_discarded_suggestion_count": 0,
-      "enrichment_quality_warnings": [],
+      "enrichment_quality_warnings": [
+        "LLM profile enrichment unavailable; using deterministic baseline only"
+      ],
       "accepted_suggestion_count": 0,
       "edited_suggestion_count": 0,
       "rejected_suggestion_count": 0,
@@ -1774,7 +1714,8 @@
       "save_payload_ready": true,
       "quality_verdict": "strong",
       "reviewer_notes": [
-        "missing expected skills: SciPy, Matplotlib"
+        "missing expected skills: SciPy, Matplotlib",
+        "fallback_count=9"
       ],
       "save_payload_snapshot": {
         "raw_resume_text": "Synthetic Resume for Product Testing Only\nName: Test Candidate\nLocation: Shenzhen, China\nTarget Role: AI Health Algorithm Intern / Physiological Signal Processing Intern / Biomedical AI Intern\n\nSUMMARY\nUndergraduate student in information engineering and computer science with project experience in physiological signal processing, AI health analytics, and deep learning model development. Familiar with PPG, ECG, and motion-sensor time-series data, including data cleaning, annotation, preprocessing, denoising, feature extraction, model training, evaluation, and technical documentation.\n\nInterested in applying AI algorithms to wearable health monitoring, blood oxygen estimation, heart rate analysis, blood pressure trend analysis, multimodal biosignal modeling, and real-time health data analysis. Available for a stable internship in Shenzhen.\n\nEDUCATION\nB.Eng. in Information Engineering / Computer Science\nUniversity in Shenzhen\nExpected Graduation: 2027\n\nRelevant Coursework:\nDigital Signal Processing, Machine Learning, Deep Learning, Biomedical Signal Processing, Probability and Statistics, Data Structures and Algorithms, Python Programming.\n\nTECHNICAL SKILLS\nProgramming: Python, MATLAB, C/C++\nDeep Learning: PyTorch, TensorFlow, CNN, RNN, model fine-tuning, data augmentation, supervised learning, time-series classification\nSignal Processing: PPG signal processing, ECG signal processing, ACC motion signal analysis, filtering, denoising, signal segmentation, noise analysis, feature extraction, time-domain and frequency-domain analysis\nData Processing: data cleaning, data annotation, preprocessing pipeline design, missing value handling, statistical analysis, visualization\nTools: NumPy, Pandas, SciPy, scikit-learn, Matplotlib, Jupyter Notebook, Git\n\nPROJECT EXPERIENCE\nPhysiological Signal Processing for Heart Rate and Blood Oxygen Estimation\n\n- Processed PPG and ECG signals for wearable health monitoring scenarios.\n- Completed signal preprocessing, noise filtering, data cleaning, and signal segmentation.\n- Extracted time-domain and frequency-domain features from physiological signals.\n- Analyzed how motion artifacts and sensor noise affect heart rate and blood oxygen estimation.\n- Built Python scripts for signal preprocessing, quality inspection, and visualization using NumPy, Pandas, SciPy, and Matplotlib.\n\nDeep Learning Model for Multimodal Biosignal Classification\n\n- Built a PyTorch-based deep learning pipeline for multimodal physiological signal classification.\n- Used PPG, ECG, and ACC-style time-series features to train and evaluate neural network models.\n- Applied data augmentation and model fine-tuning to improve robustness under noisy signal conditions.\n- Compared model performance under different preprocessing and feature extraction strategies.\n- Evaluated model results with accuracy, confusion matrix, and error case analysis.\n\nAI Health Analytics Mini Prototype\n\n- Designed a small AI health analysis prototype for real-time physiological data monitoring.\n- Implemented data cleaning, abnormal signal detection, missing value handling, and simple health trend analysis logic.\n- Explored how machine learning models can support health monitoring and early warning scenarios.\n- Collaborated with peers to define data format, preprocessing steps, and evaluation criteria.\n\nSELECTED TECHNICAL EXPERIENCE\nData Cleaning and Annotation\n\n- Cleaned noisy physiological and time-series data.\n- Removed invalid segments and handled missing or abnormal values.\n- Prepared structured datasets for model training and evaluation.\n\nModel Training and Optimization\n\n- Trained deep learning models using PyTorch and TensorFlow.\n- Practiced model fine-tuning, data augmentation, and hyperparameter adjustment.\n- Compared performance across preprocessing methods and model structures.\n\nINTERNSHIP AVAILABILITY\nAvailable for a stable internship period.\nPreferred location: Shenzhen.\nOpen to roles related to AI health algorithms, physiological signal processing, wearable device algorithms, biomedical AI, data preprocessing, and deep learning model development.\n\nROLE MATCHING KEYWORDS\nAI health algorithm, physiological signal processing, PPG, ECG, ACC, blood oxygen, heart rate, blood pressure, deep learning, PyTorch, TensorFlow, data cleaning, data annotation, data preprocessing, data augmentation, model fine-tuning, feature engineering, wearable health monitoring, multimodal biosignal analysis, health data analytics, technical documentation, cross-functional collaboration.",
@@ -2255,11 +2196,11 @@
       },
       "enrichment_enabled": true,
       "enrichment_suggestion_count": 0,
-      "enrichment_llm_success_count": 4,
-      "enrichment_fallback_count": 0,
-      "enrichment_discarded_suggestion_count": 4,
+      "enrichment_llm_success_count": 0,
+      "enrichment_fallback_count": 4,
+      "enrichment_discarded_suggestion_count": 0,
       "enrichment_quality_warnings": [
-        "discarded ungrounded profile enrichment suggestion"
+        "LLM profile enrichment unavailable; using deterministic baseline only"
       ],
       "accepted_suggestion_count": 0,
       "edited_suggestion_count": 0,
@@ -2272,7 +2213,7 @@
       "save_payload_ready": true,
       "quality_verdict": "strong",
       "reviewer_notes": [
-        "discarded 4 unsupported enrichment suggestions"
+        "fallback_count=4"
       ],
       "save_payload_snapshot": {
         "raw_resume_text": "我主要想找 AI Agent / 后端 / 数据分析 相关实习。学校是电子信息方向本科，比较希望深圳或杭州。\n之前做过一个求职分析工具，用 FastAPI、Streamlit、SQLite 做过接口和页面，也写过一些测试。这个项目主要是把简历解析、岗位分析、匹配报告和可视化页面串起来，我负责后端接口、前端展示和测试数据整理。\n还做过课程里的音频分类实验，用 PyTorch、Librosa、MFCC、STFT 做特征和模型训练，比过 CNN 和 VGG 的效果，验证准确率最高大概 75%。另外也写过一些 Python 数据处理脚本，会用 Pandas、NumPy 和 Git。",
@@ -2556,11 +2497,11 @@
       },
       "enrichment_enabled": true,
       "enrichment_suggestion_count": 0,
-      "enrichment_llm_success_count": 4,
-      "enrichment_fallback_count": 0,
-      "enrichment_discarded_suggestion_count": 3,
+      "enrichment_llm_success_count": 0,
+      "enrichment_fallback_count": 4,
+      "enrichment_discarded_suggestion_count": 0,
       "enrichment_quality_warnings": [
-        "discarded ungrounded profile enrichment suggestion"
+        "LLM profile enrichment unavailable; using deterministic baseline only"
       ],
       "accepted_suggestion_count": 0,
       "edited_suggestion_count": 0,
@@ -2574,7 +2515,7 @@
       "quality_verdict": "acceptable",
       "reviewer_notes": [
         "missing expected skills: industry research, competitor analysis, meeting notes",
-        "discarded 3 unsupported enrichment suggestions"
+        "fallback_count=4"
       ],
       "save_payload_snapshot": {
         "raw_resume_text": "我在某 FA 团队支持过新材料项目，主要用 Wind、企查查、Excel、PowerPoint 收集公司和行业信息，整理竞争格局、融资历史和潜在合作方。\n工作内容包括维护 CRM 项目跟进表，记录客户需求，写会议纪要，跟进投资人反馈，识别高意向潜在客户。也参与过新材料行业研究，整理市场空间、商业模式、产业链上下游和竞品情况。\n目标方向是 Business Analyst、Investment Analyst、FA Intern 或者行业研究相关实习，希望能在深圳、香港或杭州做商业分析、投资分析、行业研究相关工作。",

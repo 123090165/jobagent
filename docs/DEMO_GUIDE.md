@@ -64,6 +64,15 @@ v3.7 adds reproducible Profile Review Quality Evaluation artifacts under
 show synthetic end-to-end profile review readiness without changing parser,
 enrichment, or job-search logic.
 
+v3.8 improves deterministic parser coverage for AI health, ML/audio, and
+business/FA resumes, and adds provider-configurable evaluation runs for
+`mock`, local `ollama`, and `deepseek`. Use the default
+`docs/demo_outputs/profile_review_quality_eval/` artifacts for stable demos;
+only use `profile_review_ollama_eval/` or `profile_review_deepseek_eval/`
+after filling a local `.env`. DeepSeek uses OpenAI-compatible chat completions
+with `deepseek-v4-flash` as the default model, and no real API key should ever
+be committed.
+
 适用对象：
 
 - 面试官

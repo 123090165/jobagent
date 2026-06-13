@@ -51,7 +51,7 @@ def test_comparison_summary_is_generated() -> None:
 
 
 def test_script_writes_json_and_markdown_artifacts(tmp_path) -> None:
-    outputs = run(output_dir=tmp_path, mode="both")
+    outputs = run(output_dir=tmp_path, mode="both", llm_provider="mock")
 
     assert outputs.deterministic is not None
     assert outputs.llm_enriched is not None
@@ -65,3 +65,23 @@ def test_script_writes_json_and_markdown_artifacts(tmp_path) -> None:
     assert "Case Table" in (tmp_path / "deterministic_summary.md").read_text(
         encoding="utf-8"
     )
+
+
+def test_deterministic_quality_suite_has_no_failed_cases() -> None:
+    result = run_profile_review_quality_suite(use_llm_enrichment=False)
+    cases = {case.case_id: case for case in result.cases}
+
+    assert result.failed_cases == 0
+    assert cases["anker_ai_health_algorithm"].quality_verdict in {"strong", "acceptable"}
+    assert cases["realistic_business_resume_unstructured"].quality_verdict in {
+        "strong",
+        "acceptable",
+    }
+    assert cases["ml_audio_asr"].quality_verdict in {"strong", "acceptable"}
+    assert cases["finance_fa_analysis"].quality_verdict in {"strong", "acceptable"}
+    assert cases["weak_resume"].quality_verdict != "strong"
+    assert cases["ai_agent_backend"].quality_verdict == "strong"
+    assert cases["realistic_noisy_chinese_resume"].quality_verdict in {
+        "strong",
+        "acceptable",
+    }

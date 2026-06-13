@@ -47,15 +47,15 @@
     ]
   },
   "enrichment_enabled": true,
-  "enrichment_suggestion_count": 1,
-  "enrichment_llm_success_count": 6,
-  "enrichment_fallback_count": 0,
-  "enrichment_discarded_suggestion_count": 1,
+  "enrichment_suggestion_count": 0,
+  "enrichment_llm_success_count": 0,
+  "enrichment_fallback_count": 6,
+  "enrichment_discarded_suggestion_count": 0,
   "enrichment_quality_warnings": [
-    "discarded ungrounded profile enrichment suggestion"
+    "LLM profile enrichment unavailable; using deterministic baseline only"
   ],
   "accepted_suggestion_count": 0,
-  "edited_suggestion_count": 1,
+  "edited_suggestion_count": 0,
   "rejected_suggestion_count": 0,
   "confirmed_confidence_label": "strong",
   "confirmed_skill_count": 15,
@@ -65,14 +65,13 @@
   "save_payload_ready": true,
   "quality_verdict": "strong",
   "reviewer_notes": [
-    "edited 1 suggestions before confirmation",
-    "discarded 1 unsupported enrichment suggestions"
+    "fallback_count=6"
   ],
   "save_payload_snapshot": {
     "raw_resume_text": "Alex Chen\nTarget Roles: Machine Learning Engineer / AI Engineer\nSkills: Python, PyTorch, Librosa, NumPy, Pandas, CNN, ResNet, VGG, MFCC, STFT\nEducation: M.S. Data Science, City University\nProjects:\nAudio Classification Benchmark\n- Built PyTorch CNN and ResNet models using MFCC and STFT features on an environmental sound dataset.\n- Reached 95% validation accuracy on 300 evaluation clips.\nASR Error Analysis Tool\n- Used Librosa and Pandas to inspect transcription failures and dataset labeling issues.\nExperience:\nResearch Assistant, Audio Intelligence Lab\n- Ran dataset experiments and compared VGG and CNN baselines for speech tasks.\nHighlights: Improved model accuracy and documented dataset quality issues.",
     "baseline_profile": {
       "raw_text": "Alex Chen\nTarget Roles: Machine Learning Engineer / AI Engineer\nSkills: Python, PyTorch, Librosa, NumPy, Pandas, CNN, ResNet, VGG, MFCC, STFT\nEducation: M.S. Data Science, City University\nProjects:\nAudio Classification Benchmark\n- Built PyTorch CNN and ResNet models using MFCC and STFT features on an environmental sound dataset.\n- Reached 95% validation accuracy on 300 evaluation clips.\nASR Error Analysis Tool\n- Used Librosa and Pandas to inspect transcription failures and dataset labeling issues.\nExperience:\nResearch Assistant, Audio Intelligence Lab\n- Ran dataset experiments and compared VGG and CNN baselines for speech tasks.\nHighlights: Improved model accuracy and documented dataset quality issues.",
-      "name": null,
+      "name": "Alex Chen",
       "education": [
         {
           "school": "City University",
@@ -172,7 +171,7 @@
     "confirmed_result": {
       "confirmed_profile": {
         "raw_text": "Alex Chen\nTarget Roles: Machine Learning Engineer / AI Engineer\nSkills: Python, PyTorch, Librosa, NumPy, Pandas, CNN, ResNet, VGG, MFCC, STFT\nEducation: M.S. Data Science, City University\nProjects:\nAudio Classification Benchmark\n- Built PyTorch CNN and ResNet models using MFCC and STFT features on an environmental sound dataset.\n- Reached 95% validation accuracy on 300 evaluation clips.\nASR Error Analysis Tool\n- Used Librosa and Pandas to inspect transcription failures and dataset labeling issues.\nExperience:\nResearch Assistant, Audio Intelligence Lab\n- Ran dataset experiments and compared VGG and CNN baselines for speech tasks.\nHighlights: Improved model accuracy and documented dataset quality issues.",
-        "name": null,
+        "name": "Alex Chen",
         "education": [
           {
             "school": "City University",
@@ -339,23 +338,7 @@
       "remaining_warnings": [],
       "confidence_label": "strong"
     },
-    "suggestion_decisions": [
-      {
-        "section": "project",
-        "item_index": null,
-        "field": "highlights",
-        "suggested_value": [
-          "95% validation accuracy"
-        ],
-        "source_quote": "95% validation accuracy",
-        "decision_status": "edited",
-        "confidence_label": "medium",
-        "warnings": [],
-        "edited_value": [
-          "95% validation accuracy"
-        ]
-      }
-    ],
+    "suggestion_decisions": [],
     "missing_info_answers": [],
     "notes": null
   }

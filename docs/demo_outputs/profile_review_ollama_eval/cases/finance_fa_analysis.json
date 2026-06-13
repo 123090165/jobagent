@@ -45,13 +45,15 @@
     ]
   },
   "enrichment_enabled": true,
-  "enrichment_suggestion_count": 2,
-  "enrichment_llm_success_count": 6,
-  "enrichment_fallback_count": 0,
+  "enrichment_suggestion_count": 0,
+  "enrichment_llm_success_count": 0,
+  "enrichment_fallback_count": 6,
   "enrichment_discarded_suggestion_count": 0,
-  "enrichment_quality_warnings": [],
-  "accepted_suggestion_count": 1,
-  "edited_suggestion_count": 1,
+  "enrichment_quality_warnings": [
+    "LLM profile enrichment unavailable; using deterministic baseline only"
+  ],
+  "accepted_suggestion_count": 0,
+  "edited_suggestion_count": 0,
   "rejected_suggestion_count": 0,
   "confirmed_confidence_label": "strong",
   "confirmed_skill_count": 13,
@@ -61,8 +63,7 @@
   "save_payload_ready": true,
   "quality_verdict": "strong",
   "reviewer_notes": [
-    "accepted 1 grounded suggestions",
-    "edited 1 suggestions before confirmation"
+    "fallback_count=6"
   ],
   "save_payload_snapshot": {
     "raw_resume_text": "Zhao Xin\nTarget Roles: Business Analyst / Investment Analyst\nSkills: Excel, PowerPoint, Wind, CRM, market research, competitor analysis\nEducation: B.A. Finance, CUHKSZ\nExperience:\nFA Intern, Horizon Capital\n- Used Wind and Qichacha for industry research, peer mapping, and deal memo support.\n- Prepared CRM updates, meeting notes, and competitor analysis summaries.\nProjects:\nNew Energy Sector Research\n- Analyzed market size, business models, and competitive landscape for listed companies.\nHighlights: Completed investor meeting notes and delivered structured research reports.",
@@ -325,29 +326,7 @@
       "remaining_warnings": [],
       "confidence_label": "strong"
     },
-    "suggestion_decisions": [
-      {
-        "section": "work",
-        "item_index": null,
-        "field": "description",
-        "suggested_value": "Prepared CRM updates and competitor analysis summaries",
-        "source_quote": "Prepared CRM updates, meeting notes, and competitor analysis summaries",
-        "decision_status": "accepted",
-        "confidence_label": "medium",
-        "warnings": []
-      },
-      {
-        "section": "work",
-        "item_index": null,
-        "field": "description",
-        "suggested_value": "Prepared CRM updates and competitor analysis summaries",
-        "source_quote": "Prepared CRM updates, meeting notes, and competitor analysis summaries",
-        "decision_status": "edited",
-        "confidence_label": "medium",
-        "warnings": [],
-        "edited_value": "Prepared CRM updates and competitor analysis summaries"
-      }
-    ],
+    "suggestion_decisions": [],
     "missing_info_answers": [],
     "notes": null
   }

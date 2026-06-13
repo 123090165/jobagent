@@ -9,6 +9,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+from app.services.llm_provider import normalize_llm_provider, resolve_llm_provider
 from app.services.profile_review_quality_evaluation import (
     FakeProfileReviewLLMService,
     ProfileReviewQualityRunOutputs,
@@ -24,11 +25,17 @@ def run(
     *,
     mode: str = "both",
     output_dir: Path = DEFAULT_OUTPUT_DIR,
-    use_fake_llm: bool = True,
+    llm_provider: str = "mock",
     real_llm: bool = False,
 ) -> ProfileReviewQualityRunOutputs:
     outputs = ProfileReviewQualityRunOutputs()
-    llm_service = None if real_llm else FakeProfileReviewLLMService()
+    normalized_provider = normalize_llm_provider(llm_provider)
+    provider_resolution = resolve_llm_provider(normalized_provider)
+
+    if real_llm and normalized_provider != "mock":
+        llm_service = provider_resolution.service
+    else:
+        llm_service = FakeProfileReviewLLMService()
 
     if mode in {"deterministic", "both"}:
         outputs.deterministic = run_profile_review_quality_suite(
@@ -39,7 +46,7 @@ def run(
         outputs.llm_enriched = run_profile_review_quality_suite(
             use_llm_enrichment=True,
             simulate_user_decisions=True,
-            llm_service=None if real_llm else llm_service,  # type: ignore[arg-type]
+            llm_service=llm_service,  # type: ignore[arg-type]
         )
     if outputs.deterministic and outputs.llm_enriched:
         outputs.comparisons = compare_profile_review_quality_suites(
@@ -64,9 +71,9 @@ def main() -> None:
         default=DEFAULT_OUTPUT_DIR,
     )
     parser.add_argument(
-        "--use-fake-llm",
-        action="store_true",
-        default=True,
+        "--llm-provider",
+        choices=["mock", "ollama", "deepseek"],
+        default="mock",
     )
     parser.add_argument(
         "--real-llm",
@@ -78,11 +85,13 @@ def main() -> None:
     outputs = run(
         mode=args.mode,
         output_dir=args.output_dir,
-        use_fake_llm=not args.real_llm,
+        llm_provider=args.llm_provider,
         real_llm=args.real_llm,
     )
     summary = {
         "mode": args.mode,
+        "llm_provider": args.llm_provider,
+        "real_llm": args.real_llm,
         "deterministic_cases": (
             outputs.deterministic.total_cases if outputs.deterministic else 0
         ),

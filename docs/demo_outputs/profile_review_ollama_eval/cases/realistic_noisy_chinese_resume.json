@@ -46,11 +46,11 @@
   },
   "enrichment_enabled": true,
   "enrichment_suggestion_count": 0,
-  "enrichment_llm_success_count": 4,
-  "enrichment_fallback_count": 0,
-  "enrichment_discarded_suggestion_count": 4,
+  "enrichment_llm_success_count": 0,
+  "enrichment_fallback_count": 4,
+  "enrichment_discarded_suggestion_count": 0,
   "enrichment_quality_warnings": [
-    "discarded ungrounded profile enrichment suggestion"
+    "LLM profile enrichment unavailable; using deterministic baseline only"
   ],
   "accepted_suggestion_count": 0,
   "edited_suggestion_count": 0,
@@ -63,7 +63,7 @@
   "save_payload_ready": true,
   "quality_verdict": "strong",
   "reviewer_notes": [
-    "discarded 4 unsupported enrichment suggestions"
+    "fallback_count=4"
   ],
   "save_payload_snapshot": {
     "raw_resume_text": "我主要想找 AI Agent / 后端 / 数据分析 相关实习。学校是电子信息方向本科，比较希望深圳或杭州。\n之前做过一个求职分析工具，用 FastAPI、Streamlit、SQLite 做过接口和页面，也写过一些测试。这个项目主要是把简历解析、岗位分析、匹配报告和可视化页面串起来，我负责后端接口、前端展示和测试数据整理。\n还做过课程里的音频分类实验，用 PyTorch、Librosa、MFCC、STFT 做特征和模型训练，比过 CNN 和 VGG 的效果，验证准确率最高大概 75%。另外也写过一些 Python 数据处理脚本，会用 Pandas、NumPy 和 Git。",

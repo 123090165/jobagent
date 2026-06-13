@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from app.services.mock_pipeline import mock_resume_parse
 from app.services.resume_section_parser import (
+    KNOWN_RESUME_SKILLS,
     extract_highlights_from_sections,
     parse_education_from_sections,
     parse_projects_from_sections,
@@ -9,6 +10,7 @@ from app.services.resume_section_parser import (
     parse_work_experience_from_sections,
     split_resume_sections,
 )
+from app.services.resume_skill_lexicon import extract_resume_skills
 
 
 def test_split_resume_sections_detects_english_and_chinese_headings() -> None:
@@ -120,3 +122,44 @@ def test_unstructured_resume_still_returns_profile() -> None:
     assert profile.raw_text
     assert "Python" in profile.skills
     assert profile.projects
+
+
+def test_parser_extracts_ai_health_audio_and_business_terms() -> None:
+    sections = split_resume_sections(
+        """
+Technical Skills: Python, PyTorch, Librosa, MFCC, STFT, CNN, RNN, Wind, CRM
+Projects:
+Physiological Signal Processing for wearable health monitoring
+- Built a multimodal biosignal pipeline using PPG, ECG, ACC, denoising, and feature extraction.
+"""
+    )
+
+    skills = parse_skills_from_sections(sections, "\n".join(sum(sections.values(), [])))
+
+    assert {"PPG", "ECG", "ACC"} <= set(skills)
+    assert {"MFCC", "STFT", "CNN", "RNN"} <= set(skills)
+    assert {"Wind", "CRM"} <= set(skills)
+
+
+def test_short_token_skills_do_not_false_positive_on_plain_words() -> None:
+    text = (
+        "We can support growth and research goals. "
+        "The team will go deeper after the review."
+    )
+
+    skills = extract_resume_skills(text)
+
+    assert "C" not in skills
+    assert "Go" not in skills
+    assert "CAN" not in skills
+
+
+def test_can_bus_and_c_language_are_detected_in_context() -> None:
+    text = "Technical Skills: C, CAN bus, STM32, UART"
+
+    skills = extract_resume_skills(text)
+
+    assert "C" in skills
+    assert "CAN" in skills
+    assert "STM32" in skills
+    assert KNOWN_RESUME_SKILLS

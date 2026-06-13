@@ -3,6 +3,11 @@ from __future__ import annotations
 import re
 
 from app.schemas.resume import EducationItem, ProjectExperience, WorkExperience
+from app.services.resume_skill_lexicon import (
+    KNOWN_RESUME_SKILLS as ALL_KNOWN_RESUME_SKILLS,
+    canonicalize_resume_skill_token,
+    extract_resume_skills,
+)
 
 
 SECTION_KEYS = ["summary", "skills", "education", "experience", "projects", "certificates"]
@@ -12,14 +17,19 @@ SECTION_HEADINGS: dict[str, list[str]] = {
         "skills",
         "technical skills",
         "technical stack",
+        "skill set",
+        "programming",
+        "skills and tools",
         "技能",
         "技能栏",
         "专业技能",
         "技术栈",
+        "技术技能",
     ],
     "education": [
         "education",
         "academic background",
+        "education background",
         "教育",
         "教育经历",
         "学历",
@@ -31,6 +41,8 @@ SECTION_HEADINGS: dict[str, list[str]] = {
         "internship experience",
         "professional experience",
         "research experience",
+        "employment",
+        "经历",
         "实习经历",
         "工作经历",
         "科研经历",
@@ -41,9 +53,11 @@ SECTION_HEADINGS: dict[str, list[str]] = {
         "project",
         "project experience",
         "selected projects",
+        "project experience and research",
         "项目",
         "项目经历",
         "课程项目",
+        "项目经验",
     ],
     "certificates": [
         "awards",
@@ -58,63 +72,7 @@ SECTION_HEADINGS: dict[str, list[str]] = {
 }
 
 KNOWN_RESUME_SKILLS = [
-    "Python",
-    "C++",
-    "C",
-    "FastAPI",
-    "Flask",
-    "Django",
-    "Streamlit",
-    "Pydantic",
-    "LangGraph",
-    "LangChain",
-    "OpenAI API",
-    "OpenAI",
-    "LLM",
-    "RAG",
-    "MCP",
-    "Ollama",
-    "SQL",
-    "SQLite",
-    "PostgreSQL",
-    "Redis",
-    "Docker",
-    "Git",
-    "REST API",
-    "pytest",
-    "React",
-    "TypeScript",
-    "JavaScript",
-    "HTML",
-    "CSS",
-    "Pandas",
-    "NumPy",
-    "PyTorch",
-    "TensorFlow",
-    "Transformers",
-    "HuggingFace",
-    "scikit-learn",
-    "Librosa",
-    "OpenCV",
-    "CUDA",
-    "Deep Learning",
-    "Machine Learning",
-    "STM32",
-    "USART",
-    "UART",
-    "GPIO",
-    "FreeRTOS",
-    "RTOS",
-    "I2C",
-    "SPI",
-    "CAN",
-    "DMA",
-    "ADC",
-    "PWM",
-    "Keil",
-    "CubeMX",
-    "机器学习",
-    "数据分析",
+    skill for skill in ALL_KNOWN_RESUME_SKILLS if skill not in {"C", "R", "Go", "CAN"}
 ]
 
 WORK_KEYWORDS = [
@@ -128,12 +86,13 @@ WORK_KEYWORDS = [
     "research experience",
     "professional experience",
     "company",
-    "公司",
     "实习",
-    "科研",
-    "助教",
+    "工作",
+    "研究",
     "实验室",
     "负责",
+    "团队",
+    "维护 crm",
 ]
 
 DEGREE_KEYWORDS = [
@@ -141,6 +100,7 @@ DEGREE_KEYWORDS = [
     "B.S.",
     "BS",
     "BEng",
+    "B.Eng.",
     "Master",
     "M.S.",
     "MS",
@@ -160,9 +120,17 @@ HIGHLIGHT_KEYWORDS = [
     "improved",
     "reduced",
     "accuracy",
+    "validation accuracy",
+    "confusion matrix",
+    "error analysis",
     "latency",
     "throughput",
     "dataset",
+    "research",
+    "analysis",
+    "meeting notes",
+    "competitive landscape",
+    "market size",
     "实现",
     "完成",
     "优化",
@@ -175,12 +143,48 @@ HIGHLIGHT_KEYWORDS = [
     "测试",
     "用户",
     "数据集",
+    "会议纪要",
+    "行业研究",
+    "竞品",
 ]
 
 METRIC_PATTERN = re.compile(
-    r"(\d+(?:\.\d+)?\s?%|\d+\s?(?:ms|s|APIs?|tests?|users?|samples?|cases?)|[0-9]+k)",
+    r"(\d+(?:\.\d+)?\s?%|\d+\s?(?:ms|s|APIs?|tests?|users?|samples?|cases?|clips?)|[0-9]+k)",
     re.IGNORECASE,
 )
+
+_PROJECT_DETAIL_PREFIXES = [
+    "built",
+    "used",
+    "implemented",
+    "analyzed",
+    "prepared",
+    "completed",
+    "designed",
+    "processed",
+    "extracted",
+    "applied",
+    "evaluated",
+    "collaborated",
+    "cleaned",
+    "trained",
+    "practiced",
+    "compared",
+    "maintained",
+    "recorded",
+    "followed",
+    "identified",
+    "explored",
+    "ran",
+    "负责",
+    "使用",
+    "完成",
+    "实现",
+    "分析",
+    "维护",
+    "记录",
+    "整理",
+]
 
 
 def split_resume_sections(resume_text: str) -> dict[str, list[str]]:
@@ -211,17 +215,18 @@ def parse_skills_from_sections(
     found: list[str] = []
     skills_text = "\n".join(sections.get("skills", []))
     for token in _split_skill_tokens(skills_text):
-        skill = _canonical_skill(token)
+        skill = canonicalize_resume_skill_token(token)
         if skill:
             found.append(skill)
 
     searchable_sections = [
         full_text,
+        "\n".join(sections.get("summary", [])),
         "\n".join(sections.get("projects", [])),
         "\n".join(sections.get("experience", [])),
     ]
     for text in searchable_sections:
-        found.extend(_extract_known_skills(text))
+        found.extend(extract_resume_skills(text))
 
     return _dedupe(found)
 
@@ -258,7 +263,7 @@ def parse_work_experience_from_sections(
                 company=company,
                 role=role,
                 description=line,
-                technologies=_extract_known_skills(line),
+                technologies=extract_resume_skills(line),
                 raw_text=line,
             )
         )
@@ -277,16 +282,16 @@ def parse_projects_from_sections(
             if _looks_like_project_line(line)
         ]
 
+    grouped_project_lines = _group_project_lines(project_lines)
     projects: list[ProjectExperience] = []
-    for line in project_lines[:3]:
-        name, description = _extract_project_name_description(line)
-        raw_text = line
+    for raw_text in grouped_project_lines[:3]:
+        name, description = _extract_project_name_description(raw_text)
         projects.append(
             ProjectExperience(
                 name=name or f"Project {len(projects) + 1}",
                 description=description or raw_text,
-                technologies=_extract_known_skills(raw_text),
-                highlights=_extract_highlight_lines([raw_text]),
+                technologies=extract_resume_skills(raw_text),
+                highlights=_extract_highlight_lines(raw_text.splitlines()),
                 raw_text=raw_text,
             )
         )
@@ -304,7 +309,16 @@ def parse_certificates_from_sections(
             for line in _all_lines(sections)
             if _contains_any(
                 line,
-                ["certificate", "certification", "award", "honor", "CET", "证书", "奖项", "荣誉"],
+                [
+                    "certificate",
+                    "certification",
+                    "award",
+                    "honor",
+                    "CET",
+                    "证书",
+                    "奖项",
+                    "荣誉",
+                ],
             )
         ]
     return certificate_lines[:5]
@@ -317,7 +331,7 @@ def extract_highlights_from_sections(
     lines = _all_lines(sections)
     highlights = _extract_highlight_lines(lines)
     if not highlights:
-        highlights = _extract_highlight_lines([line for line in full_text.splitlines()])
+        highlights = _extract_highlight_lines(full_text.splitlines())
     return highlights[:5]
 
 
@@ -326,11 +340,10 @@ def _detect_heading(line: str) -> tuple[str | None, str | None]:
     prefix, inline_value = _split_heading_value(line)
 
     for key, headings in SECTION_HEADINGS.items():
-        if normalized in {_normalize_heading_text(heading) for heading in headings}:
+        normalized_headings = {_normalize_heading_text(heading) for heading in headings}
+        if normalized in normalized_headings:
             return key, None
-        if prefix and _normalize_heading_text(prefix) in {
-            _normalize_heading_text(heading) for heading in headings
-        }:
+        if prefix and _normalize_heading_text(prefix) in normalized_headings:
             return key, inline_value
 
     return None, None
@@ -358,34 +371,9 @@ def _clean_line(line: str) -> str:
 def _split_skill_tokens(text: str) -> list[str]:
     return [
         token.strip()
-        for token in re.split(r"[,;；，/|、\n]", text)
+        for token in re.split(r"[,;；，|/]", text)
         if token.strip()
     ]
-
-
-def _canonical_skill(token: str) -> str | None:
-    clean_token = token.strip()
-    for skill in KNOWN_RESUME_SKILLS:
-        if clean_token.lower() == skill.lower():
-            return skill
-    return None
-
-
-def _extract_known_skills(text: str) -> list[str]:
-    return [
-        skill
-        for skill in KNOWN_RESUME_SKILLS
-        if _skill_in_text(skill, text)
-    ]
-
-
-def _skill_in_text(skill: str, text: str) -> bool:
-    if not text:
-        return False
-    if re.search(r"[\u4e00-\u9fff]", skill):
-        return skill in text
-    escaped = re.escape(skill)
-    return bool(re.search(rf"(?<![A-Za-z0-9+#.]){escaped}(?![A-Za-z0-9+#.])", text, re.IGNORECASE))
 
 
 def _section_lines(sections: dict[str, list[str]], key: str) -> list[str]:
@@ -454,11 +442,11 @@ def _extract_school(line: str) -> str | None:
 
 
 def _extract_major(line: str) -> str | None:
-    in_match = re.search(r"\bin\s+([^,;；]+)", line, re.IGNORECASE)
+    in_match = re.search(r"\bin\s+([^,;，；]+)", line, re.IGNORECASE)
     if in_match:
         return in_match.group(1).strip()
     degree_major_match = re.search(
-        r"(?:B\.S\.|M\.S\.|BS|MS|MSc|BEng|Bachelor|Master|PhD)\s+([^,;；]+)",
+        r"(?:B\.S\.|M\.S\.|BS|MS|MSc|BEng|B\.Eng\.|Bachelor|Master|PhD)\s+([^,;，；]+)",
         line,
         re.IGNORECASE,
     )
@@ -472,7 +460,7 @@ def _extract_major(line: str) -> str | None:
 
 
 def _extract_role_company(line: str) -> tuple[str | None, str | None]:
-    at_match = re.search(r"(.+?)\s+at\s+([^,;；]+)", line, re.IGNORECASE)
+    at_match = re.search(r"(.+?)\s+at\s+([^,;，；]+)", line, re.IGNORECASE)
     if at_match:
         return at_match.group(1).strip(), at_match.group(2).strip()
     comma_parts = [part.strip() for part in re.split(r"[,，]", line) if part.strip()]
@@ -484,22 +472,53 @@ def _extract_role_company(line: str) -> tuple[str | None, str | None]:
 def _looks_like_project_line(line: str) -> bool:
     return _contains_any(
         line,
-        ["project", "system", "platform", "application", "agent", "demo", "项目", "系统", "平台", "应用"],
+        [
+            "project",
+            "system",
+            "platform",
+            "application",
+            "agent",
+            "demo",
+            "prototype",
+            "benchmark",
+            "analysis tool",
+            "research",
+            "项目",
+            "系统",
+            "平台",
+            "应用",
+            "原型",
+            "实验",
+        ],
     )
 
 
-def _extract_project_name_description(line: str) -> tuple[str | None, str]:
-    prefix, value = _split_heading_value(line)
-    if prefix and _normalize_heading_text(prefix) in {"project", "projects", "项目", "项目经历"} and value:
+def _extract_project_name_description(text: str) -> tuple[str | None, str]:
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    if not lines:
+        return None, text
+
+    prefix, value = _split_heading_value(lines[0])
+    if prefix and _normalize_heading_text(prefix) in {
+        "project",
+        "projects",
+        "项目",
+        "项目经历",
+    } and value:
         title, description = _split_title_description(value)
         return title, description
-    title, description = _split_title_description(line)
-    return title, description
+
+    if len(lines) == 1:
+        return _split_title_description(lines[0])
+
+    title = lines[0]
+    description = " ".join(lines[1:]).strip()
+    return title, description or title
 
 
 def _split_title_description(text: str) -> tuple[str | None, str]:
     cleaned = text.strip()
-    for separator in [". ", " - ", " — ", " – ", "，", "。"]:
+    for separator in [". ", " - ", " – ", " — ", "：", ": ", "。"]:
         if separator in cleaned:
             title, rest = cleaned.split(separator, 1)
             if 3 <= len(title.strip()) <= 80:
@@ -509,13 +528,62 @@ def _split_title_description(text: str) -> tuple[str | None, str]:
     return None, cleaned
 
 
+def _group_project_lines(lines: list[str]) -> list[str]:
+    groups: list[str] = []
+    current_title: str | None = None
+    current_details: list[str] = []
+
+    for line in lines:
+        if _looks_like_project_title(line):
+            if current_title is not None:
+                groups.append(_join_project_group(current_title, current_details))
+            current_title = line
+            current_details = []
+            continue
+
+        if current_title is None:
+            current_title = line
+        else:
+            current_details.append(line)
+
+    if current_title is not None:
+        groups.append(_join_project_group(current_title, current_details))
+    return groups
+
+
+def _looks_like_project_title(line: str) -> bool:
+    cleaned = line.strip()
+    if not cleaned or len(cleaned) > 90:
+        return False
+    if METRIC_PATTERN.search(cleaned):
+        return False
+    if _looks_like_detail_line(cleaned):
+        return False
+    word_count = len(re.findall(r"[A-Za-z0-9+#./-]+|[\u4e00-\u9fff]+", cleaned))
+    return word_count <= 10
+
+
+def _looks_like_detail_line(line: str) -> bool:
+    lowered = line.lower()
+    return any(lowered.startswith(prefix) for prefix in _PROJECT_DETAIL_PREFIXES)
+
+
+def _join_project_group(title: str, details: list[str]) -> str:
+    if not details:
+        return title
+    return "\n".join([title, *details])
+
+
 def _extract_highlight_lines(lines: list[str]) -> list[str]:
     return _dedupe(
         [
             _clean_line(line)
             for line in lines
             if _clean_line(line)
-            and (METRIC_PATTERN.search(line) or _contains_any(line, HIGHLIGHT_KEYWORDS))
+            and (
+                METRIC_PATTERN.search(line)
+                or _contains_any(line, HIGHLIGHT_KEYWORDS)
+            )
         ]
     )
 
