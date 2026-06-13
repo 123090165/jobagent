@@ -1,0 +1,331 @@
+{
+  "case_id": "anker_ai_health_algorithm",
+  "title": "Realistic AI health algorithm internship resume",
+  "target_roles": [
+    "AI Health Algorithm Intern",
+    "Physiological Signal Processing Intern",
+    "Biomedical AI Intern"
+  ],
+  "baseline_confidence_label": "strong",
+  "baseline_quality_warnings": [],
+  "baseline_missing_info_questions": [],
+  "parsed_skills": [
+    "C",
+    "C++",
+    "TensorFlow",
+    "Pandas",
+    "scikit-learn",
+    "Git",
+    "Python",
+    "NumPy",
+    "PyTorch",
+    "Deep Learning",
+    "Machine Learning",
+    "CAN"
+  ],
+  "parsed_project_count": 3,
+  "parsed_work_experience_count": 3,
+  "parsed_education_count": 3,
+  "parsed_highlights": [
+    "Completed signal preprocessing, noise filtering, data cleaning, and signal segmentation.",
+    "Built Python scripts for signal preprocessing, quality inspection, and visualization using NumPy, Pandas, SciPy, and Matplotlib.",
+    "Built a PyTorch-based deep learning pipeline for multimodal physiological signal classification.",
+    "Evaluated model results with accuracy, confusion matrix, and error case analysis.",
+    "Implemented data cleaning, abnormal signal detection, missing value handling, and simple health trend analysis logic."
+  ],
+  "profile_draft_summary": {
+    "skill_count": 12,
+    "project_count": 3,
+    "work_experience_count": 3,
+    "education_count": 3,
+    "highlight_count": 5,
+    "target_roles": [
+      "AI Health Algorithm Intern",
+      "Physiological Signal Processing Intern",
+      "Biomedical AI Intern"
+    ]
+  },
+  "enrichment_enabled": true,
+  "enrichment_suggestion_count": 0,
+  "enrichment_llm_success_count": 9,
+  "enrichment_fallback_count": 0,
+  "enrichment_discarded_suggestion_count": 0,
+  "enrichment_quality_warnings": [],
+  "accepted_suggestion_count": 0,
+  "edited_suggestion_count": 0,
+  "rejected_suggestion_count": 0,
+  "confirmed_confidence_label": "strong",
+  "confirmed_skill_count": 12,
+  "confirmed_project_count": 3,
+  "confirmed_work_experience_count": 3,
+  "confirmed_remaining_warnings": [],
+  "save_payload_ready": true,
+  "quality_verdict": "failed",
+  "reviewer_notes": [
+    "missing expected skills: MATLAB, C/C++, CNN, RNN, PPG, ECG, ACC, data cleaning, data annotation, feature extraction, signal segmentation, denoising, SciPy, Matplotlib"
+  ],
+  "save_payload_snapshot": {
+    "raw_resume_text": "Synthetic Resume for Product Testing Only\nName: Test Candidate\nLocation: Shenzhen, China\nTarget Role: AI Health Algorithm Intern / Physiological Signal Processing Intern / Biomedical AI Intern\n\nSUMMARY\nUndergraduate student in information engineering and computer science with project experience in physiological signal processing, AI health analytics, and deep learning model development. Familiar with PPG, ECG, and motion-sensor time-series data, including data cleaning, annotation, preprocessing, denoising, feature extraction, model training, evaluation, and technical documentation.\n\nInterested in applying AI algorithms to wearable health monitoring, blood oxygen estimation, heart rate analysis, blood pressure trend analysis, multimodal biosignal modeling, and real-time health data analysis. Available for a stable internship in Shenzhen.\n\nEDUCATION\nB.Eng. in Information Engineering / Computer Science\nUniversity in Shenzhen\nExpected Graduation: 2027\n\nRelevant Coursework:\nDigital Signal Processing, Machine Learning, Deep Learning, Biomedical Signal Processing, Probability and Statistics, Data Structures and Algorithms, Python Programming.\n\nTECHNICAL SKILLS\nProgramming: Python, MATLAB, C/C++\nDeep Learning: PyTorch, TensorFlow, CNN, RNN, model fine-tuning, data augmentation, supervised learning, time-series classification\nSignal Processing: PPG signal processing, ECG signal processing, ACC motion signal analysis, filtering, denoising, signal segmentation, noise analysis, feature extraction, time-domain and frequency-domain analysis\nData Processing: data cleaning, data annotation, preprocessing pipeline design, missing value handling, statistical analysis, visualization\nTools: NumPy, Pandas, SciPy, scikit-learn, Matplotlib, Jupyter Notebook, Git\n\nPROJECT EXPERIENCE\nPhysiological Signal Processing for Heart Rate and Blood Oxygen Estimation\n\n- Processed PPG and ECG signals for wearable health monitoring scenarios.\n- Completed signal preprocessing, noise filtering, data cleaning, and signal segmentation.\n- Extracted time-domain and frequency-domain features from physiological signals.\n- Analyzed how motion artifacts and sensor noise affect heart rate and blood oxygen estimation.\n- Built Python scripts for signal preprocessing, quality inspection, and visualization using NumPy, Pandas, SciPy, and Matplotlib.\n\nDeep Learning Model for Multimodal Biosignal Classification\n\n- Built a PyTorch-based deep learning pipeline for multimodal physiological signal classification.\n- Used PPG, ECG, and ACC-style time-series features to train and evaluate neural network models.\n- Applied data augmentation and model fine-tuning to improve robustness under noisy signal conditions.\n- Compared model performance under different preprocessing and feature extraction strategies.\n- Evaluated model results with accuracy, confusion matrix, and error case analysis.\n\nAI Health Analytics Mini Prototype\n\n- Designed a small AI health analysis prototype for real-time physiological data monitoring.\n- Implemented data cleaning, abnormal signal detection, missing value handling, and simple health trend analysis logic.\n- Explored how machine learning models can support health monitoring and early warning scenarios.\n- Collaborated with peers to define data format, preprocessing steps, and evaluation criteria.\n\nSELECTED TECHNICAL EXPERIENCE\nData Cleaning and Annotation\n\n- Cleaned noisy physiological and time-series data.\n- Removed invalid segments and handled missing or abnormal values.\n- Prepared structured datasets for model training and evaluation.\n\nModel Training and Optimization\n\n- Trained deep learning models using PyTorch and TensorFlow.\n- Practiced model fine-tuning, data augmentation, and hyperparameter adjustment.\n- Compared performance across preprocessing methods and model structures.\n\nINTERNSHIP AVAILABILITY\nAvailable for a stable internship period.\nPreferred location: Shenzhen.\nOpen to roles related to AI health algorithms, physiological signal processing, wearable device algorithms, biomedical AI, data preprocessing, and deep learning model development.\n\nROLE MATCHING KEYWORDS\nAI health algorithm, physiological signal processing, PPG, ECG, ACC, blood oxygen, heart rate, blood pressure, deep learning, PyTorch, TensorFlow, data cleaning, data annotation, data preprocessing, data augmentation, model fine-tuning, feature engineering, wearable health monitoring, multimodal biosignal analysis, health data analytics, technical documentation, cross-functional collaboration.",
+    "baseline_profile": {
+      "raw_text": "Synthetic Resume for Product Testing Only\nName: Test Candidate\nLocation: Shenzhen, China\nTarget Role: AI Health Algorithm Intern / Physiological Signal Processing Intern / Biomedical AI Intern\n\nSUMMARY\nUndergraduate student in information engineering and computer science with project experience in physiological signal processing, AI health analytics, and deep learning model development. Familiar with PPG, ECG, and motion-sensor time-series data, including data cleaning, annotation, preprocessing, denoising, feature extraction, model training, evaluation, and technical documentation.\n\nInterested in applying AI algorithms to wearable health monitoring, blood oxygen estimation, heart rate analysis, blood pressure trend analysis, multimodal biosignal modeling, and real-time health data analysis. Available for a stable internship in Shenzhen.\n\nEDUCATION\nB.Eng. in Information Engineering / Computer Science\nUniversity in Shenzhen\nExpected Graduation: 2027\n\nRelevant Coursework:\nDigital Signal Processing, Machine Learning, Deep Learning, Biomedical Signal Processing, Probability and Statistics, Data Structures and Algorithms, Python Programming.\n\nTECHNICAL SKILLS\nProgramming: Python, MATLAB, C/C++\nDeep Learning: PyTorch, TensorFlow, CNN, RNN, model fine-tuning, data augmentation, supervised learning, time-series classification\nSignal Processing: PPG signal processing, ECG signal processing, ACC motion signal analysis, filtering, denoising, signal segmentation, noise analysis, feature extraction, time-domain and frequency-domain analysis\nData Processing: data cleaning, data annotation, preprocessing pipeline design, missing value handling, statistical analysis, visualization\nTools: NumPy, Pandas, SciPy, scikit-learn, Matplotlib, Jupyter Notebook, Git\n\nPROJECT EXPERIENCE\nPhysiological Signal Processing for Heart Rate and Blood Oxygen Estimation\n\n- Processed PPG and ECG signals for wearable health monitoring scenarios.\n- Completed signal preprocessing, noise filtering, data cleaning, and signal segmentation.\n- Extracted time-domain and frequency-domain features from physiological signals.\n- Analyzed how motion artifacts and sensor noise affect heart rate and blood oxygen estimation.\n- Built Python scripts for signal preprocessing, quality inspection, and visualization using NumPy, Pandas, SciPy, and Matplotlib.\n\nDeep Learning Model for Multimodal Biosignal Classification\n\n- Built a PyTorch-based deep learning pipeline for multimodal physiological signal classification.\n- Used PPG, ECG, and ACC-style time-series features to train and evaluate neural network models.\n- Applied data augmentation and model fine-tuning to improve robustness under noisy signal conditions.\n- Compared model performance under different preprocessing and feature extraction strategies.\n- Evaluated model results with accuracy, confusion matrix, and error case analysis.\n\nAI Health Analytics Mini Prototype\n\n- Designed a small AI health analysis prototype for real-time physiological data monitoring.\n- Implemented data cleaning, abnormal signal detection, missing value handling, and simple health trend analysis logic.\n- Explored how machine learning models can support health monitoring and early warning scenarios.\n- Collaborated with peers to define data format, preprocessing steps, and evaluation criteria.\n\nSELECTED TECHNICAL EXPERIENCE\nData Cleaning and Annotation\n\n- Cleaned noisy physiological and time-series data.\n- Removed invalid segments and handled missing or abnormal values.\n- Prepared structured datasets for model training and evaluation.\n\nModel Training and Optimization\n\n- Trained deep learning models using PyTorch and TensorFlow.\n- Practiced model fine-tuning, data augmentation, and hyperparameter adjustment.\n- Compared performance across preprocessing methods and model structures.\n\nINTERNSHIP AVAILABILITY\nAvailable for a stable internship period.\nPreferred location: Shenzhen.\nOpen to roles related to AI health algorithms, physiological signal processing, wearable device algorithms, biomedical AI, data preprocessing, and deep learning model development.\n\nROLE MATCHING KEYWORDS\nAI health algorithm, physiological signal processing, PPG, ECG, ACC, blood oxygen, heart rate, blood pressure, deep learning, PyTorch, TensorFlow, data cleaning, data annotation, data preprocessing, data augmentation, model fine-tuning, feature engineering, wearable health monitoring, multimodal biosignal analysis, health data analytics, technical documentation, cross-functional collaboration.",
+      "name": null,
+      "education": [
+        {
+          "school": null,
+          "degree": null,
+          "major": "Information Engineering / Computer Science",
+          "raw_text": "B.Eng. in Information Engineering / Computer Science"
+        },
+        {
+          "school": "University in Shenzhen",
+          "degree": null,
+          "major": "Shenzhen",
+          "raw_text": "University in Shenzhen"
+        },
+        {
+          "school": null,
+          "degree": null,
+          "major": "Expected Graduation: 2027",
+          "raw_text": "Expected Graduation: 2027"
+        }
+      ],
+      "skills": [
+        "C",
+        "C++",
+        "TensorFlow",
+        "Pandas",
+        "scikit-learn",
+        "Git",
+        "Python",
+        "NumPy",
+        "PyTorch",
+        "Deep Learning",
+        "Machine Learning",
+        "CAN"
+      ],
+      "projects": [
+        {
+          "name": "Physiological Signal Processing for Heart Rate and Blood Oxygen Estimation",
+          "description": "Physiological Signal Processing for Heart Rate and Blood Oxygen Estimation",
+          "technologies": [],
+          "highlights": [],
+          "raw_text": "Physiological Signal Processing for Heart Rate and Blood Oxygen Estimation"
+        },
+        {
+          "name": "Processed PPG and ECG signals for wearable health monitoring scenarios.",
+          "description": "Processed PPG and ECG signals for wearable health monitoring scenarios.",
+          "technologies": [],
+          "highlights": [],
+          "raw_text": "Processed PPG and ECG signals for wearable health monitoring scenarios."
+        },
+        {
+          "name": "Project 3",
+          "description": "Completed signal preprocessing, noise filtering, data cleaning, and signal segmentation.",
+          "technologies": [],
+          "highlights": [
+            "Completed signal preprocessing, noise filtering, data cleaning, and signal segmentation."
+          ],
+          "raw_text": "Completed signal preprocessing, noise filtering, data cleaning, and signal segmentation."
+        }
+      ],
+      "work_experiences": [
+        {
+          "company": null,
+          "role": null,
+          "description": "Target Role: AI Health Algorithm Intern / Physiological Signal Processing Intern / Biomedical AI Intern",
+          "technologies": [],
+          "raw_text": "Target Role: AI Health Algorithm Intern / Physiological Signal Processing Intern / Biomedical AI Intern"
+        },
+        {
+          "company": null,
+          "role": null,
+          "description": "Interested in applying AI algorithms to wearable health monitoring, blood oxygen estimation, heart rate analysis, blood pressure trend analysis, multimodal biosignal modeling, and real-time health data analysis. Available for a stable internship in Shenzhen.",
+          "technologies": [],
+          "raw_text": "Interested in applying AI algorithms to wearable health monitoring, blood oxygen estimation, heart rate analysis, blood pressure trend analysis, multimodal biosignal modeling, and real-time health data analysis. Available for a stable internship in Shenzhen."
+        },
+        {
+          "company": null,
+          "role": null,
+          "description": "INTERNSHIP AVAILABILITY",
+          "technologies": [],
+          "raw_text": "INTERNSHIP AVAILABILITY"
+        }
+      ],
+      "certificates": [],
+      "highlights": [
+        "Completed signal preprocessing, noise filtering, data cleaning, and signal segmentation.",
+        "Built Python scripts for signal preprocessing, quality inspection, and visualization using NumPy, Pandas, SciPy, and Matplotlib.",
+        "Built a PyTorch-based deep learning pipeline for multimodal physiological signal classification.",
+        "Evaluated model results with accuracy, confusion matrix, and error case analysis.",
+        "Implemented data cleaning, abnormal signal detection, missing value handling, and simple health trend analysis logic."
+      ],
+      "missing_info": []
+    },
+    "confirmed_result": {
+      "confirmed_profile": {
+        "raw_text": "Synthetic Resume for Product Testing Only\nName: Test Candidate\nLocation: Shenzhen, China\nTarget Role: AI Health Algorithm Intern / Physiological Signal Processing Intern / Biomedical AI Intern\n\nSUMMARY\nUndergraduate student in information engineering and computer science with project experience in physiological signal processing, AI health analytics, and deep learning model development. Familiar with PPG, ECG, and motion-sensor time-series data, including data cleaning, annotation, preprocessing, denoising, feature extraction, model training, evaluation, and technical documentation.\n\nInterested in applying AI algorithms to wearable health monitoring, blood oxygen estimation, heart rate analysis, blood pressure trend analysis, multimodal biosignal modeling, and real-time health data analysis. Available for a stable internship in Shenzhen.\n\nEDUCATION\nB.Eng. in Information Engineering / Computer Science\nUniversity in Shenzhen\nExpected Graduation: 2027\n\nRelevant Coursework:\nDigital Signal Processing, Machine Learning, Deep Learning, Biomedical Signal Processing, Probability and Statistics, Data Structures and Algorithms, Python Programming.\n\nTECHNICAL SKILLS\nProgramming: Python, MATLAB, C/C++\nDeep Learning: PyTorch, TensorFlow, CNN, RNN, model fine-tuning, data augmentation, supervised learning, time-series classification\nSignal Processing: PPG signal processing, ECG signal processing, ACC motion signal analysis, filtering, denoising, signal segmentation, noise analysis, feature extraction, time-domain and frequency-domain analysis\nData Processing: data cleaning, data annotation, preprocessing pipeline design, missing value handling, statistical analysis, visualization\nTools: NumPy, Pandas, SciPy, scikit-learn, Matplotlib, Jupyter Notebook, Git\n\nPROJECT EXPERIENCE\nPhysiological Signal Processing for Heart Rate and Blood Oxygen Estimation\n\n- Processed PPG and ECG signals for wearable health monitoring scenarios.\n- Completed signal preprocessing, noise filtering, data cleaning, and signal segmentation.\n- Extracted time-domain and frequency-domain features from physiological signals.\n- Analyzed how motion artifacts and sensor noise affect heart rate and blood oxygen estimation.\n- Built Python scripts for signal preprocessing, quality inspection, and visualization using NumPy, Pandas, SciPy, and Matplotlib.\n\nDeep Learning Model for Multimodal Biosignal Classification\n\n- Built a PyTorch-based deep learning pipeline for multimodal physiological signal classification.\n- Used PPG, ECG, and ACC-style time-series features to train and evaluate neural network models.\n- Applied data augmentation and model fine-tuning to improve robustness under noisy signal conditions.\n- Compared model performance under different preprocessing and feature extraction strategies.\n- Evaluated model results with accuracy, confusion matrix, and error case analysis.\n\nAI Health Analytics Mini Prototype\n\n- Designed a small AI health analysis prototype for real-time physiological data monitoring.\n- Implemented data cleaning, abnormal signal detection, missing value handling, and simple health trend analysis logic.\n- Explored how machine learning models can support health monitoring and early warning scenarios.\n- Collaborated with peers to define data format, preprocessing steps, and evaluation criteria.\n\nSELECTED TECHNICAL EXPERIENCE\nData Cleaning and Annotation\n\n- Cleaned noisy physiological and time-series data.\n- Removed invalid segments and handled missing or abnormal values.\n- Prepared structured datasets for model training and evaluation.\n\nModel Training and Optimization\n\n- Trained deep learning models using PyTorch and TensorFlow.\n- Practiced model fine-tuning, data augmentation, and hyperparameter adjustment.\n- Compared performance across preprocessing methods and model structures.\n\nINTERNSHIP AVAILABILITY\nAvailable for a stable internship period.\nPreferred location: Shenzhen.\nOpen to roles related to AI health algorithms, physiological signal processing, wearable device algorithms, biomedical AI, data preprocessing, and deep learning model development.\n\nROLE MATCHING KEYWORDS\nAI health algorithm, physiological signal processing, PPG, ECG, ACC, blood oxygen, heart rate, blood pressure, deep learning, PyTorch, TensorFlow, data cleaning, data annotation, data preprocessing, data augmentation, model fine-tuning, feature engineering, wearable health monitoring, multimodal biosignal analysis, health data analytics, technical documentation, cross-functional collaboration.",
+        "name": null,
+        "education": [
+          {
+            "school": null,
+            "degree": null,
+            "major": "Information Engineering / Computer Science",
+            "raw_text": "B.Eng. in Information Engineering / Computer Science"
+          },
+          {
+            "school": "University in Shenzhen",
+            "degree": null,
+            "major": "Shenzhen",
+            "raw_text": "University in Shenzhen"
+          },
+          {
+            "school": null,
+            "degree": null,
+            "major": "Expected Graduation: 2027",
+            "raw_text": "Expected Graduation: 2027"
+          }
+        ],
+        "skills": [
+          "C",
+          "C++",
+          "TensorFlow",
+          "Pandas",
+          "scikit-learn",
+          "Git",
+          "Python",
+          "NumPy",
+          "PyTorch",
+          "Deep Learning",
+          "Machine Learning",
+          "CAN"
+        ],
+        "projects": [
+          {
+            "name": "Physiological Signal Processing for Heart Rate and Blood Oxygen Estimation",
+            "description": "Physiological Signal Processing for Heart Rate and Blood Oxygen Estimation",
+            "technologies": [],
+            "highlights": [],
+            "raw_text": "Physiological Signal Processing for Heart Rate and Blood Oxygen Estimation"
+          },
+          {
+            "name": "Processed PPG and ECG signals for wearable health monitoring scenarios.",
+            "description": "Processed PPG and ECG signals for wearable health monitoring scenarios.",
+            "technologies": [],
+            "highlights": [],
+            "raw_text": "Processed PPG and ECG signals for wearable health monitoring scenarios."
+          },
+          {
+            "name": "Project 3",
+            "description": "Completed signal preprocessing, noise filtering, data cleaning, and signal segmentation.",
+            "technologies": [],
+            "highlights": [
+              "Completed signal preprocessing, noise filtering, data cleaning, and signal segmentation."
+            ],
+            "raw_text": "Completed signal preprocessing, noise filtering, data cleaning, and signal segmentation."
+          }
+        ],
+        "work_experiences": [
+          {
+            "company": null,
+            "role": null,
+            "description": "Target Role: AI Health Algorithm Intern / Physiological Signal Processing Intern / Biomedical AI Intern",
+            "technologies": [],
+            "raw_text": "Target Role: AI Health Algorithm Intern / Physiological Signal Processing Intern / Biomedical AI Intern"
+          },
+          {
+            "company": null,
+            "role": null,
+            "description": "Interested in applying AI algorithms to wearable health monitoring, blood oxygen estimation, heart rate analysis, blood pressure trend analysis, multimodal biosignal modeling, and real-time health data analysis. Available for a stable internship in Shenzhen.",
+            "technologies": [],
+            "raw_text": "Interested in applying AI algorithms to wearable health monitoring, blood oxygen estimation, heart rate analysis, blood pressure trend analysis, multimodal biosignal modeling, and real-time health data analysis. Available for a stable internship in Shenzhen."
+          },
+          {
+            "company": null,
+            "role": null,
+            "description": "INTERNSHIP AVAILABILITY",
+            "technologies": [],
+            "raw_text": "INTERNSHIP AVAILABILITY"
+          }
+        ],
+        "certificates": [],
+        "highlights": [
+          "Completed signal preprocessing, noise filtering, data cleaning, and signal segmentation.",
+          "Built Python scripts for signal preprocessing, quality inspection, and visualization using NumPy, Pandas, SciPy, and Matplotlib.",
+          "Built a PyTorch-based deep learning pipeline for multimodal physiological signal classification.",
+          "Evaluated model results with accuracy, confusion matrix, and error case analysis.",
+          "Implemented data cleaning, abnormal signal detection, missing value handling, and simple health trend analysis logic."
+        ],
+        "missing_info": []
+      },
+      "user_confirmed_data": {
+        "target_roles": [
+          "AI Health Algorithm Intern",
+          "Physiological Signal Processing Intern",
+          "Biomedical AI Intern"
+        ],
+        "preferred_locations": [],
+        "additional_skills": [
+          "C",
+          "C++",
+          "TensorFlow",
+          "Pandas",
+          "scikit-learn",
+          "Git",
+          "Python",
+          "NumPy",
+          "PyTorch",
+          "Deep Learning",
+          "Machine Learning",
+          "CAN"
+        ],
+        "project_clarifications": [
+          "Physiological Signal Processing for Heart Rate and Blood Oxygen Estimation | Physiological Signal Processing for Heart Rate and Blood Oxygen Estimation",
+          "Processed PPG and ECG signals for wearable health monitoring scenarios. | Processed PPG and ECG signals for wearable health monitoring scenarios.",
+          "Project 3 | Completed signal preprocessing, noise filtering, data cleaning, and signal segmentation. | Completed signal preprocessing, noise filtering, data cleaning, and signal segmentation."
+        ],
+        "work_experience_clarifications": [
+          "Target Role: AI Health Algorithm Intern / Physiological Signal Processing Intern / Biomedical AI Intern",
+          "Interested in applying AI algorithms to wearable health monitoring, blood oxygen estimation, heart rate analysis, blood pressure trend analysis, multimodal biosignal modeling, and real-time health data analysis. Available for a stable internship in Shenzhen.",
+          "INTERNSHIP AVAILABILITY"
+        ],
+        "constraints": [],
+        "notes": null
+      },
+      "confirmation_summary": {
+        "confirmed_sections": [
+          "target_roles",
+          "skills",
+          "projects",
+          "work_experiences"
+        ],
+        "added_target_roles": [
+          "AI Health Algorithm Intern",
+          "Physiological Signal Processing Intern",
+          "Biomedical AI Intern"
+        ],
+        "added_skills": [
+          "C",
+          "C++",
+          "TensorFlow",
+          "Pandas",
+          "scikit-learn",
+          "Git",
+          "Python",
+          "NumPy",
+          "PyTorch",
+          "Deep Learning",
+          "Machine Learning",
+          "CAN"
+        ],
+        "added_project_clarifications_count": 3,
+        "added_work_experience_clarifications_count": 3,
+        "constraints_count": 0
+      },
+      "remaining_warnings": [],
+      "confidence_label": "strong"
+    },
+    "suggestion_decisions": [],
+    "missing_info_answers": [],
+    "notes": null
+  }
+}

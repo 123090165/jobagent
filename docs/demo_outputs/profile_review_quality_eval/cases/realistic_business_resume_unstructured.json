@@ -1,0 +1,205 @@
+{
+  "case_id": "realistic_business_resume_unstructured",
+  "title": "Realistic unstructured business / FA resume",
+  "target_roles": [
+    "Business Analyst",
+    "Investment Analyst",
+    "FA Intern"
+  ],
+  "baseline_confidence_label": "strong",
+  "baseline_quality_warnings": [
+    "resume profile has no highlights or measurable outcomes"
+  ],
+  "baseline_missing_info_questions": [
+    "Can you add measurable outcomes, such as number of APIs, tests passed, latency, users, dataset size, or accuracy?"
+  ],
+  "parsed_skills": [
+    "C"
+  ],
+  "parsed_project_count": 2,
+  "parsed_work_experience_count": 2,
+  "parsed_education_count": 0,
+  "parsed_highlights": [],
+  "profile_draft_summary": {
+    "skill_count": 1,
+    "project_count": 2,
+    "work_experience_count": 2,
+    "education_count": 0,
+    "highlight_count": 0,
+    "target_roles": [
+      "Business Analyst",
+      "Investment Analyst",
+      "FA Intern"
+    ]
+  },
+  "enrichment_enabled": true,
+  "enrichment_suggestion_count": 0,
+  "enrichment_llm_success_count": 4,
+  "enrichment_fallback_count": 0,
+  "enrichment_discarded_suggestion_count": 3,
+  "enrichment_quality_warnings": [
+    "resume profile has no highlights or measurable outcomes",
+    "discarded ungrounded profile enrichment suggestion"
+  ],
+  "accepted_suggestion_count": 0,
+  "edited_suggestion_count": 0,
+  "rejected_suggestion_count": 0,
+  "confirmed_confidence_label": "strong",
+  "confirmed_skill_count": 1,
+  "confirmed_project_count": 2,
+  "confirmed_work_experience_count": 2,
+  "confirmed_remaining_warnings": [],
+  "save_payload_ready": true,
+  "quality_verdict": "failed",
+  "reviewer_notes": [
+    "missing expected skills: Wind, 企查查, Excel, PowerPoint, CRM, industry research, competitor analysis, meeting notes",
+    "expected highlights section is sparse or missing",
+    "discarded 3 unsupported enrichment suggestions"
+  ],
+  "save_payload_snapshot": {
+    "raw_resume_text": "我在某 FA 团队支持过新材料项目，主要用 Wind、企查查、Excel、PowerPoint 收集公司和行业信息，整理竞争格局、融资历史和潜在合作方。\n工作内容包括维护 CRM 项目跟进表，记录客户需求，写会议纪要，跟进投资人反馈，识别高意向潜在客户。也参与过新材料行业研究，整理市场空间、商业模式、产业链上下游和竞品情况。\n目标方向是 Business Analyst、Investment Analyst、FA Intern 或者行业研究相关实习，希望能在深圳、香港或杭州做商业分析、投资分析、行业研究相关工作。",
+    "baseline_profile": {
+      "raw_text": "我在某 FA 团队支持过新材料项目，主要用 Wind、企查查、Excel、PowerPoint 收集公司和行业信息，整理竞争格局、融资历史和潜在合作方。\n工作内容包括维护 CRM 项目跟进表，记录客户需求，写会议纪要，跟进投资人反馈，识别高意向潜在客户。也参与过新材料行业研究，整理市场空间、商业模式、产业链上下游和竞品情况。\n目标方向是 Business Analyst、Investment Analyst、FA Intern 或者行业研究相关实习，希望能在深圳、香港或杭州做商业分析、投资分析、行业研究相关工作。",
+      "name": null,
+      "education": [],
+      "skills": [
+        "C"
+      ],
+      "projects": [
+        {
+          "name": "我在某 FA 团队支持过新材料项目",
+          "description": "主要用 Wind、企查查、Excel、PowerPoint 收集公司和行业信息，整理竞争格局、融资历史和潜在合作方。",
+          "technologies": [],
+          "highlights": [],
+          "raw_text": "我在某 FA 团队支持过新材料项目，主要用 Wind、企查查、Excel、PowerPoint 收集公司和行业信息，整理竞争格局、融资历史和潜在合作方。"
+        },
+        {
+          "name": "工作内容包括维护 CRM 项目跟进表",
+          "description": "记录客户需求，写会议纪要，跟进投资人反馈，识别高意向潜在客户。也参与过新材料行业研究，整理市场空间、商业模式、产业链上下游和竞品情况。",
+          "technologies": [],
+          "highlights": [],
+          "raw_text": "工作内容包括维护 CRM 项目跟进表，记录客户需求，写会议纪要，跟进投资人反馈，识别高意向潜在客户。也参与过新材料行业研究，整理市场空间、商业模式、产业链上下游和竞品情况。"
+        }
+      ],
+      "work_experiences": [
+        {
+          "company": null,
+          "role": null,
+          "description": "我在某 FA 团队支持过新材料项目，主要用 Wind、企查查、Excel、PowerPoint 收集公司和行业信息，整理竞争格局、融资历史和潜在合作方。",
+          "technologies": [],
+          "raw_text": "我在某 FA 团队支持过新材料项目，主要用 Wind、企查查、Excel、PowerPoint 收集公司和行业信息，整理竞争格局、融资历史和潜在合作方。"
+        },
+        {
+          "company": "希望能在深圳、香港或杭州做商业分析、投资分析、行业研究相关工作。",
+          "role": "目标方向是 Business Analyst、Investment Analyst、FA Intern 或者行业研究相关实习",
+          "description": "目标方向是 Business Analyst、Investment Analyst、FA Intern 或者行业研究相关实习，希望能在深圳、香港或杭州做商业分析、投资分析、行业研究相关工作。",
+          "technologies": [],
+          "raw_text": "目标方向是 Business Analyst、Investment Analyst、FA Intern 或者行业研究相关实习，希望能在深圳、香港或杭州做商业分析、投资分析、行业研究相关工作。"
+        }
+      ],
+      "certificates": [],
+      "highlights": [],
+      "missing_info": [
+        "缺少结果或量化亮点"
+      ]
+    },
+    "confirmed_result": {
+      "confirmed_profile": {
+        "raw_text": "我在某 FA 团队支持过新材料项目，主要用 Wind、企查查、Excel、PowerPoint 收集公司和行业信息，整理竞争格局、融资历史和潜在合作方。\n工作内容包括维护 CRM 项目跟进表，记录客户需求，写会议纪要，跟进投资人反馈，识别高意向潜在客户。也参与过新材料行业研究，整理市场空间、商业模式、产业链上下游和竞品情况。\n目标方向是 Business Analyst、Investment Analyst、FA Intern 或者行业研究相关实习，希望能在深圳、香港或杭州做商业分析、投资分析、行业研究相关工作。",
+        "name": null,
+        "education": [],
+        "skills": [
+          "C"
+        ],
+        "projects": [
+          {
+            "name": "我在某 FA 团队支持过新材料项目",
+            "description": "主要用 Wind、企查查、Excel、PowerPoint 收集公司和行业信息，整理竞争格局、融资历史和潜在合作方。",
+            "technologies": [],
+            "highlights": [],
+            "raw_text": "我在某 FA 团队支持过新材料项目，主要用 Wind、企查查、Excel、PowerPoint 收集公司和行业信息，整理竞争格局、融资历史和潜在合作方。"
+          },
+          {
+            "name": "工作内容包括维护 CRM 项目跟进表",
+            "description": "记录客户需求，写会议纪要，跟进投资人反馈，识别高意向潜在客户。也参与过新材料行业研究，整理市场空间、商业模式、产业链上下游和竞品情况。",
+            "technologies": [],
+            "highlights": [],
+            "raw_text": "工作内容包括维护 CRM 项目跟进表，记录客户需求，写会议纪要，跟进投资人反馈，识别高意向潜在客户。也参与过新材料行业研究，整理市场空间、商业模式、产业链上下游和竞品情况。"
+          }
+        ],
+        "work_experiences": [
+          {
+            "company": null,
+            "role": null,
+            "description": "我在某 FA 团队支持过新材料项目，主要用 Wind、企查查、Excel、PowerPoint 收集公司和行业信息，整理竞争格局、融资历史和潜在合作方。",
+            "technologies": [],
+            "raw_text": "我在某 FA 团队支持过新材料项目，主要用 Wind、企查查、Excel、PowerPoint 收集公司和行业信息，整理竞争格局、融资历史和潜在合作方。"
+          },
+          {
+            "company": "希望能在深圳、香港或杭州做商业分析、投资分析、行业研究相关工作。",
+            "role": "目标方向是 Business Analyst、Investment Analyst、FA Intern 或者行业研究相关实习",
+            "description": "目标方向是 Business Analyst、Investment Analyst、FA Intern 或者行业研究相关实习，希望能在深圳、香港或杭州做商业分析、投资分析、行业研究相关工作。",
+            "technologies": [],
+            "raw_text": "目标方向是 Business Analyst、Investment Analyst、FA Intern 或者行业研究相关实习，希望能在深圳、香港或杭州做商业分析、投资分析、行业研究相关工作。"
+          }
+        ],
+        "certificates": [],
+        "highlights": [],
+        "missing_info": [
+          "缺少结果或量化亮点"
+        ]
+      },
+      "user_confirmed_data": {
+        "target_roles": [
+          "Business Analyst",
+          "Investment Analyst",
+          "FA Intern"
+        ],
+        "preferred_locations": [],
+        "additional_skills": [
+          "C"
+        ],
+        "project_clarifications": [
+          "我在某 FA 团队支持过新材料项目 | 主要用 Wind、企查查、Excel、PowerPoint 收集公司和行业信息，整理竞争格局、融资历史和潜在合作方。",
+          "工作内容包括维护 CRM 项目跟进表 | 记录客户需求，写会议纪要，跟进投资人反馈，识别高意向潜在客户。也参与过新材料行业研究，整理市场空间、商业模式、产业链上下游和竞品情况。"
+        ],
+        "work_experience_clarifications": [
+          "我在某 FA 团队支持过新材料项目，主要用 Wind、企查查、Excel、PowerPoint 收集公司和行业信息，整理竞争格局、融资历史和潜在合作方。",
+          "希望能在深圳、香港或杭州做商业分析、投资分析、行业研究相关工作。 | 目标方向是 Business Analyst、Investment Analyst、FA Intern 或者行业研究相关实习 | 目标方向是 Business Analyst、Investment Analyst、FA Intern 或者行业研究相关实习，希望能在深圳、香港或杭州做商业分析、投资分析、行业研究相关工作。"
+        ],
+        "constraints": [],
+        "notes": "Can you add measurable outcomes, such as number of APIs, tests passed, latency, users, dataset size, or accuracy?: Please keep the existing measurable outcomes from the resume evidence."
+      },
+      "confirmation_summary": {
+        "confirmed_sections": [
+          "target_roles",
+          "skills",
+          "projects",
+          "work_experiences",
+          "notes"
+        ],
+        "added_target_roles": [
+          "Business Analyst",
+          "Investment Analyst",
+          "FA Intern"
+        ],
+        "added_skills": [
+          "C"
+        ],
+        "added_project_clarifications_count": 2,
+        "added_work_experience_clarifications_count": 2,
+        "constraints_count": 0
+      },
+      "remaining_warnings": [],
+      "confidence_label": "strong"
+    },
+    "suggestion_decisions": [],
+    "missing_info_answers": [
+      {
+        "question": "Can you add measurable outcomes, such as number of APIs, tests passed, latency, users, dataset size, or accuracy?",
+        "answer": "Please keep the existing measurable outcomes from the resume evidence."
+      }
+    ],
+    "notes": "Can you add measurable outcomes, such as number of APIs, tests passed, latency, users, dataset size, or accuracy?: Please keep the existing measurable outcomes from the resume evidence."
+  }
+}

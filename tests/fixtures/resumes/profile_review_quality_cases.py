@@ -157,4 +157,176 @@ I know Python and want an AI job.
         should_have_warnings=True,
         expected_confidence_without_llm="weak",
     ),
+    ProfileReviewQualityCase(
+        case_id="anker_ai_health_algorithm",
+        title="Realistic AI health algorithm internship resume",
+        resume_text="""
+Synthetic Resume for Product Testing Only
+Name: Test Candidate
+Location: Shenzhen, China
+Target Role: AI Health Algorithm Intern / Physiological Signal Processing Intern / Biomedical AI Intern
+
+SUMMARY
+Undergraduate student in information engineering and computer science with project experience in physiological signal processing, AI health analytics, and deep learning model development. Familiar with PPG, ECG, and motion-sensor time-series data, including data cleaning, annotation, preprocessing, denoising, feature extraction, model training, evaluation, and technical documentation.
+
+Interested in applying AI algorithms to wearable health monitoring, blood oxygen estimation, heart rate analysis, blood pressure trend analysis, multimodal biosignal modeling, and real-time health data analysis. Available for a stable internship in Shenzhen.
+
+EDUCATION
+B.Eng. in Information Engineering / Computer Science
+University in Shenzhen
+Expected Graduation: 2027
+
+Relevant Coursework:
+Digital Signal Processing, Machine Learning, Deep Learning, Biomedical Signal Processing, Probability and Statistics, Data Structures and Algorithms, Python Programming.
+
+TECHNICAL SKILLS
+Programming: Python, MATLAB, C/C++
+Deep Learning: PyTorch, TensorFlow, CNN, RNN, model fine-tuning, data augmentation, supervised learning, time-series classification
+Signal Processing: PPG signal processing, ECG signal processing, ACC motion signal analysis, filtering, denoising, signal segmentation, noise analysis, feature extraction, time-domain and frequency-domain analysis
+Data Processing: data cleaning, data annotation, preprocessing pipeline design, missing value handling, statistical analysis, visualization
+Tools: NumPy, Pandas, SciPy, scikit-learn, Matplotlib, Jupyter Notebook, Git
+
+PROJECT EXPERIENCE
+Physiological Signal Processing for Heart Rate and Blood Oxygen Estimation
+
+- Processed PPG and ECG signals for wearable health monitoring scenarios.
+- Completed signal preprocessing, noise filtering, data cleaning, and signal segmentation.
+- Extracted time-domain and frequency-domain features from physiological signals.
+- Analyzed how motion artifacts and sensor noise affect heart rate and blood oxygen estimation.
+- Built Python scripts for signal preprocessing, quality inspection, and visualization using NumPy, Pandas, SciPy, and Matplotlib.
+
+Deep Learning Model for Multimodal Biosignal Classification
+
+- Built a PyTorch-based deep learning pipeline for multimodal physiological signal classification.
+- Used PPG, ECG, and ACC-style time-series features to train and evaluate neural network models.
+- Applied data augmentation and model fine-tuning to improve robustness under noisy signal conditions.
+- Compared model performance under different preprocessing and feature extraction strategies.
+- Evaluated model results with accuracy, confusion matrix, and error case analysis.
+
+AI Health Analytics Mini Prototype
+
+- Designed a small AI health analysis prototype for real-time physiological data monitoring.
+- Implemented data cleaning, abnormal signal detection, missing value handling, and simple health trend analysis logic.
+- Explored how machine learning models can support health monitoring and early warning scenarios.
+- Collaborated with peers to define data format, preprocessing steps, and evaluation criteria.
+
+SELECTED TECHNICAL EXPERIENCE
+Data Cleaning and Annotation
+
+- Cleaned noisy physiological and time-series data.
+- Removed invalid segments and handled missing or abnormal values.
+- Prepared structured datasets for model training and evaluation.
+
+Model Training and Optimization
+
+- Trained deep learning models using PyTorch and TensorFlow.
+- Practiced model fine-tuning, data augmentation, and hyperparameter adjustment.
+- Compared performance across preprocessing methods and model structures.
+
+INTERNSHIP AVAILABILITY
+Available for a stable internship period.
+Preferred location: Shenzhen.
+Open to roles related to AI health algorithms, physiological signal processing, wearable device algorithms, biomedical AI, data preprocessing, and deep learning model development.
+
+ROLE MATCHING KEYWORDS
+AI health algorithm, physiological signal processing, PPG, ECG, ACC, blood oxygen, heart rate, blood pressure, deep learning, PyTorch, TensorFlow, data cleaning, data annotation, data preprocessing, data augmentation, model fine-tuning, feature engineering, wearable health monitoring, multimodal biosignal analysis, health data analytics, technical documentation, cross-functional collaboration.
+""",
+        target_roles=[
+            "AI Health Algorithm Intern",
+            "Physiological Signal Processing Intern",
+            "Biomedical AI Intern",
+        ],
+        expected_focus=[
+            "physiological signal processing",
+            "wearable health monitoring",
+            "PPG",
+            "ECG",
+            "ACC",
+            "blood oxygen",
+            "heart rate",
+            "deep learning",
+            "time-series classification",
+            "data cleaning",
+            "feature extraction",
+            "Shenzhen",
+        ],
+        expected_skills=[
+            "Python",
+            "MATLAB",
+            "C/C++",
+            "PyTorch",
+            "TensorFlow",
+            "CNN",
+            "RNN",
+            "PPG",
+            "ECG",
+            "ACC",
+            "data cleaning",
+            "data annotation",
+            "feature extraction",
+            "signal segmentation",
+            "denoising",
+            "NumPy",
+            "Pandas",
+            "SciPy",
+            "scikit-learn",
+            "Matplotlib",
+            "Git",
+        ],
+        expected_sections=["projects", "education", "highlights"],
+        should_have_warnings=False,
+        expected_confidence_without_llm="strong",
+    ),
+    ProfileReviewQualityCase(
+        case_id="realistic_noisy_chinese_resume",
+        title="Realistic noisy Chinese resume without clean headings",
+        resume_text="""
+我主要想找 AI Agent / 后端 / 数据分析 相关实习。学校是电子信息方向本科，比较希望深圳或杭州。
+之前做过一个求职分析工具，用 FastAPI、Streamlit、SQLite 做过接口和页面，也写过一些测试。这个项目主要是把简历解析、岗位分析、匹配报告和可视化页面串起来，我负责后端接口、前端展示和测试数据整理。
+还做过课程里的音频分类实验，用 PyTorch、Librosa、MFCC、STFT 做特征和模型训练，比过 CNN 和 VGG 的效果，验证准确率最高大概 75%。另外也写过一些 Python 数据处理脚本，会用 Pandas、NumPy 和 Git。
+""",
+        target_roles=["AI Agent Intern", "Backend Engineer Intern", "Data Analyst Intern"],
+        expected_focus=["ai agent", "backend", "data analysis", "Shenzhen", "Hangzhou"],
+        expected_skills=[
+            "Python",
+            "FastAPI",
+            "Streamlit",
+            "SQLite",
+            "PyTorch",
+            "Librosa",
+            "MFCC",
+            "STFT",
+            "CNN",
+            "Pandas",
+            "NumPy",
+            "Git",
+        ],
+        expected_sections=["projects", "education"],
+        should_have_warnings=True,
+        expected_confidence_without_llm="medium",
+    ),
+    ProfileReviewQualityCase(
+        case_id="realistic_business_resume_unstructured",
+        title="Realistic unstructured business / FA resume",
+        resume_text="""
+我在某 FA 团队支持过新材料项目，主要用 Wind、企查查、Excel、PowerPoint 收集公司和行业信息，整理竞争格局、融资历史和潜在合作方。
+工作内容包括维护 CRM 项目跟进表，记录客户需求，写会议纪要，跟进投资人反馈，识别高意向潜在客户。也参与过新材料行业研究，整理市场空间、商业模式、产业链上下游和竞品情况。
+目标方向是 Business Analyst、Investment Analyst、FA Intern 或者行业研究相关实习，希望能在深圳、香港或杭州做商业分析、投资分析、行业研究相关工作。
+""",
+        target_roles=["Business Analyst", "Investment Analyst", "FA Intern"],
+        expected_focus=["industry research", "competitive landscape", "CRM", "deal memo"],
+        expected_skills=[
+            "Wind",
+            "企查查",
+            "Excel",
+            "PowerPoint",
+            "CRM",
+            "industry research",
+            "competitor analysis",
+            "meeting notes",
+        ],
+        expected_sections=["work_experiences", "highlights"],
+        should_have_warnings=True,
+        expected_confidence_without_llm="medium",
+    ),
 ]
