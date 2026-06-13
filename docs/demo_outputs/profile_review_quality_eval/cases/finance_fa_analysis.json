@@ -1,0 +1,276 @@
+{
+  "case_id": "finance_fa_analysis",
+  "title": "Finance / FA analysis resume",
+  "target_roles": [
+    "Business Analyst",
+    "Investment Analyst"
+  ],
+  "baseline_confidence_label": "strong",
+  "baseline_quality_warnings": [
+    "project evidence may be too thin for matching"
+  ],
+  "baseline_missing_info_questions": [
+    "For your strongest project, what exactly did you build, which technologies did you use, and what measurable result can you show?"
+  ],
+  "parsed_skills": [
+    "C"
+  ],
+  "parsed_project_count": 3,
+  "parsed_work_experience_count": 3,
+  "parsed_education_count": 1,
+  "parsed_highlights": [
+    "Highlights: Completed investor meeting notes and delivered structured research reports."
+  ],
+  "profile_draft_summary": {
+    "skill_count": 1,
+    "project_count": 3,
+    "work_experience_count": 3,
+    "education_count": 1,
+    "highlight_count": 1,
+    "target_roles": [
+      "Business Analyst",
+      "Investment Analyst"
+    ]
+  },
+  "enrichment_enabled": true,
+  "enrichment_suggestion_count": 2,
+  "enrichment_llm_success_count": 7,
+  "enrichment_fallback_count": 0,
+  "enrichment_discarded_suggestion_count": 0,
+  "enrichment_quality_warnings": [
+    "project evidence may be too thin for matching"
+  ],
+  "accepted_suggestion_count": 1,
+  "edited_suggestion_count": 1,
+  "rejected_suggestion_count": 0,
+  "confirmed_confidence_label": "strong",
+  "confirmed_skill_count": 1,
+  "confirmed_project_count": 3,
+  "confirmed_work_experience_count": 3,
+  "confirmed_remaining_warnings": [
+    "project evidence may be too thin for matching"
+  ],
+  "save_payload_ready": true,
+  "quality_verdict": "needs_review",
+  "reviewer_notes": [
+    "accepted 1 grounded suggestions",
+    "edited 1 suggestions before confirmation",
+    "missing expected skills: Wind, CRM, market research, competitor analysis"
+  ],
+  "save_payload_snapshot": {
+    "raw_resume_text": "Zhao Xin\nTarget Roles: Business Analyst / Investment Analyst\nSkills: Excel, PowerPoint, Wind, CRM, market research, competitor analysis\nEducation: B.A. Finance, CUHKSZ\nExperience:\nFA Intern, Horizon Capital\n- Used Wind and Qichacha for industry research, peer mapping, and deal memo support.\n- Prepared CRM updates, meeting notes, and competitor analysis summaries.\nProjects:\nNew Energy Sector Research\n- Analyzed market size, business models, and competitive landscape for listed companies.\nHighlights: Completed investor meeting notes and delivered structured research reports.",
+    "baseline_profile": {
+      "raw_text": "Zhao Xin\nTarget Roles: Business Analyst / Investment Analyst\nSkills: Excel, PowerPoint, Wind, CRM, market research, competitor analysis\nEducation: B.A. Finance, CUHKSZ\nExperience:\nFA Intern, Horizon Capital\n- Used Wind and Qichacha for industry research, peer mapping, and deal memo support.\n- Prepared CRM updates, meeting notes, and competitor analysis summaries.\nProjects:\nNew Energy Sector Research\n- Analyzed market size, business models, and competitive landscape for listed companies.\nHighlights: Completed investor meeting notes and delivered structured research reports.",
+      "name": "Zhao Xin",
+      "education": [
+        {
+          "school": "CUHKSZ",
+          "degree": null,
+          "major": "B.A. Finance",
+          "raw_text": "B.A. Finance, CUHKSZ"
+        }
+      ],
+      "skills": [
+        "C"
+      ],
+      "projects": [
+        {
+          "name": "New Energy Sector Research",
+          "description": "New Energy Sector Research",
+          "technologies": [],
+          "highlights": [],
+          "raw_text": "New Energy Sector Research"
+        },
+        {
+          "name": "Project 2",
+          "description": "Analyzed market size, business models, and competitive landscape for listed companies.",
+          "technologies": [],
+          "highlights": [],
+          "raw_text": "Analyzed market size, business models, and competitive landscape for listed companies."
+        },
+        {
+          "name": "Project 3",
+          "description": "Highlights: Completed investor meeting notes and delivered structured research reports.",
+          "technologies": [],
+          "highlights": [
+            "Highlights: Completed investor meeting notes and delivered structured research reports."
+          ],
+          "raw_text": "Highlights: Completed investor meeting notes and delivered structured research reports."
+        }
+      ],
+      "work_experiences": [
+        {
+          "company": "Horizon Capital",
+          "role": "FA Intern",
+          "description": "FA Intern, Horizon Capital",
+          "technologies": [],
+          "raw_text": "FA Intern, Horizon Capital"
+        },
+        {
+          "company": null,
+          "role": null,
+          "description": "Used Wind and Qichacha for industry research, peer mapping, and deal memo support.",
+          "technologies": [],
+          "raw_text": "Used Wind and Qichacha for industry research, peer mapping, and deal memo support."
+        },
+        {
+          "company": null,
+          "role": null,
+          "description": "Prepared CRM updates, meeting notes, and competitor analysis summaries.",
+          "technologies": [],
+          "raw_text": "Prepared CRM updates, meeting notes, and competitor analysis summaries."
+        }
+      ],
+      "certificates": [],
+      "highlights": [
+        "Highlights: Completed investor meeting notes and delivered structured research reports."
+      ],
+      "missing_info": []
+    },
+    "confirmed_result": {
+      "confirmed_profile": {
+        "raw_text": "Zhao Xin\nTarget Roles: Business Analyst / Investment Analyst\nSkills: Excel, PowerPoint, Wind, CRM, market research, competitor analysis\nEducation: B.A. Finance, CUHKSZ\nExperience:\nFA Intern, Horizon Capital\n- Used Wind and Qichacha for industry research, peer mapping, and deal memo support.\n- Prepared CRM updates, meeting notes, and competitor analysis summaries.\nProjects:\nNew Energy Sector Research\n- Analyzed market size, business models, and competitive landscape for listed companies.\nHighlights: Completed investor meeting notes and delivered structured research reports.",
+        "name": "Zhao Xin",
+        "education": [
+          {
+            "school": "CUHKSZ",
+            "degree": null,
+            "major": "B.A. Finance",
+            "raw_text": "B.A. Finance, CUHKSZ"
+          }
+        ],
+        "skills": [
+          "C"
+        ],
+        "projects": [
+          {
+            "name": "New Energy Sector Research",
+            "description": "New Energy Sector Research",
+            "technologies": [],
+            "highlights": [],
+            "raw_text": "New Energy Sector Research"
+          },
+          {
+            "name": "Project 2",
+            "description": "Analyzed market size, business models, and competitive landscape for listed companies.",
+            "technologies": [],
+            "highlights": [],
+            "raw_text": "Analyzed market size, business models, and competitive landscape for listed companies."
+          },
+          {
+            "name": "Project 3",
+            "description": "Highlights: Completed investor meeting notes and delivered structured research reports.",
+            "technologies": [],
+            "highlights": [
+              "Highlights: Completed investor meeting notes and delivered structured research reports."
+            ],
+            "raw_text": "Highlights: Completed investor meeting notes and delivered structured research reports."
+          }
+        ],
+        "work_experiences": [
+          {
+            "company": "Horizon Capital",
+            "role": "FA Intern",
+            "description": "FA Intern, Horizon Capital",
+            "technologies": [],
+            "raw_text": "FA Intern, Horizon Capital"
+          },
+          {
+            "company": null,
+            "role": null,
+            "description": "Used Wind and Qichacha for industry research, peer mapping, and deal memo support.",
+            "technologies": [],
+            "raw_text": "Used Wind and Qichacha for industry research, peer mapping, and deal memo support."
+          },
+          {
+            "company": null,
+            "role": null,
+            "description": "Prepared CRM updates, meeting notes, and competitor analysis summaries.",
+            "technologies": [],
+            "raw_text": "Prepared CRM updates, meeting notes, and competitor analysis summaries."
+          }
+        ],
+        "certificates": [],
+        "highlights": [
+          "Highlights: Completed investor meeting notes and delivered structured research reports."
+        ],
+        "missing_info": []
+      },
+      "user_confirmed_data": {
+        "target_roles": [
+          "Business Analyst",
+          "Investment Analyst"
+        ],
+        "preferred_locations": [],
+        "additional_skills": [
+          "C"
+        ],
+        "project_clarifications": [
+          "New Energy Sector Research | New Energy Sector Research",
+          "Project 2 | Analyzed market size, business models, and competitive landscape for listed companies.",
+          "Project 3 | Highlights: Completed investor meeting notes and delivered structured research reports. | Highlights: Completed investor meeting notes and delivered structured research reports."
+        ],
+        "work_experience_clarifications": [
+          "Horizon Capital | FA Intern | FA Intern, Horizon Capital",
+          "Used Wind and Qichacha for industry research, peer mapping, and deal memo support.",
+          "Prepared CRM updates, meeting notes, and competitor analysis summaries."
+        ],
+        "constraints": [],
+        "notes": "For your strongest project, what exactly did you build, which technologies did you use, and what measurable result can you show?: Finance / FA analysis resume strongest project is described in the resume and should be highlighted."
+      },
+      "confirmation_summary": {
+        "confirmed_sections": [
+          "target_roles",
+          "skills",
+          "projects",
+          "work_experiences",
+          "notes"
+        ],
+        "added_target_roles": [
+          "Business Analyst",
+          "Investment Analyst"
+        ],
+        "added_skills": [
+          "C"
+        ],
+        "added_project_clarifications_count": 3,
+        "added_work_experience_clarifications_count": 3,
+        "constraints_count": 0
+      },
+      "remaining_warnings": [
+        "project evidence may be too thin for matching"
+      ],
+      "confidence_label": "strong"
+    },
+    "suggestion_decisions": [
+      {
+        "section": "work",
+        "item_index": null,
+        "field": "description",
+        "suggested_value": "Prepared CRM updates and competitor analysis summaries",
+        "source_quote": "Prepared CRM updates, meeting notes, and competitor analysis summaries",
+        "decision_status": "accepted",
+        "confidence_label": "medium",
+        "warnings": []
+      },
+      {
+        "section": "work",
+        "item_index": null,
+        "field": "description",
+        "suggested_value": "Prepared CRM updates and competitor analysis summaries",
+        "source_quote": "Prepared CRM updates, meeting notes, and competitor analysis summaries",
+        "decision_status": "edited",
+        "confidence_label": "medium",
+        "warnings": [],
+        "edited_value": "Prepared CRM updates and competitor analysis summaries"
+      }
+    ],
+    "missing_info_answers": [
+      {
+        "question": "For your strongest project, what exactly did you build, which technologies did you use, and what measurable result can you show?",
+        "answer": "Finance / FA analysis resume strongest project is described in the resume and should be highlighted."
+      }
+    ],
+    "notes": "For your strongest project, what exactly did you build, which technologies did you use, and what measurable result can you show?: Finance / FA analysis resume strongest project is described in the resume and should be highlighted."
+  }
+}

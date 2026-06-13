@@ -1,0 +1,1515 @@
+{
+  "mode": "deterministic_only",
+  "total_cases": 6,
+  "strong_cases": 2,
+  "acceptable_cases": 2,
+  "needs_review_cases": 0,
+  "failed_cases": 2,
+  "cases": [
+    {
+      "case_id": "ai_agent_backend",
+      "title": "AI Agent / Backend product resume",
+      "target_roles": [
+        "AI Agent Engineer",
+        "Backend Engineer"
+      ],
+      "baseline_confidence_label": "strong",
+      "baseline_quality_warnings": [],
+      "baseline_missing_info_questions": [],
+      "parsed_skills": [
+        "Python",
+        "FastAPI",
+        "Streamlit",
+        "SQLite",
+        "LangGraph",
+        "LangChain",
+        "Pydantic",
+        "pytest",
+        "Git",
+        "LLM"
+      ],
+      "parsed_project_count": 3,
+      "parsed_work_experience_count": 3,
+      "parsed_education_count": 1,
+      "parsed_highlights": [
+        "Implemented API routes, fixed parser edge cases, and reviewed deterministic evaluation output.",
+        "Highlights: Improved profile review reliability and released reproducible evaluation reports.",
+        "JobAgent - built a FastAPI and Streamlit workflow for resume review, persistence, and evaluation artifacts.",
+        "Shipped 20 APIs and completed 300 tests.",
+        "AgentOps Demo Platform - built LangGraph agent orchestration with LLM evaluation reports."
+      ],
+      "profile_draft_summary": {
+        "skill_count": 10,
+        "project_count": 3,
+        "work_experience_count": 3,
+        "education_count": 1,
+        "highlight_count": 5,
+        "target_roles": [
+          "AI Agent Engineer",
+          "Backend Engineer"
+        ]
+      },
+      "enrichment_enabled": false,
+      "enrichment_suggestion_count": 0,
+      "enrichment_llm_success_count": 0,
+      "enrichment_fallback_count": 0,
+      "enrichment_discarded_suggestion_count": 0,
+      "enrichment_quality_warnings": [],
+      "accepted_suggestion_count": 0,
+      "edited_suggestion_count": 0,
+      "rejected_suggestion_count": 0,
+      "confirmed_confidence_label": "strong",
+      "confirmed_skill_count": 10,
+      "confirmed_project_count": 3,
+      "confirmed_work_experience_count": 3,
+      "confirmed_remaining_warnings": [],
+      "save_payload_ready": true,
+      "quality_verdict": "strong",
+      "reviewer_notes": [],
+      "save_payload_snapshot": {
+        "raw_resume_text": "Li Ming\nTarget Roles: AI Agent Engineer / Backend Engineer\nSkills: Python, FastAPI, Streamlit, SQLite, LangGraph, LangChain, Pydantic, pytest, Git\nEducation: B.S. Computer Science, Shenzhen University\nProjects:\nJobAgent - built a FastAPI and Streamlit workflow for resume review, persistence, and evaluation artifacts.\n- Designed profile review endpoints and SQLite persistence payloads.\n- Shipped 20 APIs and completed 300 tests.\nAgentOps Demo Platform - built LangGraph agent orchestration with LLM evaluation reports.\nExperience:\nBackend Intern, Example AI Lab\n- Implemented API routes, fixed parser edge cases, and reviewed deterministic evaluation output.\nHighlights: Improved profile review reliability and released reproducible evaluation reports.",
+        "baseline_profile": {
+          "raw_text": "Li Ming\nTarget Roles: AI Agent Engineer / Backend Engineer\nSkills: Python, FastAPI, Streamlit, SQLite, LangGraph, LangChain, Pydantic, pytest, Git\nEducation: B.S. Computer Science, Shenzhen University\nProjects:\nJobAgent - built a FastAPI and Streamlit workflow for resume review, persistence, and evaluation artifacts.\n- Designed profile review endpoints and SQLite persistence payloads.\n- Shipped 20 APIs and completed 300 tests.\nAgentOps Demo Platform - built LangGraph agent orchestration with LLM evaluation reports.\nExperience:\nBackend Intern, Example AI Lab\n- Implemented API routes, fixed parser edge cases, and reviewed deterministic evaluation output.\nHighlights: Improved profile review reliability and released reproducible evaluation reports.",
+          "name": "Li Ming",
+          "education": [
+            {
+              "school": "Shenzhen University",
+              "degree": "B.S.",
+              "major": "Computer Science",
+              "raw_text": "B.S. Computer Science, Shenzhen University"
+            }
+          ],
+          "skills": [
+            "Python",
+            "FastAPI",
+            "Streamlit",
+            "SQLite",
+            "LangGraph",
+            "LangChain",
+            "Pydantic",
+            "pytest",
+            "Git",
+            "LLM"
+          ],
+          "projects": [
+            {
+              "name": "JobAgent",
+              "description": "built a FastAPI and Streamlit workflow for resume review, persistence, and evaluation artifacts.",
+              "technologies": [
+                "FastAPI",
+                "Streamlit"
+              ],
+              "highlights": [
+                "JobAgent - built a FastAPI and Streamlit workflow for resume review, persistence, and evaluation artifacts."
+              ],
+              "raw_text": "JobAgent - built a FastAPI and Streamlit workflow for resume review, persistence, and evaluation artifacts."
+            },
+            {
+              "name": "Designed profile review endpoints and SQLite persistence payloads.",
+              "description": "Designed profile review endpoints and SQLite persistence payloads.",
+              "technologies": [
+                "SQLite"
+              ],
+              "highlights": [],
+              "raw_text": "Designed profile review endpoints and SQLite persistence payloads."
+            },
+            {
+              "name": "Shipped 20 APIs and completed 300 tests.",
+              "description": "Shipped 20 APIs and completed 300 tests.",
+              "technologies": [],
+              "highlights": [
+                "Shipped 20 APIs and completed 300 tests."
+              ],
+              "raw_text": "Shipped 20 APIs and completed 300 tests."
+            }
+          ],
+          "work_experiences": [
+            {
+              "company": "Example AI Lab",
+              "role": "Backend Intern",
+              "description": "Backend Intern, Example AI Lab",
+              "technologies": [],
+              "raw_text": "Backend Intern, Example AI Lab"
+            },
+            {
+              "company": null,
+              "role": null,
+              "description": "Implemented API routes, fixed parser edge cases, and reviewed deterministic evaluation output.",
+              "technologies": [],
+              "raw_text": "Implemented API routes, fixed parser edge cases, and reviewed deterministic evaluation output."
+            },
+            {
+              "company": null,
+              "role": null,
+              "description": "Highlights: Improved profile review reliability and released reproducible evaluation reports.",
+              "technologies": [],
+              "raw_text": "Highlights: Improved profile review reliability and released reproducible evaluation reports."
+            }
+          ],
+          "certificates": [],
+          "highlights": [
+            "Implemented API routes, fixed parser edge cases, and reviewed deterministic evaluation output.",
+            "Highlights: Improved profile review reliability and released reproducible evaluation reports.",
+            "JobAgent - built a FastAPI and Streamlit workflow for resume review, persistence, and evaluation artifacts.",
+            "Shipped 20 APIs and completed 300 tests.",
+            "AgentOps Demo Platform - built LangGraph agent orchestration with LLM evaluation reports."
+          ],
+          "missing_info": []
+        },
+        "confirmed_result": {
+          "confirmed_profile": {
+            "raw_text": "Li Ming\nTarget Roles: AI Agent Engineer / Backend Engineer\nSkills: Python, FastAPI, Streamlit, SQLite, LangGraph, LangChain, Pydantic, pytest, Git\nEducation: B.S. Computer Science, Shenzhen University\nProjects:\nJobAgent - built a FastAPI and Streamlit workflow for resume review, persistence, and evaluation artifacts.\n- Designed profile review endpoints and SQLite persistence payloads.\n- Shipped 20 APIs and completed 300 tests.\nAgentOps Demo Platform - built LangGraph agent orchestration with LLM evaluation reports.\nExperience:\nBackend Intern, Example AI Lab\n- Implemented API routes, fixed parser edge cases, and reviewed deterministic evaluation output.\nHighlights: Improved profile review reliability and released reproducible evaluation reports.",
+            "name": "Li Ming",
+            "education": [
+              {
+                "school": "Shenzhen University",
+                "degree": "B.S.",
+                "major": "Computer Science",
+                "raw_text": "B.S. Computer Science, Shenzhen University"
+              }
+            ],
+            "skills": [
+              "Python",
+              "FastAPI",
+              "Streamlit",
+              "SQLite",
+              "LangGraph",
+              "LangChain",
+              "Pydantic",
+              "pytest",
+              "Git",
+              "LLM"
+            ],
+            "projects": [
+              {
+                "name": "JobAgent",
+                "description": "built a FastAPI and Streamlit workflow for resume review, persistence, and evaluation artifacts.",
+                "technologies": [
+                  "FastAPI",
+                  "Streamlit"
+                ],
+                "highlights": [
+                  "JobAgent - built a FastAPI and Streamlit workflow for resume review, persistence, and evaluation artifacts."
+                ],
+                "raw_text": "JobAgent - built a FastAPI and Streamlit workflow for resume review, persistence, and evaluation artifacts."
+              },
+              {
+                "name": "Designed profile review endpoints and SQLite persistence payloads.",
+                "description": "Designed profile review endpoints and SQLite persistence payloads.",
+                "technologies": [
+                  "SQLite"
+                ],
+                "highlights": [],
+                "raw_text": "Designed profile review endpoints and SQLite persistence payloads."
+              },
+              {
+                "name": "Shipped 20 APIs and completed 300 tests.",
+                "description": "Shipped 20 APIs and completed 300 tests.",
+                "technologies": [],
+                "highlights": [
+                  "Shipped 20 APIs and completed 300 tests."
+                ],
+                "raw_text": "Shipped 20 APIs and completed 300 tests."
+              }
+            ],
+            "work_experiences": [
+              {
+                "company": "Example AI Lab",
+                "role": "Backend Intern",
+                "description": "Backend Intern, Example AI Lab",
+                "technologies": [],
+                "raw_text": "Backend Intern, Example AI Lab"
+              },
+              {
+                "company": null,
+                "role": null,
+                "description": "Implemented API routes, fixed parser edge cases, and reviewed deterministic evaluation output.",
+                "technologies": [],
+                "raw_text": "Implemented API routes, fixed parser edge cases, and reviewed deterministic evaluation output."
+              },
+              {
+                "company": null,
+                "role": null,
+                "description": "Highlights: Improved profile review reliability and released reproducible evaluation reports.",
+                "technologies": [],
+                "raw_text": "Highlights: Improved profile review reliability and released reproducible evaluation reports."
+              }
+            ],
+            "certificates": [],
+            "highlights": [
+              "Implemented API routes, fixed parser edge cases, and reviewed deterministic evaluation output.",
+              "Highlights: Improved profile review reliability and released reproducible evaluation reports.",
+              "JobAgent - built a FastAPI and Streamlit workflow for resume review, persistence, and evaluation artifacts.",
+              "Shipped 20 APIs and completed 300 tests.",
+              "AgentOps Demo Platform - built LangGraph agent orchestration with LLM evaluation reports."
+            ],
+            "missing_info": []
+          },
+          "user_confirmed_data": {
+            "target_roles": [
+              "AI Agent Engineer",
+              "Backend Engineer"
+            ],
+            "preferred_locations": [],
+            "additional_skills": [
+              "Python",
+              "FastAPI",
+              "Streamlit",
+              "SQLite",
+              "LangGraph",
+              "LangChain",
+              "Pydantic",
+              "pytest",
+              "Git",
+              "LLM"
+            ],
+            "project_clarifications": [
+              "JobAgent | built a FastAPI and Streamlit workflow for resume review, persistence, and evaluation artifacts. | FastAPI, Streamlit | JobAgent - built a FastAPI and Streamlit workflow for resume review, persistence, and evaluation artifacts.",
+              "Designed profile review endpoints and SQLite persistence payloads. | Designed profile review endpoints and SQLite persistence payloads. | SQLite",
+              "Shipped 20 APIs and completed 300 tests. | Shipped 20 APIs and completed 300 tests. | Shipped 20 APIs and completed 300 tests."
+            ],
+            "work_experience_clarifications": [
+              "Example AI Lab | Backend Intern | Backend Intern, Example AI Lab",
+              "Implemented API routes, fixed parser edge cases, and reviewed deterministic evaluation output.",
+              "Highlights: Improved profile review reliability and released reproducible evaluation reports."
+            ],
+            "constraints": [],
+            "notes": null
+          },
+          "confirmation_summary": {
+            "confirmed_sections": [
+              "target_roles",
+              "skills",
+              "projects",
+              "work_experiences"
+            ],
+            "added_target_roles": [
+              "AI Agent Engineer",
+              "Backend Engineer"
+            ],
+            "added_skills": [
+              "Python",
+              "FastAPI",
+              "Streamlit",
+              "SQLite",
+              "LangGraph",
+              "LangChain",
+              "Pydantic",
+              "pytest",
+              "Git",
+              "LLM"
+            ],
+            "added_project_clarifications_count": 3,
+            "added_work_experience_clarifications_count": 3,
+            "constraints_count": 0
+          },
+          "remaining_warnings": [],
+          "confidence_label": "strong"
+        },
+        "suggestion_decisions": [],
+        "missing_info_answers": [],
+        "notes": null
+      }
+    },
+    {
+      "case_id": "embedded_stm32",
+      "title": "Embedded STM32 course-project resume",
+      "target_roles": [
+        "Embedded Software Engineer"
+      ],
+      "baseline_confidence_label": "medium",
+      "baseline_quality_warnings": [
+        "resume profile has no work experience evidence",
+        "project evidence may be too thin for matching"
+      ],
+      "baseline_missing_info_questions": [
+        "For your strongest project, what exactly did you build, which technologies did you use, and what measurable result can you show?",
+        "Do you have internship, lab, research, or course project experience that should be treated as work-like evidence?"
+      ],
+      "parsed_skills": [
+        "C",
+        "C++",
+        "STM32",
+        "USART",
+        "UART",
+        "GPIO",
+        "DMA",
+        "ADC",
+        "PWM",
+        "Keil",
+        "CubeMX",
+        "Git"
+      ],
+      "parsed_project_count": 3,
+      "parsed_work_experience_count": 0,
+      "parsed_education_count": 1,
+      "parsed_highlights": [
+        "Highlights: Completed lab integration and improved hardware debugging efficiency."
+      ],
+      "profile_draft_summary": {
+        "skill_count": 12,
+        "project_count": 3,
+        "work_experience_count": 0,
+        "education_count": 1,
+        "highlight_count": 1,
+        "target_roles": [
+          "Embedded Software Engineer"
+        ]
+      },
+      "enrichment_enabled": false,
+      "enrichment_suggestion_count": 0,
+      "enrichment_llm_success_count": 0,
+      "enrichment_fallback_count": 0,
+      "enrichment_discarded_suggestion_count": 0,
+      "enrichment_quality_warnings": [],
+      "accepted_suggestion_count": 0,
+      "edited_suggestion_count": 0,
+      "rejected_suggestion_count": 0,
+      "confirmed_confidence_label": "medium",
+      "confirmed_skill_count": 12,
+      "confirmed_project_count": 3,
+      "confirmed_work_experience_count": 0,
+      "confirmed_remaining_warnings": [
+        "resume profile has no work experience evidence",
+        "project evidence may be too thin for matching"
+      ],
+      "save_payload_ready": true,
+      "quality_verdict": "acceptable",
+      "reviewer_notes": [],
+      "save_payload_snapshot": {
+        "raw_resume_text": "Wang Lei\nTarget Role: Embedded Software Engineer\nSkills: C, C++, STM32, USART, UART, GPIO, DMA, ADC, PWM, Keil, CubeMX, Git\nEducation: B.Eng. Electronic Information Engineering, South China University\nProjects:\nSTM32 Environment Monitor System\n- Used STM32, ADC, PWM, GPIO, and USART to collect sensor data and drive alarms.\n- Responsible for board bring-up, serial protocol design, and embedded driver debugging.\nLab Project: Smart Car Controller using UART, DMA, and CubeMX configuration.\nHighlights: Completed lab integration and improved hardware debugging efficiency.",
+        "baseline_profile": {
+          "raw_text": "Wang Lei\nTarget Role: Embedded Software Engineer\nSkills: C, C++, STM32, USART, UART, GPIO, DMA, ADC, PWM, Keil, CubeMX, Git\nEducation: B.Eng. Electronic Information Engineering, South China University\nProjects:\nSTM32 Environment Monitor System\n- Used STM32, ADC, PWM, GPIO, and USART to collect sensor data and drive alarms.\n- Responsible for board bring-up, serial protocol design, and embedded driver debugging.\nLab Project: Smart Car Controller using UART, DMA, and CubeMX configuration.\nHighlights: Completed lab integration and improved hardware debugging efficiency.",
+          "name": "Wang Lei",
+          "education": [
+            {
+              "school": "South China University",
+              "degree": null,
+              "major": "B.Eng. Electronic Information Engineering",
+              "raw_text": "B.Eng. Electronic Information Engineering, South China University"
+            }
+          ],
+          "skills": [
+            "C",
+            "C++",
+            "STM32",
+            "USART",
+            "UART",
+            "GPIO",
+            "DMA",
+            "ADC",
+            "PWM",
+            "Keil",
+            "CubeMX",
+            "Git"
+          ],
+          "projects": [
+            {
+              "name": "STM32 Environment Monitor System",
+              "description": "STM32 Environment Monitor System",
+              "technologies": [
+                "STM32"
+              ],
+              "highlights": [],
+              "raw_text": "STM32 Environment Monitor System"
+            },
+            {
+              "name": "Used STM32, ADC, PWM, GPIO, and USART to collect sensor data and drive alarms.",
+              "description": "Used STM32, ADC, PWM, GPIO, and USART to collect sensor data and drive alarms.",
+              "technologies": [
+                "STM32",
+                "USART",
+                "GPIO",
+                "ADC",
+                "PWM"
+              ],
+              "highlights": [],
+              "raw_text": "Used STM32, ADC, PWM, GPIO, and USART to collect sensor data and drive alarms."
+            },
+            {
+              "name": "Project 3",
+              "description": "Responsible for board bring-up, serial protocol design, and embedded driver debugging.",
+              "technologies": [],
+              "highlights": [],
+              "raw_text": "Responsible for board bring-up, serial protocol design, and embedded driver debugging."
+            }
+          ],
+          "work_experiences": [],
+          "certificates": [],
+          "highlights": [
+            "Highlights: Completed lab integration and improved hardware debugging efficiency."
+          ],
+          "missing_info": []
+        },
+        "confirmed_result": {
+          "confirmed_profile": {
+            "raw_text": "Wang Lei\nTarget Role: Embedded Software Engineer\nSkills: C, C++, STM32, USART, UART, GPIO, DMA, ADC, PWM, Keil, CubeMX, Git\nEducation: B.Eng. Electronic Information Engineering, South China University\nProjects:\nSTM32 Environment Monitor System\n- Used STM32, ADC, PWM, GPIO, and USART to collect sensor data and drive alarms.\n- Responsible for board bring-up, serial protocol design, and embedded driver debugging.\nLab Project: Smart Car Controller using UART, DMA, and CubeMX configuration.\nHighlights: Completed lab integration and improved hardware debugging efficiency.",
+            "name": "Wang Lei",
+            "education": [
+              {
+                "school": "South China University",
+                "degree": null,
+                "major": "B.Eng. Electronic Information Engineering",
+                "raw_text": "B.Eng. Electronic Information Engineering, South China University"
+              }
+            ],
+            "skills": [
+              "C",
+              "C++",
+              "STM32",
+              "USART",
+              "UART",
+              "GPIO",
+              "DMA",
+              "ADC",
+              "PWM",
+              "Keil",
+              "CubeMX",
+              "Git"
+            ],
+            "projects": [
+              {
+                "name": "STM32 Environment Monitor System",
+                "description": "STM32 Environment Monitor System",
+                "technologies": [
+                  "STM32"
+                ],
+                "highlights": [],
+                "raw_text": "STM32 Environment Monitor System"
+              },
+              {
+                "name": "Used STM32, ADC, PWM, GPIO, and USART to collect sensor data and drive alarms.",
+                "description": "Used STM32, ADC, PWM, GPIO, and USART to collect sensor data and drive alarms.",
+                "technologies": [
+                  "STM32",
+                  "USART",
+                  "GPIO",
+                  "ADC",
+                  "PWM"
+                ],
+                "highlights": [],
+                "raw_text": "Used STM32, ADC, PWM, GPIO, and USART to collect sensor data and drive alarms."
+              },
+              {
+                "name": "Project 3",
+                "description": "Responsible for board bring-up, serial protocol design, and embedded driver debugging.",
+                "technologies": [],
+                "highlights": [],
+                "raw_text": "Responsible for board bring-up, serial protocol design, and embedded driver debugging."
+              }
+            ],
+            "work_experiences": [],
+            "certificates": [],
+            "highlights": [
+              "Highlights: Completed lab integration and improved hardware debugging efficiency."
+            ],
+            "missing_info": []
+          },
+          "user_confirmed_data": {
+            "target_roles": [
+              "Embedded Software Engineer"
+            ],
+            "preferred_locations": [],
+            "additional_skills": [
+              "C",
+              "C++",
+              "STM32",
+              "USART",
+              "UART",
+              "GPIO",
+              "DMA",
+              "ADC",
+              "PWM",
+              "Keil",
+              "CubeMX",
+              "Git"
+            ],
+            "project_clarifications": [
+              "STM32 Environment Monitor System | STM32 Environment Monitor System | STM32",
+              "Used STM32, ADC, PWM, GPIO, and USART to collect sensor data and drive alarms. | Used STM32, ADC, PWM, GPIO, and USART to collect sensor data and drive alarms. | STM32, USART, GPIO, ADC, PWM",
+              "Project 3 | Responsible for board bring-up, serial protocol design, and embedded driver debugging."
+            ],
+            "work_experience_clarifications": [],
+            "constraints": [],
+            "notes": "For your strongest project, what exactly did you build, which technologies did you use, and what measurable result can you show?: Embedded STM32 course-project resume strongest project is described in the resume and should be highlighted.\nDo you have internship, lab, research, or course project experience that should be treated as work-like evidence?: Embedded STM32 course-project resume strongest project is described in the resume and should be highlighted."
+          },
+          "confirmation_summary": {
+            "confirmed_sections": [
+              "target_roles",
+              "skills",
+              "projects",
+              "notes"
+            ],
+            "added_target_roles": [
+              "Embedded Software Engineer"
+            ],
+            "added_skills": [
+              "C",
+              "C++",
+              "STM32",
+              "USART",
+              "UART",
+              "GPIO",
+              "DMA",
+              "ADC",
+              "PWM",
+              "Keil",
+              "CubeMX",
+              "Git"
+            ],
+            "added_project_clarifications_count": 3,
+            "added_work_experience_clarifications_count": 0,
+            "constraints_count": 0
+          },
+          "remaining_warnings": [
+            "resume profile has no work experience evidence",
+            "project evidence may be too thin for matching"
+          ],
+          "confidence_label": "medium"
+        },
+        "suggestion_decisions": [],
+        "missing_info_answers": [
+          {
+            "question": "For your strongest project, what exactly did you build, which technologies did you use, and what measurable result can you show?",
+            "answer": "Embedded STM32 course-project resume strongest project is described in the resume and should be highlighted."
+          },
+          {
+            "question": "Do you have internship, lab, research, or course project experience that should be treated as work-like evidence?",
+            "answer": "Embedded STM32 course-project resume strongest project is described in the resume and should be highlighted."
+          }
+        ],
+        "notes": "For your strongest project, what exactly did you build, which technologies did you use, and what measurable result can you show?: Embedded STM32 course-project resume strongest project is described in the resume and should be highlighted.\nDo you have internship, lab, research, or course project experience that should be treated as work-like evidence?: Embedded STM32 course-project resume strongest project is described in the resume and should be highlighted."
+      }
+    },
+    {
+      "case_id": "ml_audio_asr",
+      "title": "ML Audio / ASR resume",
+      "target_roles": [
+        "Machine Learning Engineer",
+        "AI Engineer"
+      ],
+      "baseline_confidence_label": "strong",
+      "baseline_quality_warnings": [
+        "project evidence may be too thin for matching"
+      ],
+      "baseline_missing_info_questions": [
+        "For your strongest project, what exactly did you build, which technologies did you use, and what measurable result can you show?"
+      ],
+      "parsed_skills": [
+        "Python",
+        "PyTorch",
+        "Librosa",
+        "NumPy",
+        "Pandas",
+        "Machine Learning"
+      ],
+      "parsed_project_count": 3,
+      "parsed_work_experience_count": 3,
+      "parsed_education_count": 1,
+      "parsed_highlights": [
+        "Ran dataset experiments and compared VGG and CNN baselines for speech tasks.",
+        "Highlights: Improved model accuracy and documented dataset quality issues.",
+        "Built PyTorch CNN and ResNet models using MFCC and STFT features on an environmental sound dataset.",
+        "Reached 95% validation accuracy on 300 evaluation clips.",
+        "Used Librosa and Pandas to inspect transcription failures and dataset labeling issues."
+      ],
+      "profile_draft_summary": {
+        "skill_count": 6,
+        "project_count": 3,
+        "work_experience_count": 3,
+        "education_count": 1,
+        "highlight_count": 5,
+        "target_roles": [
+          "Machine Learning Engineer",
+          "AI Engineer"
+        ]
+      },
+      "enrichment_enabled": false,
+      "enrichment_suggestion_count": 0,
+      "enrichment_llm_success_count": 0,
+      "enrichment_fallback_count": 0,
+      "enrichment_discarded_suggestion_count": 0,
+      "enrichment_quality_warnings": [],
+      "accepted_suggestion_count": 0,
+      "edited_suggestion_count": 0,
+      "rejected_suggestion_count": 0,
+      "confirmed_confidence_label": "strong",
+      "confirmed_skill_count": 6,
+      "confirmed_project_count": 3,
+      "confirmed_work_experience_count": 3,
+      "confirmed_remaining_warnings": [
+        "project evidence may be too thin for matching"
+      ],
+      "save_payload_ready": true,
+      "quality_verdict": "failed",
+      "reviewer_notes": [
+        "missing expected skills: MFCC, STFT, CNN"
+      ],
+      "save_payload_snapshot": {
+        "raw_resume_text": "Alex Chen\nTarget Roles: Machine Learning Engineer / AI Engineer\nSkills: Python, PyTorch, Librosa, NumPy, Pandas, CNN, ResNet, VGG, MFCC, STFT\nEducation: M.S. Data Science, City University\nProjects:\nAudio Classification Benchmark\n- Built PyTorch CNN and ResNet models using MFCC and STFT features on an environmental sound dataset.\n- Reached 95% validation accuracy on 300 evaluation clips.\nASR Error Analysis Tool\n- Used Librosa and Pandas to inspect transcription failures and dataset labeling issues.\nExperience:\nResearch Assistant, Audio Intelligence Lab\n- Ran dataset experiments and compared VGG and CNN baselines for speech tasks.\nHighlights: Improved model accuracy and documented dataset quality issues.",
+        "baseline_profile": {
+          "raw_text": "Alex Chen\nTarget Roles: Machine Learning Engineer / AI Engineer\nSkills: Python, PyTorch, Librosa, NumPy, Pandas, CNN, ResNet, VGG, MFCC, STFT\nEducation: M.S. Data Science, City University\nProjects:\nAudio Classification Benchmark\n- Built PyTorch CNN and ResNet models using MFCC and STFT features on an environmental sound dataset.\n- Reached 95% validation accuracy on 300 evaluation clips.\nASR Error Analysis Tool\n- Used Librosa and Pandas to inspect transcription failures and dataset labeling issues.\nExperience:\nResearch Assistant, Audio Intelligence Lab\n- Ran dataset experiments and compared VGG and CNN baselines for speech tasks.\nHighlights: Improved model accuracy and documented dataset quality issues.",
+          "name": null,
+          "education": [
+            {
+              "school": "City University",
+              "degree": "M.S.",
+              "major": "Data Science",
+              "raw_text": "M.S. Data Science, City University"
+            }
+          ],
+          "skills": [
+            "Python",
+            "PyTorch",
+            "Librosa",
+            "NumPy",
+            "Pandas",
+            "Machine Learning"
+          ],
+          "projects": [
+            {
+              "name": "Audio Classification Benchmark",
+              "description": "Audio Classification Benchmark",
+              "technologies": [],
+              "highlights": [],
+              "raw_text": "Audio Classification Benchmark"
+            },
+            {
+              "name": "Project 2",
+              "description": "Built PyTorch CNN and ResNet models using MFCC and STFT features on an environmental sound dataset.",
+              "technologies": [
+                "PyTorch"
+              ],
+              "highlights": [
+                "Built PyTorch CNN and ResNet models using MFCC and STFT features on an environmental sound dataset."
+              ],
+              "raw_text": "Built PyTorch CNN and ResNet models using MFCC and STFT features on an environmental sound dataset."
+            },
+            {
+              "name": "Reached 95% validation accuracy on 300 evaluation clips.",
+              "description": "Reached 95% validation accuracy on 300 evaluation clips.",
+              "technologies": [],
+              "highlights": [
+                "Reached 95% validation accuracy on 300 evaluation clips."
+              ],
+              "raw_text": "Reached 95% validation accuracy on 300 evaluation clips."
+            }
+          ],
+          "work_experiences": [
+            {
+              "company": "Audio Intelligence Lab",
+              "role": "Research Assistant",
+              "description": "Research Assistant, Audio Intelligence Lab",
+              "technologies": [],
+              "raw_text": "Research Assistant, Audio Intelligence Lab"
+            },
+            {
+              "company": null,
+              "role": null,
+              "description": "Ran dataset experiments and compared VGG and CNN baselines for speech tasks.",
+              "technologies": [],
+              "raw_text": "Ran dataset experiments and compared VGG and CNN baselines for speech tasks."
+            },
+            {
+              "company": null,
+              "role": null,
+              "description": "Highlights: Improved model accuracy and documented dataset quality issues.",
+              "technologies": [],
+              "raw_text": "Highlights: Improved model accuracy and documented dataset quality issues."
+            }
+          ],
+          "certificates": [],
+          "highlights": [
+            "Ran dataset experiments and compared VGG and CNN baselines for speech tasks.",
+            "Highlights: Improved model accuracy and documented dataset quality issues.",
+            "Built PyTorch CNN and ResNet models using MFCC and STFT features on an environmental sound dataset.",
+            "Reached 95% validation accuracy on 300 evaluation clips.",
+            "Used Librosa and Pandas to inspect transcription failures and dataset labeling issues."
+          ],
+          "missing_info": []
+        },
+        "confirmed_result": {
+          "confirmed_profile": {
+            "raw_text": "Alex Chen\nTarget Roles: Machine Learning Engineer / AI Engineer\nSkills: Python, PyTorch, Librosa, NumPy, Pandas, CNN, ResNet, VGG, MFCC, STFT\nEducation: M.S. Data Science, City University\nProjects:\nAudio Classification Benchmark\n- Built PyTorch CNN and ResNet models using MFCC and STFT features on an environmental sound dataset.\n- Reached 95% validation accuracy on 300 evaluation clips.\nASR Error Analysis Tool\n- Used Librosa and Pandas to inspect transcription failures and dataset labeling issues.\nExperience:\nResearch Assistant, Audio Intelligence Lab\n- Ran dataset experiments and compared VGG and CNN baselines for speech tasks.\nHighlights: Improved model accuracy and documented dataset quality issues.",
+            "name": null,
+            "education": [
+              {
+                "school": "City University",
+                "degree": "M.S.",
+                "major": "Data Science",
+                "raw_text": "M.S. Data Science, City University"
+              }
+            ],
+            "skills": [
+              "Python",
+              "PyTorch",
+              "Librosa",
+              "NumPy",
+              "Pandas",
+              "Machine Learning"
+            ],
+            "projects": [
+              {
+                "name": "Audio Classification Benchmark",
+                "description": "Audio Classification Benchmark",
+                "technologies": [],
+                "highlights": [],
+                "raw_text": "Audio Classification Benchmark"
+              },
+              {
+                "name": "Project 2",
+                "description": "Built PyTorch CNN and ResNet models using MFCC and STFT features on an environmental sound dataset.",
+                "technologies": [
+                  "PyTorch"
+                ],
+                "highlights": [
+                  "Built PyTorch CNN and ResNet models using MFCC and STFT features on an environmental sound dataset."
+                ],
+                "raw_text": "Built PyTorch CNN and ResNet models using MFCC and STFT features on an environmental sound dataset."
+              },
+              {
+                "name": "Reached 95% validation accuracy on 300 evaluation clips.",
+                "description": "Reached 95% validation accuracy on 300 evaluation clips.",
+                "technologies": [],
+                "highlights": [
+                  "Reached 95% validation accuracy on 300 evaluation clips."
+                ],
+                "raw_text": "Reached 95% validation accuracy on 300 evaluation clips."
+              }
+            ],
+            "work_experiences": [
+              {
+                "company": "Audio Intelligence Lab",
+                "role": "Research Assistant",
+                "description": "Research Assistant, Audio Intelligence Lab",
+                "technologies": [],
+                "raw_text": "Research Assistant, Audio Intelligence Lab"
+              },
+              {
+                "company": null,
+                "role": null,
+                "description": "Ran dataset experiments and compared VGG and CNN baselines for speech tasks.",
+                "technologies": [],
+                "raw_text": "Ran dataset experiments and compared VGG and CNN baselines for speech tasks."
+              },
+              {
+                "company": null,
+                "role": null,
+                "description": "Highlights: Improved model accuracy and documented dataset quality issues.",
+                "technologies": [],
+                "raw_text": "Highlights: Improved model accuracy and documented dataset quality issues."
+              }
+            ],
+            "certificates": [],
+            "highlights": [
+              "Ran dataset experiments and compared VGG and CNN baselines for speech tasks.",
+              "Highlights: Improved model accuracy and documented dataset quality issues.",
+              "Built PyTorch CNN and ResNet models using MFCC and STFT features on an environmental sound dataset.",
+              "Reached 95% validation accuracy on 300 evaluation clips.",
+              "Used Librosa and Pandas to inspect transcription failures and dataset labeling issues."
+            ],
+            "missing_info": []
+          },
+          "user_confirmed_data": {
+            "target_roles": [
+              "Machine Learning Engineer",
+              "AI Engineer"
+            ],
+            "preferred_locations": [],
+            "additional_skills": [
+              "Python",
+              "PyTorch",
+              "Librosa",
+              "NumPy",
+              "Pandas",
+              "Machine Learning"
+            ],
+            "project_clarifications": [
+              "Audio Classification Benchmark | Audio Classification Benchmark",
+              "Project 2 | Built PyTorch CNN and ResNet models using MFCC and STFT features on an environmental sound dataset. | PyTorch | Built PyTorch CNN and ResNet models using MFCC and STFT features on an environmental sound dataset.",
+              "Reached 95% validation accuracy on 300 evaluation clips. | Reached 95% validation accuracy on 300 evaluation clips. | Reached 95% validation accuracy on 300 evaluation clips."
+            ],
+            "work_experience_clarifications": [
+              "Audio Intelligence Lab | Research Assistant | Research Assistant, Audio Intelligence Lab",
+              "Ran dataset experiments and compared VGG and CNN baselines for speech tasks.",
+              "Highlights: Improved model accuracy and documented dataset quality issues."
+            ],
+            "constraints": [],
+            "notes": "For your strongest project, what exactly did you build, which technologies did you use, and what measurable result can you show?: ML Audio / ASR resume strongest project is described in the resume and should be highlighted."
+          },
+          "confirmation_summary": {
+            "confirmed_sections": [
+              "target_roles",
+              "skills",
+              "projects",
+              "work_experiences",
+              "notes"
+            ],
+            "added_target_roles": [
+              "Machine Learning Engineer",
+              "AI Engineer"
+            ],
+            "added_skills": [
+              "Python",
+              "PyTorch",
+              "Librosa",
+              "NumPy",
+              "Pandas",
+              "Machine Learning"
+            ],
+            "added_project_clarifications_count": 3,
+            "added_work_experience_clarifications_count": 3,
+            "constraints_count": 0
+          },
+          "remaining_warnings": [
+            "project evidence may be too thin for matching"
+          ],
+          "confidence_label": "strong"
+        },
+        "suggestion_decisions": [],
+        "missing_info_answers": [
+          {
+            "question": "For your strongest project, what exactly did you build, which technologies did you use, and what measurable result can you show?",
+            "answer": "ML Audio / ASR resume strongest project is described in the resume and should be highlighted."
+          }
+        ],
+        "notes": "For your strongest project, what exactly did you build, which technologies did you use, and what measurable result can you show?: ML Audio / ASR resume strongest project is described in the resume and should be highlighted."
+      }
+    },
+    {
+      "case_id": "finance_fa_analysis",
+      "title": "Finance / FA analysis resume",
+      "target_roles": [
+        "Business Analyst",
+        "Investment Analyst"
+      ],
+      "baseline_confidence_label": "strong",
+      "baseline_quality_warnings": [
+        "project evidence may be too thin for matching"
+      ],
+      "baseline_missing_info_questions": [
+        "For your strongest project, what exactly did you build, which technologies did you use, and what measurable result can you show?"
+      ],
+      "parsed_skills": [
+        "C"
+      ],
+      "parsed_project_count": 3,
+      "parsed_work_experience_count": 3,
+      "parsed_education_count": 1,
+      "parsed_highlights": [
+        "Highlights: Completed investor meeting notes and delivered structured research reports."
+      ],
+      "profile_draft_summary": {
+        "skill_count": 1,
+        "project_count": 3,
+        "work_experience_count": 3,
+        "education_count": 1,
+        "highlight_count": 1,
+        "target_roles": [
+          "Business Analyst",
+          "Investment Analyst"
+        ]
+      },
+      "enrichment_enabled": false,
+      "enrichment_suggestion_count": 0,
+      "enrichment_llm_success_count": 0,
+      "enrichment_fallback_count": 0,
+      "enrichment_discarded_suggestion_count": 0,
+      "enrichment_quality_warnings": [],
+      "accepted_suggestion_count": 0,
+      "edited_suggestion_count": 0,
+      "rejected_suggestion_count": 0,
+      "confirmed_confidence_label": "strong",
+      "confirmed_skill_count": 1,
+      "confirmed_project_count": 3,
+      "confirmed_work_experience_count": 3,
+      "confirmed_remaining_warnings": [
+        "project evidence may be too thin for matching"
+      ],
+      "save_payload_ready": true,
+      "quality_verdict": "failed",
+      "reviewer_notes": [
+        "missing expected skills: Wind, CRM, market research, competitor analysis"
+      ],
+      "save_payload_snapshot": {
+        "raw_resume_text": "Zhao Xin\nTarget Roles: Business Analyst / Investment Analyst\nSkills: Excel, PowerPoint, Wind, CRM, market research, competitor analysis\nEducation: B.A. Finance, CUHKSZ\nExperience:\nFA Intern, Horizon Capital\n- Used Wind and Qichacha for industry research, peer mapping, and deal memo support.\n- Prepared CRM updates, meeting notes, and competitor analysis summaries.\nProjects:\nNew Energy Sector Research\n- Analyzed market size, business models, and competitive landscape for listed companies.\nHighlights: Completed investor meeting notes and delivered structured research reports.",
+        "baseline_profile": {
+          "raw_text": "Zhao Xin\nTarget Roles: Business Analyst / Investment Analyst\nSkills: Excel, PowerPoint, Wind, CRM, market research, competitor analysis\nEducation: B.A. Finance, CUHKSZ\nExperience:\nFA Intern, Horizon Capital\n- Used Wind and Qichacha for industry research, peer mapping, and deal memo support.\n- Prepared CRM updates, meeting notes, and competitor analysis summaries.\nProjects:\nNew Energy Sector Research\n- Analyzed market size, business models, and competitive landscape for listed companies.\nHighlights: Completed investor meeting notes and delivered structured research reports.",
+          "name": "Zhao Xin",
+          "education": [
+            {
+              "school": "CUHKSZ",
+              "degree": null,
+              "major": "B.A. Finance",
+              "raw_text": "B.A. Finance, CUHKSZ"
+            }
+          ],
+          "skills": [
+            "C"
+          ],
+          "projects": [
+            {
+              "name": "New Energy Sector Research",
+              "description": "New Energy Sector Research",
+              "technologies": [],
+              "highlights": [],
+              "raw_text": "New Energy Sector Research"
+            },
+            {
+              "name": "Project 2",
+              "description": "Analyzed market size, business models, and competitive landscape for listed companies.",
+              "technologies": [],
+              "highlights": [],
+              "raw_text": "Analyzed market size, business models, and competitive landscape for listed companies."
+            },
+            {
+              "name": "Project 3",
+              "description": "Highlights: Completed investor meeting notes and delivered structured research reports.",
+              "technologies": [],
+              "highlights": [
+                "Highlights: Completed investor meeting notes and delivered structured research reports."
+              ],
+              "raw_text": "Highlights: Completed investor meeting notes and delivered structured research reports."
+            }
+          ],
+          "work_experiences": [
+            {
+              "company": "Horizon Capital",
+              "role": "FA Intern",
+              "description": "FA Intern, Horizon Capital",
+              "technologies": [],
+              "raw_text": "FA Intern, Horizon Capital"
+            },
+            {
+              "company": null,
+              "role": null,
+              "description": "Used Wind and Qichacha for industry research, peer mapping, and deal memo support.",
+              "technologies": [],
+              "raw_text": "Used Wind and Qichacha for industry research, peer mapping, and deal memo support."
+            },
+            {
+              "company": null,
+              "role": null,
+              "description": "Prepared CRM updates, meeting notes, and competitor analysis summaries.",
+              "technologies": [],
+              "raw_text": "Prepared CRM updates, meeting notes, and competitor analysis summaries."
+            }
+          ],
+          "certificates": [],
+          "highlights": [
+            "Highlights: Completed investor meeting notes and delivered structured research reports."
+          ],
+          "missing_info": []
+        },
+        "confirmed_result": {
+          "confirmed_profile": {
+            "raw_text": "Zhao Xin\nTarget Roles: Business Analyst / Investment Analyst\nSkills: Excel, PowerPoint, Wind, CRM, market research, competitor analysis\nEducation: B.A. Finance, CUHKSZ\nExperience:\nFA Intern, Horizon Capital\n- Used Wind and Qichacha for industry research, peer mapping, and deal memo support.\n- Prepared CRM updates, meeting notes, and competitor analysis summaries.\nProjects:\nNew Energy Sector Research\n- Analyzed market size, business models, and competitive landscape for listed companies.\nHighlights: Completed investor meeting notes and delivered structured research reports.",
+            "name": "Zhao Xin",
+            "education": [
+              {
+                "school": "CUHKSZ",
+                "degree": null,
+                "major": "B.A. Finance",
+                "raw_text": "B.A. Finance, CUHKSZ"
+              }
+            ],
+            "skills": [
+              "C"
+            ],
+            "projects": [
+              {
+                "name": "New Energy Sector Research",
+                "description": "New Energy Sector Research",
+                "technologies": [],
+                "highlights": [],
+                "raw_text": "New Energy Sector Research"
+              },
+              {
+                "name": "Project 2",
+                "description": "Analyzed market size, business models, and competitive landscape for listed companies.",
+                "technologies": [],
+                "highlights": [],
+                "raw_text": "Analyzed market size, business models, and competitive landscape for listed companies."
+              },
+              {
+                "name": "Project 3",
+                "description": "Highlights: Completed investor meeting notes and delivered structured research reports.",
+                "technologies": [],
+                "highlights": [
+                  "Highlights: Completed investor meeting notes and delivered structured research reports."
+                ],
+                "raw_text": "Highlights: Completed investor meeting notes and delivered structured research reports."
+              }
+            ],
+            "work_experiences": [
+              {
+                "company": "Horizon Capital",
+                "role": "FA Intern",
+                "description": "FA Intern, Horizon Capital",
+                "technologies": [],
+                "raw_text": "FA Intern, Horizon Capital"
+              },
+              {
+                "company": null,
+                "role": null,
+                "description": "Used Wind and Qichacha for industry research, peer mapping, and deal memo support.",
+                "technologies": [],
+                "raw_text": "Used Wind and Qichacha for industry research, peer mapping, and deal memo support."
+              },
+              {
+                "company": null,
+                "role": null,
+                "description": "Prepared CRM updates, meeting notes, and competitor analysis summaries.",
+                "technologies": [],
+                "raw_text": "Prepared CRM updates, meeting notes, and competitor analysis summaries."
+              }
+            ],
+            "certificates": [],
+            "highlights": [
+              "Highlights: Completed investor meeting notes and delivered structured research reports."
+            ],
+            "missing_info": []
+          },
+          "user_confirmed_data": {
+            "target_roles": [
+              "Business Analyst",
+              "Investment Analyst"
+            ],
+            "preferred_locations": [],
+            "additional_skills": [
+              "C"
+            ],
+            "project_clarifications": [
+              "New Energy Sector Research | New Energy Sector Research",
+              "Project 2 | Analyzed market size, business models, and competitive landscape for listed companies.",
+              "Project 3 | Highlights: Completed investor meeting notes and delivered structured research reports. | Highlights: Completed investor meeting notes and delivered structured research reports."
+            ],
+            "work_experience_clarifications": [
+              "Horizon Capital | FA Intern | FA Intern, Horizon Capital",
+              "Used Wind and Qichacha for industry research, peer mapping, and deal memo support.",
+              "Prepared CRM updates, meeting notes, and competitor analysis summaries."
+            ],
+            "constraints": [],
+            "notes": "For your strongest project, what exactly did you build, which technologies did you use, and what measurable result can you show?: Finance / FA analysis resume strongest project is described in the resume and should be highlighted."
+          },
+          "confirmation_summary": {
+            "confirmed_sections": [
+              "target_roles",
+              "skills",
+              "projects",
+              "work_experiences",
+              "notes"
+            ],
+            "added_target_roles": [
+              "Business Analyst",
+              "Investment Analyst"
+            ],
+            "added_skills": [
+              "C"
+            ],
+            "added_project_clarifications_count": 3,
+            "added_work_experience_clarifications_count": 3,
+            "constraints_count": 0
+          },
+          "remaining_warnings": [
+            "project evidence may be too thin for matching"
+          ],
+          "confidence_label": "strong"
+        },
+        "suggestion_decisions": [],
+        "missing_info_answers": [
+          {
+            "question": "For your strongest project, what exactly did you build, which technologies did you use, and what measurable result can you show?",
+            "answer": "Finance / FA analysis resume strongest project is described in the resume and should be highlighted."
+          }
+        ],
+        "notes": "For your strongest project, what exactly did you build, which technologies did you use, and what measurable result can you show?: Finance / FA analysis resume strongest project is described in the resume and should be highlighted."
+      }
+    },
+    {
+      "case_id": "mixed_language_resume",
+      "title": "Mixed Chinese and English resume",
+      "target_roles": [
+        "Backend Engineer",
+        "Research Engineer"
+      ],
+      "baseline_confidence_label": "strong",
+      "baseline_quality_warnings": [],
+      "baseline_missing_info_questions": [],
+      "parsed_skills": [
+        "Python",
+        "FastAPI",
+        "SQLite",
+        "Streamlit",
+        "Git"
+      ],
+      "parsed_project_count": 1,
+      "parsed_work_experience_count": 2,
+      "parsed_education_count": 1,
+      "parsed_highlights": [
+        "完成 120 tests，并整理 evaluation notes。",
+        "Built experiment tooling and dataset scripts in Python.",
+        "图像检索系统：使用 FastAPI、SQLite 和 Streamlit 搭建 demo，负责接口设计与测试。"
+      ],
+      "profile_draft_summary": {
+        "skill_count": 5,
+        "project_count": 1,
+        "work_experience_count": 2,
+        "education_count": 1,
+        "highlight_count": 3,
+        "target_roles": [
+          "Backend Engineer",
+          "Research Engineer"
+        ]
+      },
+      "enrichment_enabled": false,
+      "enrichment_suggestion_count": 0,
+      "enrichment_llm_success_count": 0,
+      "enrichment_fallback_count": 0,
+      "enrichment_discarded_suggestion_count": 0,
+      "enrichment_quality_warnings": [],
+      "accepted_suggestion_count": 0,
+      "edited_suggestion_count": 0,
+      "rejected_suggestion_count": 0,
+      "confirmed_confidence_label": "strong",
+      "confirmed_skill_count": 5,
+      "confirmed_project_count": 1,
+      "confirmed_work_experience_count": 2,
+      "confirmed_remaining_warnings": [],
+      "save_payload_ready": true,
+      "quality_verdict": "strong",
+      "reviewer_notes": [],
+      "save_payload_snapshot": {
+        "raw_resume_text": "Liu Jia\nTarget Roles: Backend Engineer / Research Engineer\nEducation\nB.S. Software Engineering, Xidian University\nExperience\nResearch Assistant, Vision Lab\n- Built experiment tooling and dataset scripts in Python.\n项目经历\n图像检索系统：使用 FastAPI、SQLite 和 Streamlit 搭建 demo，负责接口设计与测试。\n技能\nPython, FastAPI, SQLite, Streamlit, Git\n亮点\n完成 120 tests，并整理 evaluation notes。",
+        "baseline_profile": {
+          "raw_text": "Liu Jia\nTarget Roles: Backend Engineer / Research Engineer\nEducation\nB.S. Software Engineering, Xidian University\nExperience\nResearch Assistant, Vision Lab\n- Built experiment tooling and dataset scripts in Python.\n项目经历\n图像检索系统：使用 FastAPI、SQLite 和 Streamlit 搭建 demo，负责接口设计与测试。\n技能\nPython, FastAPI, SQLite, Streamlit, Git\n亮点\n完成 120 tests，并整理 evaluation notes。",
+          "name": "Liu Jia",
+          "education": [
+            {
+              "school": "Xidian University",
+              "degree": "B.S.",
+              "major": "Software Engineering",
+              "raw_text": "B.S. Software Engineering, Xidian University"
+            }
+          ],
+          "skills": [
+            "Python",
+            "FastAPI",
+            "SQLite",
+            "Streamlit",
+            "Git"
+          ],
+          "projects": [
+            {
+              "name": "图像检索系统：使用 FastAPI、SQLite 和 Streamlit 搭建 demo",
+              "description": "负责接口设计与测试。",
+              "technologies": [
+                "FastAPI",
+                "Streamlit",
+                "SQLite"
+              ],
+              "highlights": [
+                "图像检索系统：使用 FastAPI、SQLite 和 Streamlit 搭建 demo，负责接口设计与测试。"
+              ],
+              "raw_text": "图像检索系统：使用 FastAPI、SQLite 和 Streamlit 搭建 demo，负责接口设计与测试。"
+            }
+          ],
+          "work_experiences": [
+            {
+              "company": "Vision Lab",
+              "role": "Research Assistant",
+              "description": "Research Assistant, Vision Lab",
+              "technologies": [],
+              "raw_text": "Research Assistant, Vision Lab"
+            },
+            {
+              "company": null,
+              "role": null,
+              "description": "Built experiment tooling and dataset scripts in Python.",
+              "technologies": [],
+              "raw_text": "Built experiment tooling and dataset scripts in Python."
+            }
+          ],
+          "certificates": [],
+          "highlights": [
+            "完成 120 tests，并整理 evaluation notes。",
+            "Built experiment tooling and dataset scripts in Python.",
+            "图像检索系统：使用 FastAPI、SQLite 和 Streamlit 搭建 demo，负责接口设计与测试。"
+          ],
+          "missing_info": []
+        },
+        "confirmed_result": {
+          "confirmed_profile": {
+            "raw_text": "Liu Jia\nTarget Roles: Backend Engineer / Research Engineer\nEducation\nB.S. Software Engineering, Xidian University\nExperience\nResearch Assistant, Vision Lab\n- Built experiment tooling and dataset scripts in Python.\n项目经历\n图像检索系统：使用 FastAPI、SQLite 和 Streamlit 搭建 demo，负责接口设计与测试。\n技能\nPython, FastAPI, SQLite, Streamlit, Git\n亮点\n完成 120 tests，并整理 evaluation notes。",
+            "name": "Liu Jia",
+            "education": [
+              {
+                "school": "Xidian University",
+                "degree": "B.S.",
+                "major": "Software Engineering",
+                "raw_text": "B.S. Software Engineering, Xidian University"
+              }
+            ],
+            "skills": [
+              "Python",
+              "FastAPI",
+              "SQLite",
+              "Streamlit",
+              "Git"
+            ],
+            "projects": [
+              {
+                "name": "图像检索系统：使用 FastAPI、SQLite 和 Streamlit 搭建 demo",
+                "description": "负责接口设计与测试。",
+                "technologies": [
+                  "FastAPI",
+                  "Streamlit",
+                  "SQLite"
+                ],
+                "highlights": [
+                  "图像检索系统：使用 FastAPI、SQLite 和 Streamlit 搭建 demo，负责接口设计与测试。"
+                ],
+                "raw_text": "图像检索系统：使用 FastAPI、SQLite 和 Streamlit 搭建 demo，负责接口设计与测试。"
+              }
+            ],
+            "work_experiences": [
+              {
+                "company": "Vision Lab",
+                "role": "Research Assistant",
+                "description": "Research Assistant, Vision Lab",
+                "technologies": [],
+                "raw_text": "Research Assistant, Vision Lab"
+              },
+              {
+                "company": null,
+                "role": null,
+                "description": "Built experiment tooling and dataset scripts in Python.",
+                "technologies": [],
+                "raw_text": "Built experiment tooling and dataset scripts in Python."
+              }
+            ],
+            "certificates": [],
+            "highlights": [
+              "完成 120 tests，并整理 evaluation notes。",
+              "Built experiment tooling and dataset scripts in Python.",
+              "图像检索系统：使用 FastAPI、SQLite 和 Streamlit 搭建 demo，负责接口设计与测试。"
+            ],
+            "missing_info": []
+          },
+          "user_confirmed_data": {
+            "target_roles": [
+              "Backend Engineer",
+              "Research Engineer"
+            ],
+            "preferred_locations": [],
+            "additional_skills": [
+              "Python",
+              "FastAPI",
+              "SQLite",
+              "Streamlit",
+              "Git"
+            ],
+            "project_clarifications": [
+              "图像检索系统：使用 FastAPI、SQLite 和 Streamlit 搭建 demo | 负责接口设计与测试。 | FastAPI, Streamlit, SQLite | 图像检索系统：使用 FastAPI、SQLite 和 Streamlit 搭建 demo，负责接口设计与测试。"
+            ],
+            "work_experience_clarifications": [
+              "Vision Lab | Research Assistant | Research Assistant, Vision Lab",
+              "Built experiment tooling and dataset scripts in Python."
+            ],
+            "constraints": [],
+            "notes": null
+          },
+          "confirmation_summary": {
+            "confirmed_sections": [
+              "target_roles",
+              "skills",
+              "projects",
+              "work_experiences"
+            ],
+            "added_target_roles": [
+              "Backend Engineer",
+              "Research Engineer"
+            ],
+            "added_skills": [
+              "Python",
+              "FastAPI",
+              "SQLite",
+              "Streamlit",
+              "Git"
+            ],
+            "added_project_clarifications_count": 1,
+            "added_work_experience_clarifications_count": 2,
+            "constraints_count": 0
+          },
+          "remaining_warnings": [],
+          "confidence_label": "strong"
+        },
+        "suggestion_decisions": [],
+        "missing_info_answers": [],
+        "notes": null
+      }
+    },
+    {
+      "case_id": "weak_resume",
+      "title": "Weak sparse resume",
+      "target_roles": [],
+      "baseline_confidence_label": "limited",
+      "baseline_quality_warnings": [
+        "resume profile has no project evidence",
+        "resume profile has no work experience evidence",
+        "target role is not explicit",
+        "resume profile has no highlights or measurable outcomes"
+      ],
+      "baseline_missing_info_questions": [
+        "What target roles should this profile prioritize, such as AI Agent Engineer, Backend Engineer, or Embedded Software Engineer?",
+        "Which project best demonstrates your target role fit? Please add project goal, technologies, your responsibilities, and outcomes.",
+        "Do you have internship, lab, research, or course project experience that should be treated as work-like evidence?",
+        "Can you add measurable outcomes, such as number of APIs, tests passed, latency, users, dataset size, or accuracy?"
+      ],
+      "parsed_skills": [
+        "Python"
+      ],
+      "parsed_project_count": 1,
+      "parsed_work_experience_count": 0,
+      "parsed_education_count": 0,
+      "parsed_highlights": [],
+      "profile_draft_summary": {
+        "skill_count": 1,
+        "project_count": 1,
+        "work_experience_count": 0,
+        "education_count": 0,
+        "highlight_count": 0,
+        "target_roles": []
+      },
+      "enrichment_enabled": false,
+      "enrichment_suggestion_count": 0,
+      "enrichment_llm_success_count": 0,
+      "enrichment_fallback_count": 0,
+      "enrichment_discarded_suggestion_count": 0,
+      "enrichment_quality_warnings": [],
+      "accepted_suggestion_count": 0,
+      "edited_suggestion_count": 0,
+      "rejected_suggestion_count": 0,
+      "confirmed_confidence_label": "limited",
+      "confirmed_skill_count": 1,
+      "confirmed_project_count": 1,
+      "confirmed_work_experience_count": 0,
+      "confirmed_remaining_warnings": [
+        "resume profile has no work experience evidence",
+        "target role is not explicit",
+        "project evidence comes from user clarification and should be verified before resume rewrite"
+      ],
+      "save_payload_ready": true,
+      "quality_verdict": "acceptable",
+      "reviewer_notes": [],
+      "save_payload_snapshot": {
+        "raw_resume_text": "I know Python and want an AI job.",
+        "baseline_profile": {
+          "raw_text": "I know Python and want an AI job.",
+          "name": null,
+          "education": [],
+          "skills": [
+            "Python"
+          ],
+          "projects": [
+            {
+              "name": "项目 1",
+              "description": "I know Python and want an AI job.",
+              "technologies": [
+                "Python"
+              ],
+              "highlights": [],
+              "raw_text": "I know Python and want an AI job."
+            }
+          ],
+          "work_experiences": [],
+          "certificates": [],
+          "highlights": [],
+          "missing_info": [
+            "缺少结果或量化亮点"
+          ]
+        },
+        "confirmed_result": {
+          "confirmed_profile": {
+            "raw_text": "I know Python and want an AI job.",
+            "name": null,
+            "education": [],
+            "skills": [
+              "Python"
+            ],
+            "projects": [
+              {
+                "name": "项目 1",
+                "description": "I know Python and want an AI job.",
+                "technologies": [
+                  "Python"
+                ],
+                "highlights": [],
+                "raw_text": "I know Python and want an AI job."
+              }
+            ],
+            "work_experiences": [],
+            "certificates": [],
+            "highlights": [],
+            "missing_info": [
+              "缺少结果或量化亮点"
+            ]
+          },
+          "user_confirmed_data": {
+            "target_roles": [],
+            "preferred_locations": [],
+            "additional_skills": [
+              "Python"
+            ],
+            "project_clarifications": [
+              "项目 1 | I know Python and want an AI job. | Python"
+            ],
+            "work_experience_clarifications": [],
+            "constraints": [],
+            "notes": "What target roles should this profile prioritize, such as AI Agent Engineer, Backend Engineer, or Embedded Software Engineer?: AI Engineer\nWhich project best demonstrates your target role fit? Please add project goal, technologies, your responsibilities, and outcomes.: AI Engineer\nDo you have internship, lab, research, or course project experience that should be treated as work-like evidence?: Weak sparse resume strongest project is described in the resume and should be highlighted.\nCan you add measurable outcomes, such as number of APIs, tests passed, latency, users, dataset size, or accuracy?: Please keep the existing measurable outcomes from the resume evidence."
+          },
+          "confirmation_summary": {
+            "confirmed_sections": [
+              "skills",
+              "projects",
+              "notes"
+            ],
+            "added_target_roles": [],
+            "added_skills": [
+              "Python"
+            ],
+            "added_project_clarifications_count": 1,
+            "added_work_experience_clarifications_count": 0,
+            "constraints_count": 0
+          },
+          "remaining_warnings": [
+            "resume profile has no work experience evidence",
+            "target role is not explicit",
+            "project evidence comes from user clarification and should be verified before resume rewrite"
+          ],
+          "confidence_label": "limited"
+        },
+        "suggestion_decisions": [],
+        "missing_info_answers": [
+          {
+            "question": "What target roles should this profile prioritize, such as AI Agent Engineer, Backend Engineer, or Embedded Software Engineer?",
+            "answer": "AI Engineer"
+          },
+          {
+            "question": "Which project best demonstrates your target role fit? Please add project goal, technologies, your responsibilities, and outcomes.",
+            "answer": "AI Engineer"
+          },
+          {
+            "question": "Do you have internship, lab, research, or course project experience that should be treated as work-like evidence?",
+            "answer": "Weak sparse resume strongest project is described in the resume and should be highlighted."
+          },
+          {
+            "question": "Can you add measurable outcomes, such as number of APIs, tests passed, latency, users, dataset size, or accuracy?",
+            "answer": "Please keep the existing measurable outcomes from the resume evidence."
+          }
+        ],
+        "notes": "What target roles should this profile prioritize, such as AI Agent Engineer, Backend Engineer, or Embedded Software Engineer?: AI Engineer\nWhich project best demonstrates your target role fit? Please add project goal, technologies, your responsibilities, and outcomes.: AI Engineer\nDo you have internship, lab, research, or course project experience that should be treated as work-like evidence?: Weak sparse resume strongest project is described in the resume and should be highlighted.\nCan you add measurable outcomes, such as number of APIs, tests passed, latency, users, dataset size, or accuracy?: Please keep the existing measurable outcomes from the resume evidence."
+      }
+    }
+  ]
+}

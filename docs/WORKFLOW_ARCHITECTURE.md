@@ -231,3 +231,10 @@ resume text -> parser -> profile review -> LLM enrichment -> Slate-like UI -> co
 
 This adds one SQLite table and profile persistence API. It does not change the
 parser, enrichment guardrails, matching workflow, or search providers.
+
+v3.7 does not change the workflow contracts. Instead, it adds an evaluation
+layer around the profile-review front half:
+
+```text
+resume input -> deterministic parser -> profile review -> Slate-like draft -> optional LLM enrichment -> simulated user confirmation -> confirmed-profile save payload -> evaluation artifacts
+```

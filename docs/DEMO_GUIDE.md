@@ -59,6 +59,11 @@ After confirming a profile, demo `Save Confirmed Profile`, then open `Saved
 Profiles` to show the new record summary and detail. Suggestion decisions and
 missing-info answers are preserved as JSON snapshots on the saved profile.
 
+v3.7 adds reproducible Profile Review Quality Evaluation artifacts under
+`docs/demo_outputs/profile_review_quality_eval/`. Use them when you want to
+show synthetic end-to-end profile review readiness without changing parser,
+enrichment, or job-search logic.
+
 适用对象：
 
 - 面试官

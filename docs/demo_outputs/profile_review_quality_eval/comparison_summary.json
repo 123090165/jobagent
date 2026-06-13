@@ -1,0 +1,68 @@
+[
+  {
+    "case_id": "ai_agent_backend",
+    "deterministic_verdict": "strong",
+    "llm_enriched_verdict": "strong",
+    "skill_count_delta": 0,
+    "suggestion_count": 1,
+    "warning_count_delta": 0,
+    "confirmed_confidence_delta": null,
+    "improvement_summary": "LLM path produced usable suggestion decisions without increasing confirmed coverage.",
+    "risk_summary": "unsupported suggestions were discarded by grounding checks"
+  },
+  {
+    "case_id": "embedded_stm32",
+    "deterministic_verdict": "acceptable",
+    "llm_enriched_verdict": "acceptable",
+    "skill_count_delta": 0,
+    "suggestion_count": 0,
+    "warning_count_delta": 0,
+    "confirmed_confidence_delta": null,
+    "improvement_summary": "No meaningful LLM improvement observed.",
+    "risk_summary": "unsupported suggestions were discarded by grounding checks"
+  },
+  {
+    "case_id": "ml_audio_asr",
+    "deterministic_verdict": "failed",
+    "llm_enriched_verdict": "needs_review",
+    "skill_count_delta": 0,
+    "suggestion_count": 1,
+    "warning_count_delta": 0,
+    "confirmed_confidence_delta": null,
+    "improvement_summary": "LLM path changed overall evaluation verdict.",
+    "risk_summary": "unsupported suggestions were discarded by grounding checks"
+  },
+  {
+    "case_id": "finance_fa_analysis",
+    "deterministic_verdict": "failed",
+    "llm_enriched_verdict": "needs_review",
+    "skill_count_delta": 0,
+    "suggestion_count": 2,
+    "warning_count_delta": 0,
+    "confirmed_confidence_delta": null,
+    "improvement_summary": "LLM path changed overall evaluation verdict.",
+    "risk_summary": "No notable LLM-specific risk increase."
+  },
+  {
+    "case_id": "mixed_language_resume",
+    "deterministic_verdict": "strong",
+    "llm_enriched_verdict": "strong",
+    "skill_count_delta": 0,
+    "suggestion_count": 1,
+    "warning_count_delta": 0,
+    "confirmed_confidence_delta": null,
+    "improvement_summary": "LLM path produced usable suggestion decisions without increasing confirmed coverage.",
+    "risk_summary": "unsupported suggestions were discarded by grounding checks"
+  },
+  {
+    "case_id": "weak_resume",
+    "deterministic_verdict": "acceptable",
+    "llm_enriched_verdict": "acceptable",
+    "skill_count_delta": 0,
+    "suggestion_count": 0,
+    "warning_count_delta": 0,
+    "confirmed_confidence_delta": null,
+    "improvement_summary": "No meaningful LLM improvement observed.",
+    "risk_summary": "No notable LLM-specific risk increase."
+  }
+]

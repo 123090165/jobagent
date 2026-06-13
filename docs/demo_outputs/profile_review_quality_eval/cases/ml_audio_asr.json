@@ -1,0 +1,316 @@
+{
+  "case_id": "ml_audio_asr",
+  "title": "ML Audio / ASR resume",
+  "target_roles": [
+    "Machine Learning Engineer",
+    "AI Engineer"
+  ],
+  "baseline_confidence_label": "strong",
+  "baseline_quality_warnings": [
+    "project evidence may be too thin for matching"
+  ],
+  "baseline_missing_info_questions": [
+    "For your strongest project, what exactly did you build, which technologies did you use, and what measurable result can you show?"
+  ],
+  "parsed_skills": [
+    "Python",
+    "PyTorch",
+    "Librosa",
+    "NumPy",
+    "Pandas",
+    "Machine Learning"
+  ],
+  "parsed_project_count": 3,
+  "parsed_work_experience_count": 3,
+  "parsed_education_count": 1,
+  "parsed_highlights": [
+    "Ran dataset experiments and compared VGG and CNN baselines for speech tasks.",
+    "Highlights: Improved model accuracy and documented dataset quality issues.",
+    "Built PyTorch CNN and ResNet models using MFCC and STFT features on an environmental sound dataset.",
+    "Reached 95% validation accuracy on 300 evaluation clips.",
+    "Used Librosa and Pandas to inspect transcription failures and dataset labeling issues."
+  ],
+  "profile_draft_summary": {
+    "skill_count": 6,
+    "project_count": 3,
+    "work_experience_count": 3,
+    "education_count": 1,
+    "highlight_count": 5,
+    "target_roles": [
+      "Machine Learning Engineer",
+      "AI Engineer"
+    ]
+  },
+  "enrichment_enabled": true,
+  "enrichment_suggestion_count": 1,
+  "enrichment_llm_success_count": 7,
+  "enrichment_fallback_count": 0,
+  "enrichment_discarded_suggestion_count": 1,
+  "enrichment_quality_warnings": [
+    "project evidence may be too thin for matching",
+    "discarded ungrounded profile enrichment suggestion"
+  ],
+  "accepted_suggestion_count": 0,
+  "edited_suggestion_count": 1,
+  "rejected_suggestion_count": 0,
+  "confirmed_confidence_label": "strong",
+  "confirmed_skill_count": 6,
+  "confirmed_project_count": 3,
+  "confirmed_work_experience_count": 3,
+  "confirmed_remaining_warnings": [
+    "project evidence may be too thin for matching"
+  ],
+  "save_payload_ready": true,
+  "quality_verdict": "needs_review",
+  "reviewer_notes": [
+    "edited 1 suggestions before confirmation",
+    "missing expected skills: MFCC, STFT, CNN",
+    "discarded 1 unsupported enrichment suggestions"
+  ],
+  "save_payload_snapshot": {
+    "raw_resume_text": "Alex Chen\nTarget Roles: Machine Learning Engineer / AI Engineer\nSkills: Python, PyTorch, Librosa, NumPy, Pandas, CNN, ResNet, VGG, MFCC, STFT\nEducation: M.S. Data Science, City University\nProjects:\nAudio Classification Benchmark\n- Built PyTorch CNN and ResNet models using MFCC and STFT features on an environmental sound dataset.\n- Reached 95% validation accuracy on 300 evaluation clips.\nASR Error Analysis Tool\n- Used Librosa and Pandas to inspect transcription failures and dataset labeling issues.\nExperience:\nResearch Assistant, Audio Intelligence Lab\n- Ran dataset experiments and compared VGG and CNN baselines for speech tasks.\nHighlights: Improved model accuracy and documented dataset quality issues.",
+    "baseline_profile": {
+      "raw_text": "Alex Chen\nTarget Roles: Machine Learning Engineer / AI Engineer\nSkills: Python, PyTorch, Librosa, NumPy, Pandas, CNN, ResNet, VGG, MFCC, STFT\nEducation: M.S. Data Science, City University\nProjects:\nAudio Classification Benchmark\n- Built PyTorch CNN and ResNet models using MFCC and STFT features on an environmental sound dataset.\n- Reached 95% validation accuracy on 300 evaluation clips.\nASR Error Analysis Tool\n- Used Librosa and Pandas to inspect transcription failures and dataset labeling issues.\nExperience:\nResearch Assistant, Audio Intelligence Lab\n- Ran dataset experiments and compared VGG and CNN baselines for speech tasks.\nHighlights: Improved model accuracy and documented dataset quality issues.",
+      "name": null,
+      "education": [
+        {
+          "school": "City University",
+          "degree": "M.S.",
+          "major": "Data Science",
+          "raw_text": "M.S. Data Science, City University"
+        }
+      ],
+      "skills": [
+        "Python",
+        "PyTorch",
+        "Librosa",
+        "NumPy",
+        "Pandas",
+        "Machine Learning"
+      ],
+      "projects": [
+        {
+          "name": "Audio Classification Benchmark",
+          "description": "Audio Classification Benchmark",
+          "technologies": [],
+          "highlights": [],
+          "raw_text": "Audio Classification Benchmark"
+        },
+        {
+          "name": "Project 2",
+          "description": "Built PyTorch CNN and ResNet models using MFCC and STFT features on an environmental sound dataset.",
+          "technologies": [
+            "PyTorch"
+          ],
+          "highlights": [
+            "Built PyTorch CNN and ResNet models using MFCC and STFT features on an environmental sound dataset."
+          ],
+          "raw_text": "Built PyTorch CNN and ResNet models using MFCC and STFT features on an environmental sound dataset."
+        },
+        {
+          "name": "Reached 95% validation accuracy on 300 evaluation clips.",
+          "description": "Reached 95% validation accuracy on 300 evaluation clips.",
+          "technologies": [],
+          "highlights": [
+            "Reached 95% validation accuracy on 300 evaluation clips."
+          ],
+          "raw_text": "Reached 95% validation accuracy on 300 evaluation clips."
+        }
+      ],
+      "work_experiences": [
+        {
+          "company": "Audio Intelligence Lab",
+          "role": "Research Assistant",
+          "description": "Research Assistant, Audio Intelligence Lab",
+          "technologies": [],
+          "raw_text": "Research Assistant, Audio Intelligence Lab"
+        },
+        {
+          "company": null,
+          "role": null,
+          "description": "Ran dataset experiments and compared VGG and CNN baselines for speech tasks.",
+          "technologies": [],
+          "raw_text": "Ran dataset experiments and compared VGG and CNN baselines for speech tasks."
+        },
+        {
+          "company": null,
+          "role": null,
+          "description": "Highlights: Improved model accuracy and documented dataset quality issues.",
+          "technologies": [],
+          "raw_text": "Highlights: Improved model accuracy and documented dataset quality issues."
+        }
+      ],
+      "certificates": [],
+      "highlights": [
+        "Ran dataset experiments and compared VGG and CNN baselines for speech tasks.",
+        "Highlights: Improved model accuracy and documented dataset quality issues.",
+        "Built PyTorch CNN and ResNet models using MFCC and STFT features on an environmental sound dataset.",
+        "Reached 95% validation accuracy on 300 evaluation clips.",
+        "Used Librosa and Pandas to inspect transcription failures and dataset labeling issues."
+      ],
+      "missing_info": []
+    },
+    "confirmed_result": {
+      "confirmed_profile": {
+        "raw_text": "Alex Chen\nTarget Roles: Machine Learning Engineer / AI Engineer\nSkills: Python, PyTorch, Librosa, NumPy, Pandas, CNN, ResNet, VGG, MFCC, STFT\nEducation: M.S. Data Science, City University\nProjects:\nAudio Classification Benchmark\n- Built PyTorch CNN and ResNet models using MFCC and STFT features on an environmental sound dataset.\n- Reached 95% validation accuracy on 300 evaluation clips.\nASR Error Analysis Tool\n- Used Librosa and Pandas to inspect transcription failures and dataset labeling issues.\nExperience:\nResearch Assistant, Audio Intelligence Lab\n- Ran dataset experiments and compared VGG and CNN baselines for speech tasks.\nHighlights: Improved model accuracy and documented dataset quality issues.",
+        "name": null,
+        "education": [
+          {
+            "school": "City University",
+            "degree": "M.S.",
+            "major": "Data Science",
+            "raw_text": "M.S. Data Science, City University"
+          }
+        ],
+        "skills": [
+          "Python",
+          "PyTorch",
+          "Librosa",
+          "NumPy",
+          "Pandas",
+          "Machine Learning"
+        ],
+        "projects": [
+          {
+            "name": "Audio Classification Benchmark",
+            "description": "Audio Classification Benchmark",
+            "technologies": [],
+            "highlights": [],
+            "raw_text": "Audio Classification Benchmark"
+          },
+          {
+            "name": "Project 2",
+            "description": "Built PyTorch CNN and ResNet models using MFCC and STFT features on an environmental sound dataset.",
+            "technologies": [
+              "PyTorch"
+            ],
+            "highlights": [
+              "Built PyTorch CNN and ResNet models using MFCC and STFT features on an environmental sound dataset."
+            ],
+            "raw_text": "Built PyTorch CNN and ResNet models using MFCC and STFT features on an environmental sound dataset."
+          },
+          {
+            "name": "Reached 95% validation accuracy on 300 evaluation clips.",
+            "description": "Reached 95% validation accuracy on 300 evaluation clips.",
+            "technologies": [],
+            "highlights": [
+              "Reached 95% validation accuracy on 300 evaluation clips."
+            ],
+            "raw_text": "Reached 95% validation accuracy on 300 evaluation clips."
+          }
+        ],
+        "work_experiences": [
+          {
+            "company": "Audio Intelligence Lab",
+            "role": "Research Assistant",
+            "description": "Research Assistant, Audio Intelligence Lab",
+            "technologies": [],
+            "raw_text": "Research Assistant, Audio Intelligence Lab"
+          },
+          {
+            "company": null,
+            "role": null,
+            "description": "Ran dataset experiments and compared VGG and CNN baselines for speech tasks.",
+            "technologies": [],
+            "raw_text": "Ran dataset experiments and compared VGG and CNN baselines for speech tasks."
+          },
+          {
+            "company": null,
+            "role": null,
+            "description": "Highlights: Improved model accuracy and documented dataset quality issues.",
+            "technologies": [],
+            "raw_text": "Highlights: Improved model accuracy and documented dataset quality issues."
+          }
+        ],
+        "certificates": [],
+        "highlights": [
+          "Ran dataset experiments and compared VGG and CNN baselines for speech tasks.",
+          "Highlights: Improved model accuracy and documented dataset quality issues.",
+          "Built PyTorch CNN and ResNet models using MFCC and STFT features on an environmental sound dataset.",
+          "Reached 95% validation accuracy on 300 evaluation clips.",
+          "Used Librosa and Pandas to inspect transcription failures and dataset labeling issues."
+        ],
+        "missing_info": []
+      },
+      "user_confirmed_data": {
+        "target_roles": [
+          "Machine Learning Engineer",
+          "AI Engineer"
+        ],
+        "preferred_locations": [],
+        "additional_skills": [
+          "Python",
+          "PyTorch",
+          "Librosa",
+          "NumPy",
+          "Pandas",
+          "Machine Learning"
+        ],
+        "project_clarifications": [
+          "Audio Classification Benchmark | Audio Classification Benchmark",
+          "Project 2 | Built PyTorch CNN and ResNet models using MFCC and STFT features on an environmental sound dataset. | PyTorch | Built PyTorch CNN and ResNet models using MFCC and STFT features on an environmental sound dataset.",
+          "Reached 95% validation accuracy on 300 evaluation clips. | Reached 95% validation accuracy on 300 evaluation clips. | Reached 95% validation accuracy on 300 evaluation clips."
+        ],
+        "work_experience_clarifications": [
+          "Audio Intelligence Lab | Research Assistant | Research Assistant, Audio Intelligence Lab",
+          "Ran dataset experiments and compared VGG and CNN baselines for speech tasks.",
+          "Highlights: Improved model accuracy and documented dataset quality issues."
+        ],
+        "constraints": [],
+        "notes": "For your strongest project, what exactly did you build, which technologies did you use, and what measurable result can you show?: ML Audio / ASR resume strongest project is described in the resume and should be highlighted."
+      },
+      "confirmation_summary": {
+        "confirmed_sections": [
+          "target_roles",
+          "skills",
+          "projects",
+          "work_experiences",
+          "notes"
+        ],
+        "added_target_roles": [
+          "Machine Learning Engineer",
+          "AI Engineer"
+        ],
+        "added_skills": [
+          "Python",
+          "PyTorch",
+          "Librosa",
+          "NumPy",
+          "Pandas",
+          "Machine Learning"
+        ],
+        "added_project_clarifications_count": 3,
+        "added_work_experience_clarifications_count": 3,
+        "constraints_count": 0
+      },
+      "remaining_warnings": [
+        "project evidence may be too thin for matching"
+      ],
+      "confidence_label": "strong"
+    },
+    "suggestion_decisions": [
+      {
+        "section": "project",
+        "item_index": null,
+        "field": "highlights",
+        "suggested_value": [
+          "95% validation accuracy"
+        ],
+        "source_quote": "95% validation accuracy",
+        "decision_status": "edited",
+        "confidence_label": "medium",
+        "warnings": [],
+        "edited_value": [
+          "95% validation accuracy"
+        ]
+      }
+    ],
+    "missing_info_answers": [
+      {
+        "question": "For your strongest project, what exactly did you build, which technologies did you use, and what measurable result can you show?",
+        "answer": "ML Audio / ASR resume strongest project is described in the resume and should be highlighted."
+      }
+    ],
+    "notes": "For your strongest project, what exactly did you build, which technologies did you use, and what measurable result can you show?: ML Audio / ASR resume strongest project is described in the resume and should be highlighted."
+  }
+}

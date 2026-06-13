@@ -1,0 +1,67 @@
+from __future__ import annotations
+
+from scripts.run_profile_review_quality_evaluation import run
+from app.services.profile_review_quality_evaluation import (
+    compare_profile_review_quality_suites,
+    run_profile_review_quality_suite,
+)
+from tests.fixtures.resumes.profile_review_quality_cases import (
+    PROFILE_REVIEW_QUALITY_CASES,
+)
+
+
+def test_fixtures_contain_at_least_six_cases() -> None:
+    assert len(PROFILE_REVIEW_QUALITY_CASES) >= 6
+
+
+def test_deterministic_suite_runs_without_llm() -> None:
+    result = run_profile_review_quality_suite(use_llm_enrichment=False)
+
+    assert result.total_cases >= 6
+    assert all(not case.enrichment_enabled for case in result.cases)
+
+
+def test_llm_suite_runs_with_fake_llm() -> None:
+    result = run_profile_review_quality_suite(use_llm_enrichment=True)
+
+    assert result.total_cases >= 6
+    assert all(case.enrichment_enabled for case in result.cases)
+
+
+def test_weak_resume_is_not_marked_strong() -> None:
+    result = run_profile_review_quality_suite(use_llm_enrichment=False)
+    weak_case = next(case for case in result.cases if case.case_id == "weak_resume")
+
+    assert weak_case.quality_verdict != "strong"
+    assert weak_case.baseline_confidence_label in {"weak", "limited"}
+
+
+def test_every_case_produces_save_payload_ready() -> None:
+    result = run_profile_review_quality_suite(use_llm_enrichment=True)
+
+    assert all(case.save_payload_ready for case in result.cases)
+
+
+def test_comparison_summary_is_generated() -> None:
+    deterministic = run_profile_review_quality_suite(use_llm_enrichment=False)
+    llm = run_profile_review_quality_suite(use_llm_enrichment=True)
+    comparison = compare_profile_review_quality_suites(deterministic, llm)
+
+    assert len(comparison) == deterministic.total_cases
+
+
+def test_script_writes_json_and_markdown_artifacts(tmp_path) -> None:
+    outputs = run(output_dir=tmp_path, mode="both")
+
+    assert outputs.deterministic is not None
+    assert outputs.llm_enriched is not None
+    assert (tmp_path / "deterministic_summary.json").exists()
+    assert (tmp_path / "deterministic_summary.md").exists()
+    assert (tmp_path / "llm_enriched_summary.json").exists()
+    assert (tmp_path / "llm_enriched_summary.md").exists()
+    assert (tmp_path / "comparison_summary.json").exists()
+    assert (tmp_path / "comparison_summary.md").exists()
+    assert (tmp_path / "cases" / "ai_agent_backend.json").exists()
+    assert "Case Table" in (tmp_path / "deterministic_summary.md").read_text(
+        encoding="utf-8"
+    )

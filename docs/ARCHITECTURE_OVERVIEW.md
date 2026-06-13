@@ -64,6 +64,11 @@ v3.6-light persists confirmed profiles into one SQLite table:
 Suggestion decisions and missing-info answers are stored as JSON snapshots on
 the confirmed profile record rather than separate analytics tables.
 
+v3.7 adds a reproducible Profile Review Quality Evaluation suite. It runs
+synthetic resumes through deterministic parsing, optional LLM enrichment,
+simulated user confirmation, and confirmed-profile save-payload validation, then
+writes JSON/Markdown artifacts for human review.
+
 ## 1. Project Goal
 
 JobAgent 不是一个单纯的聊天机器人，也不是一个通用爬虫项目。它更像一个面向求职准备场景的本地工作台，用来把“找岗位、判断匹配度、改简历、准备面试、记录投递进展”串成一个可复盘的流程。
