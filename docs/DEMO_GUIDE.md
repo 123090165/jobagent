@@ -49,6 +49,16 @@ Demo the profile cards first, then show LLM suggestions with source quotes.
 Accept, edit, and reject decisions update only the frontend draft until the user
 confirms the profile through the existing confirm API.
 
+v3.6-light adds a persistence step after confirmation:
+
+```text
+resume text -> parser -> profile review -> LLM enrichment -> Slate-like UI -> confirmed profile persistence -> profile-driven search and analysis
+```
+
+After confirming a profile, demo `Save Confirmed Profile`, then open `Saved
+Profiles` to show the new record summary and detail. Suggestion decisions and
+missing-info answers are preserved as JSON snapshots on the saved profile.
+
 适用对象：
 
 - 面试官

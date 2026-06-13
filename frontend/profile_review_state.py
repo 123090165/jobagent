@@ -15,6 +15,8 @@ PROFILE_REVIEW_STATE_KEYS = {
     "rejected_suggestions",
     "edited_suggestions",
     "confirmed_profile_result",
+    "missing_info_answers",
+    "saved_confirmed_profile_id",
 }
 
 LIST_FIELD_ALIASES = {
@@ -157,6 +159,77 @@ def append_missing_info_answer(
     return draft
 
 
+def build_confirmed_profile_save_payload(
+    *,
+    resume_text: str,
+    baseline_review: dict[str, Any] | None,
+    confirmed_profile_result: dict[str, Any] | None,
+    accepted_suggestions: dict[str, dict[str, Any]] | list[dict[str, Any]],
+    edited_suggestions: dict[str, dict[str, Any]] | list[dict[str, Any]],
+    rejected_suggestions: dict[str, dict[str, Any]] | list[dict[str, Any]],
+    missing_info_answers: dict[str, str] | list[dict[str, Any]],
+    notes: str | None = None,
+) -> dict[str, Any] | None:
+    if not baseline_review or not confirmed_profile_result:
+        return None
+    baseline_profile = baseline_review.get("parsed_profile")
+    if not baseline_profile:
+        return None
+
+    return {
+        "raw_resume_text": resume_text,
+        "baseline_profile": baseline_profile,
+        "confirmed_result": confirmed_profile_result,
+        "suggestion_decisions": build_suggestion_decisions_payload(
+            accepted_suggestions=accepted_suggestions,
+            edited_suggestions=edited_suggestions,
+            rejected_suggestions=rejected_suggestions,
+        ),
+        "missing_info_answers": build_missing_info_answers_payload(
+            missing_info_answers
+        ),
+        "notes": notes,
+    }
+
+
+def build_suggestion_decisions_payload(
+    *,
+    accepted_suggestions: dict[str, dict[str, Any]] | list[dict[str, Any]],
+    edited_suggestions: dict[str, dict[str, Any]] | list[dict[str, Any]],
+    rejected_suggestions: dict[str, dict[str, Any]] | list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    decisions: list[dict[str, Any]] = []
+    decisions.extend(
+        _suggestions_with_status(accepted_suggestions, decision_status="accepted")
+    )
+    decisions.extend(_suggestions_with_status(edited_suggestions, decision_status="edited"))
+    decisions.extend(
+        _suggestions_with_status(rejected_suggestions, decision_status="rejected")
+    )
+    return decisions
+
+
+def build_missing_info_answers_payload(
+    missing_info_answers: dict[str, str] | list[dict[str, Any]],
+) -> list[dict[str, str]]:
+    if isinstance(missing_info_answers, dict):
+        raw_answers = [
+            {"question": question, "answer": answer}
+            for question, answer in missing_info_answers.items()
+        ]
+    else:
+        raw_answers = missing_info_answers
+
+    answers: list[dict[str, str]] = []
+    for item in raw_answers:
+        question = str(item.get("question") or "").strip()
+        answer = str(item.get("answer") or "").strip()
+        if not question or not answer:
+            continue
+        answers.append({"question": question, "answer": answer})
+    return answers
+
+
 def _apply_item_suggestion(
     draft: dict[str, Any],
     collection_name: str,
@@ -234,3 +307,27 @@ def _as_list(value: Any) -> list[Any]:
     if isinstance(value, list):
         return value
     return [value]
+
+
+def _suggestions_with_status(
+    suggestions: dict[str, dict[str, Any]] | list[dict[str, Any]],
+    *,
+    decision_status: str,
+) -> list[dict[str, Any]]:
+    normalized = suggestions.values() if isinstance(suggestions, dict) else suggestions
+    decisions: list[dict[str, Any]] = []
+    for suggestion in normalized:
+        decision = {
+            "section": str(suggestion.get("section") or ""),
+            "item_index": suggestion.get("item_index"),
+            "field": str(suggestion.get("field") or ""),
+            "suggested_value": suggestion.get("suggested_value"),
+            "source_quote": suggestion.get("source_quote"),
+            "decision_status": decision_status,
+            "confidence_label": suggestion.get("confidence_label"),
+            "warnings": _as_list(suggestion.get("warnings")),
+        }
+        if decision_status == "edited" and suggestion.get("edited_value") is not None:
+            decision["edited_value"] = suggestion.get("edited_value")
+        decisions.append(decision)
+    return decisions

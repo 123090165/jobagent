@@ -118,6 +118,25 @@ def init_database(connection: sqlite3.Connection) -> None:
             FOREIGN KEY (job_posting_id) REFERENCES job_postings(id),
             FOREIGN KEY (resume_version_id) REFERENCES resume_versions(id)
         );
+
+        CREATE TABLE IF NOT EXISTS confirmed_profile_records (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            resume_record_id INTEGER,
+            raw_resume_text TEXT NOT NULL,
+            baseline_profile_json TEXT NOT NULL,
+            confirmed_profile_json TEXT NOT NULL,
+            user_edits_json TEXT NOT NULL,
+            confirmation_summary_json TEXT NOT NULL,
+            remaining_warnings_json TEXT NOT NULL,
+            suggestion_decisions_json TEXT NOT NULL,
+            missing_info_answers_json TEXT NOT NULL,
+            confidence_label TEXT NOT NULL,
+            target_roles_json TEXT NOT NULL,
+            notes TEXT,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (resume_record_id) REFERENCES resume_records(id)
+        );
         """
     )
     _ensure_column(connection, "analysis_records", "application_id", "INTEGER")

@@ -222,3 +222,12 @@ parser -> profile review -> enrichment suggestions -> UI accept/edit/reject -> c
 The Streamlit UI converts the parsed profile into editable cards, applies only
 user-approved suggestions to a frontend draft, and maps that draft back into the
 existing confirm API.
+
+v3.6-light adds local persistence after confirmation:
+
+```text
+resume text -> parser -> profile review -> LLM enrichment -> Slate-like UI -> confirmed profile persistence -> profile-driven search and analysis
+```
+
+This adds one SQLite table and profile persistence API. It does not change the
+parser, enrichment guardrails, matching workflow, or search providers.

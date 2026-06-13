@@ -13,6 +13,7 @@ from app.services.errors import JobAgentError
 from frontend.profile_review_state import (
     append_missing_info_answer,
     apply_suggestion_to_profile_draft,
+    build_confirmed_profile_save_payload,
     build_confirm_user_edits_from_profile_draft,
     build_profile_draft_from_baseline,
     dedupe_skills,
@@ -38,6 +39,10 @@ FLOW_KEYS = [
     "confirmed_profile_result",
     "profile_search_plan",
     "brief_result",
+    "saved_confirmed_profile_id",
+    "saved_confirmed_profile_detail",
+    "profile_flow_saved_profiles",
+    "profile_flow_missing_info_answers",
 ]
 
 
@@ -223,6 +228,64 @@ def request_confirm_resume_profile_from_api(
     )
 
 
+def request_save_confirmed_profile_from_api(
+    *,
+    payload: dict[str, object],
+    api_base_url: str = DEFAULT_API_BASE_URL,
+    timeout_seconds: int = DEFAULT_API_TIMEOUT_SECONDS,
+) -> dict[str, object]:
+    return _call_api(
+        "/profile/confirmed",
+        payload,
+        api_base_url=api_base_url,
+        timeout_seconds=timeout_seconds,
+        unavailable_error_code="confirmed_profile_api_unavailable",
+        failure_error_code="confirmed_profile_api_request_failed",
+    )
+
+
+def request_saved_confirmed_profiles_from_api(
+    *,
+    limit: int = 10,
+    api_base_url: str = DEFAULT_API_BASE_URL,
+    timeout_seconds: int = DEFAULT_API_TIMEOUT_SECONDS,
+) -> list[dict[str, object]]:
+    payload = _get_api(
+        f"/profile/confirmed?limit={int(limit)}",
+        api_base_url=api_base_url,
+        timeout_seconds=timeout_seconds,
+        unavailable_error_code="confirmed_profile_api_unavailable",
+        failure_error_code="confirmed_profile_api_request_failed",
+    )
+    if not isinstance(payload, list):
+        raise JobAgentError(
+            "Confirmed profile API returned an invalid list response",
+            "confirmed_profile_api_invalid_json",
+        )
+    return payload
+
+
+def request_saved_confirmed_profile_detail_from_api(
+    *,
+    record_id: int,
+    api_base_url: str = DEFAULT_API_BASE_URL,
+    timeout_seconds: int = DEFAULT_API_TIMEOUT_SECONDS,
+) -> dict[str, object]:
+    payload = _get_api(
+        f"/profile/confirmed/{int(record_id)}",
+        api_base_url=api_base_url,
+        timeout_seconds=timeout_seconds,
+        unavailable_error_code="confirmed_profile_api_unavailable",
+        failure_error_code="confirmed_profile_api_request_failed",
+    )
+    if not isinstance(payload, dict):
+        raise JobAgentError(
+            "Confirmed profile API returned an invalid detail response",
+            "confirmed_profile_api_invalid_json",
+        )
+    return payload
+
+
 def request_profile_search_plan_from_api(
     *,
     query: str,
@@ -253,6 +316,7 @@ def _ensure_initial_state(sample_resume: str) -> None:
     st.session_state.setdefault("profile_flow_accepted_suggestions", {})
     st.session_state.setdefault("profile_flow_rejected_suggestions", {})
     st.session_state.setdefault("profile_flow_edited_suggestions", {})
+    st.session_state.setdefault("profile_flow_missing_info_answers", {})
     st.session_state.setdefault("profile_flow_sync_token", 0)
 
 
@@ -279,8 +343,16 @@ def _parse_resume_profile(*, resume_text: str, target_roles: list[str]) -> None:
         "confirmed_profile_result",
         "profile_search_plan",
         "brief_result",
+        "saved_confirmed_profile_id",
+        "saved_confirmed_profile_detail",
+        "profile_flow_saved_profiles",
+        "profile_flow_missing_info_answers",
     ]:
-        st.session_state[key] = {} if key.endswith("suggestions") else None
+        st.session_state[key] = (
+            {}
+            if key.endswith("suggestions") or key == "profile_flow_missing_info_answers"
+            else None
+        )
     st.success("Resume profile parsed.")
 
 
@@ -548,6 +620,9 @@ def _render_missing_info_questions(
                 answer=answer,
             )
             profile_draft.update(updated)
+            st.session_state.setdefault("profile_flow_missing_info_answers", {})[
+                question
+            ] = answer
             _bump_sync_token()
             st.success("Answer saved to draft notes.")
             st.rerun()
@@ -618,6 +693,91 @@ def _render_confirm_profile(
             st.json(confirmed_profile_result)
         for warning in confirmed_profile_result.get("remaining_warnings") or []:
             st.warning(str(warning))
+        _render_save_confirmed_profile(baseline_review, profile_draft)
+        _render_saved_profiles_list()
+
+
+def _render_save_confirmed_profile(
+    baseline_review: dict[str, Any],
+    profile_draft: dict[str, Any],
+) -> None:
+    confirmed_profile_result = st.session_state.get("confirmed_profile_result")
+    payload = build_confirmed_profile_save_payload(
+        resume_text=st.session_state.get("profile_flow_resume_text", ""),
+        baseline_review=baseline_review,
+        confirmed_profile_result=confirmed_profile_result,
+        accepted_suggestions=st.session_state.get("profile_flow_accepted_suggestions", {}),
+        edited_suggestions=st.session_state.get("profile_flow_edited_suggestions", {}),
+        rejected_suggestions=st.session_state.get("profile_flow_rejected_suggestions", {}),
+        missing_info_answers=st.session_state.get("profile_flow_missing_info_answers", {}),
+        notes=str(profile_draft.get("notes") or "").strip() or None,
+    )
+    if payload is None:
+        return
+
+    if st.button(
+        "Save Confirmed Profile",
+        key="profile_flow_save_confirmed_profile",
+        use_container_width=True,
+    ):
+        try:
+            response = request_save_confirmed_profile_from_api(payload=payload)
+        except JobAgentError as exc:
+            st.error(str(exc))
+            return
+        record_id = response.get("id")
+        st.session_state["saved_confirmed_profile_id"] = record_id
+        st.success(f"Saved confirmed profile: ID {record_id}")
+
+
+def _render_saved_profiles_list() -> None:
+    with st.expander("Saved Profiles"):
+        if st.button("Refresh Saved Profiles", key="profile_flow_refresh_saved_profiles"):
+            try:
+                st.session_state["profile_flow_saved_profiles"] = (
+                    request_saved_confirmed_profiles_from_api(limit=10)
+                )
+            except JobAgentError as exc:
+                st.error(str(exc))
+                return
+
+        saved_profiles = st.session_state.get("profile_flow_saved_profiles")
+        if not saved_profiles:
+            st.caption("No saved profiles loaded yet.")
+            return
+
+        rows = [
+            {
+                "id": item.get("id"),
+                "confidence_label": item.get("confidence_label"),
+                "target_roles": ", ".join(item.get("target_roles") or []),
+                "skill_count": item.get("skill_count"),
+                "project_count": item.get("project_count"),
+                "work_experience_count": item.get("work_experience_count"),
+                "decision_count": item.get("decision_count"),
+                "missing_answer_count": item.get("missing_answer_count"),
+                "created_at": item.get("created_at"),
+            }
+            for item in saved_profiles
+        ]
+        st.dataframe(rows, hide_index=True, use_container_width=True)
+        for item in saved_profiles:
+            record_id = item.get("id")
+            if st.button(f"Load {record_id}", key=f"profile_flow_load_saved_{record_id}"):
+                try:
+                    st.session_state["saved_confirmed_profile_detail"] = (
+                        request_saved_confirmed_profile_detail_from_api(
+                            record_id=int(record_id)
+                        )
+                    )
+                except JobAgentError as exc:
+                    st.error(str(exc))
+                    return
+
+        detail = st.session_state.get("saved_confirmed_profile_detail")
+        if detail:
+            with st.expander("Saved profile detail", expanded=True):
+                st.json(detail)
 
 
 def _render_search_and_brief_flow(
@@ -891,13 +1051,46 @@ def _call_api(
     return _load_json_payload(response_body)
 
 
-def _load_json_payload(raw_text: str) -> dict[str, object]:
+def _get_api(
+    path: str,
+    *,
+    api_base_url: str = DEFAULT_API_BASE_URL,
+    timeout_seconds: int = DEFAULT_API_TIMEOUT_SECONDS,
+    unavailable_error_code: str = "api_unavailable",
+    failure_error_code: str = "api_request_failed",
+) -> dict[str, object] | list[dict[str, object]]:
+    request = Request(
+        f"{api_base_url.rstrip('/')}{path}",
+        headers={"Content-Type": "application/json"},
+        method="GET",
+    )
+    try:
+        with urlopen(request, timeout=timeout_seconds) as response:
+            response_body = response.read().decode("utf-8")
+    except HTTPError as exc:
+        error_body = exc.read().decode("utf-8", errors="replace")
+        error_payload = _load_json_payload(error_body)
+        raise JobAgentError(
+            str(error_payload.get("detail", f"{path} failed with status {exc.code}")),
+            str(error_payload.get("error_code", failure_error_code)),
+        ) from exc
+    except URLError as exc:
+        raise JobAgentError(
+            "Cannot connect to FastAPI backend. Start it with: "
+            ".venv\\Scripts\\python.exe -m uvicorn app.main:app --reload",
+            unavailable_error_code,
+        ) from exc
+
+    return _load_json_payload(response_body)
+
+
+def _load_json_payload(raw_text: str) -> dict[str, object] | list[dict[str, object]]:
     try:
         payload = json.loads(raw_text)
     except json.JSONDecodeError as exc:
         raise JobAgentError("Job Brief API returned invalid JSON", "brief_api_invalid_json") from exc
 
-    if not isinstance(payload, dict):
+    if not isinstance(payload, (dict, list)):
         raise JobAgentError("Job Brief API returned an invalid response object", "brief_api_invalid_json")
     return payload
 
