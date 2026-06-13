@@ -59,4 +59,7 @@ Response includes:
 
 ## Next Step
 
-Profile Review UI can be upgraded to support accepting/rejecting suggestions.
+v3.5 adds a Slate-like Profile Review UI where users can inspect section cards,
+accept/edit/reject evidence-bound suggestions, answer missing-info questions,
+and confirm a profile draft without letting LLM output overwrite the
+deterministic baseline automatically.

@@ -211,3 +211,14 @@ section-based parser -> profile review -> optional LLM enrichment -> user confir
 Each enrichment call receives one project, work, or education item. Pydantic
 schema validation and Python evidence checks keep suggestions grounded before
 they can be shown to the user.
+
+v3.5 keeps the backend workflow unchanged and upgrades the frontend review
+state:
+
+```text
+parser -> profile review -> enrichment suggestions -> UI accept/edit/reject -> confirmed profile
+```
+
+The Streamlit UI converts the parsed profile into editable cards, applies only
+user-approved suggestions to a frontend draft, and maps that draft back into the
+existing confirm API.

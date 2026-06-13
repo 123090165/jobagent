@@ -39,6 +39,16 @@ v2.2 adds a minimal Streamlit panel for the same flow:
 This UI is only a demo panel. It does not add persistence, tracker integration,
 provider internals changes, or new backend logic.
 
+v3.5 upgrades the profile review demo path to:
+
+```text
+parser -> profile review -> enrichment suggestions -> UI accept/edit/reject -> confirmed profile
+```
+
+Demo the profile cards first, then show LLM suggestions with source quotes.
+Accept, edit, and reject decisions update only the frontend draft until the user
+confirms the profile through the existing confirm API.
+
 适用对象：
 
 - 面试官
