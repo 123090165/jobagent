@@ -81,6 +81,7 @@ def test_confirm_profile_draft_returns_payload() -> None:
     assert payload["status"] == "confirmed"
     assert payload["confirmed_search_ready_profile"]["summary"]
     assert payload["source_profile_snapshot"]
+    assert payload["missing_info_answers"] == {}
     assert payload["save_payload_ready"] is True
 
 

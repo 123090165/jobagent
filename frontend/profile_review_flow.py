@@ -524,6 +524,8 @@ def _render_confirm_profile_draft_card() -> None:
 
 def _current_profile_draft() -> ProfileDraft | None:
     draft = st.session_state.get("profile_flow_profile_draft")
+    if draft is None:
+        draft = st.session_state.get("profile_draft")
     if isinstance(draft, ProfileDraft):
         return draft
     if isinstance(draft, dict):
@@ -533,6 +535,7 @@ def _current_profile_draft() -> ProfileDraft | None:
 
 def _replace_profile_draft(draft: ProfileDraft) -> None:
     st.session_state["profile_flow_profile_draft"] = draft
+    st.session_state["profile_draft"] = draft
 
 
 def _render_profile_overview(

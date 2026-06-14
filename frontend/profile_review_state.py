@@ -11,6 +11,7 @@ PROFILE_REVIEW_STATE_KEYS = {
     "target_roles",
     "baseline_review",
     "enrichment_result",
+    "profile_flow_profile_draft",
     "profile_draft",
     "accepted_suggestions",
     "rejected_suggestions",
@@ -59,6 +60,8 @@ def set_profile_draft_state(
     session_state: dict[str, Any],
     draft: ProfileDraft,
 ) -> None:
+    session_state["profile_flow_profile_draft"] = draft
+    # Backward-compatible alias for older tests or helper paths.
     session_state["profile_draft"] = draft
     session_state["profile_draft_confirmed_payload"] = None
 

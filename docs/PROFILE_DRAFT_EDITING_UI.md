@@ -39,6 +39,11 @@ This keeps system-generated structure separate from user-confirmed intent.
 - `created_at`
 - `updated_at`
 
+In Streamlit session state, the main draft key is
+`profile_flow_profile_draft`. A legacy `profile_draft` alias may still be
+written for backward compatibility, but the editable UI reads the flow-scoped
+key.
+
 ## Editing Flow
 
 The current UI flow is:
