@@ -484,12 +484,35 @@ def _replace_profile_draft(draft: ProfileDraft) -> None:
     st.session_state["profile_draft"] = draft
 
 
+def _render_safe_debug_json(label: str, payload: Any) -> None:
+    st.caption(label)
+    if payload is None:
+        st.caption("Not available yet.")
+        return
+    if isinstance(payload, ProfileDraft):
+        st.json(payload.model_dump(mode="json"))
+        return
+    if hasattr(payload, "model_dump"):
+        st.json(payload.model_dump(mode="json"))
+        return
+    if isinstance(payload, (dict, list, str, int, float, bool)):
+        st.json(payload)
+        return
+    st.code(str(payload))
+
+
 def _render_raw_debug() -> None:
     with st.expander("Advanced / Raw JSON Debug"):
-        st.json(st.session_state.get("profile_flow_baseline_review"))
+        _render_safe_debug_json(
+            "Baseline review",
+            st.session_state.get("profile_flow_baseline_review"),
+        )
         draft = _current_profile_draft()
-        st.json(draft.model_dump(mode="json") if draft else None)
-        st.json(st.session_state.get("profile_draft_confirmed_payload"))
+        _render_safe_debug_json("Profile draft", draft)
+        _render_safe_debug_json(
+            "Confirmed payload",
+            st.session_state.get("profile_draft_confirmed_payload"),
+        )
 
 
 def _render_reset_button() -> None:

@@ -14,6 +14,14 @@ from frontend.profile_review_state import (
 from tests.test_profile_draft_service import _create
 
 
+class _FakeExpander:
+    def __enter__(self) -> "_FakeExpander":
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> bool:
+        return False
+
+
 def test_profile_review_ui_state_tracks_draft_created() -> None:
     session_state: dict[str, object] = {}
     draft = _create("ai_agent_backend")
@@ -148,3 +156,63 @@ def test_save_profile_draft_moves_step_to_profile_saved(monkeypatch) -> None:
     assert fake_st.session_state["profile_flow_step"] == "profile_saved"
     assert "profile_draft_confirmed_payload" in fake_st.session_state
     assert any("saved" in message.lower() for message in messages)
+
+
+def test_render_safe_debug_json_handles_none_without_st_json(monkeypatch) -> None:
+    captions: list[str] = []
+    json_calls: list[object] = []
+    code_calls: list[str] = []
+    fake_st = SimpleNamespace(
+        caption=lambda message: captions.append(message),
+        json=lambda payload: json_calls.append(payload),
+        code=lambda payload: code_calls.append(payload),
+    )
+    monkeypatch.setattr(profile_review_flow, "st", fake_st)
+
+    profile_review_flow._render_safe_debug_json("Profile draft", None)
+
+    assert captions == ["Profile draft", "Not available yet."]
+    assert json_calls == []
+    assert code_calls == []
+
+
+def test_render_safe_debug_json_serializes_profile_draft(monkeypatch) -> None:
+    draft = _create("ai_agent_backend")
+    json_calls: list[object] = []
+    fake_st = SimpleNamespace(
+        caption=lambda message: None,
+        json=lambda payload: json_calls.append(payload),
+        code=lambda payload: None,
+    )
+    monkeypatch.setattr(profile_review_flow, "st", fake_st)
+
+    profile_review_flow._render_safe_debug_json("Profile draft", draft)
+
+    assert json_calls == [draft.model_dump(mode="json")]
+
+
+def test_render_raw_debug_handles_empty_payloads(monkeypatch) -> None:
+    json_calls: list[object] = []
+    code_calls: list[str] = []
+    captions: list[str] = []
+    fake_st = SimpleNamespace(
+        session_state={},
+        expander=lambda label: _FakeExpander(),
+        caption=lambda message: captions.append(message),
+        json=lambda payload: json_calls.append(payload),
+        code=lambda payload: code_calls.append(payload),
+    )
+    monkeypatch.setattr(profile_review_flow, "st", fake_st)
+
+    profile_review_flow._render_raw_debug()
+
+    assert captions == [
+        "Baseline review",
+        "Not available yet.",
+        "Profile draft",
+        "Not available yet.",
+        "Confirmed payload",
+        "Not available yet.",
+    ]
+    assert json_calls == []
+    assert code_calls == []
