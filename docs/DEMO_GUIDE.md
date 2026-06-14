@@ -84,6 +84,17 @@ the parsed profile is converted into a Slate-like candidate summary with target
 directions, core skills, auxiliary skills, search keywords, preferences, and
 quality warnings, without calling an external LLM or changing search logic.
 
+v3.9b adds an editable Profile Draft review step on top of that layer:
+
+```text
+resume text -> parser/profile review -> search-ready profile -> editable profile draft -> confirmed payload
+```
+
+Demo it by pasting the Anker AI Health sample resume, reviewing the generated
+summary and chips, editing `search_keywords` or `preferred_locations`, saving a
+missing-info answer if needed, and clicking confirm to inspect the confirmed
+profile payload. This phase does not run job search from the same UI step.
+
 适用对象：
 
 - 面试官

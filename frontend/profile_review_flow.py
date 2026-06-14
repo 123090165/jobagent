@@ -9,15 +9,19 @@ from urllib.request import Request, urlopen
 import streamlit as st
 
 from app.schemas.brief import JobBriefReport
+from app.schemas.profile_draft import ProfileDraft
+from app.schemas.resume import ResumeProfile
 from app.services.errors import JobAgentError
+from app.services.profile_draft_service import (
+    answer_missing_info_question,
+    confirm_profile_draft,
+    create_profile_draft,
+    update_profile_draft,
+)
 from frontend.profile_review_state import (
-    append_missing_info_answer,
-    apply_suggestion_to_profile_draft,
-    build_confirmed_profile_save_payload,
-    build_confirm_user_edits_from_profile_draft,
-    build_profile_draft_from_baseline,
-    dedupe_skills,
     dedupe_strings,
+    set_confirmed_profile_draft_payload,
+    set_profile_draft_state,
 )
 
 DEFAULT_API_BASE_URL = os.getenv("JOBAGENT_API_BASE_URL", "http://127.0.0.1:8000")
@@ -31,18 +35,8 @@ SCORING_QUALITY_LABELS = {
 }
 FLOW_KEYS = [
     "profile_flow_baseline_review",
-    "profile_flow_enrichment_result",
     "profile_flow_profile_draft",
-    "profile_flow_accepted_suggestions",
-    "profile_flow_rejected_suggestions",
-    "profile_flow_edited_suggestions",
-    "confirmed_profile_result",
-    "profile_search_plan",
-    "brief_result",
-    "saved_confirmed_profile_id",
-    "saved_confirmed_profile_detail",
-    "profile_flow_saved_profiles",
-    "profile_flow_missing_info_answers",
+    "profile_draft_confirmed_payload",
 ]
 
 
@@ -95,10 +89,9 @@ def request_job_brief_from_api(
 
 
 def render_profile_review_flow_tab(*, sample_resume: str) -> None:
-    st.subheader("Slate-like Profile Review Flow")
+    st.subheader("Profile Review")
     st.caption(
-        "Parse resume evidence, review editable profile cards, decide on LLM suggestions, "
-        "answer missing-info questions, then confirm the profile."
+        "确认后，这份画像将用于后续岗位搜索和匹配。"
     )
     _ensure_initial_state(sample_resume)
 
@@ -119,48 +112,12 @@ def render_profile_review_flow_tab(*, sample_resume: str) -> None:
 
     baseline_review = st.session_state.get("profile_flow_baseline_review")
     profile_draft = st.session_state.get("profile_flow_profile_draft")
-    enrichment_result = st.session_state.get("profile_flow_enrichment_result")
-    confirmed_profile_result = st.session_state.get("confirmed_profile_result")
 
     if baseline_review and profile_draft:
-        st.markdown("### 02 Parsed Profile Overview")
-        _render_profile_overview(baseline_review, profile_draft)
-
-        st.markdown("### 03 Skills Card")
-        _render_skills_card(profile_draft)
-
-        st.markdown("### 04 Projects Card")
-        _render_projects_card(profile_draft)
-
-        st.markdown("### 05 Work Experience Card")
-        _render_work_card(profile_draft)
-
-        st.markdown("### 06 Education Card")
-        _render_education_card(profile_draft)
-
-        st.markdown("### 07 Certificates / Highlights Card")
-        _render_certificates_highlights_card(profile_draft)
-
-        st.markdown("### 08 LLM Enrichment Suggestions")
-        if st.button(
-            "Run LLM Profile Enrichment",
-            key="profile_flow_run_enrichment",
-            use_container_width=True,
-        ):
-            _run_profile_enrichment(resume_text=resume_text, target_roles=target_roles)
-        _render_enrichment_suggestions(enrichment_result, profile_draft)
-
-        st.markdown("### 09 Missing Info Questions")
-        _render_missing_info_questions(baseline_review, enrichment_result, profile_draft)
-
-        st.markdown("### 10 Confirmed Profile Preview")
-        _render_confirm_profile(baseline_review, profile_draft)
+        st.markdown("### 02 Search-Ready Profile Draft")
+        _render_profile_draft_editor(baseline_review, profile_draft)
     else:
         st.info("Parse a resume to start profile review.")
-
-    confirmed_profile_result = st.session_state.get("confirmed_profile_result")
-    if confirmed_profile_result:
-        _render_search_and_brief_flow(resume_text, confirmed_profile_result)
 
     _render_raw_debug()
     _render_reset_button()
@@ -312,11 +269,6 @@ def _ensure_initial_state(sample_resume: str) -> None:
         "profile_flow_initial_target_roles",
         "AI Agent Engineer, Backend Engineer",
     )
-    st.session_state.setdefault("profile_flow_search_query", "")
-    st.session_state.setdefault("profile_flow_accepted_suggestions", {})
-    st.session_state.setdefault("profile_flow_rejected_suggestions", {})
-    st.session_state.setdefault("profile_flow_edited_suggestions", {})
-    st.session_state.setdefault("profile_flow_missing_info_answers", {})
     st.session_state.setdefault("profile_flow_sync_token", 0)
 
 
@@ -330,30 +282,18 @@ def _parse_resume_profile(*, resume_text: str, target_roles: list[str]) -> None:
         st.error(str(exc))
         return
 
-    st.session_state["profile_flow_baseline_review"] = baseline_review
-    st.session_state["profile_flow_profile_draft"] = build_profile_draft_from_baseline(
-        baseline_review,
-        target_roles=target_roles,
+    parsed_profile = ResumeProfile.model_validate(
+        dict(baseline_review.get("parsed_profile") or {})
     )
-    for key in [
-        "profile_flow_enrichment_result",
-        "profile_flow_accepted_suggestions",
-        "profile_flow_rejected_suggestions",
-        "profile_flow_edited_suggestions",
-        "confirmed_profile_result",
-        "profile_search_plan",
-        "brief_result",
-        "saved_confirmed_profile_id",
-        "saved_confirmed_profile_detail",
-        "profile_flow_saved_profiles",
-        "profile_flow_missing_info_answers",
-    ]:
-        st.session_state[key] = (
-            {}
-            if key.endswith("suggestions") or key == "profile_flow_missing_info_answers"
-            else None
-        )
-    st.success("Resume profile parsed.")
+    draft = create_profile_draft(
+        parsed_profile,
+        target_roles,
+        quality_warnings=baseline_review.get("quality_warnings") or [],
+        missing_info_questions=baseline_review.get("missing_info_questions") or [],
+    )
+    st.session_state["profile_flow_baseline_review"] = baseline_review
+    set_profile_draft_state(st.session_state, draft)
+    st.success("Search-ready profile draft created.")
 
 
 def _run_profile_enrichment(*, resume_text: str, target_roles: list[str]) -> None:
@@ -368,6 +308,231 @@ def _run_profile_enrichment(*, resume_text: str, target_roles: list[str]) -> Non
         return
     st.session_state["profile_flow_enrichment_result"] = enrichment_result
     st.success("Profile enrichment completed.")
+
+
+def _render_profile_draft_editor(
+    baseline_review: dict[str, Any],
+    draft: ProfileDraft,
+) -> None:
+    _render_search_ready_overview(baseline_review, draft)
+    _render_summary_card(draft)
+    _render_chip_list_card(
+        title="Target Directions",
+        field="target_directions",
+        help_text="Add or remove draft role directions for later job search.",
+    )
+    _render_chip_list_card(
+        title="Core Skills",
+        field="core_skills",
+        help_text="These are the main profile signals the system will keep in focus.",
+    )
+    _render_chip_list_card(
+        title="Auxiliary Skills",
+        field="auxiliary_skills",
+        help_text="Secondary skills stay editable and deduplicated.",
+    )
+    _render_chip_list_card(
+        title="Search Keywords",
+        field="search_keywords",
+        help_text="这些关键词会影响后续岗位搜索。",
+    )
+    _render_preferences_card()
+    _render_profile_notes_card()
+    _render_missing_info_card()
+    _render_quality_warnings_card()
+    _render_raw_evidence_card()
+    _render_confirm_profile_draft_card()
+
+
+def _render_search_ready_overview(
+    baseline_review: dict[str, Any],
+    draft: ProfileDraft,
+) -> None:
+    profile = draft.search_ready_profile
+    cols = st.columns(4)
+    cols[0].metric("Target Directions", len(profile.target_directions))
+    cols[1].metric("Core Skills", len(profile.core_skills))
+    cols[2].metric("Keywords", len(profile.search_keywords))
+    cols[3].metric("Missing Answers", len(draft.user_answers))
+    if baseline_review.get("confidence_label"):
+        st.caption(f"Confidence: {baseline_review['confidence_label']}")
+    for warning in baseline_review.get("quality_warnings") or []:
+        st.warning(str(warning))
+
+
+def _render_summary_card(draft: ProfileDraft) -> None:
+    st.markdown("#### Summary")
+    summary = st.text_area(
+        "summary",
+        value=draft.search_ready_profile.summary,
+        key="profile_flow_search_ready_summary",
+        height=120,
+    )
+    if summary != draft.search_ready_profile.summary:
+        _replace_profile_draft(update_profile_draft(draft, {"summary": summary}))
+
+
+def _render_chip_list_card(*, title: str, field: str, help_text: str) -> None:
+    draft = _current_profile_draft()
+    if draft is None:
+        return
+
+    st.markdown(f"#### {title}")
+    st.caption(help_text)
+    items = list(getattr(draft.search_ready_profile, field))
+    if not items:
+        st.caption("No items yet.")
+    for index, item in enumerate(items):
+        label_col, action_col = st.columns([8, 1])
+        label_col.markdown(f"`{item}`")
+        if action_col.button("x", key=f"profile_flow_remove_{field}_{index}"):
+            updated_items = [existing for existing in items if existing != item]
+            _replace_profile_draft(update_profile_draft(draft, {field: updated_items}))
+            st.rerun()
+
+    add_key = f"profile_flow_add_{field}"
+    new_value = st.text_input(
+        f"Add {field}",
+        key=add_key,
+        placeholder="Type a value and click Add",
+        label_visibility="collapsed",
+    )
+    if st.button(f"Add to {title}", key=f"profile_flow_add_button_{field}"):
+        _replace_profile_draft(update_profile_draft(draft, {field: [*items, new_value]}))
+        st.session_state[add_key] = ""
+        st.rerun()
+
+
+def _render_preferences_card() -> None:
+    st.markdown("#### Preferences")
+    _render_chip_list_card(
+        title="Preferred Locations",
+        field="preferred_locations",
+        help_text="Keep only explicit location preferences.",
+    )
+    _render_chip_list_card(
+        title="Work Arrangements",
+        field="work_arrangements",
+        help_text="Internship, full-time, remote, onsite, or hybrid.",
+    )
+    _render_chip_list_card(
+        title="Company Preferences",
+        field="company_preferences",
+        help_text="Optional company or company-type preferences.",
+    )
+
+
+def _render_profile_notes_card() -> None:
+    draft = _current_profile_draft()
+    if draft is None:
+        return
+
+    st.markdown("#### Profile Notes")
+    notes_text = st.text_area(
+        "profile_notes",
+        value="\n".join(draft.search_ready_profile.profile_notes),
+        key="profile_flow_profile_notes_editor",
+        height=140,
+        help="One note per line.",
+    )
+    updated_notes = _split_lines(notes_text)
+    if updated_notes != draft.search_ready_profile.profile_notes:
+        _replace_profile_draft(update_profile_draft(draft, {"profile_notes": updated_notes}))
+
+
+def _render_missing_info_card() -> None:
+    draft = _current_profile_draft()
+    if draft is None:
+        return
+
+    st.markdown("#### Missing Info Questions")
+    questions = draft.search_ready_profile.missing_info_questions
+    if not questions:
+        st.success("No missing-info questions right now.")
+        return
+
+    for index, question in enumerate(questions):
+        st.write(question)
+        answer_key = f"profile_flow_missing_info_answer_{index}"
+        st.text_area(
+            "Your answer",
+            value=draft.user_answers.get(question, ""),
+            key=answer_key,
+            height=80,
+        )
+        if st.button("Save Answer", key=f"profile_flow_missing_info_save_{index}"):
+            updated = answer_missing_info_question(
+                draft,
+                question,
+                st.session_state.get(answer_key, ""),
+            )
+            _replace_profile_draft(updated)
+            st.success("Answer saved to draft.")
+            st.rerun()
+
+
+def _render_quality_warnings_card() -> None:
+    draft = _current_profile_draft()
+    if draft is None:
+        return
+
+    st.markdown("#### Quality Warnings")
+    warnings = draft.search_ready_profile.quality_warnings
+    if not warnings:
+        st.caption("No quality warnings.")
+        return
+    for warning in warnings:
+        st.warning(warning)
+
+
+def _render_raw_evidence_card() -> None:
+    draft = _current_profile_draft()
+    if draft is None:
+        return
+
+    with st.expander("Raw Evidence / Parsed Details"):
+        snapshot = draft.source_profile_snapshot or draft.search_ready_profile.source_profile_snapshot or {}
+        st.json(
+            {
+                "skills": snapshot.get("skills") or [],
+                "projects": snapshot.get("projects") or [],
+                "work_experiences": snapshot.get("work_experiences") or [],
+                "education": snapshot.get("education") or [],
+                "highlights": snapshot.get("highlights") or [],
+            }
+        )
+
+
+def _render_confirm_profile_draft_card() -> None:
+    draft = _current_profile_draft()
+    if draft is None:
+        return
+
+    st.markdown("#### Confirm Draft")
+    if st.button("Confirm Profile Draft", key="profile_flow_confirm_draft", use_container_width=True):
+        payload = confirm_profile_draft(draft)
+        _replace_profile_draft(draft.model_copy(update={"status": "confirmed"}))
+        set_confirmed_profile_draft_payload(st.session_state, payload)
+        st.success("Confirmed profile payload is ready.")
+        st.rerun()
+
+    payload = st.session_state.get("profile_draft_confirmed_payload")
+    if payload:
+        st.success("Confirmed profile payload ready for persistence reuse.")
+        st.json(payload)
+
+
+def _current_profile_draft() -> ProfileDraft | None:
+    draft = st.session_state.get("profile_flow_profile_draft")
+    if isinstance(draft, ProfileDraft):
+        return draft
+    if isinstance(draft, dict):
+        return ProfileDraft.model_validate(draft)
+    return None
+
+
+def _replace_profile_draft(draft: ProfileDraft) -> None:
+    st.session_state["profile_flow_profile_draft"] = draft
 
 
 def _render_profile_overview(
@@ -881,9 +1046,9 @@ def _render_search_and_brief_flow(
 def _render_raw_debug() -> None:
     with st.expander("Advanced / Raw JSON Debug"):
         st.json(st.session_state.get("profile_flow_baseline_review"))
-        st.json(st.session_state.get("profile_flow_enrichment_result"))
-        st.json(st.session_state.get("profile_flow_profile_draft"))
-        st.json(st.session_state.get("confirmed_profile_result"))
+        draft = _current_profile_draft()
+        st.json(draft.model_dump(mode="json") if draft else None)
+        st.json(st.session_state.get("profile_draft_confirmed_payload"))
 
 
 def _render_reset_button() -> None:

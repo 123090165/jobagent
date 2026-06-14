@@ -3,6 +3,7 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any
 
+from app.schemas.profile_draft import ProfileDraft
 from app.schemas.profile_review import ResumeProfileUserEdits
 
 PROFILE_REVIEW_STATE_KEYS = {
@@ -17,6 +18,7 @@ PROFILE_REVIEW_STATE_KEYS = {
     "confirmed_profile_result",
     "missing_info_answers",
     "saved_confirmed_profile_id",
+    "profile_draft_confirmed_payload",
 }
 
 LIST_FIELD_ALIASES = {
@@ -51,6 +53,21 @@ def build_profile_draft_from_baseline(
         "constraints": [],
         "notes": "",
     }
+
+
+def set_profile_draft_state(
+    session_state: dict[str, Any],
+    draft: ProfileDraft,
+) -> None:
+    session_state["profile_draft"] = draft
+    session_state["profile_draft_confirmed_payload"] = None
+
+
+def set_confirmed_profile_draft_payload(
+    session_state: dict[str, Any],
+    payload: dict[str, Any],
+) -> None:
+    session_state["profile_draft_confirmed_payload"] = payload
 
 
 def dedupe_skills(skills: list[str]) -> list[str]:

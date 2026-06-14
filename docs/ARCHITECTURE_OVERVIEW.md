@@ -76,6 +76,13 @@ skills, search keywords, preferences, quality warnings, and missing-info
 questions. It does not change frontend UI, persistence schema, provider logic,
 or downstream job-search agents.
 
+v3.9b adds `ProfileDraft` as the editable review wrapper around
+`SearchReadyProfile`. The Streamlit profile review page now lets the user edit
+summary, target directions, skills, search keywords, preferences, and
+missing-info answers before confirming a payload for later persistence and job
+search. This phase does not change downstream job-search agents or database
+schema.
+
 ## 1. Project Goal
 
 JobAgent 不是一个单纯的聊天机器人，也不是一个通用爬虫项目。它更像一个面向求职准备场景的本地工作台，用来把“找岗位、判断匹配度、改简历、准备面试、记录投递进展”串成一个可复盘的流程。
