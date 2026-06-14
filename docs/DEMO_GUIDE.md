@@ -110,6 +110,21 @@ want cloud-provider metadata in the draft context. The parser and
 SearchReadyProfile builder remain deterministic-first, and mock remains internal
 fallback only.
 
+v3.9d productizes the entry into that same flow:
+
+```text
+upload txt/md resume or paste resume text
+-> Step 1 Add Resume
+-> Step 2 Parsed Resume Review
+-> Step 3 Search-Ready Profile Draft
+-> Step 4 Profile Saved
+```
+
+Use Profile Setup as the main starting point in demos. Uploaded files only
+extract text into the same `resume_text` field and still go through Profile
+Review and editable ProfileDraft confirmation. PDF, DOCX, OCR, and real JD
+search remain out of scope for this round.
+
 适用对象：
 
 - 面试官

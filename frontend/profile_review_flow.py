@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 from typing import Any
@@ -13,6 +14,12 @@ from app.schemas.profile_draft import ProfileDraft
 from app.schemas.resume import ResumeProfile
 from app.services.errors import JobAgentError
 from app.services.llm_provider import DEFAULT_LLM_PROVIDER, resolve_llm_provider
+from app.services.resume_file_service import (
+    ResumeFileParseError,
+    extract_text_from_resume_file,
+    get_resume_file_type,
+    normalize_resume_filename,
+)
 from app.services.profile_draft_service import (
     answer_missing_info_question,
     confirm_profile_draft,
@@ -38,6 +45,12 @@ FLOW_KEYS = [
     "profile_flow_step",
     "profile_flow_selected_provider",
     "profile_flow_selected_provider_metadata",
+    "profile_flow_uploaded_filename",
+    "profile_flow_uploaded_file_type",
+    "profile_flow_uploaded_text_length",
+    "profile_flow_resume_input_source",
+    "profile_flow_upload_error",
+    "profile_flow_upload_fingerprint",
 ]
 
 
@@ -94,11 +107,8 @@ def render_profile_review_flow_tab(
     sample_resume: str,
     selected_provider: str = DEFAULT_LLM_PROVIDER,
 ) -> None:
-    st.subheader("Profile Setup")
-    st.caption(
-        "First build the candidate profile. JD search and downstream analysis come later."
-    )
     _ensure_initial_state(sample_resume)
+    _render_profile_setup_intro()
 
     provider_resolution = resolve_llm_provider(selected_provider)
     set_selected_provider(
@@ -172,9 +182,35 @@ def _ensure_initial_state(sample_resume: str) -> None:
         "profile_flow_initial_target_roles",
         "AI Agent Engineer, Backend Engineer",
     )
+    st.session_state.setdefault("profile_flow_uploaded_filename", None)
+    st.session_state.setdefault("profile_flow_uploaded_file_type", None)
+    st.session_state.setdefault("profile_flow_uploaded_text_length", 0)
+    st.session_state.setdefault(
+        "profile_flow_resume_input_source",
+        "paste" if sample_resume.strip() else "empty",
+    )
+    st.session_state.setdefault("profile_flow_upload_error", None)
+    st.session_state.setdefault("profile_flow_upload_fingerprint", None)
     st.session_state.setdefault("profile_flow_step", "resume_input")
     st.session_state.setdefault("profile_flow_selected_provider", DEFAULT_LLM_PROVIDER)
     st.session_state.setdefault("profile_flow_selected_provider_metadata", {})
+
+
+def _render_profile_setup_intro() -> None:
+    st.subheader("JobAgent Profile Setup")
+    st.caption(
+        "Upload or paste your resume first. JobAgent will parse your background, build a searchable profile, and only then continue to JD search and job analysis."
+    )
+    phases = [
+        ("01 Resume", True),
+        ("02 Profile", True),
+        ("03 Search", False),
+        ("04 Brief", False),
+    ]
+    with st.container(border=True):
+        cols = st.columns(len(phases))
+        for col, (label, active) in zip(cols, phases):
+            col.markdown(f"**{label}**" if active else label)
 
 
 def _render_provider_status(provider_resolution: Any) -> None:
@@ -193,23 +229,102 @@ def _render_provider_status(provider_resolution: Any) -> None:
 
 
 def _render_resume_input_step() -> None:
-    st.markdown("### Step 1: Resume Input")
-    resume_text = st.text_area("resume_text", key="profile_flow_resume_text", height=220)
-    target_roles_text = st.text_input(
-        "target_roles",
-        key="profile_flow_initial_target_roles",
-        placeholder="AI Agent Engineer, Backend Engineer",
+    st.markdown("### Step 1: Add Resume")
+    st.caption(
+        "Start by uploading a txt/md resume or pasting the full resume text below."
     )
+    _render_resume_upload_entry()
+    existing_text = str(st.session_state.get("profile_flow_resume_text") or "")
+    resume_text = st.text_area(
+        "Paste resume text",
+        key="profile_flow_resume_text",
+        height=220,
+    )
+    _update_resume_input_source(existing_text, resume_text)
+    target_roles_text = st.text_input(
+        "Target roles",
+        key="profile_flow_initial_target_roles",
+        placeholder="Optional target roles, e.g. AI Agent Engineer, Backend Engineer",
+    )
+    st.caption("Target roles are optional for the first profile setup pass.")
     target_roles = _split_comma_list(target_roles_text)
     provider = get_selected_provider(st.session_state)
     st.caption(f"Selected provider: {provider}")
 
-    if st.button("Parse Resume", key="profile_flow_parse", use_container_width=True):
+    if st.button("Start Profile Setup", key="profile_flow_parse", use_container_width=True):
         _parse_resume_profile(
             resume_text=resume_text,
             target_roles=target_roles,
             llm_provider=provider,
         )
+
+
+def build_resume_upload_state(filename: str, content: bytes) -> dict[str, Any]:
+    normalized_filename = normalize_resume_filename(filename)
+    extracted_text = extract_text_from_resume_file(normalized_filename, content)
+    file_type = get_resume_file_type(normalized_filename)
+    return {
+        "profile_flow_resume_text": extracted_text,
+        "profile_flow_uploaded_filename": normalized_filename,
+        "profile_flow_uploaded_file_type": file_type,
+        "profile_flow_uploaded_text_length": len(extracted_text),
+        "profile_flow_resume_input_source": "upload",
+        "profile_flow_upload_error": None,
+        "profile_flow_upload_fingerprint": f"{normalized_filename}:{hashlib.sha256(content).hexdigest()}",
+    }
+
+
+def _render_resume_upload_entry() -> None:
+    uploaded_file = st.file_uploader(
+        "Upload resume file",
+        type=["txt", "md"],
+        key="profile_flow_resume_upload",
+    )
+    if uploaded_file is not None:
+        file_bytes = uploaded_file.getvalue()
+        fingerprint = f"{uploaded_file.name}:{hashlib.sha256(file_bytes).hexdigest()}"
+        if st.session_state.get("profile_flow_upload_fingerprint") != fingerprint:
+            _apply_resume_upload(uploaded_file.name, file_bytes)
+
+    with st.container(border=True):
+        st.markdown("#### Resume source")
+        source = st.session_state.get("profile_flow_resume_input_source") or "empty"
+        if source in {"upload", "upload_edited"}:
+            st.write(f"File: `{st.session_state.get('profile_flow_uploaded_filename') or 'N/A'}`")
+            st.write(f"Type: `{st.session_state.get('profile_flow_uploaded_file_type') or 'N/A'}`")
+            st.write(f"Text length: `{st.session_state.get('profile_flow_uploaded_text_length') or 0}`")
+            st.write(f"Status: `{source}`")
+        else:
+            st.write(f"Status: `{source}`")
+        upload_error = st.session_state.get("profile_flow_upload_error")
+        if upload_error:
+            st.error(str(upload_error))
+
+
+def _apply_resume_upload(filename: str, content: bytes) -> None:
+    try:
+        upload_state = build_resume_upload_state(filename, content)
+    except ResumeFileParseError as exc:
+        st.session_state["profile_flow_upload_error"] = str(exc)
+        st.session_state["profile_flow_upload_fingerprint"] = None
+        return
+
+    st.session_state.update(upload_state)
+    st.success(f"Resume loaded from file: {upload_state['profile_flow_uploaded_filename']}")
+
+
+def _update_resume_input_source(previous_text: str, current_text: str) -> None:
+    if current_text == previous_text:
+        return
+    normalized = current_text.strip()
+    if not normalized:
+        st.session_state["profile_flow_resume_input_source"] = "empty"
+        return
+    current_source = str(st.session_state.get("profile_flow_resume_input_source") or "empty")
+    if current_source in {"upload", "upload_edited"}:
+        st.session_state["profile_flow_resume_input_source"] = "upload_edited"
+        return
+    st.session_state["profile_flow_resume_input_source"] = "paste"
 
 
 def _parse_resume_profile(
@@ -218,9 +333,14 @@ def _parse_resume_profile(
     target_roles: list[str],
     llm_provider: str,
 ) -> None:
+    normalized_resume_text = resume_text.strip()
+    if not normalized_resume_text:
+        st.session_state["profile_flow_resume_input_source"] = "empty"
+        st.warning("Add resume text before starting profile setup.")
+        return
     try:
         baseline_review = request_resume_profile_review_from_api(
-            resume_text=resume_text,
+            resume_text=normalized_resume_text,
             target_roles=target_roles,
             llm_provider=llm_provider,
         )
@@ -235,7 +355,10 @@ def _parse_resume_profile(
 
 
 def _render_parsed_review_step(baseline_review: dict[str, Any]) -> None:
-    st.markdown("### Step 2: Parsed Resume Review")
+    st.markdown("### Step 2: Review Parsed Resume")
+    st.caption(
+        "Confirm that JobAgent understood the core facts of your resume before generating the searchable profile."
+    )
     parsed_profile = dict(baseline_review.get("parsed_profile") or {})
     st.write(f"Skills: {', '.join(parsed_profile.get('skills') or []) or '-'}")
     st.write(f"Projects: {len(parsed_profile.get('projects') or [])}")
@@ -306,7 +429,10 @@ def _render_profile_draft_step(
 def _render_profile_saved_step(payload: dict[str, Any]) -> None:
     st.markdown("### Step 4: Profile Saved")
     confirmed = payload.get("confirmed_search_ready_profile") or {}
-    st.success("Confirmed profile payload is ready.")
+    st.success("Your search-ready profile has been saved.")
+    st.caption(
+        "You can return to the start or continue to the later JD search and job analysis stage."
+    )
     st.write(f"Summary: {confirmed.get('summary') or '-'}")
     st.write(
         "Target Directions: "

@@ -24,7 +24,7 @@ build candidate profile first
 ## Flow
 
 ```text
-Step 1: Resume Input
+Step 1: Add Resume
 Step 2: Parsed Resume Review
 Step 3: Search-Ready Profile Draft
 Step 4: Profile Saved
@@ -32,6 +32,11 @@ Step 4: Profile Saved
 
 This keeps the user focused on establishing a clean, confirmed candidate
 profile before moving to downstream workflows.
+
+Step 1 is now the product entry point. The user can upload a `.txt` or `.md`
+resume file or paste full resume text directly. Uploaded files are converted
+into `resume_text` only; they do not bypass Profile Review or jump ahead in the
+flow. PDF, DOCX, and OCR support remain out of scope for this phase.
 
 ## Model Selection
 
