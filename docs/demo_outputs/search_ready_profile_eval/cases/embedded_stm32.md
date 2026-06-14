@@ -1,0 +1,16 @@
+# embedded_stm32
+
+- target_roles: Embedded Software Engineer
+- summary: Search-ready profile aligned to Embedded Software Engineer, with core evidence around STM32 development, embedded C, UART / USART, GPIO. Some search fields still need confirmation before broad job targeting.
+- target_directions: Embedded Software Engineer
+- core_skills: STM32 development, embedded C, UART / USART, GPIO, DMA, ADC, PWM
+- auxiliary_skills: C, C++, Keil, CubeMX, Git
+- search_keywords: Embedded Software Engineer, STM32 development, embedded C, UART / USART, GPIO, DMA, ADC, PWM, C, C++, Keil, CubeMX, Git, STM32, UART, USART
+- preferred_locations: -
+- work_arrangements: -
+- company_preferences: -
+- profile_notes: Project-heavy profile with limited formal work experience evidence., Open quality follow-up: resume profile has no work experience evidence.
+- quality_warnings: resume profile has no work experience evidence
+- missing_info_questions: Do you have internship, lab, research, or course project experience that should be treated as work-like evidence?
+- coverage_notes: search-ready profile coverage is strong
+- quality_verdict: strong

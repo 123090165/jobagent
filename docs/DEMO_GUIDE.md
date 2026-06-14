@@ -73,6 +73,17 @@ after filling a local `.env`. DeepSeek uses OpenAI-compatible chat completions
 with `deepseek-v4-flash` as the default model, and no real API key should ever
 be committed.
 
+v3.9a adds a deterministic SearchReadyProfile layer after profile review:
+
+```text
+resume text -> parser/profile review -> search-ready profile -> later search / analysis
+```
+
+Use `docs/demo_outputs/search_ready_profile_eval/` when you want to show how
+the parsed profile is converted into a Slate-like candidate summary with target
+directions, core skills, auxiliary skills, search keywords, preferences, and
+quality warnings, without calling an external LLM or changing search logic.
+
 适用对象：
 
 - 面试官

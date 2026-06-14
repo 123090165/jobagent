@@ -1,0 +1,35 @@
+{
+  "case_id": "weak_resume",
+  "target_roles": [],
+  "summary": "Profile information is limited and still needs target-direction confirmation. Current evidence mainly points to a small Python-related starting point.",
+  "target_directions": [],
+  "core_skills": [],
+  "auxiliary_skills": [],
+  "search_keywords": [
+    "Python"
+  ],
+  "preferred_locations": [],
+  "work_arrangements": [],
+  "company_preferences": [],
+  "profile_notes": [
+    "Project-heavy profile with limited formal work experience evidence.",
+    "Target directions still need explicit user confirmation.",
+    "Open quality follow-up: resume profile has no project evidence."
+  ],
+  "quality_warnings": [
+    "resume profile has no project evidence",
+    "resume profile has no work experience evidence",
+    "target role is not explicit",
+    "resume profile has no highlights or measurable outcomes"
+  ],
+  "missing_info_questions": [
+    "What target roles should this profile prioritize, such as AI Agent Engineer, Backend Engineer, or Embedded Software Engineer?",
+    "Which project best demonstrates your target role fit? Please add project goal, technologies, your responsibilities, and outcomes.",
+    "Do you have internship, lab, research, or course project experience that should be treated as work-like evidence?",
+    "Can you add measurable outcomes, such as number of APIs, tests passed, latency, users, dataset size, or accuracy?"
+  ],
+  "coverage_notes": [
+    "missing info questions preserved for weak profile"
+  ],
+  "quality_verdict": "acceptable"
+}

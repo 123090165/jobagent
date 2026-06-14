@@ -1,0 +1,16 @@
+# realistic_business_resume_unstructured
+
+- target_roles: Business Analyst, Investment Analyst, FA Intern
+- summary: Search-ready profile aligned to Business Analyst, Investment Analyst, FA Intern, with core evidence around FA project support, CRM tracking. Preferred locations include Shenzhen, Hong Kong, Hangzhou.
+- target_directions: Business Analyst, Investment Analyst, FA Intern
+- core_skills: FA project support, CRM tracking
+- auxiliary_skills: Wind, Excel, PowerPoint, CRM
+- search_keywords: Business Analyst, Investment Analyst, FA Intern, FA project support, CRM tracking, Wind, Excel, PowerPoint, CRM, industry research, market research, competitor analysis, 浼佹煡鏌?, meeting notes, FA, 企查查
+- preferred_locations: Shenzhen, Hong Kong, Hangzhou
+- work_arrangements: internship
+- company_preferences: -
+- profile_notes: Location preference: Shenzhen, Hong Kong, Hangzhou., Profile is oriented toward research-heavy business, investment, and FA support search.
+- quality_warnings: -
+- missing_info_questions: -
+- coverage_notes: search-ready profile coverage is strong
+- quality_verdict: strong

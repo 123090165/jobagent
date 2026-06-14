@@ -81,11 +81,16 @@ If `DEEPSEEK_API_KEY` is empty, the real DeepSeek path is skipped by falling bac
 Main synthetic outputs live under:
 
 - `docs/demo_outputs/profile_review_quality_eval/`
+- `docs/demo_outputs/search_ready_profile_eval/`
 
 Optional real-provider runs can be written to:
 
 - `docs/demo_outputs/profile_review_ollama_eval/`
 - `docs/demo_outputs/profile_review_deepseek_eval/`
+
+The search-ready profile artifacts are deterministic only. They evaluate the
+derived candidate profile layer after parsing/profile review and do not call an
+external LLM.
 
 ## Review Order
 
