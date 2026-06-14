@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -19,6 +20,28 @@ from app.services.profile_review_quality_evaluation import (
 )
 
 DEFAULT_OUTPUT_DIR = Path("docs/demo_outputs/profile_review_quality_eval")
+
+
+def load_env_file(env_file: Path) -> list[str]:
+    if not env_file.exists():
+        raise FileNotFoundError(f"Environment file not found: {env_file}")
+    if not env_file.is_file():
+        raise FileNotFoundError(f"Environment file not found: {env_file}")
+
+    loaded_keys: list[str] = []
+    for raw_line in env_file.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        normalized_key = key.strip()
+        if not normalized_key:
+            continue
+        os.environ[normalized_key] = _strip_env_value(value.strip())
+        loaded_keys.append(normalized_key)
+    return loaded_keys
 
 
 def run(
@@ -71,6 +94,11 @@ def main() -> None:
         default=DEFAULT_OUTPUT_DIR,
     )
     parser.add_argument(
+        "--env-file",
+        type=Path,
+        help="Optional local env file to load before resolving provider settings.",
+    )
+    parser.add_argument(
         "--llm-provider",
         choices=["mock", "ollama", "deepseek"],
         default="mock",
@@ -82,6 +110,11 @@ def main() -> None:
     )
     args = parser.parse_args()
 
+    env_file_loaded = False
+    if args.env_file:
+        load_env_file(args.env_file)
+        env_file_loaded = True
+
     outputs = run(
         mode=args.mode,
         output_dir=args.output_dir,
@@ -92,6 +125,7 @@ def main() -> None:
         "mode": args.mode,
         "llm_provider": args.llm_provider,
         "real_llm": args.real_llm,
+        "env_file_loaded": env_file_loaded,
         "deterministic_cases": (
             outputs.deterministic.total_cases if outputs.deterministic else 0
         ),
@@ -99,6 +133,12 @@ def main() -> None:
         "comparison_count": len(outputs.comparisons),
     }
     print(json.dumps(summary, ensure_ascii=False))
+
+
+def _strip_env_value(value: str) -> str:
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in {'"', "'"}:
+        return value[1:-1]
+    return value
 
 
 if __name__ == "__main__":

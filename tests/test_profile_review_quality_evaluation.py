@@ -1,6 +1,11 @@
 from __future__ import annotations
 
-from scripts.run_profile_review_quality_evaluation import run
+import json
+import os
+
+import pytest
+
+from scripts.run_profile_review_quality_evaluation import load_env_file, main, run
 from app.services.profile_review_quality_evaluation import (
     compare_profile_review_quality_suites,
     run_profile_review_quality_suite,
@@ -85,3 +90,62 @@ def test_deterministic_quality_suite_has_no_failed_cases() -> None:
         "strong",
         "acceptable",
     }
+
+
+def test_env_file_loads_plain_environment_variables(tmp_path, monkeypatch) -> None:
+    env_file = tmp_path / ".env.deepseek.local"
+    env_file.write_text(
+        "DEEPSEEK_API_KEY=test-secret\nDEEPSEEK_MODEL=deepseek-v4-flash\n",
+        encoding="utf-8",
+    )
+    monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
+    monkeypatch.delenv("DEEPSEEK_MODEL", raising=False)
+
+    loaded_keys = load_env_file(env_file)
+
+    assert loaded_keys == ["DEEPSEEK_API_KEY", "DEEPSEEK_MODEL"]
+    assert "test-secret" == os.environ["DEEPSEEK_API_KEY"]
+    assert "deepseek-v4-flash" == os.environ["DEEPSEEK_MODEL"]
+
+
+def test_missing_env_file_raises_clear_error(tmp_path) -> None:
+    missing = tmp_path / ".env.missing.local"
+
+    with pytest.raises(FileNotFoundError) as exc_info:
+        load_env_file(missing)
+    assert str(missing) in str(exc_info.value)
+
+
+def test_env_file_secret_does_not_appear_in_logs(
+    tmp_path,
+    monkeypatch,
+    capsys,
+) -> None:
+    env_file = tmp_path / ".env.deepseek.local"
+    env_file.write_text(
+        "DEEPSEEK_API_KEY=super-secret-value\nDEEPSEEK_MODEL=deepseek-v4-flash\n",
+        encoding="utf-8",
+    )
+    output_dir = tmp_path / "outputs"
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "run_profile_review_quality_evaluation.py",
+            "--mode",
+            "deterministic",
+            "--llm-provider",
+            "deepseek",
+            "--env-file",
+            str(env_file),
+            "--output-dir",
+            str(output_dir),
+        ],
+    )
+
+    main()
+
+    captured = capsys.readouterr()
+    summary = json.loads(captured.out)
+    assert summary["env_file_loaded"] is True
+    assert "super-secret-value" not in captured.out
+    assert "super-secret-value" not in captured.err
