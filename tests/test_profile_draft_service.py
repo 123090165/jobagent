@@ -30,9 +30,27 @@ def test_create_profile_draft_builds_search_ready_profile() -> None:
     draft = _create("anker_ai_health_algorithm")
 
     assert draft.status == "draft"
+    assert draft.llm_provider == "ollama"
     assert draft.search_ready_profile.target_directions
     assert "PPG" in draft.search_ready_profile.search_keywords
     assert draft.source_profile_snapshot
+
+
+def test_create_profile_draft_accepts_deepseek_provider() -> None:
+    case = _case("ai_agent_backend")
+    review = build_resume_profile_review(case.resume_text, target_roles=case.target_roles)
+
+    draft = create_profile_draft(
+        review.parsed_profile,
+        case.target_roles,
+        quality_warnings=review.quality_warnings,
+        missing_info_questions=review.missing_info_questions,
+        llm_provider="deepseek",
+    )
+
+    assert draft.llm_provider == "deepseek"
+    assert draft.llm_configured is False
+    assert draft.llm_provider_reason
 
 
 def test_update_profile_draft_updates_summary() -> None:
@@ -82,6 +100,7 @@ def test_confirm_profile_draft_returns_payload() -> None:
     assert payload["confirmed_search_ready_profile"]["summary"]
     assert payload["source_profile_snapshot"]
     assert payload["missing_info_answers"] == {}
+    assert payload["llm_provider_metadata"]["provider"] == "ollama"
     assert payload["save_payload_ready"] is True
 
 

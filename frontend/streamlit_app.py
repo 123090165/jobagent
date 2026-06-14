@@ -15,7 +15,7 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 from app.services.jd_url_service import JDUrlImportError, import_jd_from_url
-from app.services.llm_service import is_llm_configured
+from app.services.llm_provider import DEFAULT_LLM_PROVIDER, resolve_llm_provider
 from app.services.batch_brief_service import build_brief_from_search
 from app.services.application_service import list_applications, save_application
 from app.services.errors import JobAgentError
@@ -71,27 +71,31 @@ def main() -> None:
     st.set_page_config(page_title="JobAgent", page_icon="JA", layout="wide")
 
     st.title("JobAgent")
-    st.caption("Resume-JD matching, optimization, interview prep, and job history")
+    st.caption("Profile creation first, then JD search and later matching.")
 
     with st.sidebar:
         st.subheader("当前阶段")
-        st.write("当前支持分析报告、历史记录和本地岗位库。")
-        st.write("暂不做 URL 抓取、自动投递、登录、验证码。")
-        use_llm_jd = st.checkbox(
-            "启用 LLM JD 分析",
-            value=False,
-            help="需要先配置 JOBAGENT_LLM_API_KEY；失败时会自动回退到 mock JD 分析。",
+        st.write("当前阶段：建立求职画像。JD 分析、简历优化、项目追问将在后续流程中出现。")
+        provider_options = ["ollama", "deepseek"]
+        current_provider = st.selectbox(
+            "模型 provider",
+            options=provider_options,
+            index=provider_options.index(
+                st.session_state.get("profile_flow_selected_provider", DEFAULT_LLM_PROVIDER)
+                if st.session_state.get("profile_flow_selected_provider", DEFAULT_LLM_PROVIDER) in provider_options
+                else DEFAULT_LLM_PROVIDER
+            ),
+            key="global_model_provider",
         )
-        use_llm_resume_optimize = st.checkbox(
-            "启用 LLM 简历优化",
-            value=False,
-            help="需要先配置 JOBAGENT_LLM_API_KEY；失败时会自动回退到 mock 简历优化。",
+        provider_resolution = resolve_llm_provider(current_provider)
+        st.caption(f"provider: {provider_resolution.provider}")
+        st.caption(f"model: {provider_resolution.model or 'N/A'}")
+        st.caption(f"base_url: {provider_resolution.base_url or 'N/A'}")
+        st.caption(f"configured: {'yes' if provider_resolution.configured else 'no'}")
+        st.caption(
+            f"reason: {provider_resolution.reason or 'provider ready or uses deterministic fallback'}"
         )
-        use_llm_project_challenge = st.checkbox(
-            "启用 LLM 项目追问",
-            value=False,
-            help="需要先配置 JOBAGENT_LLM_API_KEY；失败时会自动回退到 mock 项目追问。",
-        )
+        st.caption("mock is internal fallback only and is not shown as a primary user option.")
         use_langgraph_workflow = st.checkbox(
             "启用 LangGraph 原型 workflow",
             value=False,
@@ -102,41 +106,38 @@ def main() -> None:
             value=True,
             help="保存到本地 SQLite，之后可在历史记录和岗位库中查看。",
         )
-        if use_llm_jd and not is_llm_configured():
-            st.info("当前未配置 LLM API key，本次 JD 分析会自动回退到 mock。")
-        if use_llm_resume_optimize and not is_llm_configured():
-            st.info("当前未配置 LLM API key，本次简历优化会自动回退到 mock。")
-        if use_llm_project_challenge and not is_llm_configured():
-            st.info("当前未配置 LLM API key，本次项目追问会自动回退到 mock。")
         if use_langgraph_workflow:
             st.caption("当前已启用 LangGraph 原型 workflow：实验入口，不替换默认 Python workflow。")
 
     (
-        tab_analyze,
         tab_profile_flow,
         tab_brief,
+        tab_analyze,
         tab_history,
         tab_jobs,
         tab_versions,
         tab_tracker,
     ) = st.tabs(
-        ["生成报告", "Profile Review Flow", "岗位批量推荐", "历史记录", "岗位库", "简历版本", "投递跟进"]
+        ["Profile Setup", "岗位搜索", "生成报告", "历史记录", "岗位库", "简历版本", "投递跟进"]
     )
+
+    with tab_profile_flow:
+        render_profile_review_flow_tab(
+            sample_resume=SAMPLE_RESUME,
+            selected_provider=current_provider,
+        )
+
+    with tab_brief:
+        render_job_brief_tab(use_llm_jd=False)
 
     with tab_analyze:
         render_analysis_tab(
-            use_llm_jd=use_llm_jd,
-            use_llm_resume_optimize=use_llm_resume_optimize,
-            use_llm_project_challenge=use_llm_project_challenge,
+            use_llm_jd=False,
+            use_llm_resume_optimize=False,
+            use_llm_project_challenge=False,
             use_langgraph_workflow=use_langgraph_workflow,
             save_result=save_result,
         )
-
-    with tab_profile_flow:
-        render_profile_review_flow_tab(sample_resume=SAMPLE_RESUME)
-
-    with tab_brief:
-        render_job_brief_tab(use_llm_jd=use_llm_jd)
 
     with tab_history:
         render_history_tab()

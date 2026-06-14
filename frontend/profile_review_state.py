@@ -6,6 +6,16 @@ from typing import Any
 from app.schemas.profile_draft import ProfileDraft
 from app.schemas.profile_review import ResumeProfileUserEdits
 
+PROFILE_FLOW_STEP_KEY = "profile_flow_step"
+PROFILE_FLOW_PROVIDER_KEY = "profile_flow_selected_provider"
+PROFILE_FLOW_PROVIDER_META_KEY = "profile_flow_selected_provider_metadata"
+PROFILE_FLOW_STEPS = {
+    "resume_input",
+    "parsed_review",
+    "profile_draft",
+    "profile_saved",
+}
+
 PROFILE_REVIEW_STATE_KEYS = {
     "resume_text",
     "target_roles",
@@ -20,6 +30,9 @@ PROFILE_REVIEW_STATE_KEYS = {
     "missing_info_answers",
     "saved_confirmed_profile_id",
     "profile_draft_confirmed_payload",
+    PROFILE_FLOW_STEP_KEY,
+    PROFILE_FLOW_PROVIDER_KEY,
+    PROFILE_FLOW_PROVIDER_META_KEY,
 }
 
 LIST_FIELD_ALIASES = {
@@ -71,6 +84,32 @@ def set_confirmed_profile_draft_payload(
     payload: dict[str, Any],
 ) -> None:
     session_state["profile_draft_confirmed_payload"] = payload
+
+
+def get_profile_flow_step(session_state: dict[str, Any]) -> str:
+    step = str(session_state.get(PROFILE_FLOW_STEP_KEY) or "resume_input")
+    if step not in PROFILE_FLOW_STEPS:
+        return "resume_input"
+    return step
+
+
+def set_profile_flow_step(session_state: dict[str, Any], step: str) -> None:
+    session_state[PROFILE_FLOW_STEP_KEY] = (
+        step if step in PROFILE_FLOW_STEPS else "resume_input"
+    )
+
+
+def get_selected_provider(session_state: dict[str, Any]) -> str:
+    return str(session_state.get(PROFILE_FLOW_PROVIDER_KEY) or "ollama")
+
+
+def set_selected_provider(
+    session_state: dict[str, Any],
+    provider: str,
+    metadata: dict[str, Any] | None = None,
+) -> None:
+    session_state[PROFILE_FLOW_PROVIDER_KEY] = provider or "ollama"
+    session_state[PROFILE_FLOW_PROVIDER_META_KEY] = metadata or {}
 
 
 def dedupe_skills(skills: list[str]) -> list[str]:

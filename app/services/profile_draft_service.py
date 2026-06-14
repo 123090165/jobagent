@@ -6,7 +6,7 @@ from uuid import uuid4
 
 from app.schemas.profile_draft import ProfileDraft
 from app.schemas.resume import ResumeProfile
-from app.schemas.search_ready_profile import SearchReadyProfile
+from app.services.llm_provider import DEFAULT_LLM_PROVIDER, resolve_llm_provider
 from app.services.search_ready_profile_builder import build_search_ready_profile
 
 EDITABLE_LIST_FIELDS = {
@@ -27,8 +27,10 @@ def create_profile_draft(
     *,
     quality_warnings: list[str] | None = None,
     missing_info_questions: list[str] | None = None,
+    llm_provider: str | None = None,
 ) -> ProfileDraft:
     now = datetime.now(timezone.utc)
+    provider_resolution = resolve_llm_provider(llm_provider or DEFAULT_LLM_PROVIDER)
     search_ready_profile = build_search_ready_profile(
         parsed_profile,
         target_roles,
@@ -40,6 +42,11 @@ def create_profile_draft(
         draft_id=str(uuid4()),
         status="draft",
         search_ready_profile=search_ready_profile,
+        llm_provider=provider_resolution.provider,
+        llm_model=provider_resolution.model,
+        llm_base_url=provider_resolution.base_url,
+        llm_configured=provider_resolution.configured,
+        llm_provider_reason=provider_resolution.reason,
         user_answers={},
         user_edit_snapshot={},
         source_profile_snapshot=parsed_profile.model_dump(mode="json"),
@@ -114,6 +121,13 @@ def confirm_profile_draft(draft: ProfileDraft) -> dict[str, Any]:
         "source_profile_snapshot": draft.source_profile_snapshot,
         "user_edit_snapshot": draft.user_edit_snapshot,
         "missing_info_answers": dict(draft.user_answers),
+        "llm_provider_metadata": {
+            "provider": draft.llm_provider,
+            "model": draft.llm_model,
+            "base_url": draft.llm_base_url,
+            "configured": draft.llm_configured,
+            "reason": draft.llm_provider_reason,
+        },
         "confirmed_at": confirmed_at.isoformat(),
         "save_payload_ready": True,
     }

@@ -8,6 +8,7 @@ from app.schemas.resume import ResumeProfile
 class ResumeProfileReviewRequest(BaseModel):
     resume_text: str
     target_roles: list[str] = Field(default_factory=list)
+    llm_provider: str = "ollama"
 
 
 class ResumeProfileReviewResult(BaseModel):

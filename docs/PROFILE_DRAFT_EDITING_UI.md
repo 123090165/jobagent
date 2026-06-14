@@ -44,6 +44,14 @@ In Streamlit session state, the main draft key is
 written for backward compatibility, but the editable UI reads the flow-scoped
 key.
 
+The draft also records model-provider metadata:
+
+- `llm_provider`
+- `llm_model`
+- `llm_base_url`
+- `llm_configured`
+- `llm_provider_reason`
+
 ## Editing Flow
 
 The current UI flow is:
@@ -89,6 +97,7 @@ User answers are saved into `user_answers` and also appended to
 - `source_profile_snapshot`
 - `user_edit_snapshot`
 - `missing_info_answers`
+- `llm_provider_metadata`
 - `confirmed_at`
 
 ## Persistence Scope

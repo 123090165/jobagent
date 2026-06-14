@@ -83,6 +83,12 @@ missing-info answers before confirming a payload for later persistence and job
 search. This phase does not change downstream job-search agents or database
 schema.
 
+v3.9c decouples Profile Creation from downstream JD analysis and other later
+LLM workflows. The UI now treats model choice as provider selection rather than
+task-specific LLM checkboxes, uses local `ollama` as the default provider,
+offers `deepseek` as an optional cloud provider, and records provider metadata
+inside `ProfileDraft` while keeping profile creation deterministic-first.
+
 ## 1. Project Goal
 
 JobAgent 不是一个单纯的聊天机器人，也不是一个通用爬虫项目。它更像一个面向求职准备场景的本地工作台，用来把“找岗位、判断匹配度、改简历、准备面试、记录投递进展”串成一个可复盘的流程。

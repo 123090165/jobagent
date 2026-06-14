@@ -95,6 +95,21 @@ summary and chips, editing `search_keywords` or `preferred_locations`, saving a
 missing-info answer if needed, and clicking confirm to inspect the confirmed
 profile payload. This phase does not run job search from the same UI step.
 
+v3.9c turns that into a decoupled Profile Setup flow with explicit model
+selection:
+
+```text
+Step 1 Resume Input
+-> Step 2 Parsed Resume Review
+-> Step 3 Search-Ready Profile Draft
+-> Step 4 Profile Saved
+```
+
+Use `ollama` as the default local provider. Switch to `deepseek` only when you
+want cloud-provider metadata in the draft context. The parser and
+SearchReadyProfile builder remain deterministic-first, and mock remains internal
+fallback only.
+
 适用对象：
 
 - 面试官
