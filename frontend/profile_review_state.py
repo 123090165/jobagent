@@ -33,6 +33,7 @@ PROFILE_REVIEW_STATE_KEYS = {
     "profile_flow_uploaded_filename",
     "profile_flow_uploaded_file_type",
     "profile_flow_uploaded_text_length",
+    "profile_flow_sample_resume",
     "profile_flow_resume_input_source",
     "profile_flow_upload_error",
     PROFILE_FLOW_STEP_KEY,

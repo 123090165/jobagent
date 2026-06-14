@@ -74,11 +74,11 @@ def main() -> None:
     st.caption("Profile creation first, then JD search and later matching.")
 
     with st.sidebar:
-        st.subheader("当前阶段")
-        st.write("当前阶段：建立求职画像。JD 分析、简历优化、项目追问将在后续流程中出现。")
+        st.subheader("Current Stage")
+        st.write("Build the candidate profile first. JD search and later analysis come after profile confirmation.")
         provider_options = ["ollama", "deepseek"]
         current_provider = st.selectbox(
-            "模型 provider",
+            "Model provider",
             options=provider_options,
             index=provider_options.index(
                 st.session_state.get("profile_flow_selected_provider", DEFAULT_LLM_PROVIDER)
@@ -96,18 +96,8 @@ def main() -> None:
             f"reason: {provider_resolution.reason or 'provider ready or uses deterministic fallback'}"
         )
         st.caption("mock is internal fallback only and is not shown as a primary user option.")
-        use_langgraph_workflow = st.checkbox(
-            "启用 LangGraph 原型 workflow",
-            value=False,
-            help="当前为实验模式，不替换默认 Python workflow；会使用 graph node 和 match score 条件分支。",
-        )
-        save_result = st.checkbox(
-            "保存本次分析",
-            value=True,
-            help="保存到本地 SQLite，之后可在历史记录和岗位库中查看。",
-        )
-        if use_langgraph_workflow:
-            st.caption("当前已启用 LangGraph 原型 workflow：实验入口，不替换默认 Python workflow。")
+    use_langgraph_workflow = False
+    save_result = True
 
     (
         tab_profile_flow,
@@ -128,9 +118,11 @@ def main() -> None:
         )
 
     with tab_brief:
+        st.info("Recommended: complete Profile Setup first, then continue to later search and brief stages.")
         render_job_brief_tab(use_llm_jd=False)
 
     with tab_analyze:
+        st.info("Recommended: complete Profile Setup first, then continue to downstream analysis.")
         render_analysis_tab(
             use_llm_jd=False,
             use_llm_resume_optimize=False,
@@ -140,15 +132,19 @@ def main() -> None:
         )
 
     with tab_history:
+        st.info("Recommended: complete Profile Setup first, then review saved history here.")
         render_history_tab()
 
     with tab_jobs:
+        st.info("Recommended: complete Profile Setup first, then browse later-stage saved jobs here.")
         render_jobs_tab()
 
     with tab_versions:
+        st.info("Recommended: complete Profile Setup first, then work with resume versions here.")
         render_resume_versions_tab()
 
     with tab_tracker:
+        st.info("Recommended: complete Profile Setup first, then use tracker features here.")
         render_tracker_tab()
 
 

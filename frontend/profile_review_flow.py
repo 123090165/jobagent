@@ -177,7 +177,8 @@ def request_resume_profile_review_from_api(
 
 
 def _ensure_initial_state(sample_resume: str) -> None:
-    st.session_state.setdefault("profile_flow_resume_text", sample_resume)
+    st.session_state.setdefault("profile_flow_sample_resume", sample_resume)
+    st.session_state.setdefault("profile_flow_resume_text", "")
     st.session_state.setdefault(
         "profile_flow_initial_target_roles",
         "AI Agent Engineer, Backend Engineer",
@@ -187,7 +188,7 @@ def _ensure_initial_state(sample_resume: str) -> None:
     st.session_state.setdefault("profile_flow_uploaded_text_length", 0)
     st.session_state.setdefault(
         "profile_flow_resume_input_source",
-        "paste" if sample_resume.strip() else "empty",
+        "empty",
     )
     st.session_state.setdefault("profile_flow_upload_error", None)
     st.session_state.setdefault("profile_flow_upload_fingerprint", None)
@@ -199,7 +200,7 @@ def _ensure_initial_state(sample_resume: str) -> None:
 def _render_profile_setup_intro() -> None:
     st.subheader("JobAgent Profile Setup")
     st.caption(
-        "Upload or paste your resume first. JobAgent will parse your background, build a searchable profile, and only then continue to JD search and job analysis."
+        "One resume, one search-ready profile. Upload or paste your resume, let JobAgent parse your background, then confirm the profile before any JD search or downstream analysis."
     )
     phases = [
         ("01 Resume", True),
@@ -233,6 +234,12 @@ def _render_resume_input_step() -> None:
     st.caption(
         "Start by uploading a txt/md resume or pasting the full resume text below."
     )
+    if st.button("Load sample resume", key="profile_flow_load_sample"):
+        st.session_state.update(
+            build_sample_resume_state(
+                str(st.session_state.get("profile_flow_sample_resume") or "")
+            )
+        )
     _render_resume_upload_entry()
     existing_text = str(st.session_state.get("profile_flow_resume_text") or "")
     resume_text = st.text_area(
@@ -271,6 +278,18 @@ def build_resume_upload_state(filename: str, content: bytes) -> dict[str, Any]:
         "profile_flow_resume_input_source": "upload",
         "profile_flow_upload_error": None,
         "profile_flow_upload_fingerprint": f"{normalized_filename}:{hashlib.sha256(content).hexdigest()}",
+    }
+
+
+def build_sample_resume_state(sample_resume: str) -> dict[str, Any]:
+    return {
+        "profile_flow_resume_text": sample_resume.strip(),
+        "profile_flow_uploaded_filename": None,
+        "profile_flow_uploaded_file_type": None,
+        "profile_flow_uploaded_text_length": 0,
+        "profile_flow_resume_input_source": "sample",
+        "profile_flow_upload_error": None,
+        "profile_flow_upload_fingerprint": None,
     }
 
 
@@ -336,7 +355,7 @@ def _parse_resume_profile(
     normalized_resume_text = resume_text.strip()
     if not normalized_resume_text:
         st.session_state["profile_flow_resume_input_source"] = "empty"
-        st.warning("Add resume text before starting profile setup.")
+        st.warning("Please upload or paste your resume before starting profile setup.")
         return
     try:
         baseline_review = request_resume_profile_review_from_api(

@@ -125,6 +125,12 @@ extract text into the same `resume_text` field and still go through Profile
 Review and editable ProfileDraft confirmation. PDF, DOCX, OCR, and real JD
 search remain out of scope for this round.
 
+v3.9e polishes that homepage into a clearer user entry point. The app now opens
+with an empty Profile Setup input instead of a preloaded sample resume, keeps
+`Load sample resume` as an explicit demo action only, and reduces the sidebar
+to provider/model context. Treat the other tabs as later-stage follow-ons after
+the profile has been confirmed.
+
 适用对象：
 
 - 面试官

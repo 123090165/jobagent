@@ -110,7 +110,7 @@ def test_parse_resume_profile_requires_non_empty_text(monkeypatch) -> None:
     )
 
     assert fake_st.session_state["profile_flow_resume_input_source"] == "empty"
-    assert events == ["warning:Add resume text before starting profile setup."]
+    assert events == ["warning:Please upload or paste your resume before starting profile setup."]
 
 
 def test_profile_flow_step_defaults_to_resume_input() -> None:
@@ -121,9 +121,19 @@ def test_ensure_initial_state_defaults_resume_input_source_to_empty(monkeypatch)
     fake_st = SimpleNamespace(session_state={})
     monkeypatch.setattr(profile_review_flow, "st", fake_st)
 
-    profile_review_flow._ensure_initial_state("")
+    profile_review_flow._ensure_initial_state("Sample resume")
 
+    assert fake_st.session_state["profile_flow_resume_text"] == ""
     assert fake_st.session_state["profile_flow_resume_input_source"] == "empty"
+    assert fake_st.session_state["profile_flow_sample_resume"] == "Sample resume"
+
+
+def test_build_sample_resume_state_loads_sample_resume() -> None:
+    sample_state = profile_review_flow.build_sample_resume_state("Sample resume text")
+
+    assert sample_state["profile_flow_resume_text"] == "Sample resume text"
+    assert sample_state["profile_flow_resume_input_source"] == "sample"
+    assert sample_state["profile_flow_upload_error"] is None
 
 
 def test_profile_flow_step_transitions() -> None:

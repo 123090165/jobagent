@@ -96,6 +96,12 @@ Profile Review -> SearchReadyProfile -> ProfileDraft confirmation flow. This
 phase does not add PDF/DOCX/OCR parsing or implement JD search from the same
 entry step.
 
+v3.9e further tightens that entry around normal user behavior. Profile Setup is
+the default first stop, the resume box starts empty, `Load sample resume` is
+kept only as a demo helper, and the sidebar shows provider selection without
+developer-facing workflow toggles. JD search and downstream analysis remain
+later stages that should follow confirmed profile creation.
+
 ## 1. Project Goal
 
 JobAgent 不是一个单纯的聊天机器人，也不是一个通用爬虫项目。它更像一个面向求职准备场景的本地工作台，用来把“找岗位、判断匹配度、改简历、准备面试、记录投递进展”串成一个可复盘的流程。

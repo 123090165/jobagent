@@ -38,6 +38,11 @@ resume file or paste full resume text directly. Uploaded files are converted
 into `resume_text` only; they do not bypass Profile Review or jump ahead in the
 flow. PDF, DOCX, and OCR support remain out of scope for this phase.
 
+The homepage no longer preloads a sample resume by default. The default entry
+state is an empty resume box plus an explicit `Load sample resume` action for
+demo use only. The sidebar is narrowed to model-provider selection so Profile
+Setup stays the obvious first step before later search or analysis pages.
+
 ## Model Selection
 
 Provider selection is treated as model context, not a set of task-specific
