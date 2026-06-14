@@ -6,6 +6,7 @@ from typing import Any
 from app.schemas.resume import ResumeProfile
 from app.schemas.search_ready_profile import SearchReadyProfile
 
+QICHACHA = "\u4f01\u67e5\u67e5"
 
 CATEGORY_CORE_SKILLS: dict[str, list[str]] = {
     "ai_agent_backend": [
@@ -69,7 +70,7 @@ CATEGORY_AUXILIARY_SKILLS: dict[str, list[str]] = {
         "Matplotlib",
     ],
     "ml_audio": ["Python", "PyTorch", "Librosa", "NumPy", "Pandas"],
-    "business_fa": ["Wind", "浼佹煡鏌?", "Excel", "PowerPoint", "CRM"],
+    "business_fa": ["Wind", QICHACHA, "Excel", "PowerPoint", "CRM"],
     "embedded": ["C", "C++", "Keil", "CubeMX", "Git"],
 }
 
@@ -113,7 +114,7 @@ CATEGORY_SEARCH_KEYWORDS: dict[str, list[str]] = {
         "market research",
         "competitor analysis",
         "Wind",
-        "浼佹煡鏌?",
+        QICHACHA,
         "CRM",
         "Excel",
         "PowerPoint",
@@ -132,18 +133,24 @@ CATEGORY_SEARCH_KEYWORDS: dict[str, list[str]] = {
 }
 
 LOCATION_PATTERNS: dict[str, list[str]] = {
-    "Shenzhen": ["shenzhen", "深圳"],
-    "Hong Kong": ["hong kong", "香港"],
-    "Hangzhou": ["hangzhou", "杭州"],
-    "Tokyo": ["tokyo", "东京"],
+    "Shenzhen": ["shenzhen", "娣卞湷"],
+    "Hong Kong": ["hong kong", "棣欐腐"],
+    "Hangzhou": ["hangzhou", "鏉窞"],
+    "Tokyo": ["tokyo", "涓滀含"],
 }
 
 WORK_ARRANGEMENT_PATTERNS: dict[str, list[str]] = {
-    "internship": ["intern", "internship", "实习"],
-    "full-time": ["full-time", "full time", "全职"],
-    "remote": ["remote", "远程"],
-    "onsite": ["onsite", "on-site", "现场"],
-    "hybrid": ["hybrid", "混合办公"],
+    "internship": ["intern", "internship", "瀹炰範"],
+    "full-time": ["full-time", "full time", "鍏ㄨ亴"],
+    "remote": ["remote", "杩滅▼"],
+    "onsite": ["onsite", "on-site", "鐜板満"],
+    "hybrid": ["hybrid", "娣峰悎鍔炲叕"],
+}
+
+TEXT_NORMALIZATION_MAP: dict[str, str] = {
+    "浼佹煡鏌?": QICHACHA,
+    "浼佹煡鏌�": QICHACHA,
+    "qichacha": QICHACHA,
 }
 
 
@@ -255,19 +262,28 @@ def _build_auxiliary_skills(
     for category in categories:
         auxiliary.extend(CATEGORY_AUXILIARY_SKILLS.get(category, []))
 
-    parsed_skill_map = {skill.lower(): skill for skill in parsed_profile.skills}
+    parsed_skill_map = {
+        _normalized_key(skill): _normalize_display_term(skill) for skill in parsed_profile.skills
+    }
+    core_skill_keys = {_normalized_key(skill) for skill in core_skills}
+    normalized_raw_text = _normalize_text(parsed_profile.raw_text).lower()
     final_auxiliary: list[str] = []
     for skill in auxiliary:
-        if skill.lower() in {item.lower() for item in core_skills}:
+        normalized_skill = _normalize_display_term(skill)
+        skill_key = _normalized_key(normalized_skill)
+        if skill_key in core_skill_keys:
             continue
-        if skill.lower() in parsed_skill_map:
-            final_auxiliary.append(parsed_skill_map[skill.lower()])
+        if skill_key in parsed_skill_map:
+            final_auxiliary.append(parsed_skill_map[skill_key])
             continue
-        if skill in {"SciPy", "Matplotlib"} and skill.lower() in parsed_profile.raw_text.lower():
-            final_auxiliary.append(skill)
+        if normalized_skill in {"SciPy", "Matplotlib"} and normalized_skill.lower() in normalized_raw_text:
+            final_auxiliary.append(normalized_skill)
             continue
-        if skill in {"浼佹煡鏌?"} and skill in parsed_profile.raw_text:
-            final_auxiliary.append(skill)
+        if normalized_skill == QICHACHA and QICHACHA in normalized_raw_text:
+            final_auxiliary.append(normalized_skill)
+            continue
+        if normalized_skill in {"Wind", "Excel", "PowerPoint", "CRM"} and normalized_skill.lower() in normalized_raw_text:
+            final_auxiliary.append(normalized_skill)
     return _dedupe(final_auxiliary)
 
 
@@ -374,7 +390,7 @@ def _detect_categories(
 ) -> list[str]:
     categories: list[str] = []
     lowered_roles = " ".join(normalized_roles).lower()
-    lowered_evidence = evidence_text.lower()
+    lowered_evidence = _normalize_text(evidence_text).lower()
 
     if any(
         term in lowered_roles or term in lowered_evidence
@@ -399,6 +415,7 @@ def _detect_categories(
         or "fa intern" in lowered_roles
         or "wind" in lowered_evidence
         or "crm" in lowered_evidence
+        or QICHACHA.lower() in lowered_evidence
         or re.search(r"\bfa\b", lowered_evidence)
     ):
         categories.append("business_fa")
@@ -422,7 +439,7 @@ def _supports_term(
     evidence_text: str,
     category: str,
 ) -> bool:
-    lowered = evidence_text.lower()
+    lowered = _normalize_text(evidence_text).lower()
     direct_markers = {
         "AI Agent": ["ai agent", "agent"],
         "backend API": ["fastapi", "api", "backend"],
@@ -431,6 +448,10 @@ def _supports_term(
         "model evaluation": ["accuracy", "confusion matrix", "error analysis", "evaluation"],
         "FA project support": ["deal memo", "peer mapping", "fa intern", "fa team", "horizon capital"],
         "CRM tracking": ["crm"],
+        "industry research": ["industry research", "research-heavy", "研究", "行业研究"],
+        "market research": ["market research", "market size", "市场", "商业模式"],
+        "competitor analysis": ["competitor analysis", "competitive landscape", "竞品", "竞争格局"],
+        "meeting notes": ["meeting notes", "investor meeting notes", "纪要", "会议纪要"],
         "embedded C": ["c/c++", "embedded c", "stm32"],
         "UART / USART": ["uart", "usart"],
         "STM32 development": ["stm32"],
@@ -439,8 +460,8 @@ def _supports_term(
         return any(marker in lowered for marker in direct_markers[term])
     if term.lower() in lowered:
         return True
-    if category == "business_fa" and term in {"industry research", "market research"}:
-        return "research" in lowered or "market" in lowered
+    if category == "business_fa" and term == "investment analysis":
+        return "investment" in lowered or "融资" in lowered or "投资" in lowered
     if category == "ai_health" and term in {"feature extraction", "signal segmentation"}:
         return term.lower() in lowered
     return False
@@ -468,10 +489,25 @@ def _dedupe(items: list[str]) -> list[str]:
     result: list[str] = []
     seen: set[str] = set()
     for item in items:
-        normalized = item.strip()
-        key = normalized.lower()
+        normalized = _normalize_display_term(item)
+        key = _normalized_key(normalized)
         if not normalized or key in seen:
             continue
         seen.add(key)
         result.append(normalized)
     return result
+
+
+def _normalize_text(text: str) -> str:
+    normalized = text
+    for bad, good in TEXT_NORMALIZATION_MAP.items():
+        normalized = normalized.replace(bad, good)
+    return normalized
+
+
+def _normalize_display_term(term: str) -> str:
+    return _normalize_text(term).strip()
+
+
+def _normalized_key(term: str) -> str:
+    return _normalize_display_term(term).lower()

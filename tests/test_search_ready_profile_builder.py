@@ -39,9 +39,25 @@ def test_business_fa_builds_research_profile() -> None:
 
     assert "business analyst" in [item.lower() for item in profile.target_directions]
     assert "investment analyst" in [item.lower() for item in profile.target_directions]
-    assert "industry research" in combined or "market research" in combined
+    assert "industry research" in profile.core_skills
+    assert "market research" in profile.core_skills
+    assert "competitor analysis" in profile.core_skills
+    assert "meeting notes" in profile.core_skills
     assert "crm" in combined
     assert "wind" in combined
+    assert "企查查" in profile.auxiliary_skills
+    assert "Wind" in profile.auxiliary_skills
+    assert "Excel" in profile.auxiliary_skills
+    assert "PowerPoint" in profile.auxiliary_skills
+    assert "CRM" in profile.auxiliary_skills
+
+
+def test_business_keywords_preserve_qichacha_without_garbled_text() -> None:
+    profile = _build("realistic_business_resume_unstructured")
+
+    assert "企查查" in profile.search_keywords
+    assert all("浼佹煡鏌" not in keyword for keyword in profile.search_keywords)
+    assert all("?" not in keyword for keyword in profile.search_keywords if "企查查" in keyword)
 
 
 def test_ai_agent_backend_builds_agent_search_profile() -> None:
@@ -66,6 +82,13 @@ def test_weak_resume_is_not_overexpanded() -> None:
 
 def test_search_keywords_are_deduped() -> None:
     profile = _build("ml_audio_asr")
+
+    lowered = [item.lower() for item in profile.search_keywords]
+    assert len(lowered) == len(set(lowered))
+
+
+def test_business_search_keywords_are_deduped_after_normalization() -> None:
+    profile = _build("realistic_business_resume_unstructured")
 
     lowered = [item.lower() for item in profile.search_keywords]
     assert len(lowered) == len(set(lowered))

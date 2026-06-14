@@ -192,7 +192,7 @@
         "Business Analyst",
         "Investment Analyst"
       ],
-      "summary": "Search-ready profile aligned to Business Analyst, Investment Analyst, with core evidence around industry research, market research, competitor analysis, FA project support.",
+      "summary": "Search-ready profile aligned to Business Analyst, Investment Analyst, with core evidence around industry research, market research, competitor analysis, investment analysis.",
       "target_directions": [
         "Business Analyst",
         "Investment Analyst"
@@ -201,6 +201,7 @@
         "industry research",
         "market research",
         "competitor analysis",
+        "investment analysis",
         "FA project support",
         "CRM tracking",
         "meeting notes"
@@ -217,6 +218,7 @@
         "industry research",
         "market research",
         "competitor analysis",
+        "investment analysis",
         "FA project support",
         "CRM tracking",
         "meeting notes",
@@ -225,7 +227,7 @@
         "PowerPoint",
         "CRM",
         "FA Intern",
-        "浼佹煡鏌?",
+        "企查查",
         "competitive landscape"
       ],
       "preferred_locations": [],
@@ -419,7 +421,7 @@
         "Backend Engineer Intern",
         "Data Analyst Intern"
       ],
-      "summary": "Search-ready profile aligned to AI Agent Intern, Backend Engineer Intern, Data Analyst Intern, with core evidence around MFCC, STFT, CNN, AI Agent. Preferred locations include Shenzhen, Hangzhou.",
+      "summary": "Search-ready profile aligned to AI Agent Intern, Backend Engineer Intern, Data Analyst Intern, with core evidence around MFCC, STFT, CNN, AI Agent.",
       "target_directions": [
         "AI Agent Intern",
         "Backend Engineer Intern",
@@ -471,17 +473,12 @@
         "job matching",
         "evaluation"
       ],
-      "preferred_locations": [
-        "Shenzhen",
-        "Hangzhou"
-      ],
+      "preferred_locations": [],
       "work_arrangements": [
         "internship"
       ],
       "company_preferences": [],
-      "profile_notes": [
-        "Location preference: Shenzhen, Hangzhou."
-      ],
+      "profile_notes": [],
       "quality_warnings": [],
       "missing_info_questions": [],
       "coverage_notes": [
@@ -496,18 +493,24 @@
         "Investment Analyst",
         "FA Intern"
       ],
-      "summary": "Search-ready profile aligned to Business Analyst, Investment Analyst, FA Intern, with core evidence around FA project support, CRM tracking. Preferred locations include Shenzhen, Hong Kong, Hangzhou.",
+      "summary": "Search-ready profile aligned to Business Analyst, Investment Analyst, FA Intern, with core evidence around industry research, market research, competitor analysis, investment analysis.",
       "target_directions": [
         "Business Analyst",
         "Investment Analyst",
         "FA Intern"
       ],
       "core_skills": [
+        "industry research",
+        "market research",
+        "competitor analysis",
+        "investment analysis",
         "FA project support",
-        "CRM tracking"
+        "CRM tracking",
+        "meeting notes"
       ],
       "auxiliary_skills": [
         "Wind",
+        "企查查",
         "Excel",
         "PowerPoint",
         "CRM"
@@ -516,31 +519,26 @@
         "Business Analyst",
         "Investment Analyst",
         "FA Intern",
-        "FA project support",
-        "CRM tracking",
-        "Wind",
-        "Excel",
-        "PowerPoint",
-        "CRM",
         "industry research",
         "market research",
         "competitor analysis",
-        "浼佹煡鏌?",
+        "investment analysis",
+        "FA project support",
+        "CRM tracking",
         "meeting notes",
-        "FA",
-        "企查查"
+        "Wind",
+        "企查查",
+        "Excel",
+        "PowerPoint",
+        "CRM",
+        "FA"
       ],
-      "preferred_locations": [
-        "Shenzhen",
-        "Hong Kong",
-        "Hangzhou"
-      ],
+      "preferred_locations": [],
       "work_arrangements": [
         "internship"
       ],
       "company_preferences": [],
       "profile_notes": [
-        "Location preference: Shenzhen, Hong Kong, Hangzhou.",
         "Profile is oriented toward research-heavy business, investment, and FA support search."
       ],
       "quality_warnings": [],

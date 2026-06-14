@@ -1,15 +1,15 @@
 # realistic_noisy_chinese_resume
 
 - target_roles: AI Agent Intern, Backend Engineer Intern, Data Analyst Intern
-- summary: Search-ready profile aligned to AI Agent Intern, Backend Engineer Intern, Data Analyst Intern, with core evidence around MFCC, STFT, CNN, AI Agent. Preferred locations include Shenzhen, Hangzhou.
+- summary: Search-ready profile aligned to AI Agent Intern, Backend Engineer Intern, Data Analyst Intern, with core evidence around MFCC, STFT, CNN, AI Agent.
 - target_directions: AI Agent Intern, Backend Engineer Intern, Data Analyst Intern
 - core_skills: MFCC, STFT, CNN, AI Agent, FastAPI, backend API
 - auxiliary_skills: Python, PyTorch, Librosa, NumPy, Pandas, Streamlit, SQLite, Git
 - search_keywords: AI Agent Intern, Backend Engineer Intern, Data Analyst Intern, MFCC, STFT, CNN, AI Agent, FastAPI, backend API, Python, PyTorch, Librosa, NumPy, Pandas, Streamlit, SQLite, Git, audio classification, ASR, validation accuracy, error analysis, Backend Engineer, LLM application, resume parsing, job matching, evaluation
-- preferred_locations: Shenzhen, Hangzhou
+- preferred_locations: -
 - work_arrangements: internship
 - company_preferences: -
-- profile_notes: Location preference: Shenzhen, Hangzhou.
+- profile_notes: -
 - quality_warnings: -
 - missing_info_questions: -
 - coverage_notes: search-ready profile coverage is strong
