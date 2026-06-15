@@ -64,6 +64,44 @@ v3.6-light persists confirmed profiles into one SQLite table:
 Suggestion decisions and missing-info answers are stored as JSON snapshots on
 the confirmed profile record rather than separate analytics tables.
 
+v3.7 adds a reproducible Profile Review Quality Evaluation suite. It runs
+synthetic resumes through deterministic parsing, optional LLM enrichment,
+simulated user confirmation, and confirmed-profile save-payload validation, then
+writes JSON/Markdown artifacts for human review.
+
+v3.9a adds a deterministic `SearchReadyProfile` layer on top of parsed profile
+review output. It converts `ResumeProfile` into a compact search-ready
+candidate profile with summary, target directions, core skills, auxiliary
+skills, search keywords, preferences, quality warnings, and missing-info
+questions. It does not change frontend UI, persistence schema, provider logic,
+or downstream job-search agents.
+
+v3.9b adds `ProfileDraft` as the editable review wrapper around
+`SearchReadyProfile`. The Streamlit profile review page now lets the user edit
+summary, target directions, skills, search keywords, preferences, and
+missing-info answers before confirming a payload for later persistence and job
+search. This phase does not change downstream job-search agents or database
+schema.
+
+v3.9c decouples Profile Creation from downstream JD analysis and other later
+LLM workflows. The UI now treats model choice as provider selection rather than
+task-specific LLM checkboxes, uses local `ollama` as the default provider,
+offers `deepseek` as an optional cloud provider, and records provider metadata
+inside `ProfileDraft` while keeping profile creation deterministic-first.
+
+v3.9d makes Profile Setup the productized homepage entry for this chain. Users
+can upload `.txt` or `.md` resume files or paste full resume text, but the
+uploaded content still becomes `resume_text` and continues through the same
+Profile Review -> SearchReadyProfile -> ProfileDraft confirmation flow. This
+phase does not add PDF/DOCX/OCR parsing or implement JD search from the same
+entry step.
+
+v3.9e further tightens that entry around normal user behavior. Profile Setup is
+the default first stop, the resume box starts empty, `Load sample resume` is
+kept only as a demo helper, and the sidebar shows provider selection without
+developer-facing workflow toggles. JD search and downstream analysis remain
+later stages that should follow confirmed profile creation.
+
 ## 1. Project Goal
 
 JobAgent 不是一个单纯的聊天机器人，也不是一个通用爬虫项目。它更像一个面向求职准备场景的本地工作台，用来把“找岗位、判断匹配度、改简历、准备面试、记录投递进展”串成一个可复盘的流程。

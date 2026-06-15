@@ -1,0 +1,552 @@
+{
+  "total_cases": 9,
+  "strong_cases": 8,
+  "acceptable_cases": 1,
+  "needs_review_cases": 0,
+  "failed_cases": 0,
+  "cases": [
+    {
+      "case_id": "ai_agent_backend",
+      "target_roles": [
+        "AI Agent Engineer",
+        "Backend Engineer"
+      ],
+      "summary": "Search-ready profile aligned to AI Agent Engineer, Backend Engineer, with core evidence around AI Agent, FastAPI, LangGraph, LangChain. Preferred locations include Shenzhen.",
+      "target_directions": [
+        "AI Agent Engineer",
+        "Backend Engineer"
+      ],
+      "core_skills": [
+        "AI Agent",
+        "FastAPI",
+        "LangGraph",
+        "LangChain",
+        "backend API",
+        "evaluation / testing"
+      ],
+      "auxiliary_skills": [
+        "Python",
+        "Streamlit",
+        "SQLite",
+        "Pydantic",
+        "Git"
+      ],
+      "search_keywords": [
+        "AI Agent Engineer",
+        "Backend Engineer",
+        "AI Agent",
+        "FastAPI",
+        "LangGraph",
+        "LangChain",
+        "backend API",
+        "evaluation / testing",
+        "Python",
+        "Streamlit",
+        "SQLite",
+        "Pydantic",
+        "Git",
+        "LLM application",
+        "resume parsing",
+        "job matching",
+        "evaluation",
+        "pytest"
+      ],
+      "preferred_locations": [
+        "Shenzhen"
+      ],
+      "work_arrangements": [
+        "internship"
+      ],
+      "company_preferences": [],
+      "profile_notes": [
+        "Location preference: Shenzhen."
+      ],
+      "quality_warnings": [],
+      "missing_info_questions": [],
+      "coverage_notes": [
+        "search-ready profile coverage is strong"
+      ],
+      "quality_verdict": "strong"
+    },
+    {
+      "case_id": "embedded_stm32",
+      "target_roles": [
+        "Embedded Software Engineer"
+      ],
+      "summary": "Search-ready profile aligned to Embedded Software Engineer, with core evidence around STM32 development, embedded C, UART / USART, GPIO. Some search fields still need confirmation before broad job targeting.",
+      "target_directions": [
+        "Embedded Software Engineer"
+      ],
+      "core_skills": [
+        "STM32 development",
+        "embedded C",
+        "UART / USART",
+        "GPIO",
+        "DMA",
+        "ADC",
+        "PWM"
+      ],
+      "auxiliary_skills": [
+        "C",
+        "C++",
+        "Keil",
+        "CubeMX",
+        "Git"
+      ],
+      "search_keywords": [
+        "Embedded Software Engineer",
+        "STM32 development",
+        "embedded C",
+        "UART / USART",
+        "GPIO",
+        "DMA",
+        "ADC",
+        "PWM",
+        "C",
+        "C++",
+        "Keil",
+        "CubeMX",
+        "Git",
+        "STM32",
+        "UART",
+        "USART"
+      ],
+      "preferred_locations": [],
+      "work_arrangements": [],
+      "company_preferences": [],
+      "profile_notes": [
+        "Project-heavy profile with limited formal work experience evidence.",
+        "Open quality follow-up: resume profile has no work experience evidence."
+      ],
+      "quality_warnings": [
+        "resume profile has no work experience evidence"
+      ],
+      "missing_info_questions": [
+        "Do you have internship, lab, research, or course project experience that should be treated as work-like evidence?"
+      ],
+      "coverage_notes": [
+        "search-ready profile coverage is strong"
+      ],
+      "quality_verdict": "strong"
+    },
+    {
+      "case_id": "ml_audio_asr",
+      "target_roles": [
+        "Machine Learning Engineer",
+        "AI Engineer"
+      ],
+      "summary": "Search-ready profile aligned to Machine Learning Engineer, AI Engineer, with core evidence around audio classification, ASR, MFCC, STFT.",
+      "target_directions": [
+        "Machine Learning Engineer",
+        "AI Engineer"
+      ],
+      "core_skills": [
+        "audio classification",
+        "ASR",
+        "MFCC",
+        "STFT",
+        "CNN",
+        "model evaluation",
+        "error analysis"
+      ],
+      "auxiliary_skills": [
+        "Python",
+        "PyTorch",
+        "Librosa",
+        "NumPy",
+        "Pandas"
+      ],
+      "search_keywords": [
+        "Machine Learning Engineer",
+        "AI Engineer",
+        "audio classification",
+        "ASR",
+        "MFCC",
+        "STFT",
+        "CNN",
+        "model evaluation",
+        "error analysis",
+        "Python",
+        "PyTorch",
+        "Librosa",
+        "NumPy",
+        "Pandas",
+        "validation accuracy",
+        "ResNet",
+        "VGG"
+      ],
+      "preferred_locations": [],
+      "work_arrangements": [],
+      "company_preferences": [],
+      "profile_notes": [],
+      "quality_warnings": [],
+      "missing_info_questions": [],
+      "coverage_notes": [
+        "search-ready profile coverage is strong"
+      ],
+      "quality_verdict": "strong"
+    },
+    {
+      "case_id": "finance_fa_analysis",
+      "target_roles": [
+        "Business Analyst",
+        "Investment Analyst"
+      ],
+      "summary": "Search-ready profile aligned to Business Analyst, Investment Analyst, with core evidence around industry research, market research, competitor analysis, investment analysis.",
+      "target_directions": [
+        "Business Analyst",
+        "Investment Analyst"
+      ],
+      "core_skills": [
+        "industry research",
+        "market research",
+        "competitor analysis",
+        "investment analysis",
+        "FA project support",
+        "CRM tracking",
+        "meeting notes"
+      ],
+      "auxiliary_skills": [
+        "Wind",
+        "Excel",
+        "PowerPoint",
+        "CRM"
+      ],
+      "search_keywords": [
+        "Business Analyst",
+        "Investment Analyst",
+        "industry research",
+        "market research",
+        "competitor analysis",
+        "investment analysis",
+        "FA project support",
+        "CRM tracking",
+        "meeting notes",
+        "Wind",
+        "Excel",
+        "PowerPoint",
+        "CRM",
+        "FA Intern",
+        "企查查",
+        "competitive landscape"
+      ],
+      "preferred_locations": [],
+      "work_arrangements": [
+        "internship"
+      ],
+      "company_preferences": [],
+      "profile_notes": [
+        "Profile is oriented toward research-heavy business, investment, and FA support search."
+      ],
+      "quality_warnings": [],
+      "missing_info_questions": [],
+      "coverage_notes": [
+        "search-ready profile coverage is strong"
+      ],
+      "quality_verdict": "strong"
+    },
+    {
+      "case_id": "mixed_language_resume",
+      "target_roles": [
+        "Backend Engineer",
+        "Research Engineer"
+      ],
+      "summary": "Search-ready profile aligned to Backend Engineer, Research Engineer, with core evidence around FastAPI, backend API, evaluation / testing.",
+      "target_directions": [
+        "Backend Engineer",
+        "Research Engineer"
+      ],
+      "core_skills": [
+        "FastAPI",
+        "backend API",
+        "evaluation / testing"
+      ],
+      "auxiliary_skills": [
+        "Python",
+        "Streamlit",
+        "SQLite",
+        "Git"
+      ],
+      "search_keywords": [
+        "Backend Engineer",
+        "Research Engineer",
+        "FastAPI",
+        "backend API",
+        "evaluation / testing",
+        "Python",
+        "Streamlit",
+        "SQLite",
+        "Git",
+        "AI Agent",
+        "LLM application",
+        "resume parsing",
+        "job matching",
+        "evaluation"
+      ],
+      "preferred_locations": [],
+      "work_arrangements": [],
+      "company_preferences": [],
+      "profile_notes": [],
+      "quality_warnings": [],
+      "missing_info_questions": [],
+      "coverage_notes": [
+        "search-ready profile coverage is strong"
+      ],
+      "quality_verdict": "strong"
+    },
+    {
+      "case_id": "weak_resume",
+      "target_roles": [],
+      "summary": "Profile information is limited and still needs target-direction confirmation. Current evidence mainly points to a small Python-related starting point.",
+      "target_directions": [],
+      "core_skills": [],
+      "auxiliary_skills": [],
+      "search_keywords": [
+        "Python"
+      ],
+      "preferred_locations": [],
+      "work_arrangements": [],
+      "company_preferences": [],
+      "profile_notes": [
+        "Project-heavy profile with limited formal work experience evidence.",
+        "Target directions still need explicit user confirmation.",
+        "Open quality follow-up: resume profile has no project evidence."
+      ],
+      "quality_warnings": [
+        "resume profile has no project evidence",
+        "resume profile has no work experience evidence",
+        "target role is not explicit",
+        "resume profile has no highlights or measurable outcomes"
+      ],
+      "missing_info_questions": [
+        "What target roles should this profile prioritize, such as AI Agent Engineer, Backend Engineer, or Embedded Software Engineer?",
+        "Which project best demonstrates your target role fit? Please add project goal, technologies, your responsibilities, and outcomes.",
+        "Do you have internship, lab, research, or course project experience that should be treated as work-like evidence?",
+        "Can you add measurable outcomes, such as number of APIs, tests passed, latency, users, dataset size, or accuracy?"
+      ],
+      "coverage_notes": [
+        "missing info questions preserved for weak profile"
+      ],
+      "quality_verdict": "acceptable"
+    },
+    {
+      "case_id": "anker_ai_health_algorithm",
+      "target_roles": [
+        "AI Health Algorithm Intern",
+        "Physiological Signal Processing Intern",
+        "Biomedical AI Intern"
+      ],
+      "summary": "Search-ready profile aligned to AI Health Algorithm Intern, Physiological Signal Processing Intern, Biomedical AI Intern, with core evidence around AI health algorithm, physiological signal processing, PPG, ECG. Preferred locations include Shenzhen.",
+      "target_directions": [
+        "AI Health Algorithm Intern",
+        "Physiological Signal Processing Intern",
+        "Biomedical AI Intern"
+      ],
+      "core_skills": [
+        "AI health algorithm",
+        "physiological signal processing",
+        "PPG",
+        "ECG",
+        "ACC",
+        "wearable health monitoring",
+        "health analytics",
+        "feature extraction",
+        "signal segmentation"
+      ],
+      "auxiliary_skills": [
+        "Python",
+        "MATLAB",
+        "PyTorch",
+        "TensorFlow",
+        "NumPy",
+        "Pandas",
+        "SciPy",
+        "Matplotlib"
+      ],
+      "search_keywords": [
+        "AI Health Algorithm Intern",
+        "Physiological Signal Processing Intern",
+        "Biomedical AI Intern",
+        "AI health algorithm",
+        "physiological signal processing",
+        "PPG",
+        "ECG",
+        "ACC",
+        "wearable health monitoring",
+        "health analytics",
+        "feature extraction",
+        "signal segmentation",
+        "Python",
+        "MATLAB",
+        "PyTorch",
+        "TensorFlow",
+        "NumPy",
+        "Pandas",
+        "SciPy",
+        "Matplotlib",
+        "blood oxygen",
+        "heart rate",
+        "blood pressure",
+        "biosignal",
+        "C",
+        "CNN",
+        "RNN",
+        "denoising"
+      ],
+      "preferred_locations": [
+        "Shenzhen"
+      ],
+      "work_arrangements": [
+        "internship"
+      ],
+      "company_preferences": [
+        "wearable health",
+        "biomedical AI"
+      ],
+      "profile_notes": [
+        "Location preference: Shenzhen.",
+        "Profile is oriented toward wearable health, biosignal, and AI health algorithm search."
+      ],
+      "quality_warnings": [],
+      "missing_info_questions": [],
+      "coverage_notes": [
+        "search-ready profile coverage is strong"
+      ],
+      "quality_verdict": "strong"
+    },
+    {
+      "case_id": "realistic_noisy_chinese_resume",
+      "target_roles": [
+        "AI Agent Intern",
+        "Backend Engineer Intern",
+        "Data Analyst Intern"
+      ],
+      "summary": "Search-ready profile aligned to AI Agent Intern, Backend Engineer Intern, Data Analyst Intern, with core evidence around MFCC, STFT, CNN, AI Agent.",
+      "target_directions": [
+        "AI Agent Intern",
+        "Backend Engineer Intern",
+        "Data Analyst Intern"
+      ],
+      "core_skills": [
+        "MFCC",
+        "STFT",
+        "CNN",
+        "AI Agent",
+        "FastAPI",
+        "backend API"
+      ],
+      "auxiliary_skills": [
+        "Python",
+        "PyTorch",
+        "Librosa",
+        "NumPy",
+        "Pandas",
+        "Streamlit",
+        "SQLite",
+        "Git"
+      ],
+      "search_keywords": [
+        "AI Agent Intern",
+        "Backend Engineer Intern",
+        "Data Analyst Intern",
+        "MFCC",
+        "STFT",
+        "CNN",
+        "AI Agent",
+        "FastAPI",
+        "backend API",
+        "Python",
+        "PyTorch",
+        "Librosa",
+        "NumPy",
+        "Pandas",
+        "Streamlit",
+        "SQLite",
+        "Git",
+        "audio classification",
+        "ASR",
+        "validation accuracy",
+        "error analysis",
+        "Backend Engineer",
+        "LLM application",
+        "resume parsing",
+        "job matching",
+        "evaluation"
+      ],
+      "preferred_locations": [],
+      "work_arrangements": [
+        "internship"
+      ],
+      "company_preferences": [],
+      "profile_notes": [],
+      "quality_warnings": [],
+      "missing_info_questions": [],
+      "coverage_notes": [
+        "search-ready profile coverage is strong"
+      ],
+      "quality_verdict": "strong"
+    },
+    {
+      "case_id": "realistic_business_resume_unstructured",
+      "target_roles": [
+        "Business Analyst",
+        "Investment Analyst",
+        "FA Intern"
+      ],
+      "summary": "Search-ready profile aligned to Business Analyst, Investment Analyst, FA Intern, with core evidence around industry research, market research, competitor analysis, investment analysis.",
+      "target_directions": [
+        "Business Analyst",
+        "Investment Analyst",
+        "FA Intern"
+      ],
+      "core_skills": [
+        "industry research",
+        "market research",
+        "competitor analysis",
+        "investment analysis",
+        "FA project support",
+        "CRM tracking",
+        "meeting notes"
+      ],
+      "auxiliary_skills": [
+        "Wind",
+        "企查查",
+        "Excel",
+        "PowerPoint",
+        "CRM"
+      ],
+      "search_keywords": [
+        "Business Analyst",
+        "Investment Analyst",
+        "FA Intern",
+        "industry research",
+        "market research",
+        "competitor analysis",
+        "investment analysis",
+        "FA project support",
+        "CRM tracking",
+        "meeting notes",
+        "Wind",
+        "企查查",
+        "Excel",
+        "PowerPoint",
+        "CRM",
+        "FA"
+      ],
+      "preferred_locations": [],
+      "work_arrangements": [
+        "internship"
+      ],
+      "company_preferences": [],
+      "profile_notes": [
+        "Profile is oriented toward research-heavy business, investment, and FA support search."
+      ],
+      "quality_warnings": [],
+      "missing_info_questions": [],
+      "coverage_notes": [
+        "search-ready profile coverage is strong"
+      ],
+      "quality_verdict": "strong"
+    }
+  ]
+}

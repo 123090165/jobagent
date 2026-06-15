@@ -59,6 +59,78 @@ After confirming a profile, demo `Save Confirmed Profile`, then open `Saved
 Profiles` to show the new record summary and detail. Suggestion decisions and
 missing-info answers are preserved as JSON snapshots on the saved profile.
 
+v3.7 adds reproducible Profile Review Quality Evaluation artifacts under
+`docs/demo_outputs/profile_review_quality_eval/`. Use them when you want to
+show synthetic end-to-end profile review readiness without changing parser,
+enrichment, or job-search logic.
+
+v3.8 improves deterministic parser coverage for AI health, ML/audio, and
+business/FA resumes, and adds provider-configurable evaluation runs for
+`mock`, local `ollama`, and `deepseek`. Use the default
+`docs/demo_outputs/profile_review_quality_eval/` artifacts for stable demos;
+only use `profile_review_ollama_eval/` or `profile_review_deepseek_eval/`
+after filling a local `.env`. DeepSeek uses OpenAI-compatible chat completions
+with `deepseek-v4-flash` as the default model, and no real API key should ever
+be committed.
+
+v3.9a adds a deterministic SearchReadyProfile layer after profile review:
+
+```text
+resume text -> parser/profile review -> search-ready profile -> later search / analysis
+```
+
+Use `docs/demo_outputs/search_ready_profile_eval/` when you want to show how
+the parsed profile is converted into a Slate-like candidate summary with target
+directions, core skills, auxiliary skills, search keywords, preferences, and
+quality warnings, without calling an external LLM or changing search logic.
+
+v3.9b adds an editable Profile Draft review step on top of that layer:
+
+```text
+resume text -> parser/profile review -> search-ready profile -> editable profile draft -> confirmed payload
+```
+
+Demo it by pasting the Anker AI Health sample resume, reviewing the generated
+summary and chips, editing `search_keywords` or `preferred_locations`, saving a
+missing-info answer if needed, and clicking confirm to inspect the confirmed
+profile payload. This phase does not run job search from the same UI step.
+
+v3.9c turns that into a decoupled Profile Setup flow with explicit model
+selection:
+
+```text
+Step 1 Resume Input
+-> Step 2 Parsed Resume Review
+-> Step 3 Search-Ready Profile Draft
+-> Step 4 Profile Saved
+```
+
+Use `ollama` as the default local provider. Switch to `deepseek` only when you
+want cloud-provider metadata in the draft context. The parser and
+SearchReadyProfile builder remain deterministic-first, and mock remains internal
+fallback only.
+
+v3.9d productizes the entry into that same flow:
+
+```text
+upload txt/md resume or paste resume text
+-> Step 1 Add Resume
+-> Step 2 Parsed Resume Review
+-> Step 3 Search-Ready Profile Draft
+-> Step 4 Profile Saved
+```
+
+Use Profile Setup as the main starting point in demos. Uploaded files only
+extract text into the same `resume_text` field and still go through Profile
+Review and editable ProfileDraft confirmation. PDF, DOCX, OCR, and real JD
+search remain out of scope for this round.
+
+v3.9e polishes that homepage into a clearer user entry point. The app now opens
+with an empty Profile Setup input instead of a preloaded sample resume, keeps
+`Load sample resume` as an explicit demo action only, and reduces the sidebar
+to provider/model context. Treat the other tabs as later-stage follow-ons after
+the profile has been confirmed.
+
 适用对象：
 
 - 面试官

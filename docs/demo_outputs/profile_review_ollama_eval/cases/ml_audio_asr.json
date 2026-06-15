@@ -1,0 +1,345 @@
+{
+  "case_id": "ml_audio_asr",
+  "title": "ML Audio / ASR resume",
+  "target_roles": [
+    "Machine Learning Engineer",
+    "AI Engineer"
+  ],
+  "baseline_confidence_label": "strong",
+  "baseline_quality_warnings": [],
+  "baseline_missing_info_questions": [],
+  "parsed_skills": [
+    "Python",
+    "PyTorch",
+    "Librosa",
+    "NumPy",
+    "Pandas",
+    "CNN",
+    "ResNet",
+    "VGG",
+    "MFCC",
+    "STFT",
+    "Machine Learning",
+    "audio classification",
+    "ASR",
+    "validation accuracy",
+    "error analysis"
+  ],
+  "parsed_project_count": 2,
+  "parsed_work_experience_count": 3,
+  "parsed_education_count": 1,
+  "parsed_highlights": [
+    "Research Assistant, Audio Intelligence Lab",
+    "Ran dataset experiments and compared VGG and CNN baselines for speech tasks.",
+    "Highlights: Improved model accuracy and documented dataset quality issues.",
+    "Built PyTorch CNN and ResNet models using MFCC and STFT features on an environmental sound dataset.",
+    "Reached 95% validation accuracy on 300 evaluation clips."
+  ],
+  "profile_draft_summary": {
+    "skill_count": 15,
+    "project_count": 2,
+    "work_experience_count": 3,
+    "education_count": 1,
+    "highlight_count": 5,
+    "target_roles": [
+      "Machine Learning Engineer",
+      "AI Engineer"
+    ]
+  },
+  "enrichment_enabled": true,
+  "enrichment_suggestion_count": 0,
+  "enrichment_llm_success_count": 0,
+  "enrichment_fallback_count": 6,
+  "enrichment_discarded_suggestion_count": 0,
+  "enrichment_quality_warnings": [
+    "LLM profile enrichment unavailable; using deterministic baseline only"
+  ],
+  "accepted_suggestion_count": 0,
+  "edited_suggestion_count": 0,
+  "rejected_suggestion_count": 0,
+  "confirmed_confidence_label": "strong",
+  "confirmed_skill_count": 15,
+  "confirmed_project_count": 2,
+  "confirmed_work_experience_count": 3,
+  "confirmed_remaining_warnings": [],
+  "save_payload_ready": true,
+  "quality_verdict": "strong",
+  "reviewer_notes": [
+    "fallback_count=6"
+  ],
+  "save_payload_snapshot": {
+    "raw_resume_text": "Alex Chen\nTarget Roles: Machine Learning Engineer / AI Engineer\nSkills: Python, PyTorch, Librosa, NumPy, Pandas, CNN, ResNet, VGG, MFCC, STFT\nEducation: M.S. Data Science, City University\nProjects:\nAudio Classification Benchmark\n- Built PyTorch CNN and ResNet models using MFCC and STFT features on an environmental sound dataset.\n- Reached 95% validation accuracy on 300 evaluation clips.\nASR Error Analysis Tool\n- Used Librosa and Pandas to inspect transcription failures and dataset labeling issues.\nExperience:\nResearch Assistant, Audio Intelligence Lab\n- Ran dataset experiments and compared VGG and CNN baselines for speech tasks.\nHighlights: Improved model accuracy and documented dataset quality issues.",
+    "baseline_profile": {
+      "raw_text": "Alex Chen\nTarget Roles: Machine Learning Engineer / AI Engineer\nSkills: Python, PyTorch, Librosa, NumPy, Pandas, CNN, ResNet, VGG, MFCC, STFT\nEducation: M.S. Data Science, City University\nProjects:\nAudio Classification Benchmark\n- Built PyTorch CNN and ResNet models using MFCC and STFT features on an environmental sound dataset.\n- Reached 95% validation accuracy on 300 evaluation clips.\nASR Error Analysis Tool\n- Used Librosa and Pandas to inspect transcription failures and dataset labeling issues.\nExperience:\nResearch Assistant, Audio Intelligence Lab\n- Ran dataset experiments and compared VGG and CNN baselines for speech tasks.\nHighlights: Improved model accuracy and documented dataset quality issues.",
+      "name": "Alex Chen",
+      "education": [
+        {
+          "school": "City University",
+          "degree": "M.S.",
+          "major": "Data Science",
+          "raw_text": "M.S. Data Science, City University"
+        }
+      ],
+      "skills": [
+        "Python",
+        "PyTorch",
+        "Librosa",
+        "NumPy",
+        "Pandas",
+        "CNN",
+        "ResNet",
+        "VGG",
+        "MFCC",
+        "STFT",
+        "Machine Learning",
+        "audio classification",
+        "ASR",
+        "validation accuracy",
+        "error analysis"
+      ],
+      "projects": [
+        {
+          "name": "Audio Classification Benchmark",
+          "description": "Built PyTorch CNN and ResNet models using MFCC and STFT features on an environmental sound dataset. Reached 95% validation accuracy on 300 evaluation clips.",
+          "technologies": [
+            "PyTorch",
+            "audio classification",
+            "MFCC",
+            "STFT",
+            "CNN",
+            "ResNet",
+            "validation accuracy"
+          ],
+          "highlights": [
+            "Built PyTorch CNN and ResNet models using MFCC and STFT features on an environmental sound dataset.",
+            "Reached 95% validation accuracy on 300 evaluation clips."
+          ],
+          "raw_text": "Audio Classification Benchmark\nBuilt PyTorch CNN and ResNet models using MFCC and STFT features on an environmental sound dataset.\nReached 95% validation accuracy on 300 evaluation clips."
+        },
+        {
+          "name": "ASR Error Analysis Tool",
+          "description": "Used Librosa and Pandas to inspect transcription failures and dataset labeling issues.",
+          "technologies": [
+            "Pandas",
+            "Librosa",
+            "ASR",
+            "error analysis"
+          ],
+          "highlights": [
+            "ASR Error Analysis Tool",
+            "Used Librosa and Pandas to inspect transcription failures and dataset labeling issues."
+          ],
+          "raw_text": "ASR Error Analysis Tool\nUsed Librosa and Pandas to inspect transcription failures and dataset labeling issues."
+        }
+      ],
+      "work_experiences": [
+        {
+          "company": "Audio Intelligence Lab",
+          "role": "Research Assistant",
+          "description": "Research Assistant, Audio Intelligence Lab",
+          "technologies": [],
+          "raw_text": "Research Assistant, Audio Intelligence Lab"
+        },
+        {
+          "company": null,
+          "role": null,
+          "description": "Ran dataset experiments and compared VGG and CNN baselines for speech tasks.",
+          "technologies": [
+            "CNN",
+            "VGG"
+          ],
+          "raw_text": "Ran dataset experiments and compared VGG and CNN baselines for speech tasks."
+        },
+        {
+          "company": null,
+          "role": null,
+          "description": "Highlights: Improved model accuracy and documented dataset quality issues.",
+          "technologies": [],
+          "raw_text": "Highlights: Improved model accuracy and documented dataset quality issues."
+        }
+      ],
+      "certificates": [],
+      "highlights": [
+        "Research Assistant, Audio Intelligence Lab",
+        "Ran dataset experiments and compared VGG and CNN baselines for speech tasks.",
+        "Highlights: Improved model accuracy and documented dataset quality issues.",
+        "Built PyTorch CNN and ResNet models using MFCC and STFT features on an environmental sound dataset.",
+        "Reached 95% validation accuracy on 300 evaluation clips."
+      ],
+      "missing_info": []
+    },
+    "confirmed_result": {
+      "confirmed_profile": {
+        "raw_text": "Alex Chen\nTarget Roles: Machine Learning Engineer / AI Engineer\nSkills: Python, PyTorch, Librosa, NumPy, Pandas, CNN, ResNet, VGG, MFCC, STFT\nEducation: M.S. Data Science, City University\nProjects:\nAudio Classification Benchmark\n- Built PyTorch CNN and ResNet models using MFCC and STFT features on an environmental sound dataset.\n- Reached 95% validation accuracy on 300 evaluation clips.\nASR Error Analysis Tool\n- Used Librosa and Pandas to inspect transcription failures and dataset labeling issues.\nExperience:\nResearch Assistant, Audio Intelligence Lab\n- Ran dataset experiments and compared VGG and CNN baselines for speech tasks.\nHighlights: Improved model accuracy and documented dataset quality issues.",
+        "name": "Alex Chen",
+        "education": [
+          {
+            "school": "City University",
+            "degree": "M.S.",
+            "major": "Data Science",
+            "raw_text": "M.S. Data Science, City University"
+          }
+        ],
+        "skills": [
+          "Python",
+          "PyTorch",
+          "Librosa",
+          "NumPy",
+          "Pandas",
+          "CNN",
+          "ResNet",
+          "VGG",
+          "MFCC",
+          "STFT",
+          "Machine Learning",
+          "audio classification",
+          "ASR",
+          "validation accuracy",
+          "error analysis"
+        ],
+        "projects": [
+          {
+            "name": "Audio Classification Benchmark",
+            "description": "Built PyTorch CNN and ResNet models using MFCC and STFT features on an environmental sound dataset. Reached 95% validation accuracy on 300 evaluation clips.",
+            "technologies": [
+              "PyTorch",
+              "audio classification",
+              "MFCC",
+              "STFT",
+              "CNN",
+              "ResNet",
+              "validation accuracy"
+            ],
+            "highlights": [
+              "Built PyTorch CNN and ResNet models using MFCC and STFT features on an environmental sound dataset.",
+              "Reached 95% validation accuracy on 300 evaluation clips."
+            ],
+            "raw_text": "Audio Classification Benchmark\nBuilt PyTorch CNN and ResNet models using MFCC and STFT features on an environmental sound dataset.\nReached 95% validation accuracy on 300 evaluation clips."
+          },
+          {
+            "name": "ASR Error Analysis Tool",
+            "description": "Used Librosa and Pandas to inspect transcription failures and dataset labeling issues.",
+            "technologies": [
+              "Pandas",
+              "Librosa",
+              "ASR",
+              "error analysis"
+            ],
+            "highlights": [
+              "ASR Error Analysis Tool",
+              "Used Librosa and Pandas to inspect transcription failures and dataset labeling issues."
+            ],
+            "raw_text": "ASR Error Analysis Tool\nUsed Librosa and Pandas to inspect transcription failures and dataset labeling issues."
+          }
+        ],
+        "work_experiences": [
+          {
+            "company": "Audio Intelligence Lab",
+            "role": "Research Assistant",
+            "description": "Research Assistant, Audio Intelligence Lab",
+            "technologies": [],
+            "raw_text": "Research Assistant, Audio Intelligence Lab"
+          },
+          {
+            "company": null,
+            "role": null,
+            "description": "Ran dataset experiments and compared VGG and CNN baselines for speech tasks.",
+            "technologies": [
+              "CNN",
+              "VGG"
+            ],
+            "raw_text": "Ran dataset experiments and compared VGG and CNN baselines for speech tasks."
+          },
+          {
+            "company": null,
+            "role": null,
+            "description": "Highlights: Improved model accuracy and documented dataset quality issues.",
+            "technologies": [],
+            "raw_text": "Highlights: Improved model accuracy and documented dataset quality issues."
+          }
+        ],
+        "certificates": [],
+        "highlights": [
+          "Research Assistant, Audio Intelligence Lab",
+          "Ran dataset experiments and compared VGG and CNN baselines for speech tasks.",
+          "Highlights: Improved model accuracy and documented dataset quality issues.",
+          "Built PyTorch CNN and ResNet models using MFCC and STFT features on an environmental sound dataset.",
+          "Reached 95% validation accuracy on 300 evaluation clips."
+        ],
+        "missing_info": []
+      },
+      "user_confirmed_data": {
+        "target_roles": [
+          "Machine Learning Engineer",
+          "AI Engineer"
+        ],
+        "preferred_locations": [],
+        "additional_skills": [
+          "Python",
+          "PyTorch",
+          "Librosa",
+          "NumPy",
+          "Pandas",
+          "CNN",
+          "ResNet",
+          "VGG",
+          "MFCC",
+          "STFT",
+          "Machine Learning",
+          "audio classification",
+          "ASR",
+          "validation accuracy",
+          "error analysis"
+        ],
+        "project_clarifications": [
+          "Audio Classification Benchmark | Built PyTorch CNN and ResNet models using MFCC and STFT features on an environmental sound dataset. Reached 95% validation accuracy on 300 evaluation clips. | PyTorch, audio classification, MFCC, STFT, CNN, ResNet, validation accuracy | Built PyTorch CNN and ResNet models using MFCC and STFT features on an environmental sound dataset.; Reached 95% validation accuracy on 300 evaluation clips.",
+          "ASR Error Analysis Tool | Used Librosa and Pandas to inspect transcription failures and dataset labeling issues. | Pandas, Librosa, ASR, error analysis | ASR Error Analysis Tool; Used Librosa and Pandas to inspect transcription failures and dataset labeling issues."
+        ],
+        "work_experience_clarifications": [
+          "Audio Intelligence Lab | Research Assistant | Research Assistant, Audio Intelligence Lab",
+          "Ran dataset experiments and compared VGG and CNN baselines for speech tasks. | CNN, VGG",
+          "Highlights: Improved model accuracy and documented dataset quality issues."
+        ],
+        "constraints": [],
+        "notes": null
+      },
+      "confirmation_summary": {
+        "confirmed_sections": [
+          "target_roles",
+          "skills",
+          "projects",
+          "work_experiences"
+        ],
+        "added_target_roles": [
+          "Machine Learning Engineer",
+          "AI Engineer"
+        ],
+        "added_skills": [
+          "Python",
+          "PyTorch",
+          "Librosa",
+          "NumPy",
+          "Pandas",
+          "CNN",
+          "ResNet",
+          "VGG",
+          "MFCC",
+          "STFT",
+          "Machine Learning",
+          "audio classification",
+          "ASR",
+          "validation accuracy",
+          "error analysis"
+        ],
+        "added_project_clarifications_count": 2,
+        "added_work_experience_clarifications_count": 3,
+        "constraints_count": 0
+      },
+      "remaining_warnings": [],
+      "confidence_label": "strong"
+    },
+    "suggestion_decisions": [],
+    "missing_info_answers": [],
+    "notes": null
+  }
+}

@@ -1,0 +1,333 @@
+{
+  "case_id": "finance_fa_analysis",
+  "title": "Finance / FA analysis resume",
+  "target_roles": [
+    "Business Analyst",
+    "Investment Analyst"
+  ],
+  "baseline_confidence_label": "strong",
+  "baseline_quality_warnings": [],
+  "baseline_missing_info_questions": [],
+  "parsed_skills": [
+    "Excel",
+    "PowerPoint",
+    "Wind",
+    "CRM",
+    "market research",
+    "competitor analysis",
+    "industry research",
+    "competitive landscape",
+    "deal memo",
+    "meeting notes",
+    "peer mapping",
+    "market size",
+    "FA"
+  ],
+  "parsed_project_count": 2,
+  "parsed_work_experience_count": 3,
+  "parsed_education_count": 1,
+  "parsed_highlights": [
+    "Excel, PowerPoint, Wind, CRM, market research, competitor analysis",
+    "Used Wind and Qichacha for industry research, peer mapping, and deal memo support.",
+    "Prepared CRM updates, meeting notes, and competitor analysis summaries.",
+    "New Energy Sector Research",
+    "Analyzed market size, business models, and competitive landscape for listed companies."
+  ],
+  "profile_draft_summary": {
+    "skill_count": 13,
+    "project_count": 2,
+    "work_experience_count": 3,
+    "education_count": 1,
+    "highlight_count": 5,
+    "target_roles": [
+      "Business Analyst",
+      "Investment Analyst"
+    ]
+  },
+  "enrichment_enabled": true,
+  "enrichment_suggestion_count": 0,
+  "enrichment_llm_success_count": 6,
+  "enrichment_fallback_count": 0,
+  "enrichment_discarded_suggestion_count": 6,
+  "enrichment_quality_warnings": [
+    "discarded ungrounded profile enrichment suggestion"
+  ],
+  "accepted_suggestion_count": 0,
+  "edited_suggestion_count": 0,
+  "rejected_suggestion_count": 0,
+  "confirmed_confidence_label": "strong",
+  "confirmed_skill_count": 13,
+  "confirmed_project_count": 2,
+  "confirmed_work_experience_count": 3,
+  "confirmed_remaining_warnings": [],
+  "save_payload_ready": true,
+  "quality_verdict": "strong",
+  "reviewer_notes": [
+    "discarded 6 unsupported enrichment suggestions"
+  ],
+  "save_payload_snapshot": {
+    "raw_resume_text": "Zhao Xin\nTarget Roles: Business Analyst / Investment Analyst\nSkills: Excel, PowerPoint, Wind, CRM, market research, competitor analysis\nEducation: B.A. Finance, CUHKSZ\nExperience:\nFA Intern, Horizon Capital\n- Used Wind and Qichacha for industry research, peer mapping, and deal memo support.\n- Prepared CRM updates, meeting notes, and competitor analysis summaries.\nProjects:\nNew Energy Sector Research\n- Analyzed market size, business models, and competitive landscape for listed companies.\nHighlights: Completed investor meeting notes and delivered structured research reports.",
+    "baseline_profile": {
+      "raw_text": "Zhao Xin\nTarget Roles: Business Analyst / Investment Analyst\nSkills: Excel, PowerPoint, Wind, CRM, market research, competitor analysis\nEducation: B.A. Finance, CUHKSZ\nExperience:\nFA Intern, Horizon Capital\n- Used Wind and Qichacha for industry research, peer mapping, and deal memo support.\n- Prepared CRM updates, meeting notes, and competitor analysis summaries.\nProjects:\nNew Energy Sector Research\n- Analyzed market size, business models, and competitive landscape for listed companies.\nHighlights: Completed investor meeting notes and delivered structured research reports.",
+      "name": "Zhao Xin",
+      "education": [
+        {
+          "school": "CUHKSZ",
+          "degree": null,
+          "major": "B.A. Finance",
+          "raw_text": "B.A. Finance, CUHKSZ"
+        }
+      ],
+      "skills": [
+        "Excel",
+        "PowerPoint",
+        "Wind",
+        "CRM",
+        "market research",
+        "competitor analysis",
+        "industry research",
+        "competitive landscape",
+        "deal memo",
+        "meeting notes",
+        "peer mapping",
+        "market size",
+        "FA"
+      ],
+      "projects": [
+        {
+          "name": "New Energy Sector Research",
+          "description": "Analyzed market size, business models, and competitive landscape for listed companies.",
+          "technologies": [
+            "competitive landscape",
+            "market size"
+          ],
+          "highlights": [
+            "New Energy Sector Research",
+            "Analyzed market size, business models, and competitive landscape for listed companies."
+          ],
+          "raw_text": "New Energy Sector Research\nAnalyzed market size, business models, and competitive landscape for listed companies."
+        },
+        {
+          "name": "Highlights",
+          "description": "Completed investor meeting notes and delivered structured research reports.",
+          "technologies": [
+            "meeting notes"
+          ],
+          "highlights": [
+            "Highlights: Completed investor meeting notes and delivered structured research reports."
+          ],
+          "raw_text": "Highlights: Completed investor meeting notes and delivered structured research reports."
+        }
+      ],
+      "work_experiences": [
+        {
+          "company": "Horizon Capital",
+          "role": "FA Intern",
+          "description": "FA Intern, Horizon Capital",
+          "technologies": [
+            "FA"
+          ],
+          "raw_text": "FA Intern, Horizon Capital"
+        },
+        {
+          "company": null,
+          "role": null,
+          "description": "Used Wind and Qichacha for industry research, peer mapping, and deal memo support.",
+          "technologies": [
+            "industry research",
+            "deal memo",
+            "peer mapping",
+            "Wind"
+          ],
+          "raw_text": "Used Wind and Qichacha for industry research, peer mapping, and deal memo support."
+        },
+        {
+          "company": null,
+          "role": null,
+          "description": "Prepared CRM updates, meeting notes, and competitor analysis summaries.",
+          "technologies": [
+            "competitor analysis",
+            "meeting notes",
+            "CRM"
+          ],
+          "raw_text": "Prepared CRM updates, meeting notes, and competitor analysis summaries."
+        }
+      ],
+      "certificates": [],
+      "highlights": [
+        "Excel, PowerPoint, Wind, CRM, market research, competitor analysis",
+        "Used Wind and Qichacha for industry research, peer mapping, and deal memo support.",
+        "Prepared CRM updates, meeting notes, and competitor analysis summaries.",
+        "New Energy Sector Research",
+        "Analyzed market size, business models, and competitive landscape for listed companies."
+      ],
+      "missing_info": []
+    },
+    "confirmed_result": {
+      "confirmed_profile": {
+        "raw_text": "Zhao Xin\nTarget Roles: Business Analyst / Investment Analyst\nSkills: Excel, PowerPoint, Wind, CRM, market research, competitor analysis\nEducation: B.A. Finance, CUHKSZ\nExperience:\nFA Intern, Horizon Capital\n- Used Wind and Qichacha for industry research, peer mapping, and deal memo support.\n- Prepared CRM updates, meeting notes, and competitor analysis summaries.\nProjects:\nNew Energy Sector Research\n- Analyzed market size, business models, and competitive landscape for listed companies.\nHighlights: Completed investor meeting notes and delivered structured research reports.",
+        "name": "Zhao Xin",
+        "education": [
+          {
+            "school": "CUHKSZ",
+            "degree": null,
+            "major": "B.A. Finance",
+            "raw_text": "B.A. Finance, CUHKSZ"
+          }
+        ],
+        "skills": [
+          "Excel",
+          "PowerPoint",
+          "Wind",
+          "CRM",
+          "market research",
+          "competitor analysis",
+          "industry research",
+          "competitive landscape",
+          "deal memo",
+          "meeting notes",
+          "peer mapping",
+          "market size",
+          "FA"
+        ],
+        "projects": [
+          {
+            "name": "New Energy Sector Research",
+            "description": "Analyzed market size, business models, and competitive landscape for listed companies.",
+            "technologies": [
+              "competitive landscape",
+              "market size"
+            ],
+            "highlights": [
+              "New Energy Sector Research",
+              "Analyzed market size, business models, and competitive landscape for listed companies."
+            ],
+            "raw_text": "New Energy Sector Research\nAnalyzed market size, business models, and competitive landscape for listed companies."
+          },
+          {
+            "name": "Highlights",
+            "description": "Completed investor meeting notes and delivered structured research reports.",
+            "technologies": [
+              "meeting notes"
+            ],
+            "highlights": [
+              "Highlights: Completed investor meeting notes and delivered structured research reports."
+            ],
+            "raw_text": "Highlights: Completed investor meeting notes and delivered structured research reports."
+          }
+        ],
+        "work_experiences": [
+          {
+            "company": "Horizon Capital",
+            "role": "FA Intern",
+            "description": "FA Intern, Horizon Capital",
+            "technologies": [
+              "FA"
+            ],
+            "raw_text": "FA Intern, Horizon Capital"
+          },
+          {
+            "company": null,
+            "role": null,
+            "description": "Used Wind and Qichacha for industry research, peer mapping, and deal memo support.",
+            "technologies": [
+              "industry research",
+              "deal memo",
+              "peer mapping",
+              "Wind"
+            ],
+            "raw_text": "Used Wind and Qichacha for industry research, peer mapping, and deal memo support."
+          },
+          {
+            "company": null,
+            "role": null,
+            "description": "Prepared CRM updates, meeting notes, and competitor analysis summaries.",
+            "technologies": [
+              "competitor analysis",
+              "meeting notes",
+              "CRM"
+            ],
+            "raw_text": "Prepared CRM updates, meeting notes, and competitor analysis summaries."
+          }
+        ],
+        "certificates": [],
+        "highlights": [
+          "Excel, PowerPoint, Wind, CRM, market research, competitor analysis",
+          "Used Wind and Qichacha for industry research, peer mapping, and deal memo support.",
+          "Prepared CRM updates, meeting notes, and competitor analysis summaries.",
+          "New Energy Sector Research",
+          "Analyzed market size, business models, and competitive landscape for listed companies."
+        ],
+        "missing_info": []
+      },
+      "user_confirmed_data": {
+        "target_roles": [
+          "Business Analyst",
+          "Investment Analyst"
+        ],
+        "preferred_locations": [],
+        "additional_skills": [
+          "Excel",
+          "PowerPoint",
+          "Wind",
+          "CRM",
+          "market research",
+          "competitor analysis",
+          "industry research",
+          "competitive landscape",
+          "deal memo",
+          "meeting notes",
+          "peer mapping",
+          "market size",
+          "FA"
+        ],
+        "project_clarifications": [
+          "New Energy Sector Research | Analyzed market size, business models, and competitive landscape for listed companies. | competitive landscape, market size | New Energy Sector Research; Analyzed market size, business models, and competitive landscape for listed companies.",
+          "Highlights | Completed investor meeting notes and delivered structured research reports. | meeting notes | Highlights: Completed investor meeting notes and delivered structured research reports."
+        ],
+        "work_experience_clarifications": [
+          "Horizon Capital | FA Intern | FA Intern, Horizon Capital | FA",
+          "Used Wind and Qichacha for industry research, peer mapping, and deal memo support. | industry research, deal memo, peer mapping, Wind",
+          "Prepared CRM updates, meeting notes, and competitor analysis summaries. | competitor analysis, meeting notes, CRM"
+        ],
+        "constraints": [],
+        "notes": null
+      },
+      "confirmation_summary": {
+        "confirmed_sections": [
+          "target_roles",
+          "skills",
+          "projects",
+          "work_experiences"
+        ],
+        "added_target_roles": [
+          "Business Analyst",
+          "Investment Analyst"
+        ],
+        "added_skills": [
+          "Excel",
+          "PowerPoint",
+          "Wind",
+          "CRM",
+          "market research",
+          "competitor analysis",
+          "industry research",
+          "competitive landscape",
+          "deal memo",
+          "meeting notes",
+          "peer mapping",
+          "market size",
+          "FA"
+        ],
+        "added_project_clarifications_count": 2,
+        "added_work_experience_clarifications_count": 3,
+        "constraints_count": 0
+      },
+      "remaining_warnings": [],
+      "confidence_label": "strong"
+    },
+    "suggestion_decisions": [],
+    "missing_info_answers": [],
+    "notes": null
+  }
+}

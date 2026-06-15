@@ -1,0 +1,63 @@
+{
+  "case_id": "ai_agent_backend",
+  "target_roles": [
+    "AI Agent Engineer",
+    "Backend Engineer"
+  ],
+  "summary": "Search-ready profile aligned to AI Agent Engineer, Backend Engineer, with core evidence around AI Agent, FastAPI, LangGraph, LangChain. Preferred locations include Shenzhen.",
+  "target_directions": [
+    "AI Agent Engineer",
+    "Backend Engineer"
+  ],
+  "core_skills": [
+    "AI Agent",
+    "FastAPI",
+    "LangGraph",
+    "LangChain",
+    "backend API",
+    "evaluation / testing"
+  ],
+  "auxiliary_skills": [
+    "Python",
+    "Streamlit",
+    "SQLite",
+    "Pydantic",
+    "Git"
+  ],
+  "search_keywords": [
+    "AI Agent Engineer",
+    "Backend Engineer",
+    "AI Agent",
+    "FastAPI",
+    "LangGraph",
+    "LangChain",
+    "backend API",
+    "evaluation / testing",
+    "Python",
+    "Streamlit",
+    "SQLite",
+    "Pydantic",
+    "Git",
+    "LLM application",
+    "resume parsing",
+    "job matching",
+    "evaluation",
+    "pytest"
+  ],
+  "preferred_locations": [
+    "Shenzhen"
+  ],
+  "work_arrangements": [
+    "internship"
+  ],
+  "company_preferences": [],
+  "profile_notes": [
+    "Location preference: Shenzhen."
+  ],
+  "quality_warnings": [],
+  "missing_info_questions": [],
+  "coverage_notes": [
+    "search-ready profile coverage is strong"
+  ],
+  "quality_verdict": "strong"
+}

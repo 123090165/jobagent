@@ -3,13 +3,25 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any
 
+from app.schemas.profile_draft import ProfileDraft
 from app.schemas.profile_review import ResumeProfileUserEdits
+
+PROFILE_FLOW_STEP_KEY = "profile_flow_step"
+PROFILE_FLOW_PROVIDER_KEY = "profile_flow_selected_provider"
+PROFILE_FLOW_PROVIDER_META_KEY = "profile_flow_selected_provider_metadata"
+PROFILE_FLOW_STEPS = {
+    "resume_input",
+    "parsed_review",
+    "profile_draft",
+    "profile_saved",
+}
 
 PROFILE_REVIEW_STATE_KEYS = {
     "resume_text",
     "target_roles",
     "baseline_review",
     "enrichment_result",
+    "profile_flow_profile_draft",
     "profile_draft",
     "accepted_suggestions",
     "rejected_suggestions",
@@ -17,6 +29,16 @@ PROFILE_REVIEW_STATE_KEYS = {
     "confirmed_profile_result",
     "missing_info_answers",
     "saved_confirmed_profile_id",
+    "profile_draft_confirmed_payload",
+    "profile_flow_uploaded_filename",
+    "profile_flow_uploaded_file_type",
+    "profile_flow_uploaded_text_length",
+    "profile_flow_sample_resume",
+    "profile_flow_resume_input_source",
+    "profile_flow_upload_error",
+    PROFILE_FLOW_STEP_KEY,
+    PROFILE_FLOW_PROVIDER_KEY,
+    PROFILE_FLOW_PROVIDER_META_KEY,
 }
 
 LIST_FIELD_ALIASES = {
@@ -51,6 +73,49 @@ def build_profile_draft_from_baseline(
         "constraints": [],
         "notes": "",
     }
+
+
+def set_profile_draft_state(
+    session_state: dict[str, Any],
+    draft: ProfileDraft,
+) -> None:
+    session_state["profile_flow_profile_draft"] = draft
+    # Backward-compatible alias for older tests or helper paths.
+    session_state["profile_draft"] = draft
+    session_state["profile_draft_confirmed_payload"] = None
+
+
+def set_confirmed_profile_draft_payload(
+    session_state: dict[str, Any],
+    payload: dict[str, Any],
+) -> None:
+    session_state["profile_draft_confirmed_payload"] = payload
+
+
+def get_profile_flow_step(session_state: dict[str, Any]) -> str:
+    step = str(session_state.get(PROFILE_FLOW_STEP_KEY) or "resume_input")
+    if step not in PROFILE_FLOW_STEPS:
+        return "resume_input"
+    return step
+
+
+def set_profile_flow_step(session_state: dict[str, Any], step: str) -> None:
+    session_state[PROFILE_FLOW_STEP_KEY] = (
+        step if step in PROFILE_FLOW_STEPS else "resume_input"
+    )
+
+
+def get_selected_provider(session_state: dict[str, Any]) -> str:
+    return str(session_state.get(PROFILE_FLOW_PROVIDER_KEY) or "ollama")
+
+
+def set_selected_provider(
+    session_state: dict[str, Any],
+    provider: str,
+    metadata: dict[str, Any] | None = None,
+) -> None:
+    session_state[PROFILE_FLOW_PROVIDER_KEY] = provider or "ollama"
+    session_state[PROFILE_FLOW_PROVIDER_META_KEY] = metadata or {}
 
 
 def dedupe_skills(skills: list[str]) -> list[str]:
