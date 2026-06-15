@@ -36,6 +36,8 @@ Vue 3 with Vite and TypeScript gives the product frontend:
 - Backend orchestration belongs in `app/application`.
 - Backend implementation details stay behind `app/api/v1`.
 - Streamlit remains available for legacy demos and admin-style internal testing.
+- Backend `ProfileSession.current_step` is the source of truth for route access.
+- Session-based Vue pages must fetch `ProfileSession` before entry and redirect according to `docs/V4_FRONTEND_ROUTE_GUARDS.md`.
 
 ## Migration Route
 
@@ -44,6 +46,21 @@ Vue 3 with Vite and TypeScript gives the product frontend:
 3. Add `/api/v1` endpoints around the ProfileSession flow.
 4. Move user-facing Profile Creation screens into Vue page by page.
 5. Keep parser and LLM services behind FastAPI.
-6. Add persistence for ProfileSession and related resources after the contract is stable.
+6. Add minimal persistence for `ProfileSession` and `ResumeDocument` at v4.1 Resume Intake.
+7. Keep expensive generation steps idempotent and require explicit regenerate actions.
 
 This round only starts that route. It does not migrate the full Profile Setup flow, rewrite the parser, or implement job search.
+
+## Route Guard Plan
+
+Vue route guards should live in `web/src/router` and the frontend store layer.
+
+For any session-based page, the frontend should:
+
+```text
+1. GET /api/v1/profile-sessions/{session_id}
+2. check current_step
+3. allow or redirect based on the v4 route guard table
+```
+
+The backend remains the source of truth. The frontend may cache session state for UI responsiveness, but cached state must not override the backend.
