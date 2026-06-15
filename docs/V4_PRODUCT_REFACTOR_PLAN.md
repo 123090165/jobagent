@@ -408,6 +408,8 @@ npm run build
 
 ### v4.1 - Resume Intake Flow
 
+Status: implemented.
+
 Goal:
 
 Make the Vue homepage usable for the first real user action.
@@ -461,6 +463,7 @@ Acceptance criteria:
 - upload txt works
 - upload md works
 - paste text works
+- GET /api/v1/profile-sessions/{session_id}/resume returns the current ResumeDocument
 - unsupported file shows clear error
 - empty file/text shows clear error
 - frontend never imports backend service

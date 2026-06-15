@@ -92,6 +92,9 @@ Implemented in this skeleton:
 ```text
 POST /api/v1/profile-sessions
 GET  /api/v1/profile-sessions/{session_id}
+POST /api/v1/profile-sessions/{session_id}/resume-text
+POST /api/v1/profile-sessions/{session_id}/resume-file
+GET  /api/v1/profile-sessions/{session_id}/resume
 ```
 
 Planned contract routes:
@@ -134,7 +137,7 @@ Generation endpoints are idempotent by default. If a current result already exis
   "parsed_review_id": null,
   "profile_draft_id": null,
   "confirmed_profile_id": null,
-  "current_step": "resume_intake"
+  "current_step": "created"
 }
 ```
 
@@ -146,6 +149,17 @@ Unknown sessions return:
 {
   "detail": "Profile session not found.",
   "error_code": "profile_session_not_found"
+}
+```
+
+`GET /api/v1/profile-sessions/{session_id}/resume` returns the current `ResumeDocument` resource for that session.
+
+If the session exists but no current resume has been stored yet, the endpoint returns:
+
+```json
+{
+  "detail": "Resume document not found for this session.",
+  "error_code": "resume_document_not_found"
 }
 ```
 

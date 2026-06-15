@@ -1,6 +1,14 @@
 <script setup lang="ts">
+const props = withDefaults(
+  defineProps<{
+    activeIndex?: number;
+  }>(),
+  {
+    activeIndex: 0
+  }
+);
+
 const steps = ["Resume", "Profile", "Search", "Brief"];
-const activeIndex = 0;
 </script>
 
 <template>
@@ -9,7 +17,10 @@ const activeIndex = 0;
       v-for="(step, index) in steps"
       :key="step"
       class="step-item"
-      :class="{ 'is-active': index === activeIndex, 'is-complete': index < activeIndex }"
+      :class="{
+        'is-active': index === props.activeIndex,
+        'is-complete': index < props.activeIndex
+      }"
     >
       <span class="step-line" aria-hidden="true" />
       <span class="step-label">{{ step }}</span>

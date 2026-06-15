@@ -137,6 +137,31 @@ def init_database(connection: sqlite3.Connection) -> None:
             updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (resume_record_id) REFERENCES resume_records(id)
         );
+
+        CREATE TABLE IF NOT EXISTS profile_sessions (
+            session_id TEXT PRIMARY KEY,
+            status TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            resume_document_id TEXT,
+            parsed_review_id TEXT,
+            profile_draft_id TEXT,
+            confirmed_profile_id TEXT,
+            current_step TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS resume_documents (
+            resume_document_id TEXT PRIMARY KEY,
+            session_id TEXT NOT NULL,
+            source_type TEXT NOT NULL,
+            filename TEXT,
+            file_type TEXT,
+            text TEXT NOT NULL,
+            text_length INTEGER NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY (session_id) REFERENCES profile_sessions(session_id)
+        );
         """
     )
     _ensure_column(connection, "analysis_records", "application_id", "INTEGER")

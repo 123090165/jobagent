@@ -21,7 +21,7 @@ Recommended development default:
 
 ```text
 database: SQLite
-ORM: SQLAlchemy
+implementation style: existing sqlite3 repository pattern
 ```
 
 Acceptance requirement for v4.1:
