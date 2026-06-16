@@ -114,6 +114,38 @@ class ProfileSessionRepository:
                 return None
         return self.get(session_id)
 
+    def attach_parsed_review(
+        self,
+        *,
+        session_id: str,
+        parsed_review_id: str,
+    ) -> ProfileSession | None:
+        updated_at = _utc_now()
+        with get_connection() as connection:
+            init_database(connection)
+            cursor = connection.execute(
+                """
+                UPDATE profile_sessions
+                SET
+                    parsed_review_id = ?,
+                    profile_draft_id = NULL,
+                    confirmed_profile_id = NULL,
+                    current_step = ?,
+                    updated_at = ?
+                WHERE session_id = ?
+                """,
+                (
+                    parsed_review_id,
+                    ProfileSessionStep.resume_review.value,
+                    updated_at.isoformat(),
+                    session_id,
+                ),
+            )
+            connection.commit()
+            if cursor.rowcount == 0:
+                return None
+        return self.get(session_id)
+
     @staticmethod
     def _row_to_profile_session(row: object) -> ProfileSession:
         return ProfileSession(

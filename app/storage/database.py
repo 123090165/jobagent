@@ -162,6 +162,25 @@ def init_database(connection: sqlite3.Connection) -> None:
             updated_at TEXT NOT NULL,
             FOREIGN KEY (session_id) REFERENCES profile_sessions(session_id)
         );
+
+        CREATE TABLE IF NOT EXISTS parsed_resume_reviews (
+            parsed_review_id TEXT PRIMARY KEY,
+            session_id TEXT NOT NULL,
+            resume_document_id TEXT NOT NULL,
+            basic_info_json TEXT NOT NULL,
+            education_json TEXT NOT NULL,
+            work_experience_json TEXT NOT NULL,
+            projects_json TEXT NOT NULL,
+            skills_json TEXT NOT NULL,
+            target_signals_json TEXT NOT NULL,
+            quality_warnings_json TEXT NOT NULL,
+            missing_info_questions_json TEXT NOT NULL,
+            raw_parser_output_json TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY (session_id) REFERENCES profile_sessions(session_id),
+            FOREIGN KEY (resume_document_id) REFERENCES resume_documents(resume_document_id)
+        );
         """
     )
     _ensure_column(connection, "analysis_records", "application_id", "INTEGER")

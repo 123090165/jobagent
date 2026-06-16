@@ -95,6 +95,8 @@ GET  /api/v1/profile-sessions/{session_id}
 POST /api/v1/profile-sessions/{session_id}/resume-text
 POST /api/v1/profile-sessions/{session_id}/resume-file
 GET  /api/v1/profile-sessions/{session_id}/resume
+POST /api/v1/profile-sessions/{session_id}/parse-resume
+GET  /api/v1/profile-sessions/{session_id}/parsed-review
 ```
 
 Planned contract routes:

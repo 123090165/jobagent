@@ -3,11 +3,14 @@ import { AxiosError } from "axios";
 
 import {
   createProfileSession,
+  getParsedResumeReview,
   getProfileSession,
+  parseResumeForReview,
   submitResumeFile,
   submitResumeText
 } from "../api/profileSessions";
 import type {
+  ParsedResumeReview,
   ProfileSession,
   ResumeDocument
 } from "../types/profileSession";
@@ -15,8 +18,10 @@ import type {
 interface ProfileSessionState {
   session: ProfileSession | null;
   resumeDocument: ResumeDocument | null;
+  parsedReview: ParsedResumeReview | null;
   isCreating: boolean;
   isSubmitting: boolean;
+  isReviewLoading: boolean;
   hasLoadedSession: boolean;
   error: string | null;
 }
@@ -29,8 +34,10 @@ export const useProfileSessionStore = defineStore("profileSession", {
   state: (): ProfileSessionState => ({
     session: null,
     resumeDocument: null,
+    parsedReview: null,
     isCreating: false,
     isSubmitting: false,
+    isReviewLoading: false,
     hasLoadedSession: false,
     error: null
   }),
@@ -55,8 +62,14 @@ export const useProfileSessionStore = defineStore("profileSession", {
         this.session = await getProfileSession(sessionId);
         this.hasLoadedSession = true;
         this.error = null;
+        if (this.session.current_step !== "resume_review") {
+          this.parsedReview = null;
+        }
         return this.session;
       } catch (error) {
+        this.session = null;
+        this.resumeDocument = null;
+        this.parsedReview = null;
         this.error = toApiErrorMessage(error, "Failed to load profile session.");
         throw error;
       }
@@ -69,6 +82,7 @@ export const useProfileSessionStore = defineStore("profileSession", {
         const response = await submitResumeText(session.session_id, text);
         this.session = response.profile_session;
         this.resumeDocument = response.resume_document;
+        this.parsedReview = null;
         return response.profile_session;
       } catch (error) {
         this.error = toApiErrorMessage(error, "Failed to submit resume text.");
@@ -85,6 +99,7 @@ export const useProfileSessionStore = defineStore("profileSession", {
         const response = await submitResumeFile(session.session_id, file);
         this.session = response.profile_session;
         this.resumeDocument = response.resume_document;
+        this.parsedReview = null;
         return response.profile_session;
       } catch (error) {
         this.error = toApiErrorMessage(error, "Failed to submit resume file.");
@@ -98,6 +113,38 @@ export const useProfileSessionStore = defineStore("profileSession", {
         return this.session;
       }
       return this.createSession();
+    },
+    async loadParsedReview(sessionId: string): Promise<ParsedResumeReview> {
+      this.isReviewLoading = true;
+      this.error = null;
+      try {
+        const response = await getParsedResumeReview(sessionId);
+        this.session = response.profile_session;
+        this.parsedReview = response.parsed_review;
+        return response.parsed_review;
+      } catch (error) {
+        this.parsedReview = null;
+        this.error = toApiErrorMessage(error, "Failed to load parsed resume review.");
+        throw error;
+      } finally {
+        this.isReviewLoading = false;
+      }
+    },
+    async analyzeResume(sessionId: string, regenerate = false): Promise<ParsedResumeReview> {
+      this.isReviewLoading = true;
+      this.error = null;
+      try {
+        const response = await parseResumeForReview(sessionId, regenerate);
+        this.session = response.profile_session;
+        this.parsedReview = response.parsed_review;
+        return response.parsed_review;
+      } catch (error) {
+        this.parsedReview = null;
+        this.error = toApiErrorMessage(error, "Failed to analyze resume.");
+        throw error;
+      } finally {
+        this.isReviewLoading = false;
+      }
     }
   }
 });

@@ -1,5 +1,7 @@
 import { client } from "./client";
 import type {
+  ParsedResumeReview,
+  ParsedResumeReviewResponse,
   ProfileSession,
   ResumeDocument,
   ResumeIntakeResponse
@@ -44,6 +46,29 @@ export async function submitResumeFile(
 export async function getResumeDocument(sessionId: string): Promise<ResumeDocument> {
   const response = await client.get<ResumeDocument>(
     `/api/v1/profile-sessions/${sessionId}/resume`
+  );
+  return response.data;
+}
+
+export async function parseResumeForReview(
+  sessionId: string,
+  regenerate = false
+): Promise<ParsedResumeReviewResponse> {
+  const response = await client.post<ParsedResumeReviewResponse>(
+    `/api/v1/profile-sessions/${sessionId}/parse-resume`,
+    null,
+    {
+      params: { regenerate }
+    }
+  );
+  return response.data;
+}
+
+export async function getParsedResumeReview(
+  sessionId: string
+): Promise<ParsedResumeReviewResponse> {
+  const response = await client.get<ParsedResumeReviewResponse>(
+    `/api/v1/profile-sessions/${sessionId}/parsed-review`
   );
   return response.data;
 }

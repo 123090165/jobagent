@@ -473,6 +473,8 @@ Acceptance criteria:
 
 ### v4.2 - Resume Review Flow
 
+Status: implemented.
+
 Goal:
 
 Parse the resume and let the user confirm whether JobAgent understood the resume correctly.

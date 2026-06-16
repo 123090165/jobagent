@@ -13,11 +13,11 @@ It uses Vite, TypeScript, Vue Router, Pinia, Axios, and Naive UI. It talks to th
 
 ## Current Flow
 
-The current v4.1 shell includes:
+The current v4 shell includes:
 
 - Home page with Resume Intake
 - StepProgress component
-- Profile review, draft, and confirmed placeholder pages
+- Profile review cards and draft/confirmed placeholder pages
 - ProfileSession API client
 - ProfileSession Pinia store
 
@@ -28,7 +28,13 @@ The Resume Intake flow can:
 - upload `.txt` and `.md` files
 - navigate to `/profile/:sessionId/review`
 
-Resume parsing review is intentionally deferred to v4.2.
+The Resume Review flow can:
+
+- call `/api/v1/profile-sessions/{session_id}/parse-resume`
+- load `/api/v1/profile-sessions/{session_id}/parsed-review`
+- render structured review cards for parsed resume understanding
+
+Profile Draft generation is intentionally deferred to v4.3.
 
 ## Local Development
 

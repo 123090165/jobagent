@@ -41,3 +41,32 @@ export interface ResumeIntakeResponse {
   resume_document: ResumeDocument;
   profile_session: ProfileSession;
 }
+
+export interface ParsedResumeReview {
+  parsed_review_id: string;
+  session_id: string;
+  resume_document_id: string;
+  basic_info: {
+    name?: string | null;
+    highlights?: string[];
+    certificates?: string[];
+  };
+  education: Array<Record<string, unknown>>;
+  work_experience: Array<Record<string, unknown>>;
+  projects: Array<Record<string, unknown>>;
+  skills: {
+    items: string[];
+    count: number;
+  };
+  target_signals: string[];
+  quality_warnings: string[];
+  missing_info_questions: string[];
+  raw_parser_output: Record<string, unknown> | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ParsedResumeReviewResponse {
+  parsed_review: ParsedResumeReview;
+  profile_session: ProfileSession;
+}

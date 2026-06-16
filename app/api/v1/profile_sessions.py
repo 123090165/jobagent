@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, File, UploadFile, status
+from fastapi import APIRouter, File, Query, UploadFile, status
 
 from app.application.profile_session_usecases import (
     create_profile_session,
@@ -11,6 +11,11 @@ from app.application.resume_intake_usecases import (
     submit_resume_file,
     submit_resume_text,
 )
+from app.application.resume_review_usecases import (
+    get_parsed_resume_review,
+    parse_resume_for_review,
+)
+from app.schemas.parsed_resume_review import ParsedResumeReviewResponse
 from app.schemas.profile_session import ProfileSession
 from app.schemas.resume_document import ResumeDocument
 from app.schemas.resume_intake import ResumeIntakeResponse, ResumeTextRequest
@@ -53,3 +58,22 @@ async def submit_resume_file_endpoint(
 @router.get("/{session_id}/resume", response_model=ResumeDocument)
 def get_resume_document_endpoint(session_id: str) -> ResumeDocument:
     return get_resume_document(session_id)
+
+
+@router.post(
+    "/{session_id}/parse-resume",
+    response_model=ParsedResumeReviewResponse,
+)
+def parse_resume_for_review_endpoint(
+    session_id: str,
+    regenerate: bool = Query(default=False),
+) -> ParsedResumeReviewResponse:
+    return parse_resume_for_review(session_id, regenerate=regenerate)
+
+
+@router.get(
+    "/{session_id}/parsed-review",
+    response_model=ParsedResumeReviewResponse,
+)
+def get_parsed_resume_review_endpoint(session_id: str) -> ParsedResumeReviewResponse:
+    return get_parsed_resume_review(session_id)
