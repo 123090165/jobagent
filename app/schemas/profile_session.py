@@ -13,11 +13,17 @@ class ProfileSessionStatus(str, Enum):
 
 
 class ProfileSessionStep(str, Enum):
-    resume_intake = "resume_intake"
+    created = "created"
+    resume_empty = "resume_empty"
+    resume_ready = "resume_ready"
     resume_review = "resume_review"
     profile_draft = "profile_draft"
     profile_confirmed = "profile_confirmed"
     job_search_ready = "job_search_ready"
+    job_search_running = "job_search_running"
+    job_search_completed = "job_search_completed"
+    brief_ready = "brief_ready"
+    archived = "archived"
 
 
 class ProfileSession(BaseModel):

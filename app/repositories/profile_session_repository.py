@@ -8,28 +8,157 @@ from app.schemas.profile_session import (
     ProfileSessionStatus,
     ProfileSessionStep,
 )
+from app.storage.database import get_connection, init_database
 
 
-class InMemoryProfileSessionRepository:
-    """Temporary repository for the v4 API contract skeleton."""
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc)
 
-    def __init__(self) -> None:
-        self._sessions: dict[str, ProfileSession] = {}
 
+class ProfileSessionRepository:
     def create(self) -> ProfileSession:
-        now = datetime.now(timezone.utc)
+        now = _utc_now()
         session = ProfileSession(
             session_id=str(uuid4()),
             status=ProfileSessionStatus.active,
             created_at=now,
             updated_at=now,
-            current_step=ProfileSessionStep.resume_intake,
+            current_step=ProfileSessionStep.created,
         )
-        self._sessions[session.session_id] = session
+        with get_connection() as connection:
+            init_database(connection)
+            connection.execute(
+                """
+                INSERT INTO profile_sessions (
+                    session_id,
+                    status,
+                    created_at,
+                    updated_at,
+                    resume_document_id,
+                    parsed_review_id,
+                    profile_draft_id,
+                    confirmed_profile_id,
+                    current_step
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    session.session_id,
+                    session.status.value,
+                    session.created_at.isoformat(),
+                    session.updated_at.isoformat(),
+                    session.resume_document_id,
+                    session.parsed_review_id,
+                    session.profile_draft_id,
+                    session.confirmed_profile_id,
+                    session.current_step.value,
+                ),
+            )
+            connection.commit()
         return session
 
     def get(self, session_id: str) -> ProfileSession | None:
-        return self._sessions.get(session_id)
+        with get_connection() as connection:
+            init_database(connection)
+            row = connection.execute(
+                """
+                SELECT
+                    session_id,
+                    status,
+                    created_at,
+                    updated_at,
+                    resume_document_id,
+                    parsed_review_id,
+                    profile_draft_id,
+                    confirmed_profile_id,
+                    current_step
+                FROM profile_sessions
+                WHERE session_id = ?
+                """,
+                (session_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        return self._row_to_profile_session(row)
+
+    def attach_resume_document(
+        self,
+        *,
+        session_id: str,
+        resume_document_id: str,
+    ) -> ProfileSession | None:
+        updated_at = _utc_now()
+        with get_connection() as connection:
+            init_database(connection)
+            cursor = connection.execute(
+                """
+                UPDATE profile_sessions
+                SET
+                    resume_document_id = ?,
+                    parsed_review_id = NULL,
+                    profile_draft_id = NULL,
+                    confirmed_profile_id = NULL,
+                    current_step = ?,
+                    updated_at = ?
+                WHERE session_id = ?
+                """,
+                (
+                    resume_document_id,
+                    ProfileSessionStep.resume_ready.value,
+                    updated_at.isoformat(),
+                    session_id,
+                ),
+            )
+            connection.commit()
+            if cursor.rowcount == 0:
+                return None
+        return self.get(session_id)
+
+    def attach_parsed_review(
+        self,
+        *,
+        session_id: str,
+        parsed_review_id: str,
+    ) -> ProfileSession | None:
+        updated_at = _utc_now()
+        with get_connection() as connection:
+            init_database(connection)
+            cursor = connection.execute(
+                """
+                UPDATE profile_sessions
+                SET
+                    parsed_review_id = ?,
+                    profile_draft_id = NULL,
+                    confirmed_profile_id = NULL,
+                    current_step = ?,
+                    updated_at = ?
+                WHERE session_id = ?
+                """,
+                (
+                    parsed_review_id,
+                    ProfileSessionStep.resume_review.value,
+                    updated_at.isoformat(),
+                    session_id,
+                ),
+            )
+            connection.commit()
+            if cursor.rowcount == 0:
+                return None
+        return self.get(session_id)
+
+    @staticmethod
+    def _row_to_profile_session(row: object) -> ProfileSession:
+        return ProfileSession(
+            session_id=row["session_id"],
+            status=ProfileSessionStatus(row["status"]),
+            created_at=datetime.fromisoformat(row["created_at"]),
+            updated_at=datetime.fromisoformat(row["updated_at"]),
+            resume_document_id=row["resume_document_id"],
+            parsed_review_id=row["parsed_review_id"],
+            profile_draft_id=row["profile_draft_id"],
+            confirmed_profile_id=row["confirmed_profile_id"],
+            current_step=ProfileSessionStep(row["current_step"]),
+        )
 
 
-profile_session_repository = InMemoryProfileSessionRepository()
+profile_session_repository = ProfileSessionRepository()

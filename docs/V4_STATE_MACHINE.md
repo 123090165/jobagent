@@ -21,7 +21,7 @@ Recommended development default:
 
 ```text
 database: SQLite
-ORM: SQLAlchemy
+implementation style: existing sqlite3 repository pattern
 ```
 
 Acceptance requirement for v4.1:
@@ -68,7 +68,7 @@ archived: no longer active
 
 ```text
 v4.1 supports at least: created, resume_ready
-v4.2 adds: resume_review
+v4.2 adds: resume_review and a persisted ParsedResumeReview linked from ProfileSession.parsed_review_id
 v4.3 adds: profile_draft
 v4.4 adds: profile_confirmed, job_search_ready
 ```

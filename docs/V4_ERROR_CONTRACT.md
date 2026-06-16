@@ -30,6 +30,7 @@ resume_file_empty
 resume_file_unsupported_type
 resume_file_too_large
 resume_text_too_long
+resume_document_not_found
 parsed_review_not_found
 profile_draft_not_found
 confirmed_profile_not_found

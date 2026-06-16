@@ -11,21 +11,30 @@ It uses Vite, TypeScript, Vue Router, Pinia, Axios, and Naive UI. It talks to th
 - Use typed API clients in `src/api/`.
 - Use Pinia stores in `src/stores/` for client workflow state.
 
-## Current Shell
+## Current Flow
 
-The first shell includes:
+The current v4 shell includes:
 
-- Home page
+- Home page with Resume Intake
 - StepProgress component
-- Profile review, draft, and confirmed placeholder pages
+- Profile review cards and draft/confirmed placeholder pages
 - ProfileSession API client
 - ProfileSession Pinia store
 
-The current start button calls:
+The Resume Intake flow can:
 
-```ts
-client.post("/api/v1/profile-sessions");
-```
+- create a `ProfileSession`
+- submit pasted resume text
+- upload `.txt` and `.md` files
+- navigate to `/profile/:sessionId/review`
+
+The Resume Review flow can:
+
+- call `/api/v1/profile-sessions/{session_id}/parse-resume`
+- load `/api/v1/profile-sessions/{session_id}/parsed-review`
+- render structured review cards for parsed resume understanding
+
+Profile Draft generation is intentionally deferred to v4.3.
 
 ## Local Development
 

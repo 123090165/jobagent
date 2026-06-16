@@ -137,6 +137,50 @@ def init_database(connection: sqlite3.Connection) -> None:
             updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (resume_record_id) REFERENCES resume_records(id)
         );
+
+        CREATE TABLE IF NOT EXISTS profile_sessions (
+            session_id TEXT PRIMARY KEY,
+            status TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            resume_document_id TEXT,
+            parsed_review_id TEXT,
+            profile_draft_id TEXT,
+            confirmed_profile_id TEXT,
+            current_step TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS resume_documents (
+            resume_document_id TEXT PRIMARY KEY,
+            session_id TEXT NOT NULL,
+            source_type TEXT NOT NULL,
+            filename TEXT,
+            file_type TEXT,
+            text TEXT NOT NULL,
+            text_length INTEGER NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY (session_id) REFERENCES profile_sessions(session_id)
+        );
+
+        CREATE TABLE IF NOT EXISTS parsed_resume_reviews (
+            parsed_review_id TEXT PRIMARY KEY,
+            session_id TEXT NOT NULL,
+            resume_document_id TEXT NOT NULL,
+            basic_info_json TEXT NOT NULL,
+            education_json TEXT NOT NULL,
+            work_experience_json TEXT NOT NULL,
+            projects_json TEXT NOT NULL,
+            skills_json TEXT NOT NULL,
+            target_signals_json TEXT NOT NULL,
+            quality_warnings_json TEXT NOT NULL,
+            missing_info_questions_json TEXT NOT NULL,
+            raw_parser_output_json TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY (session_id) REFERENCES profile_sessions(session_id),
+            FOREIGN KEY (resume_document_id) REFERENCES resume_documents(resume_document_id)
+        );
         """
     )
     _ensure_column(connection, "analysis_records", "application_id", "INTEGER")
