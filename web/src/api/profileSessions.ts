@@ -2,9 +2,12 @@ import { client } from "./client";
 import type {
   ParsedResumeReview,
   ParsedResumeReviewResponse,
+  ProfileDraft,
+  ProfileDraftResponse,
   ProfileSession,
   ResumeDocument,
-  ResumeIntakeResponse
+  ResumeIntakeResponse,
+  UpdateProfileDraftPayload
 } from "../types/profileSession";
 
 export async function createProfileSession(): Promise<ProfileSession> {
@@ -69,6 +72,36 @@ export async function getParsedResumeReview(
 ): Promise<ParsedResumeReviewResponse> {
   const response = await client.get<ParsedResumeReviewResponse>(
     `/api/v1/profile-sessions/${sessionId}/parsed-review`
+  );
+  return response.data;
+}
+
+export async function createProfileDraft(
+  sessionId: string,
+  regenerate = false
+): Promise<ProfileDraftResponse> {
+  const response = await client.post<ProfileDraftResponse>(
+    `/api/v1/profile-sessions/${sessionId}/profile-draft`,
+    null,
+    {
+      params: { regenerate }
+    }
+  );
+  return response.data;
+}
+
+export async function getProfileDraft(draftId: string): Promise<ProfileDraftResponse> {
+  const response = await client.get<ProfileDraftResponse>(`/api/v1/profile-drafts/${draftId}`);
+  return response.data;
+}
+
+export async function updateProfileDraft(
+  draftId: string,
+  payload: UpdateProfileDraftPayload
+): Promise<ProfileDraftResponse> {
+  const response = await client.patch<ProfileDraftResponse>(
+    `/api/v1/profile-drafts/${draftId}`,
+    payload
   );
   return response.data;
 }
