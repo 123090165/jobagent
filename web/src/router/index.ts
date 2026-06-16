@@ -33,14 +33,22 @@ const router = createRouter({
       name: "profile-draft",
       component: ProfileDraftPage,
       beforeEnter: async (to) =>
-        requireSessionStep(String(to.params.sessionId), ["resume_review", "profile_draft"])
+        requireSessionStep(String(to.params.sessionId), [
+          "resume_review",
+          "profile_draft",
+          "job_search_ready"
+        ])
     },
     {
       path: "/profile/:sessionId/confirmed",
       name: "profile-confirmed",
       component: ProfileConfirmedPage,
       beforeEnter: async (to) =>
-        requireSessionStep(String(to.params.sessionId), ["profile_confirmed", "job_search_ready"])
+        requireSessionStep(String(to.params.sessionId), [
+          "profile_draft",
+          "profile_confirmed",
+          "job_search_ready"
+        ])
     }
   ]
 });

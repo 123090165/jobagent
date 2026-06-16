@@ -597,7 +597,8 @@ Acceptance criteria:
 - user can confirm profile
 - confirmed profile is stored
 - session enters job_search_ready
-- user can navigate to job search
+- confirmed page is available in Vue
+- job search remains a later step
 - backend tests pass
 - Vue build passes
 ```

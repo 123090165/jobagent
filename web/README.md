@@ -17,7 +17,9 @@ The current v4 shell includes:
 
 - Home page with Resume Intake
 - StepProgress component
-- Profile review cards and draft/confirmed placeholder pages
+- Profile review cards
+- Profile draft editing page
+- Confirmed profile page
 - ProfileSession API client
 - ProfileSession Pinia store
 
@@ -34,7 +36,18 @@ The Resume Review flow can:
 - load `/api/v1/profile-sessions/{session_id}/parsed-review`
 - render structured review cards for parsed resume understanding
 
-Profile Draft generation is intentionally deferred to v4.3.
+The Profile Draft flow can:
+
+- call `/api/v1/profile-sessions/{session_id}/profile-draft`
+- load `/api/v1/profile-drafts/{draft_id}`
+- patch `/api/v1/profile-drafts/{draft_id}`
+- confirm through `/api/v1/profile-drafts/{draft_id}/confirm`
+
+The Confirmed Profile flow can:
+
+- load `/api/v1/confirmed-profiles/{confirmed_profile_id}`
+- render the final search-ready profile
+- show a Start Job Search placeholder for v4.5a
 
 ## Local Development
 

@@ -114,6 +114,7 @@ POST  /api/v1/profile-sessions/{session_id}/profile-draft?regenerate=true
 GET   /api/v1/profile-drafts/{draft_id}
 PATCH /api/v1/profile-drafts/{draft_id}
 POST  /api/v1/profile-drafts/{draft_id}/confirm
+GET   /api/v1/confirmed-profiles/{confirmed_profile_id}
 
 POST /api/v1/job-search-runs
 GET  /api/v1/job-search-runs/{run_id}

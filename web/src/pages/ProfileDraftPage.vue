@@ -12,6 +12,7 @@ const router = useRouter();
 const profileSessionStore = useProfileSessionStore();
 const sessionId = computed(() => String(route.params.sessionId ?? ""));
 const saveMessage = ref<string | null>(null);
+const confirmMessage = ref<string | null>(null);
 const sessionUnavailable = computed(
   () => profileSessionStore.hasLoadedSession && !profileSessionStore.session
 );
@@ -53,6 +54,7 @@ function toList(value: string) {
 
 async function loadDraftPage() {
   saveMessage.value = null;
+  confirmMessage.value = null;
   try {
     const session = await profileSessionStore.loadSession(sessionId.value);
     if (session.profile_draft_id) {
@@ -76,6 +78,7 @@ async function saveDraft() {
   }
 
   saveMessage.value = null;
+  confirmMessage.value = null;
   try {
     const updated = await profileSessionStore.saveDraft(draftId, {
       summary: form.summary.trim(),
@@ -92,6 +95,36 @@ async function saveDraft() {
     });
     syncForm(updated);
     saveMessage.value = "Profile draft saved.";
+  } catch {
+    // Error state is rendered from the store.
+  }
+}
+
+async function confirmProfile() {
+  const draftId = profileSessionStore.profileDraft?.profile_draft_id;
+  if (!draftId) {
+    return;
+  }
+
+  saveMessage.value = null;
+  confirmMessage.value = null;
+  try {
+    const updated = await profileSessionStore.saveDraft(draftId, {
+      summary: form.summary.trim(),
+      target_roles: toList(form.target_roles),
+      target_directions: toList(form.target_directions),
+      core_skills: toList(form.core_skills),
+      supporting_skills: toList(form.supporting_skills),
+      search_keywords: toList(form.search_keywords),
+      preferred_locations: toList(form.preferred_locations),
+      work_arrangements: toList(form.work_arrangements),
+      strengths: toList(form.strengths),
+      risks: toList(form.risks),
+      missing_info_questions: toList(form.missing_info_questions)
+    });
+    syncForm(updated);
+    await profileSessionStore.confirmDraft(draftId);
+    await router.push({ name: "profile-confirmed", params: { sessionId: sessionId.value } });
   } catch {
     // Error state is rendered from the store.
   }
@@ -134,11 +167,23 @@ function goBackToReview() {
         >
           Save Draft
         </n-button>
+        <n-button
+          tertiary
+          :loading="profileSessionStore.isConfirming"
+          :disabled="profileSessionStore.isDraftLoading || !profileSessionStore.profileDraft"
+          @click="confirmProfile"
+        >
+          Confirm Profile
+        </n-button>
       </div>
 
       <p v-if="saveMessage" class="flow-meta">{{ saveMessage }}</p>
+      <p v-if="confirmMessage" class="flow-meta">{{ confirmMessage }}</p>
 
-      <div v-if="profileSessionStore.isDraftLoading && !profileSessionStore.profileDraft" class="review-empty-state">
+      <div
+        v-if="profileSessionStore.isDraftLoading && !profileSessionStore.profileDraft"
+        class="review-empty-state"
+      >
         <p class="flow-message">Preparing profile draft...</p>
       </div>
 
@@ -207,9 +252,6 @@ function goBackToReview() {
         </n-card>
       </div>
 
-      <div class="draft-placeholder">
-        Confirmed Profile will be implemented in v4.4.
-      </div>
     </div>
   </section>
 </template>

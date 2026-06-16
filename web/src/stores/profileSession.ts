@@ -2,8 +2,10 @@ import { defineStore } from "pinia";
 import { AxiosError } from "axios";
 
 import {
+  confirmProfileDraft,
   createProfileDraft,
   createProfileSession,
+  getConfirmedProfile,
   getParsedResumeReview,
   getProfileDraft,
   getProfileSession,
@@ -13,6 +15,7 @@ import {
   updateProfileDraft
 } from "../api/profileSessions";
 import type {
+  ConfirmedProfile,
   ParsedResumeReview,
   ProfileDraft,
   ProfileSession,
@@ -25,11 +28,14 @@ interface ProfileSessionState {
   resumeDocument: ResumeDocument | null;
   parsedReview: ParsedResumeReview | null;
   profileDraft: ProfileDraft | null;
+  confirmedProfile: ConfirmedProfile | null;
   isCreating: boolean;
   isSubmitting: boolean;
   isReviewLoading: boolean;
   isDraftLoading: boolean;
   isDraftSaving: boolean;
+  isConfirming: boolean;
+  isConfirmedLoading: boolean;
   hasLoadedSession: boolean;
   error: string | null;
 }
@@ -44,11 +50,14 @@ export const useProfileSessionStore = defineStore("profileSession", {
     resumeDocument: null,
     parsedReview: null,
     profileDraft: null,
+    confirmedProfile: null,
     isCreating: false,
     isSubmitting: false,
     isReviewLoading: false,
     isDraftLoading: false,
     isDraftSaving: false,
+    isConfirming: false,
+    isConfirmedLoading: false,
     hasLoadedSession: false,
     error: null
   }),
@@ -79,12 +88,16 @@ export const useProfileSessionStore = defineStore("profileSession", {
         if (!this.session.profile_draft_id) {
           this.profileDraft = null;
         }
+        if (!this.session.confirmed_profile_id) {
+          this.confirmedProfile = null;
+        }
         return this.session;
       } catch (error) {
         this.session = null;
         this.resumeDocument = null;
         this.parsedReview = null;
         this.profileDraft = null;
+        this.confirmedProfile = null;
         this.error = toApiErrorMessage(error, "Failed to load profile session.");
         throw error;
       }
@@ -99,6 +112,7 @@ export const useProfileSessionStore = defineStore("profileSession", {
         this.resumeDocument = response.resume_document;
         this.parsedReview = null;
         this.profileDraft = null;
+        this.confirmedProfile = null;
         return response.profile_session;
       } catch (error) {
         this.error = toApiErrorMessage(error, "Failed to submit resume text.");
@@ -117,6 +131,7 @@ export const useProfileSessionStore = defineStore("profileSession", {
         this.resumeDocument = response.resume_document;
         this.parsedReview = null;
         this.profileDraft = null;
+        this.confirmedProfile = null;
         return response.profile_session;
       } catch (error) {
         this.error = toApiErrorMessage(error, "Failed to submit resume file.");
@@ -155,6 +170,7 @@ export const useProfileSessionStore = defineStore("profileSession", {
         this.session = response.profile_session;
         this.parsedReview = response.parsed_review;
         this.profileDraft = null;
+        this.confirmedProfile = null;
         return response.parsed_review;
       } catch (error) {
         this.parsedReview = null;
@@ -171,6 +187,7 @@ export const useProfileSessionStore = defineStore("profileSession", {
         const response = await createProfileDraft(sessionId, regenerate);
         this.session = response.profile_session;
         this.profileDraft = response.profile_draft;
+        this.confirmedProfile = null;
         return response.profile_draft;
       } catch (error) {
         this.profileDraft = null;
@@ -206,12 +223,44 @@ export const useProfileSessionStore = defineStore("profileSession", {
         const response = await updateProfileDraft(draftId, payload);
         this.session = response.profile_session;
         this.profileDraft = response.profile_draft;
+        this.confirmedProfile = null;
         return response.profile_draft;
       } catch (error) {
         this.error = toApiErrorMessage(error, "Failed to save profile draft.");
         throw error;
       } finally {
         this.isDraftSaving = false;
+      }
+    },
+    async confirmDraft(draftId: string): Promise<ConfirmedProfile> {
+      this.isConfirming = true;
+      this.error = null;
+      try {
+        const response = await confirmProfileDraft(draftId);
+        this.session = response.profile_session;
+        this.confirmedProfile = response.confirmed_profile;
+        return response.confirmed_profile;
+      } catch (error) {
+        this.error = toApiErrorMessage(error, "Failed to confirm profile.");
+        throw error;
+      } finally {
+        this.isConfirming = false;
+      }
+    },
+    async loadConfirmedProfile(confirmedProfileId: string): Promise<ConfirmedProfile> {
+      this.isConfirmedLoading = true;
+      this.error = null;
+      try {
+        const response = await getConfirmedProfile(confirmedProfileId);
+        this.session = response.profile_session;
+        this.confirmedProfile = response.confirmed_profile;
+        return response.confirmed_profile;
+      } catch (error) {
+        this.confirmedProfile = null;
+        this.error = toApiErrorMessage(error, "Failed to load confirmed profile.");
+        throw error;
+      } finally {
+        this.isConfirmedLoading = false;
       }
     }
   }
