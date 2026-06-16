@@ -281,6 +281,42 @@ h1 {
   margin-top: 20px;
 }
 
+.draft-layout {
+  margin-top: 28px;
+}
+
+.draft-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 24px;
+}
+
+.draft-field {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.draft-field:last-child {
+  margin-bottom: 0;
+}
+
+.draft-field span {
+  color: #34414a;
+  font-size: 0.92rem;
+  font-weight: 650;
+}
+
+.draft-placeholder {
+  margin-top: 20px;
+  border: 1px dashed #c8d8d0;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.72);
+  color: #52616b;
+  padding: 18px;
+}
+
 @media (max-width: 680px) {
   .home-page {
     align-content: start;
@@ -289,7 +325,8 @@ h1 {
 
   .intake-actions,
   .step-progress,
-  .review-grid {
+  .review-grid,
+  .draft-grid {
     grid-template-columns: 1fr;
   }
 

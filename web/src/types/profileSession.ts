@@ -70,3 +70,41 @@ export interface ParsedResumeReviewResponse {
   parsed_review: ParsedResumeReview;
   profile_session: ProfileSession;
 }
+
+export interface ProfileDraft {
+  profile_draft_id: string;
+  session_id: string;
+  parsed_review_id: string;
+  summary: string;
+  target_roles: string[];
+  target_directions: string[];
+  core_skills: string[];
+  supporting_skills: string[];
+  search_keywords: string[];
+  preferred_locations: string[];
+  work_arrangements: string[];
+  strengths: string[];
+  risks: string[];
+  missing_info_questions: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProfileDraftResponse {
+  profile_draft: ProfileDraft;
+  profile_session: ProfileSession;
+}
+
+export interface UpdateProfileDraftPayload {
+  summary?: string;
+  target_roles?: string[];
+  target_directions?: string[];
+  core_skills?: string[];
+  supporting_skills?: string[];
+  search_keywords?: string[];
+  preferred_locations?: string[];
+  work_arrangements?: string[];
+  strengths?: string[];
+  risks?: string[];
+  missing_info_questions?: string[];
+}

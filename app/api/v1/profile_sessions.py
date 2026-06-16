@@ -6,6 +6,7 @@ from app.application.profile_session_usecases import (
     create_profile_session,
     get_profile_session,
 )
+from app.application.profile_draft_usecases import create_profile_draft
 from app.application.resume_intake_usecases import (
     get_resume_document,
     submit_resume_file,
@@ -16,6 +17,7 @@ from app.application.resume_review_usecases import (
     parse_resume_for_review,
 )
 from app.schemas.parsed_resume_review import ParsedResumeReviewResponse
+from app.schemas.profile_draft import ProfileDraftResponse
 from app.schemas.profile_session import ProfileSession
 from app.schemas.resume_document import ResumeDocument
 from app.schemas.resume_intake import ResumeIntakeResponse, ResumeTextRequest
@@ -77,3 +79,14 @@ def parse_resume_for_review_endpoint(
 )
 def get_parsed_resume_review_endpoint(session_id: str) -> ParsedResumeReviewResponse:
     return get_parsed_resume_review(session_id)
+
+
+@router.post(
+    "/{session_id}/profile-draft",
+    response_model=ProfileDraftResponse,
+)
+def create_profile_draft_endpoint(
+    session_id: str,
+    regenerate: bool = Query(default=False),
+) -> ProfileDraftResponse:
+    return create_profile_draft(session_id, regenerate=regenerate)

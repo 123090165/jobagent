@@ -2,26 +2,34 @@ import { defineStore } from "pinia";
 import { AxiosError } from "axios";
 
 import {
+  createProfileDraft,
   createProfileSession,
   getParsedResumeReview,
+  getProfileDraft,
   getProfileSession,
   parseResumeForReview,
   submitResumeFile,
-  submitResumeText
+  submitResumeText,
+  updateProfileDraft
 } from "../api/profileSessions";
 import type {
   ParsedResumeReview,
+  ProfileDraft,
   ProfileSession,
-  ResumeDocument
+  ResumeDocument,
+  UpdateProfileDraftPayload
 } from "../types/profileSession";
 
 interface ProfileSessionState {
   session: ProfileSession | null;
   resumeDocument: ResumeDocument | null;
   parsedReview: ParsedResumeReview | null;
+  profileDraft: ProfileDraft | null;
   isCreating: boolean;
   isSubmitting: boolean;
   isReviewLoading: boolean;
+  isDraftLoading: boolean;
+  isDraftSaving: boolean;
   hasLoadedSession: boolean;
   error: string | null;
 }
@@ -35,9 +43,12 @@ export const useProfileSessionStore = defineStore("profileSession", {
     session: null,
     resumeDocument: null,
     parsedReview: null,
+    profileDraft: null,
     isCreating: false,
     isSubmitting: false,
     isReviewLoading: false,
+    isDraftLoading: false,
+    isDraftSaving: false,
     hasLoadedSession: false,
     error: null
   }),
@@ -65,11 +76,15 @@ export const useProfileSessionStore = defineStore("profileSession", {
         if (this.session.current_step !== "resume_review") {
           this.parsedReview = null;
         }
+        if (!this.session.profile_draft_id) {
+          this.profileDraft = null;
+        }
         return this.session;
       } catch (error) {
         this.session = null;
         this.resumeDocument = null;
         this.parsedReview = null;
+        this.profileDraft = null;
         this.error = toApiErrorMessage(error, "Failed to load profile session.");
         throw error;
       }
@@ -83,6 +98,7 @@ export const useProfileSessionStore = defineStore("profileSession", {
         this.session = response.profile_session;
         this.resumeDocument = response.resume_document;
         this.parsedReview = null;
+        this.profileDraft = null;
         return response.profile_session;
       } catch (error) {
         this.error = toApiErrorMessage(error, "Failed to submit resume text.");
@@ -100,6 +116,7 @@ export const useProfileSessionStore = defineStore("profileSession", {
         this.session = response.profile_session;
         this.resumeDocument = response.resume_document;
         this.parsedReview = null;
+        this.profileDraft = null;
         return response.profile_session;
       } catch (error) {
         this.error = toApiErrorMessage(error, "Failed to submit resume file.");
@@ -137,6 +154,7 @@ export const useProfileSessionStore = defineStore("profileSession", {
         const response = await parseResumeForReview(sessionId, regenerate);
         this.session = response.profile_session;
         this.parsedReview = response.parsed_review;
+        this.profileDraft = null;
         return response.parsed_review;
       } catch (error) {
         this.parsedReview = null;
@@ -144,6 +162,56 @@ export const useProfileSessionStore = defineStore("profileSession", {
         throw error;
       } finally {
         this.isReviewLoading = false;
+      }
+    },
+    async createDraft(sessionId: string, regenerate = false): Promise<ProfileDraft> {
+      this.isDraftLoading = true;
+      this.error = null;
+      try {
+        const response = await createProfileDraft(sessionId, regenerate);
+        this.session = response.profile_session;
+        this.profileDraft = response.profile_draft;
+        return response.profile_draft;
+      } catch (error) {
+        this.profileDraft = null;
+        this.error = toApiErrorMessage(error, "Failed to create profile draft.");
+        throw error;
+      } finally {
+        this.isDraftLoading = false;
+      }
+    },
+    async loadDraft(draftId: string): Promise<ProfileDraft> {
+      this.isDraftLoading = true;
+      this.error = null;
+      try {
+        const response = await getProfileDraft(draftId);
+        this.session = response.profile_session;
+        this.profileDraft = response.profile_draft;
+        return response.profile_draft;
+      } catch (error) {
+        this.profileDraft = null;
+        this.error = toApiErrorMessage(error, "Failed to load profile draft.");
+        throw error;
+      } finally {
+        this.isDraftLoading = false;
+      }
+    },
+    async saveDraft(
+      draftId: string,
+      payload: UpdateProfileDraftPayload
+    ): Promise<ProfileDraft> {
+      this.isDraftSaving = true;
+      this.error = null;
+      try {
+        const response = await updateProfileDraft(draftId, payload);
+        this.session = response.profile_session;
+        this.profileDraft = response.profile_draft;
+        return response.profile_draft;
+      } catch (error) {
+        this.error = toApiErrorMessage(error, "Failed to save profile draft.");
+        throw error;
+      } finally {
+        this.isDraftSaving = false;
       }
     }
   }

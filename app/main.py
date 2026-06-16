@@ -18,6 +18,7 @@ from app.api.routes_resume_profile_enrichment import router as resume_profile_en
 from app.api.routes_resume_profile_review import router as resume_profile_review_router
 from app.api.routes_resume_versions import router as resume_versions_router
 from app.api.routes_search import router as search_router
+from app.api.v1.profile_drafts import router as profile_drafts_v1_router
 from app.api.v1.profile_sessions import router as profile_sessions_v1_router
 from app.schemas.api import HealthResponse
 from app.services.errors import JobAgentError
@@ -62,6 +63,7 @@ def create_app() -> FastAPI:
     api.include_router(applications_router)
     api.include_router(resume_versions_router)
     api.include_router(profile_sessions_v1_router)
+    api.include_router(profile_drafts_v1_router)
     return api
 
 

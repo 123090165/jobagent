@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { NButton, NCard, NCode, NCollapse, NCollapseItem, NThing } from "naive-ui";
 
@@ -10,7 +10,6 @@ const route = useRoute();
 const router = useRouter();
 const profileSessionStore = useProfileSessionStore();
 const sessionId = computed(() => String(route.params.sessionId ?? ""));
-const reviewHint = ref<string | null>(null);
 const sessionUnavailable = computed(
   () => profileSessionStore.hasLoadedSession && !profileSessionStore.session
 );
@@ -50,7 +49,6 @@ onMounted(async () => {
 });
 
 async function analyzeResume(regenerate = false) {
-  reviewHint.value = null;
   try {
     await profileSessionStore.analyzeResume(sessionId.value, regenerate);
   } catch {
@@ -62,8 +60,13 @@ function goToIntake() {
   void router.push({ name: "home" });
 }
 
-function showDraftHint() {
-  reviewHint.value = "Profile Draft generation will be implemented in v4.3.";
+async function continueToDraft() {
+  try {
+    await profileSessionStore.createDraft(sessionId.value, false);
+    await router.push({ name: "profile-draft", params: { sessionId: sessionId.value } });
+  } catch {
+    // Error state is rendered from the store.
+  }
 }
 </script>
 
@@ -112,12 +115,15 @@ function showDraftHint() {
         >
           Regenerate Review
         </n-button>
-        <n-button tertiary :disabled="!parsedReview" @click="showDraftHint">
+        <n-button
+          tertiary
+          :disabled="!parsedReview"
+          :loading="profileSessionStore.isDraftLoading"
+          @click="continueToDraft"
+        >
           Continue to Profile Draft
         </n-button>
       </div>
-
-      <p v-if="reviewHint" class="flow-meta">{{ reviewHint }}</p>
 
       <div v-if="!parsedReview" class="review-empty-state">
         <p class="flow-message">
