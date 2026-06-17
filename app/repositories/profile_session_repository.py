@@ -207,6 +207,29 @@ class ProfileSessionRepository:
                 return None
         return self.get(session_id)
 
+    def mark_job_search_completed(self, *, session_id: str) -> ProfileSession | None:
+        updated_at = _utc_now()
+        with get_connection() as connection:
+            init_database(connection)
+            cursor = connection.execute(
+                """
+                UPDATE profile_sessions
+                SET
+                    current_step = ?,
+                    updated_at = ?
+                WHERE session_id = ?
+                """,
+                (
+                    ProfileSessionStep.job_search_completed.value,
+                    updated_at.isoformat(),
+                    session_id,
+                ),
+            )
+            connection.commit()
+            if cursor.rowcount == 0:
+                return None
+        return self.get(session_id)
+
     @staticmethod
     def _row_to_profile_session(row: object) -> ProfileSession:
         return ProfileSession(

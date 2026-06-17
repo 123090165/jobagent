@@ -47,7 +47,14 @@ The Confirmed Profile flow can:
 
 - load `/api/v1/confirmed-profiles/{confirmed_profile_id}`
 - render the final search-ready profile
-- show a Start Job Search placeholder for v4.5a
+- start a local/mock job search through `/api/v1/job-search-runs`
+
+The Local/Mock Job Search flow can:
+
+- load `/api/v1/job-search-runs/{run_id}`
+- load `/api/v1/profile-sessions/{session_id}/job-search-runs`
+- render deterministic local/mock job cards
+- keep Job Brief out of scope until v4.6
 
 ## Local Development
 

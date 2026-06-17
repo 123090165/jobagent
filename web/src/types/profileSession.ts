@@ -121,6 +121,51 @@ export interface ConfirmedProfileResponse {
   profile_session: ProfileSession;
 }
 
+export interface JobSearchResult {
+  job_result_id: string;
+  title: string;
+  company: string;
+  location: string;
+  source: "local_mock";
+  description: string;
+  matched_keywords: string[];
+  match_reasons: string[];
+  risks: string[];
+  match_score: number;
+  recommended_action: string;
+}
+
+export interface JobSearchRun {
+  job_search_run_id: string;
+  session_id: string;
+  confirmed_profile_id: string;
+  query: string;
+  locations: string[];
+  target_roles: string[];
+  keywords: string[];
+  status: "completed";
+  results: JobSearchResult[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface JobSearchRunResponse {
+  job_search_run: JobSearchRun;
+  profile_session: ProfileSession;
+}
+
+export interface JobSearchRunListResponse {
+  items: JobSearchRun[];
+}
+
+export interface CreateJobSearchRunPayload {
+  session_id: string;
+  query?: string | null;
+  locations?: string[];
+  target_roles?: string[];
+  keywords?: string[];
+}
+
 export interface UpdateProfileDraftPayload {
   summary?: string;
   target_roles?: string[];

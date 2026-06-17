@@ -615,16 +615,17 @@ Backend scope:
 - JobSearchRun schema/resource
 - POST /api/v1/job-search-runs
 - GET /api/v1/job-search-runs/{run_id}
+- GET /api/v1/profile-sessions/{session_id}/job-search-runs
 - require confirmed_profile_id
-- generate search query from ConfirmedProfile
+- generate deterministic local/mock results from ConfirmedProfile
 ```
 
 Frontend scope:
 
 ```text
-- /jobs/search
-- show recommended search keywords from confirmed profile
-- allow user to edit keywords, location, job type
+- Start Job Search entry from the confirmed profile page
+- /jobs/:runId
+- show generated query, keywords, and deterministic job cards
 - show job result cards
 ```
 

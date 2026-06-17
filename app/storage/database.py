@@ -227,6 +227,22 @@ def init_database(connection: sqlite3.Connection) -> None:
             FOREIGN KEY (parsed_review_id) REFERENCES parsed_resume_reviews(parsed_review_id),
             FOREIGN KEY (profile_draft_id) REFERENCES profile_drafts(profile_draft_id)
         );
+
+        CREATE TABLE IF NOT EXISTS job_search_runs (
+            job_search_run_id TEXT PRIMARY KEY,
+            session_id TEXT NOT NULL,
+            confirmed_profile_id TEXT NOT NULL,
+            query TEXT NOT NULL,
+            locations_json TEXT NOT NULL,
+            target_roles_json TEXT NOT NULL,
+            keywords_json TEXT NOT NULL,
+            status TEXT NOT NULL,
+            results_json TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY (session_id) REFERENCES profile_sessions(session_id),
+            FOREIGN KEY (confirmed_profile_id) REFERENCES confirmed_profiles(confirmed_profile_id)
+        );
         """
     )
     _ensure_column(connection, "analysis_records", "application_id", "INTEGER")

@@ -118,6 +118,7 @@ GET   /api/v1/confirmed-profiles/{confirmed_profile_id}
 
 POST /api/v1/job-search-runs
 GET  /api/v1/job-search-runs/{run_id}
+GET  /api/v1/profile-sessions/{session_id}/job-search-runs
 
 POST /api/v1/job-search-runs/{run_id}/brief
 POST /api/v1/job-search-runs/{run_id}/brief?regenerate=true
