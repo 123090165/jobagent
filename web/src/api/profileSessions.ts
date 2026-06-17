@@ -2,8 +2,10 @@ import { client } from "./client";
 import type {
   CreateJobSearchRunPayload,
   ConfirmedProfileResponse,
+  JobSearchTraceStepListResponse,
   JobSearchRunListResponse,
   JobSearchRunResponse,
+  LlmStatus,
   ParsedResumeReview,
   ParsedResumeReviewResponse,
   ProfileDraftResponse,
@@ -134,8 +136,20 @@ export async function createJobSearchRun(
   return response.data;
 }
 
+export async function getLlmStatus(): Promise<LlmStatus> {
+  const response = await client.get<LlmStatus>("/api/v1/llm/status");
+  return response.data;
+}
+
 export async function getJobSearchRun(runId: string): Promise<JobSearchRunResponse> {
   const response = await client.get<JobSearchRunResponse>(`/api/v1/job-search-runs/${runId}`);
+  return response.data;
+}
+
+export async function getJobSearchRunSteps(runId: string): Promise<JobSearchTraceStepListResponse> {
+  const response = await client.get<JobSearchTraceStepListResponse>(
+    `/api/v1/job-search-runs/${runId}/steps`
+  );
   return response.data;
 }
 

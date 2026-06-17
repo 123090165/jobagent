@@ -236,12 +236,35 @@ def init_database(connection: sqlite3.Connection) -> None:
             locations_json TEXT NOT NULL,
             target_roles_json TEXT NOT NULL,
             keywords_json TEXT NOT NULL,
+            search_mode TEXT NOT NULL DEFAULT 'local_mock',
+            llm_enabled INTEGER NOT NULL DEFAULT 0,
+            search_provider TEXT,
             status TEXT NOT NULL,
+            error_message TEXT,
             results_json TEXT NOT NULL,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL,
             FOREIGN KEY (session_id) REFERENCES profile_sessions(session_id),
             FOREIGN KEY (confirmed_profile_id) REFERENCES confirmed_profiles(confirmed_profile_id)
+        );
+
+        CREATE TABLE IF NOT EXISTS job_search_trace_steps (
+            step_id TEXT PRIMARY KEY,
+            job_search_run_id TEXT NOT NULL,
+            step_index INTEGER NOT NULL,
+            name TEXT NOT NULL,
+            status TEXT NOT NULL,
+            mode TEXT NOT NULL,
+            summary TEXT NOT NULL,
+            fallback_reason TEXT,
+            guardrails_json TEXT NOT NULL,
+            quality_warnings_json TEXT NOT NULL,
+            started_at TEXT,
+            completed_at TEXT,
+            duration_ms REAL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY (job_search_run_id) REFERENCES job_search_runs(job_search_run_id)
         );
         """
     )
@@ -249,6 +272,10 @@ def init_database(connection: sqlite3.Connection) -> None:
     _ensure_column(connection, "application_records", "resume_version_id", "INTEGER")
     _ensure_column(connection, "workflow_step_traces", "workflow_run_id", "TEXT")
     _ensure_column(connection, "workflow_step_traces", "duration_ms", "REAL")
+    _ensure_column(connection, "job_search_runs", "search_mode", "TEXT DEFAULT 'local_mock'")
+    _ensure_column(connection, "job_search_runs", "llm_enabled", "INTEGER DEFAULT 0")
+    _ensure_column(connection, "job_search_runs", "search_provider", "TEXT")
+    _ensure_column(connection, "job_search_runs", "error_message", "TEXT")
     connection.commit()
 
 

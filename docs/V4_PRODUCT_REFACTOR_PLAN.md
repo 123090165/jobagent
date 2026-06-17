@@ -639,17 +639,44 @@ Acceptance criteria:
 - Vue build passes
 ```
 
-### v4.5b - Imported JD Search
+### v4.5b - Traced Live Job Search with LLM Planning
 
 Goal:
 
-Search or rank user-imported JD content after the local/mock job search product shape is stable.
+Add provider-backed live search with deterministic fallbacks, optional LLM-assisted planning/filtering, and visible pipeline tracing without adding LangGraph.
 
-### v4.5c - Live Provider Search
+Backend scope:
 
-Goal:
+```text
+- extend JobSearchRun with search_mode, llm_enabled, search_provider, status, error_message
+- persist trace steps in job_search_trace_steps
+- add provider abstraction with mock and Tavily-backed implementations
+- add search planner and candidate filter services with deterministic fallback behavior
+- reuse JDAnalysisAgent for candidate description analysis
+- expose GET /api/v1/llm/status
+```
 
-Connect live providers only after local/mock result cards and match explanations are stable.
+Frontend scope:
+
+```text
+- confirmed profile page gets live-search setup controls
+- add LLM status display
+- poll GET /api/v1/job-search-runs/{run_id}
+- render trace timeline while the run is pending/running
+- render provider-backed job cards on completion
+```
+
+Acceptance criteria:
+
+```text
+- local_mock remains deterministic and testable
+- live_search creates a traced run with pending/running/completed/failed status
+- frontend polling stops on completed or failed
+- live job cards show source provider and source URL
+- no frontend API key handling is introduced
+- backend tests pass
+- Vue build passes
+```
 
 ### v4.6 - Job Brief
 
@@ -800,11 +827,7 @@ Then start:
 v4.1 Resume Intake Flow
 ```
 
-The goal of v4.1 is:
-
-```text
-Vue homepage can create a profile session, upload or paste resume content, store it as ResumeDocument, and continue to the review page.
-```
+The current next product step after v4.5a is v4.5b traced live job search, not imported JD search and not LangGraph orchestration.
 
 ## 15. Hardening References
 

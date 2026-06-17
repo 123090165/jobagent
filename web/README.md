@@ -47,14 +47,21 @@ The Confirmed Profile flow can:
 
 - load `/api/v1/confirmed-profiles/{confirmed_profile_id}`
 - render the final search-ready profile
-- start a local/mock job search through `/api/v1/job-search-runs`
+- load `/api/v1/llm/status`
+- start either `live_search` or `local_mock` job search runs through `/api/v1/job-search-runs`
 
-The Local/Mock Job Search flow can:
+The Job Search flow can:
 
-- load `/api/v1/job-search-runs/{run_id}`
+- poll `/api/v1/job-search-runs/{run_id}`
+- load `/api/v1/job-search-runs/{run_id}/steps`
 - load `/api/v1/profile-sessions/{session_id}/job-search-runs`
-- render deterministic local/mock job cards
+- render live step tracing while a run is pending/running
+- render deterministic local/mock cards or live provider-backed cards when completed
 - keep Job Brief out of scope until v4.6
+
+Frontend rule:
+
+- Never store or submit provider API keys from `web/`. Provider and LLM credentials stay server-side.
 
 ## Local Development
 

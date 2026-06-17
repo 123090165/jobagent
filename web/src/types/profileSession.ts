@@ -126,13 +126,34 @@ export interface JobSearchResult {
   title: string;
   company: string;
   location: string;
-  source: "local_mock";
+  source: "local_mock" | "live_search";
+  source_provider: string | null;
+  source_url: string | null;
+  raw_snippet: string | null;
   description: string;
   matched_keywords: string[];
   match_reasons: string[];
   risks: string[];
   match_score: number;
   recommended_action: string;
+  analysis_mode: "deterministic" | "llm" | "fallback" | "mock";
+  confidence_label: "strong" | "medium" | "limited" | "weak";
+}
+
+export interface JobSearchTraceStep {
+  step_id: string;
+  job_search_run_id: string;
+  step_index: number;
+  name: string;
+  status: "pending" | "running" | "completed" | "failed";
+  mode: "deterministic" | "llm" | "provider" | "fallback" | "mock";
+  summary: string;
+  fallback_reason: string | null;
+  guardrails: string[];
+  quality_warnings: string[];
+  started_at: string | null;
+  completed_at: string | null;
+  duration_ms: number | null;
 }
 
 export interface JobSearchRun {
@@ -143,7 +164,11 @@ export interface JobSearchRun {
   locations: string[];
   target_roles: string[];
   keywords: string[];
-  status: "completed";
+  search_mode: "local_mock" | "live_search";
+  llm_enabled: boolean;
+  search_provider: string | null;
+  status: "pending" | "running" | "completed" | "failed";
+  error_message: string | null;
   results: JobSearchResult[];
   created_at: string;
   updated_at: string;
@@ -152,18 +177,34 @@ export interface JobSearchRun {
 export interface JobSearchRunResponse {
   job_search_run: JobSearchRun;
   profile_session: ProfileSession;
+  steps: JobSearchTraceStep[];
 }
 
 export interface JobSearchRunListResponse {
   items: JobSearchRun[];
 }
 
+export interface JobSearchTraceStepListResponse {
+  items: JobSearchTraceStep[];
+}
+
+export interface LlmStatus {
+  provider: string;
+  configured: boolean;
+  model: string | null;
+  base_url: string | null;
+  reason: string | null;
+}
+
 export interface CreateJobSearchRunPayload {
   session_id: string;
   query?: string | null;
+  search_mode?: "local_mock" | "live_search";
+  use_llm?: boolean;
   locations?: string[];
   target_roles?: string[];
   keywords?: string[];
+  max_results?: number;
 }
 
 export interface UpdateProfileDraftPayload {

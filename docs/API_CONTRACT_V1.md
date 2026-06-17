@@ -69,6 +69,36 @@ Search-ready profile confirmed by the user and linked from `ProfileSession.confi
 
 A search run created from a confirmed profile.
 
+Current fields include:
+
+- `search_mode`: `local_mock | live_search`
+- `llm_enabled`: `true | false`
+- `search_provider`: backend-selected provider name or `null`
+- `status`: `pending | running | completed | failed`
+- `error_message`: nullable failure detail
+
+Each run also returns `results[]` and `steps[]`.
+
+### JobSearchTraceStep
+
+Trace record for one pipeline step within a `JobSearchRun`.
+
+Fields:
+
+- `step_id`
+- `job_search_run_id`
+- `step_index`
+- `name`
+- `status`
+- `mode`
+- `summary`
+- `fallback_reason`
+- `guardrails`
+- `quality_warnings`
+- `started_at`
+- `completed_at`
+- `duration_ms`
+
 ### JobBrief
 
 A brief generated for a job search result.
@@ -118,12 +148,36 @@ GET   /api/v1/confirmed-profiles/{confirmed_profile_id}
 
 POST /api/v1/job-search-runs
 GET  /api/v1/job-search-runs/{run_id}
+GET  /api/v1/job-search-runs/{run_id}/steps
 GET  /api/v1/profile-sessions/{session_id}/job-search-runs
+GET  /api/v1/llm/status
 
 POST /api/v1/job-search-runs/{run_id}/brief
 POST /api/v1/job-search-runs/{run_id}/brief?regenerate=true
 GET  /api/v1/briefs/{brief_id}
 ```
+
+`POST /api/v1/job-search-runs` accepts:
+
+```json
+{
+  "session_id": "uuid",
+  "search_mode": "live_search",
+  "use_llm": false,
+  "locations": [],
+  "target_roles": [],
+  "keywords": [],
+  "max_results": 10
+}
+```
+
+Notes:
+
+- `search_mode=local_mock` keeps the deterministic demo path.
+- `search_mode=live_search` creates a traced run and returns quickly with `pending` or `running`.
+- Frontend polling should use `GET /api/v1/job-search-runs/{run_id}` every 1-2 seconds until `completed` or `failed`.
+- Live job cards must preserve `source_provider` and `source_url` from the backend provider result.
+- `/api/v1/llm/status` is for display/configuration feedback only and does not execute a live LLM request.
 
 Generation endpoints are idempotent by default. If a current result already exists, return it unless `regenerate=true` is explicitly requested.
 

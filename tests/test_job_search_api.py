@@ -59,7 +59,7 @@ def test_job_search_creates_run_and_updates_session(monkeypatch, tmp_path) -> No
 
     response = client.post(
         "/api/v1/job-search-runs",
-        json={"session_id": confirmed["profile_session"]["session_id"]},
+        json={"session_id": confirmed["profile_session"]["session_id"], "search_mode": "local_mock"},
     )
 
     assert response.status_code == 200
@@ -74,7 +74,7 @@ def test_job_search_uses_local_mock_source(monkeypatch, tmp_path) -> None:
 
     response = client.post(
         "/api/v1/job-search-runs",
-        json={"session_id": confirmed["profile_session"]["session_id"]},
+        json={"session_id": confirmed["profile_session"]["session_id"], "search_mode": "local_mock"},
     )
 
     results = response.json()["job_search_run"]["results"]
@@ -86,7 +86,7 @@ def test_job_search_results_have_expected_fields(monkeypatch, tmp_path) -> None:
 
     response = client.post(
         "/api/v1/job-search-runs",
-        json={"session_id": confirmed["profile_session"]["session_id"]},
+        json={"session_id": confirmed["profile_session"]["session_id"], "search_mode": "local_mock"},
     )
 
     first = response.json()["job_search_run"]["results"][0]
@@ -101,7 +101,7 @@ def test_get_job_search_run_returns_run(monkeypatch, tmp_path) -> None:
     confirmed = _create_session_with_confirmed_profile(tmp_path, monkeypatch, "job-search-get.sqlite3")
     created = client.post(
         "/api/v1/job-search-runs",
-        json={"session_id": confirmed["profile_session"]["session_id"]},
+        json={"session_id": confirmed["profile_session"]["session_id"], "search_mode": "local_mock"},
     ).json()
 
     response = client.get(f"/api/v1/job-search-runs/{created['job_search_run']['job_search_run_id']}")
@@ -125,8 +125,7 @@ def test_get_missing_job_search_run_returns_not_found(monkeypatch, tmp_path) -> 
 def test_list_job_search_runs_by_session_returns_runs(monkeypatch, tmp_path) -> None:
     confirmed = _create_session_with_confirmed_profile(tmp_path, monkeypatch, "job-search-list.sqlite3")
     session_id = confirmed["profile_session"]["session_id"]
-    client.post("/api/v1/job-search-runs", json={"session_id": session_id})
-
+    client.post("/api/v1/job-search-runs", json={"session_id": session_id, "search_mode": "local_mock"})
     response = client.get(f"/api/v1/profile-sessions/{session_id}/job-search-runs")
 
     assert response.status_code == 200
@@ -138,7 +137,7 @@ def test_job_search_does_not_require_network_or_llm(monkeypatch, tmp_path) -> No
 
     response = client.post(
         "/api/v1/job-search-runs",
-        json={"session_id": confirmed["profile_session"]["session_id"]},
+        json={"session_id": confirmed["profile_session"]["session_id"], "search_mode": "local_mock"},
     )
 
     assert response.status_code == 200

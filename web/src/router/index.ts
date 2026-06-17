@@ -49,6 +49,7 @@ const router = createRouter({
           "profile_draft",
           "profile_confirmed",
           "job_search_ready",
+          "job_search_running",
           "job_search_completed"
         ])
     },

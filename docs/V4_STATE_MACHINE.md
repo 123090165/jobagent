@@ -133,3 +133,13 @@ POST /api/v1/job-search-runs/{run_id}/brief?regenerate=true
 ```
 
 `v4.5a` local/mock Job Search creates a persisted `JobSearchRun` and advances `ProfileSession.current_step` from `job_search_ready` to `job_search_completed` without contacting any live provider.
+
+`v4.5b` live search may move a session through:
+
+```text
+job_search_ready
+-> job_search_running
+-> job_search_completed
+```
+
+If the run fails, the run resource should move to `failed` while trace steps remain visible for debugging and frontend status display.

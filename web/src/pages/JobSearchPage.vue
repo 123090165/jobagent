@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { NButton, NCard, NTag } from "naive-ui";
 
@@ -12,13 +12,27 @@ const profileSessionStore = useProfileSessionStore();
 const runId = computed(() => String(route.params.runId ?? ""));
 const jobBriefHint = ref<string | null>(null);
 
+const isRunning = computed(() =>
+  ["pending", "running"].includes(profileSessionStore.jobSearchRun?.status ?? "")
+);
+
 onMounted(async () => {
   jobBriefHint.value = null;
   try {
-    await profileSessionStore.loadJobSearchRun(runId.value);
+    const run = await profileSessionStore.loadJobSearchRun(runId.value);
+    if (!profileSessionStore.jobSearchSteps.length) {
+      await profileSessionStore.loadJobSearchSteps(runId.value);
+    }
+    if (run.status === "pending" || run.status === "running") {
+      await profileSessionStore.pollJobSearchRun(runId.value);
+    }
   } catch {
     // Error state is rendered from the store.
   }
+});
+
+onUnmounted(() => {
+  profileSessionStore.stopPollingJobSearchRun();
 });
 
 function goBackToConfirmed() {
@@ -33,13 +47,20 @@ function goBackToConfirmed() {
 function showJobBriefHint() {
   jobBriefHint.value = "Job Brief will be implemented in v4.6.";
 }
+
+function statusTagType(status: string) {
+  if (status === "completed") return "success";
+  if (status === "failed") return "error";
+  if (status === "running") return "warning";
+  return "default";
+}
 </script>
 
 <template>
   <section class="flow-page">
-    <h1>Job Search Results</h1>
+    <h1>Job Search Run</h1>
     <p class="flow-message">
-      Review deterministic local/mock job results generated from the confirmed profile.
+      Follow the live search timeline, wait for analysis to finish, and then review the provider-backed job cards.
     </p>
     <p class="flow-meta">Run {{ runId }}</p>
     <StepProgress :active-index="2" />
@@ -48,14 +69,16 @@ function showJobBriefHint() {
       {{ profileSessionStore.error }}
     </div>
 
-    <div v-if="profileSessionStore.isJobSearchLoading && !profileSessionStore.jobSearchRun" class="review-empty-state">
-      <p class="flow-message">Loading local job search results...</p>
+    <div
+      v-if="profileSessionStore.isJobSearchLoading && !profileSessionStore.jobSearchRun"
+      class="review-empty-state"
+    >
+      <p class="flow-message">Loading job search run...</p>
     </div>
 
     <div v-else-if="!profileSessionStore.jobSearchRun" class="review-empty-state">
       <p class="flow-message">
-        This job search run could not be loaded. Return to the confirmed profile and start a new
-        local/mock search.
+        This job search run could not be loaded. Return to the confirmed profile and start a new search.
       </p>
       <n-button type="primary" @click="goBackToConfirmed">Back to Confirmed Profile</n-button>
     </div>
@@ -65,7 +88,16 @@ function showJobBriefHint() {
         <n-button secondary @click="goBackToConfirmed">Back to Confirmed Profile</n-button>
       </div>
 
-      <n-card title="Search Context" size="small" class="job-search-summary">
+      <n-card title="Run Status" size="small" class="job-search-summary">
+        <div class="job-status-row">
+          <n-tag :type="statusTagType(profileSessionStore.jobSearchRun.status)" round>
+            {{ profileSessionStore.jobSearchRun.status }}
+          </n-tag>
+          <span>
+            Mode: {{ profileSessionStore.jobSearchRun.search_mode }} • Provider:
+            {{ profileSessionStore.jobSearchRun.search_provider || "not set" }}
+          </span>
+        </div>
         <p><strong>Query:</strong> {{ profileSessionStore.jobSearchRun.query }}</p>
         <p>
           <strong>Target Roles:</strong>
@@ -79,11 +111,39 @@ function showJobBriefHint() {
           <strong>Locations:</strong>
           {{ profileSessionStore.jobSearchRun.locations.join(", ") || "Not set" }}
         </p>
+        <p><strong>LLM Assisted:</strong> {{ profileSessionStore.jobSearchRun.llm_enabled ? "Yes" : "No" }}</p>
+        <p v-if="profileSessionStore.jobSearchRun.error_message">
+          <strong>Error:</strong> {{ profileSessionStore.jobSearchRun.error_message }}
+        </p>
+      </n-card>
+
+      <n-card title="Trace Timeline" size="small">
+        <p v-if="isRunning" class="flow-message">Searching and analyzing jobs...</p>
+        <div class="trace-timeline">
+          <div
+            v-for="step in profileSessionStore.jobSearchSteps"
+            :key="step.step_id"
+            class="trace-step"
+          >
+            <div class="trace-step-header">
+              <strong>{{ step.step_index }}. {{ step.name }}</strong>
+              <div class="trace-step-tags">
+                <n-tag :type="statusTagType(step.status)" round>{{ step.status }}</n-tag>
+                <n-tag size="small" round>{{ step.mode }}</n-tag>
+              </div>
+            </div>
+            <p>{{ step.summary }}</p>
+            <p v-if="step.fallback_reason"><strong>Fallback:</strong> {{ step.fallback_reason }}</p>
+            <p v-if="step.quality_warnings.length">
+              <strong>Warnings:</strong> {{ step.quality_warnings.join(" • ") }}
+            </p>
+          </div>
+        </div>
       </n-card>
 
       <p v-if="jobBriefHint" class="flow-meta">{{ jobBriefHint }}</p>
 
-      <div class="job-card-grid">
+      <div v-if="profileSessionStore.jobSearchRun.status === 'completed'" class="job-card-grid">
         <n-card
           v-for="result in profileSessionStore.jobSearchRun.results"
           :key="result.job_result_id"
@@ -95,10 +155,29 @@ function showJobBriefHint() {
               <h2 class="job-card-title">{{ result.title }}</h2>
               <p class="job-card-company">{{ result.company }} · {{ result.location }}</p>
             </div>
-            <n-tag type="success" round>{{ result.match_score }}</n-tag>
+            <div class="trace-step-tags">
+              <n-tag type="success" round>{{ result.match_score }}</n-tag>
+              <n-tag size="small" round>{{ result.confidence_label }}</n-tag>
+            </div>
           </div>
 
           <p class="job-card-description">{{ result.description }}</p>
+
+          <div class="job-card-section">
+            <strong>Source</strong>
+            <p>
+              {{ result.source_provider || result.source }}
+              <template v-if="result.source_url">
+                ·
+                <a :href="result.source_url" target="_blank" rel="noreferrer">Open listing</a>
+              </template>
+            </p>
+          </div>
+
+          <div class="job-card-section">
+            <strong>Analysis</strong>
+            <p>{{ result.analysis_mode }} · {{ result.confidence_label }}</p>
+          </div>
 
           <div class="job-card-section">
             <strong>Matched Keywords</strong>
