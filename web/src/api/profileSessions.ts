@@ -1,8 +1,8 @@
 import { client } from "./client";
 import type {
+  ConfirmedProfileResponse,
   ParsedResumeReview,
   ParsedResumeReviewResponse,
-  ProfileDraft,
   ProfileDraftResponse,
   ProfileSession,
   ResumeDocument,
@@ -102,6 +102,24 @@ export async function updateProfileDraft(
   const response = await client.patch<ProfileDraftResponse>(
     `/api/v1/profile-drafts/${draftId}`,
     payload
+  );
+  return response.data;
+}
+
+export async function confirmProfileDraft(
+  draftId: string
+): Promise<ConfirmedProfileResponse> {
+  const response = await client.post<ConfirmedProfileResponse>(
+    `/api/v1/profile-drafts/${draftId}/confirm`
+  );
+  return response.data;
+}
+
+export async function getConfirmedProfile(
+  confirmedProfileId: string
+): Promise<ConfirmedProfileResponse> {
+  const response = await client.get<ConfirmedProfileResponse>(
+    `/api/v1/confirmed-profiles/${confirmedProfileId}`
   );
   return response.data;
 }

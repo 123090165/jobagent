@@ -317,6 +317,23 @@ h1 {
   padding: 18px;
 }
 
+.confirmed-layout {
+  margin-top: 28px;
+}
+
+.confirmed-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 24px;
+}
+
+.confirmed-summary {
+  margin: 0;
+  color: #34414a;
+  line-height: 1.7;
+}
+
 @media (max-width: 680px) {
   .home-page {
     align-content: start;
@@ -326,7 +343,8 @@ h1 {
   .intake-actions,
   .step-progress,
   .review-grid,
-  .draft-grid {
+  .draft-grid,
+  .confirmed-grid {
     grid-template-columns: 1fr;
   }
 

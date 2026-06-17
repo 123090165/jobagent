@@ -75,6 +75,8 @@ v4.4 adds: profile_confirmed, job_search_ready
 
 `resume_empty` is recommended for v4.1 validation feedback, but the backend may also return a validation error without persisting this state if no valid resume content exists.
 
+In the current v4.4 implementation, confirming a profile draft stores `confirmed_profile_id` and moves the session directly to `job_search_ready`. The separate `profile_confirmed` state remains available for future UX refinements.
+
 ## Downstream Invalidation
 
 When a user replaces the current `ResumeDocument`:

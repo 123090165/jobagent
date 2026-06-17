@@ -177,6 +177,36 @@ class ProfileSessionRepository:
                 return None
         return self.get(session_id)
 
+    def attach_confirmed_profile(
+        self,
+        *,
+        session_id: str,
+        confirmed_profile_id: str,
+    ) -> ProfileSession | None:
+        updated_at = _utc_now()
+        with get_connection() as connection:
+            init_database(connection)
+            cursor = connection.execute(
+                """
+                UPDATE profile_sessions
+                SET
+                    confirmed_profile_id = ?,
+                    current_step = ?,
+                    updated_at = ?
+                WHERE session_id = ?
+                """,
+                (
+                    confirmed_profile_id,
+                    ProfileSessionStep.job_search_ready.value,
+                    updated_at.isoformat(),
+                    session_id,
+                ),
+            )
+            connection.commit()
+            if cursor.rowcount == 0:
+                return None
+        return self.get(session_id)
+
     @staticmethod
     def _row_to_profile_session(row: object) -> ProfileSession:
         return ProfileSession(
