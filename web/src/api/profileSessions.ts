@@ -1,6 +1,9 @@
 import { client } from "./client";
 import type {
+  CreateJobSearchRunPayload,
   ConfirmedProfileResponse,
+  JobSearchRunListResponse,
+  JobSearchRunResponse,
   ParsedResumeReview,
   ParsedResumeReviewResponse,
   ProfileDraftResponse,
@@ -120,6 +123,25 @@ export async function getConfirmedProfile(
 ): Promise<ConfirmedProfileResponse> {
   const response = await client.get<ConfirmedProfileResponse>(
     `/api/v1/confirmed-profiles/${confirmedProfileId}`
+  );
+  return response.data;
+}
+
+export async function createJobSearchRun(
+  payload: CreateJobSearchRunPayload
+): Promise<JobSearchRunResponse> {
+  const response = await client.post<JobSearchRunResponse>("/api/v1/job-search-runs", payload);
+  return response.data;
+}
+
+export async function getJobSearchRun(runId: string): Promise<JobSearchRunResponse> {
+  const response = await client.get<JobSearchRunResponse>(`/api/v1/job-search-runs/${runId}`);
+  return response.data;
+}
+
+export async function listJobSearchRuns(sessionId: string): Promise<JobSearchRunListResponse> {
+  const response = await client.get<JobSearchRunListResponse>(
+    `/api/v1/profile-sessions/${sessionId}/job-search-runs`
   );
   return response.data;
 }

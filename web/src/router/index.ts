@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from "vue-router";
 import { useProfileSessionStore } from "../stores/profileSession";
 
 import HomePage from "../pages/HomePage.vue";
+import JobSearchPage from "../pages/JobSearchPage.vue";
 import ProfileConfirmedPage from "../pages/ProfileConfirmedPage.vue";
 import ProfileDraftPage from "../pages/ProfileDraftPage.vue";
 import ProfileReviewPage from "../pages/ProfileReviewPage.vue";
@@ -47,8 +48,14 @@ const router = createRouter({
         requireSessionStep(String(to.params.sessionId), [
           "profile_draft",
           "profile_confirmed",
-          "job_search_ready"
+          "job_search_ready",
+          "job_search_completed"
         ])
+    },
+    {
+      path: "/jobs/:runId",
+      name: "job-search",
+      component: JobSearchPage
     }
   ]
 });

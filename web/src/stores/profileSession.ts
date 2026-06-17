@@ -3,19 +3,24 @@ import { AxiosError } from "axios";
 
 import {
   confirmProfileDraft,
+  createJobSearchRun,
   createProfileDraft,
   createProfileSession,
   getConfirmedProfile,
+  getJobSearchRun,
   getParsedResumeReview,
   getProfileDraft,
   getProfileSession,
+  listJobSearchRuns,
   parseResumeForReview,
   submitResumeFile,
   submitResumeText,
   updateProfileDraft
 } from "../api/profileSessions";
 import type {
+  CreateJobSearchRunPayload,
   ConfirmedProfile,
+  JobSearchRun,
   ParsedResumeReview,
   ProfileDraft,
   ProfileSession,
@@ -29,6 +34,8 @@ interface ProfileSessionState {
   parsedReview: ParsedResumeReview | null;
   profileDraft: ProfileDraft | null;
   confirmedProfile: ConfirmedProfile | null;
+  jobSearchRun: JobSearchRun | null;
+  jobSearchRuns: JobSearchRun[];
   isCreating: boolean;
   isSubmitting: boolean;
   isReviewLoading: boolean;
@@ -36,6 +43,8 @@ interface ProfileSessionState {
   isDraftSaving: boolean;
   isConfirming: boolean;
   isConfirmedLoading: boolean;
+  isJobSearchCreating: boolean;
+  isJobSearchLoading: boolean;
   hasLoadedSession: boolean;
   error: string | null;
 }
@@ -51,6 +60,8 @@ export const useProfileSessionStore = defineStore("profileSession", {
     parsedReview: null,
     profileDraft: null,
     confirmedProfile: null,
+    jobSearchRun: null,
+    jobSearchRuns: [],
     isCreating: false,
     isSubmitting: false,
     isReviewLoading: false,
@@ -58,6 +69,8 @@ export const useProfileSessionStore = defineStore("profileSession", {
     isDraftSaving: false,
     isConfirming: false,
     isConfirmedLoading: false,
+    isJobSearchCreating: false,
+    isJobSearchLoading: false,
     hasLoadedSession: false,
     error: null
   }),
@@ -91,6 +104,9 @@ export const useProfileSessionStore = defineStore("profileSession", {
         if (!this.session.confirmed_profile_id) {
           this.confirmedProfile = null;
         }
+        if (this.session.current_step !== "job_search_completed") {
+          this.jobSearchRun = null;
+        }
         return this.session;
       } catch (error) {
         this.session = null;
@@ -98,6 +114,8 @@ export const useProfileSessionStore = defineStore("profileSession", {
         this.parsedReview = null;
         this.profileDraft = null;
         this.confirmedProfile = null;
+        this.jobSearchRun = null;
+        this.jobSearchRuns = [];
         this.error = toApiErrorMessage(error, "Failed to load profile session.");
         throw error;
       }
@@ -113,6 +131,8 @@ export const useProfileSessionStore = defineStore("profileSession", {
         this.parsedReview = null;
         this.profileDraft = null;
         this.confirmedProfile = null;
+        this.jobSearchRun = null;
+        this.jobSearchRuns = [];
         return response.profile_session;
       } catch (error) {
         this.error = toApiErrorMessage(error, "Failed to submit resume text.");
@@ -132,6 +152,8 @@ export const useProfileSessionStore = defineStore("profileSession", {
         this.parsedReview = null;
         this.profileDraft = null;
         this.confirmedProfile = null;
+        this.jobSearchRun = null;
+        this.jobSearchRuns = [];
         return response.profile_session;
       } catch (error) {
         this.error = toApiErrorMessage(error, "Failed to submit resume file.");
@@ -171,6 +193,8 @@ export const useProfileSessionStore = defineStore("profileSession", {
         this.parsedReview = response.parsed_review;
         this.profileDraft = null;
         this.confirmedProfile = null;
+        this.jobSearchRun = null;
+        this.jobSearchRuns = [];
         return response.parsed_review;
       } catch (error) {
         this.parsedReview = null;
@@ -188,6 +212,8 @@ export const useProfileSessionStore = defineStore("profileSession", {
         this.session = response.profile_session;
         this.profileDraft = response.profile_draft;
         this.confirmedProfile = null;
+        this.jobSearchRun = null;
+        this.jobSearchRuns = [];
         return response.profile_draft;
       } catch (error) {
         this.profileDraft = null;
@@ -224,6 +250,8 @@ export const useProfileSessionStore = defineStore("profileSession", {
         this.session = response.profile_session;
         this.profileDraft = response.profile_draft;
         this.confirmedProfile = null;
+        this.jobSearchRun = null;
+        this.jobSearchRuns = [];
         return response.profile_draft;
       } catch (error) {
         this.error = toApiErrorMessage(error, "Failed to save profile draft.");
@@ -261,6 +289,57 @@ export const useProfileSessionStore = defineStore("profileSession", {
         throw error;
       } finally {
         this.isConfirmedLoading = false;
+      }
+    },
+    async createJobSearch(
+      payload: CreateJobSearchRunPayload
+    ): Promise<JobSearchRun> {
+      this.isJobSearchCreating = true;
+      this.error = null;
+      try {
+        const response = await createJobSearchRun(payload);
+        this.session = response.profile_session;
+        this.jobSearchRun = response.job_search_run;
+        this.jobSearchRuns = [response.job_search_run, ...this.jobSearchRuns.filter(
+          (item) => item.job_search_run_id !== response.job_search_run.job_search_run_id
+        )];
+        return response.job_search_run;
+      } catch (error) {
+        this.error = toApiErrorMessage(error, "Failed to start job search.");
+        throw error;
+      } finally {
+        this.isJobSearchCreating = false;
+      }
+    },
+    async loadJobSearchRun(runId: string): Promise<JobSearchRun> {
+      this.isJobSearchLoading = true;
+      this.error = null;
+      try {
+        const response = await getJobSearchRun(runId);
+        this.session = response.profile_session;
+        this.jobSearchRun = response.job_search_run;
+        return response.job_search_run;
+      } catch (error) {
+        this.jobSearchRun = null;
+        this.error = toApiErrorMessage(error, "Failed to load job search run.");
+        throw error;
+      } finally {
+        this.isJobSearchLoading = false;
+      }
+    },
+    async loadJobSearchRuns(sessionId: string): Promise<JobSearchRun[]> {
+      this.isJobSearchLoading = true;
+      this.error = null;
+      try {
+        const response = await listJobSearchRuns(sessionId);
+        this.jobSearchRuns = response.items;
+        return response.items;
+      } catch (error) {
+        this.jobSearchRuns = [];
+        this.error = toApiErrorMessage(error, "Failed to load job search runs.");
+        throw error;
+      } finally {
+        this.isJobSearchLoading = false;
       }
     }
   }

@@ -131,3 +131,5 @@ POST /api/v1/profile-sessions/{session_id}/parse-resume?regenerate=true
 POST /api/v1/profile-sessions/{session_id}/profile-draft?regenerate=true
 POST /api/v1/job-search-runs/{run_id}/brief?regenerate=true
 ```
+
+`v4.5a` local/mock Job Search creates a persisted `JobSearchRun` and advances `ProfileSession.current_step` from `job_search_ready` to `job_search_completed` without contacting any live provider.

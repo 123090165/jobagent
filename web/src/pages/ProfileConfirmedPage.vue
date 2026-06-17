@@ -10,13 +10,11 @@ const route = useRoute();
 const router = useRouter();
 const profileSessionStore = useProfileSessionStore();
 const sessionId = computed(() => String(route.params.sessionId ?? ""));
-const jobSearchHint = ref<string | null>(null);
 const sessionUnavailable = computed(
   () => profileSessionStore.hasLoadedSession && !profileSessionStore.session
 );
 
 onMounted(async () => {
-  jobSearchHint.value = null;
   try {
     const session = await profileSessionStore.loadSession(sessionId.value);
     if (session.confirmed_profile_id) {
@@ -31,8 +29,16 @@ function goBackToDraft() {
   void router.push({ name: "profile-draft", params: { sessionId: sessionId.value } });
 }
 
-function showJobSearchHint() {
-  jobSearchHint.value = "Job Search will be implemented in v4.5a.";
+async function startJobSearch() {
+  if (!profileSessionStore.session?.confirmed_profile_id) {
+    return;
+  }
+  try {
+    const run = await profileSessionStore.createJobSearch({ session_id: sessionId.value });
+    await router.push({ name: "job-search", params: { runId: run.job_search_run_id } });
+  } catch {
+    // Error state is rendered from the store.
+  }
 }
 </script>
 
@@ -69,13 +75,12 @@ function showJobSearchHint() {
         <n-button
           type="primary"
           :disabled="!profileSessionStore.confirmedProfile"
-          @click="showJobSearchHint"
+          :loading="profileSessionStore.isJobSearchCreating"
+          @click="startJobSearch"
         >
           Start Job Search
         </n-button>
       </div>
-
-      <p v-if="jobSearchHint" class="flow-meta">{{ jobSearchHint }}</p>
 
       <div
         v-if="profileSessionStore.isConfirmedLoading && !profileSessionStore.confirmedProfile"

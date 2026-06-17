@@ -6,7 +6,9 @@ from app.application.profile_session_usecases import (
     create_profile_session,
     get_profile_session,
 )
+from app.application.job_search_usecases import list_job_search_runs
 from app.application.profile_draft_usecases import create_profile_draft
+from app.schemas.job_search import JobSearchRunListResponse
 from app.application.resume_intake_usecases import (
     get_resume_document,
     submit_resume_file,
@@ -90,3 +92,11 @@ def create_profile_draft_endpoint(
     regenerate: bool = Query(default=False),
 ) -> ProfileDraftResponse:
     return create_profile_draft(session_id, regenerate=regenerate)
+
+
+@router.get(
+    "/{session_id}/job-search-runs",
+    response_model=JobSearchRunListResponse,
+)
+def list_job_search_runs_endpoint(session_id: str) -> JobSearchRunListResponse:
+    return JobSearchRunListResponse(items=list_job_search_runs(session_id))
