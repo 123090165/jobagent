@@ -1,5 +1,7 @@
 # JobAgent
 
+> This repository is currently being refactored toward the v4 ProfileSession flow. Some older tracker/demo documentation may be legacy and is tracked in [docs/CLEANUP_AUDIT.md](docs/CLEANUP_AUDIT.md).
+
 ## What Is JobAgent?
 
 JobAgent 是一个面向求职准备场景的本地工作台，用来把岗位来源、候选岗位、投递 tracker、单岗位深度分析和 evidence-based report 串成可复盘流程。
