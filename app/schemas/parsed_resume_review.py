@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import Any
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -21,6 +22,8 @@ class ParsedResumeReview(BaseModel):
     quality_warnings: list[str] = Field(default_factory=list)
     missing_info_questions: list[str] = Field(default_factory=list)
     raw_parser_output: dict[str, Any] | None = None
+    analysis_mode: Literal["deterministic", "llm", "fallback"] = "deterministic"
+    analysis_warnings: list[str] = Field(default_factory=list)
     created_at: datetime
     updated_at: datetime
 

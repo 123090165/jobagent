@@ -29,6 +29,7 @@ class ProjectExperience(BaseModel):
 class ResumeProfile(BaseModel):
     raw_text: str
     name: str | None = None
+    target_roles: list[str] = Field(default_factory=list)
     education: list[EducationItem] = Field(default_factory=list)
     skills: list[str] = Field(default_factory=list)
     projects: list[ProjectExperience] = Field(default_factory=list)

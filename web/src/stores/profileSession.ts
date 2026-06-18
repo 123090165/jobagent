@@ -207,11 +207,15 @@ export const useProfileSessionStore = defineStore("profileSession", {
         this.isReviewLoading = false;
       }
     },
-    async analyzeResume(sessionId: string, regenerate = false): Promise<ParsedResumeReview> {
+    async analyzeResume(
+      sessionId: string,
+      regenerate = false,
+      useLlm = false
+    ): Promise<ParsedResumeReview> {
       this.isReviewLoading = true;
       this.error = null;
       try {
-        const response = await parseResumeForReview(sessionId, regenerate);
+        const response = await parseResumeForReview(sessionId, regenerate, useLlm);
         this.session = response.profile_session;
         this.parsedReview = response.parsed_review;
         this.profileDraft = null;

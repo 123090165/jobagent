@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from fastapi.testclient import TestClient
+from types import SimpleNamespace
 
 from app.main import app
 
@@ -76,6 +77,50 @@ def test_parse_resume_regenerate_creates_new_review(monkeypatch, tmp_path) -> No
 
     assert first["parsed_review"]["parsed_review_id"] != second["parsed_review"]["parsed_review_id"]
     assert second["profile_session"]["parsed_review_id"] == second["parsed_review"]["parsed_review_id"]
+
+
+def test_parse_resume_accepts_use_llm_true(monkeypatch, tmp_path) -> None:
+    session = _create_session_with_resume(tmp_path, monkeypatch, "use-llm-review.sqlite3")
+
+    class FakeResumeReviewLLM:
+        def chat_completion_json(self, *, system_prompt: str, user_prompt: str) -> dict:
+            return {
+                "resume_profile": {
+                    "raw_text": "Name: Jane Doe\nSkills: Python",
+                    "name": "Jane Doe",
+                    "target_roles": ["AI Health Signal Processing Engineer"],
+                    "education": [],
+                    "skills": ["Python", "PPG", "ECG"],
+                    "projects": [
+                        {
+                            "name": "AI Health Signals",
+                            "description": "Analyzed physiological signals.",
+                            "technologies": ["Python"],
+                            "highlights": [],
+                            "raw_text": "AI Health Signals",
+                        }
+                    ],
+                    "work_experiences": [],
+                    "certificates": [],
+                    "highlights": [],
+                    "missing_info": [],
+                },
+                "quality_warnings": [],
+            }
+
+    monkeypatch.setattr(
+        "app.application.resume_review_usecases.resolve_llm_provider",
+        lambda: SimpleNamespace(service=FakeResumeReviewLLM()),
+    )
+
+    response = client.post(
+        f"/api/v1/profile-sessions/{session['session_id']}/parse-resume?regenerate=true&use_llm=true"
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["parsed_review"]["analysis_mode"] == "llm"
+    assert payload["parsed_review"]["raw_parser_output"]["name"] == "Jane Doe"
 
 
 def test_get_parsed_review_returns_current_review(monkeypatch, tmp_path) -> None:

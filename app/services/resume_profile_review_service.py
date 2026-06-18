@@ -9,6 +9,8 @@ from app.schemas.profile_review import (
 )
 from app.schemas.resume import ProjectExperience, ResumeProfile
 from app.services.errors import JobAgentError
+from app.services.llm_provider import JSONChatLLM
+from app.services.resume_llm_review_service import build_llm_assisted_resume_review
 
 EDITABLE_SECTIONS = [
     "target_roles",
@@ -51,6 +53,9 @@ SUGGESTED_EDITS = [
 def build_resume_profile_review(
     resume_text: str,
     target_roles: list[str] | None = None,
+    *,
+    use_llm: bool = False,
+    llm_service: JSONChatLLM | None = None,
 ) -> ResumeProfileReviewResult:
     normalized_resume = resume_text.strip()
     if not normalized_resume:
@@ -59,9 +64,23 @@ def build_resume_profile_review(
             error_code="resume_text_required",
         )
 
-    parsed_profile = parse_resume(normalized_resume)
+    deterministic_profile = parse_resume(normalized_resume)
+    analysis_mode = "deterministic"
+    analysis_warnings: list[str] = []
+    parsed_profile = deterministic_profile
+    if use_llm:
+        parsed_profile, analysis_warnings, analysis_mode = build_llm_assisted_resume_review(
+            normalized_resume,
+            deterministic_profile,
+            llm_service=llm_service,
+        )
     normalized_target_roles = _normalize_list(target_roles)
-    quality_warnings = _build_quality_warnings(parsed_profile, normalized_target_roles)
+    profile_target_roles = _normalize_list(getattr(parsed_profile, "target_roles", []))
+    quality_warnings = _build_quality_warnings(
+        parsed_profile,
+        _dedupe_list([*normalized_target_roles, *profile_target_roles]),
+    )
+    quality_warnings = _dedupe_list([*quality_warnings, *analysis_warnings])
     missing_info_questions = _build_missing_info_questions(parsed_profile, quality_warnings)
     confidence_label = _build_confidence_label(parsed_profile, quality_warnings)
 
@@ -72,6 +91,8 @@ def build_resume_profile_review(
         suggested_edits=SUGGESTED_EDITS.copy(),
         editable_sections=EDITABLE_SECTIONS.copy(),
         confidence_label=confidence_label,
+        analysis_mode=analysis_mode,
+        analysis_warnings=analysis_warnings,
     )
 
 
@@ -341,6 +362,21 @@ def _fallback_project_has_clear_project_signal(project: ProjectExperience) -> bo
 
 def _normalize_list(items: list[str] | None) -> list[str]:
     return [item.strip() for item in items or [] if item.strip()]
+
+
+def _dedupe_list(items: list[str]) -> list[str]:
+    result: list[str] = []
+    seen: set[str] = set()
+    for item in items:
+        text = str(item).strip()
+        if not text:
+            continue
+        key = text.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        result.append(text)
+    return result
 
 
 def _normalize_user_edits(user_edits: ResumeProfileUserEdits) -> ResumeProfileUserEdits:

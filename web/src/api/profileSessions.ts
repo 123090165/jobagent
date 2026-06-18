@@ -61,13 +61,14 @@ export async function getResumeDocument(sessionId: string): Promise<ResumeDocume
 
 export async function parseResumeForReview(
   sessionId: string,
-  regenerate = false
+  regenerate = false,
+  useLlm = false
 ): Promise<ParsedResumeReviewResponse> {
   const response = await client.post<ParsedResumeReviewResponse>(
     `/api/v1/profile-sessions/${sessionId}/parse-resume`,
     null,
     {
-      params: { regenerate }
+      params: { regenerate, use_llm: useLlm }
     }
   );
   return response.data;

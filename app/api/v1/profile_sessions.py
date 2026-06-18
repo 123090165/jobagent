@@ -71,8 +71,9 @@ def get_resume_document_endpoint(session_id: str) -> ResumeDocument:
 def parse_resume_for_review_endpoint(
     session_id: str,
     regenerate: bool = Query(default=False),
+    use_llm: bool = Query(default=False),
 ) -> ParsedResumeReviewResponse:
-    return parse_resume_for_review(session_id, regenerate=regenerate)
+    return parse_resume_for_review(session_id, regenerate=regenerate, use_llm=use_llm)
 
 
 @router.get(

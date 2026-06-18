@@ -62,6 +62,8 @@ export interface ParsedResumeReview {
   quality_warnings: string[];
   missing_info_questions: string[];
   raw_parser_output: Record<string, unknown> | null;
+  analysis_mode: "deterministic" | "llm" | "fallback";
+  analysis_warnings: string[];
   created_at: string;
   updated_at: string;
 }

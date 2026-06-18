@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed, onMounted } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { NButton, NCard, NCode, NCollapse, NCollapseItem, NThing } from "naive-ui";
+import { NButton, NCard, NCode, NCollapse, NCollapseItem, NSwitch, NTag, NThing } from "naive-ui";
 
 import StepProgress from "../components/StepProgress.vue";
 import { useProfileSessionStore } from "../stores/profileSession";
@@ -15,6 +15,28 @@ const sessionUnavailable = computed(
 );
 const hasResume = computed(() => Boolean(profileSessionStore.session?.resume_document_id));
 const parsedReview = computed(() => profileSessionStore.parsedReview);
+const useLlmResumeAnalysis = ref(false);
+const analysisModeLabel = computed(() => {
+  if (!parsedReview.value) {
+    return "Not analyzed";
+  }
+  if (parsedReview.value.analysis_mode === "llm") {
+    return "LLM-assisted parser";
+  }
+  if (parsedReview.value.analysis_mode === "fallback") {
+    return "Fallback parser";
+  }
+  return "Deterministic parser";
+});
+const analysisModeTagType = computed(() => {
+  if (parsedReview.value?.analysis_mode === "llm") {
+    return "success";
+  }
+  if (parsedReview.value?.analysis_mode === "fallback") {
+    return "warning";
+  }
+  return "default";
+});
 
 function formatEducationItem(item: Record<string, unknown>): string {
   const parts = [item.school, item.degree, item.major].filter(
@@ -50,7 +72,7 @@ onMounted(async () => {
 
 async function analyzeResume(regenerate = false) {
   try {
-    await profileSessionStore.analyzeResume(sessionId.value, regenerate);
+    await profileSessionStore.analyzeResume(sessionId.value, regenerate, useLlmResumeAnalysis.value);
   } catch {
     // Error state is rendered from the store.
   }
@@ -100,6 +122,10 @@ async function continueToDraft() {
 
     <div v-else class="review-layout">
       <div class="review-actions">
+        <div class="job-search-setup-row">
+          <span class="job-search-setup-label">Use LLM-assisted resume analysis</span>
+          <n-switch v-model:value="useLlmResumeAnalysis" />
+        </div>
         <n-button
           type="primary"
           :loading="profileSessionStore.isReviewLoading"
@@ -132,6 +158,17 @@ async function continueToDraft() {
       </div>
 
       <div v-else class="review-grid">
+        <n-card title="Analysis Mode" size="small">
+          <div class="job-search-status-copy">
+            <n-tag :type="analysisModeTagType" round>{{ analysisModeLabel }}</n-tag>
+          </div>
+          <ul v-if="parsedReview.analysis_warnings.length" class="review-list">
+            <li v-for="warning in parsedReview.analysis_warnings" :key="warning">
+              {{ warning }}
+            </li>
+          </ul>
+        </n-card>
+
         <n-card title="Basic Info" size="small">
           <n-thing>
             <p><strong>Name:</strong> {{ parsedReview.basic_info.name || "Not detected" }}</p>

@@ -27,6 +27,8 @@ class ParsedResumeReviewRepository:
         quality_warnings: list[str],
         missing_info_questions: list[str],
         raw_parser_output: dict | None,
+        analysis_mode: str = "deterministic",
+        analysis_warnings: list[str] | None = None,
     ) -> ParsedResumeReview:
         now = _utc_now()
         review = ParsedResumeReview(
@@ -42,6 +44,8 @@ class ParsedResumeReviewRepository:
             quality_warnings=quality_warnings,
             missing_info_questions=missing_info_questions,
             raw_parser_output=raw_parser_output,
+            analysis_mode=analysis_mode,  # type: ignore[arg-type]
+            analysis_warnings=analysis_warnings or [],
             created_at=now,
             updated_at=now,
         )
@@ -62,10 +66,12 @@ class ParsedResumeReviewRepository:
                     quality_warnings_json,
                     missing_info_questions_json,
                     raw_parser_output_json,
+                    analysis_mode,
+                    analysis_warnings_json,
                     created_at,
                     updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     review.parsed_review_id,
@@ -80,6 +86,8 @@ class ParsedResumeReviewRepository:
                     json.dumps(review.quality_warnings),
                     json.dumps(review.missing_info_questions),
                     json.dumps(review.raw_parser_output) if review.raw_parser_output is not None else None,
+                    review.analysis_mode,
+                    json.dumps(review.analysis_warnings),
                     review.created_at.isoformat(),
                     review.updated_at.isoformat(),
                 ),
@@ -105,6 +113,8 @@ class ParsedResumeReviewRepository:
                     quality_warnings_json,
                     missing_info_questions_json,
                     raw_parser_output_json,
+                    analysis_mode,
+                    analysis_warnings_json,
                     created_at,
                     updated_at
                 FROM parsed_resume_reviews
@@ -139,6 +149,8 @@ class ParsedResumeReviewRepository:
                     quality_warnings_json,
                     missing_info_questions_json,
                     raw_parser_output_json,
+                    analysis_mode,
+                    analysis_warnings_json,
                     created_at,
                     updated_at
                 FROM parsed_resume_reviews
@@ -171,6 +183,8 @@ class ParsedResumeReviewRepository:
                 if row["raw_parser_output_json"] is not None
                 else None
             ),
+            analysis_mode=row["analysis_mode"] or "deterministic",
+            analysis_warnings=json.loads(row["analysis_warnings_json"] or "[]"),
             created_at=datetime.fromisoformat(row["created_at"]),
             updated_at=datetime.fromisoformat(row["updated_at"]),
         )
