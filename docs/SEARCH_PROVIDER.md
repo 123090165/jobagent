@@ -14,7 +14,6 @@ Current scope:
 Out of scope in this phase:
 
 - Google Search
-- Tavily / Exa
 - RAG / MCP
 - Browser automation
 - Crawling, login, captcha handling, or anti-bot bypass

@@ -332,7 +332,7 @@ export const useProfileSessionStore = defineStore("profileSession", {
       }
     },
     async loadJobSearchProviderStatus(
-      provider?: "mock" | "tavily" | "curated_crawler"
+      provider?: "mock" | "cuhksz_career"
     ): Promise<JobSearchProviderStatus> {
       this.error = null;
       try {

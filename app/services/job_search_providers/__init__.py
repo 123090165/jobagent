@@ -8,15 +8,16 @@ from app.services.job_search_providers.base import (
     JobSearchProviderError,
     RawJobCandidate,
 )
-from app.services.job_search_providers.curated_crawler_provider import (
-    CuratedCrawlerProvider,
-    get_curated_job_domains,
+from app.services.job_search_providers.cuhksz_career_provider import (
+    CUHKSZ_CAREER_ALLOWED_DOMAINS,
+    CUHKSZ_CAREER_BASE_URL,
+    CUHKSZ_CAREER_SEARCH_URL,
+    CUHKSZCareerProvider,
 )
 from app.services.job_search_providers.mock_provider import MockJobSearchProvider
-from app.services.job_search_providers.web_provider import WebSearchProvider
 
-DEFAULT_JOB_SEARCH_PROVIDER = "curated_crawler"
-AVAILABLE_JOB_SEARCH_PROVIDERS = ["mock", "tavily", "curated_crawler"]
+DEFAULT_JOB_SEARCH_PROVIDER = "cuhksz_career"
+AVAILABLE_JOB_SEARCH_PROVIDERS = ["mock", "cuhksz_career"]
 
 
 @dataclass(frozen=True)
@@ -25,17 +26,19 @@ class JobSearchProviderStatus:
     configured: bool
     available_providers: list[str]
     reason: str | None
+    base_url: str | None
+    search_url: str | None
     allowlisted_domains: list[str]
 
 
 def normalize_job_search_provider_name(provider_name: str | None = None) -> str:
-    normalized = (provider_name or os.getenv("JOBAGENT_JOB_SEARCH_PROVIDER", DEFAULT_JOB_SEARCH_PROVIDER)).strip().lower()
+    normalized = (
+        provider_name or os.getenv("JOBAGENT_JOB_SEARCH_PROVIDER", DEFAULT_JOB_SEARCH_PROVIDER)
+    ).strip().lower()
     if normalized in {"mock", "local_mock"}:
         return "mock"
-    if normalized in {"web", "tavily"}:
-        return "tavily"
-    if normalized in {"curated", "curated_crawler", "crawler"}:
-        return "curated_crawler"
+    if normalized in {"cuhksz", "cuhksz_career", "cuhk", "career_cuhk"}:
+        return "cuhksz_career"
     raise JobSearchProviderError(f"Unsupported job search provider: {provider_name}")
 
 
@@ -43,9 +46,7 @@ def resolve_job_search_provider(provider_name: str | None = None) -> JobSearchPr
     normalized = normalize_job_search_provider_name(provider_name)
     if normalized == "mock":
         return MockJobSearchProvider()
-    if normalized == "tavily":
-        return WebSearchProvider()
-    return CuratedCrawlerProvider()
+    return CUHKSZCareerProvider()
 
 
 def get_job_search_provider_status(provider_name: str | None = None) -> dict[str, object]:
@@ -56,42 +57,32 @@ def get_job_search_provider_status(provider_name: str | None = None) -> dict[str
             configured=True,
             available_providers=AVAILABLE_JOB_SEARCH_PROVIDERS,
             reason="In-process deterministic provider for demos and tests.",
+            base_url=None,
+            search_url=None,
             allowlisted_domains=[],
         )
         return asdict(status)
-    if normalized == "tavily":
-        configured = bool(os.getenv("TAVILY_API_KEY"))
-        status = JobSearchProviderStatus(
-            provider="tavily",
-            configured=configured,
-            available_providers=AVAILABLE_JOB_SEARCH_PROVIDERS,
-            reason=None if configured else "TAVILY_API_KEY is empty.",
-            allowlisted_domains=[],
-        )
-        return asdict(status)
-
-    curated_status = CuratedCrawlerProvider.status()
     status = JobSearchProviderStatus(
-        provider="curated_crawler",
-        configured=curated_status.configured,
+        provider="cuhksz_career",
+        configured=True,
         available_providers=AVAILABLE_JOB_SEARCH_PROVIDERS,
-        reason=curated_status.reason,
-        allowlisted_domains=curated_status.allowlisted_domains,
+        reason=None,
+        base_url=CUHKSZ_CAREER_BASE_URL,
+        search_url=CUHKSZ_CAREER_SEARCH_URL,
+        allowlisted_domains=CUHKSZ_CAREER_ALLOWED_DOMAINS,
     )
     return asdict(status)
 
 
 __all__ = [
     "AVAILABLE_JOB_SEARCH_PROVIDERS",
+    "CUHKSZCareerProvider",
     "DEFAULT_JOB_SEARCH_PROVIDER",
-    "CuratedCrawlerProvider",
     "JobSearchProvider",
     "JobSearchProviderError",
     "JobSearchProviderStatus",
     "MockJobSearchProvider",
     "RawJobCandidate",
-    "WebSearchProvider",
-    "get_curated_job_domains",
     "get_job_search_provider_status",
     "normalize_job_search_provider_name",
     "resolve_job_search_provider",

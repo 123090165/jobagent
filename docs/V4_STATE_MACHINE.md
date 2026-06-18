@@ -144,4 +144,4 @@ job_search_ready
 
 If the run fails, the run resource should move to `failed` while trace steps remain visible for debugging and frontend status display.
 
-Starting in `v4.5c`, a live run should also preserve which live provider produced the run metadata, for example `curated_crawler` or `tavily`, while `local_mock` remains the demo fallback.
+Starting in `v4.5c`, a live run should also preserve which live provider produced the run metadata, for example `cuhksz_career`, while `local_mock` remains the demo fallback.

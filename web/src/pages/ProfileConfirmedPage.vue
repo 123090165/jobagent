@@ -7,7 +7,7 @@ import StepProgress from "../components/StepProgress.vue";
 import { useProfileSessionStore } from "../stores/profileSession";
 import type { CreateJobSearchRunPayload } from "../types/profileSession";
 
-type SearchSource = "curated_crawler" | "tavily" | "mock";
+type SearchSource = "cuhksz_career" | "mock";
 
 const route = useRoute();
 const router = useRouter();
@@ -17,7 +17,7 @@ const sessionUnavailable = computed(
   () => profileSessionStore.hasLoadedSession && !profileSessionStore.session
 );
 
-const selectedSearchSource = ref<SearchSource>("curated_crawler");
+const selectedSearchSource = ref<SearchSource>("cuhksz_career");
 const useLlm = ref(false);
 const maxResults = ref(10);
 
@@ -40,20 +40,20 @@ const providerStatusLabel = computed(() => {
   if (!status) {
     return "Provider status unavailable.";
   }
-  if (status.configured) {
-    const domains = status.allowlisted_domains.length
-      ? ` • ${status.allowlisted_domains.join(", ")}`
-      : "";
-    return `${status.provider} ready${domains}`;
+  if (status.provider === "mock") {
+    return "Local demo provider ready";
   }
-  return `${status.provider} unavailable${status.reason ? ` • ${status.reason}` : ""}`;
+  if (status.configured) {
+    return `CUHKSZ Career ready${status.search_url ? ` • ${status.search_url}` : ""}`;
+  }
+  return `CUHKSZ Career unavailable${status.reason ? ` • ${status.reason}` : ""}`;
 });
 
 onMounted(async () => {
   try {
     const session = await profileSessionStore.loadSession(sessionId.value);
     if (session.confirmed_profile_id) {
-    await profileSessionStore.loadConfirmedProfile(session.confirmed_profile_id);
+      await profileSessionStore.loadConfirmedProfile(session.confirmed_profile_id);
     }
     await profileSessionStore.loadLlmStatus();
     await profileSessionStore.loadJobSearchProviderStatus(selectedSearchSource.value);
@@ -82,8 +82,8 @@ async function startJobSearch() {
     const payload: CreateJobSearchRunPayload = {
       session_id: sessionId.value,
       search_mode: selectedSearchSource.value === "mock" ? "local_mock" : "live_search",
-      search_provider: selectedSearchSource.value,
-      use_llm: selectedSearchSource.value !== "mock" ? useLlm.value : false,
+      search_provider: selectedSearchSource.value === "mock" ? "mock" : "cuhksz_career",
+      use_llm: selectedSearchSource.value === "mock" ? false : useLlm.value,
       max_results: maxResults.value
     };
     const run = await profileSessionStore.createJobSearch(payload);
@@ -98,7 +98,7 @@ async function startJobSearch() {
   <section class="flow-page">
     <h1>Profile Confirmed</h1>
     <p class="flow-message">
-      Review the final confirmed profile, choose a controlled search source, and launch the next job search run.
+      Review the final confirmed profile, choose between the CUHKSZ live board and the local demo path, and launch the next job search run.
     </p>
     <p class="flow-meta">Session {{ sessionId }}</p>
     <StepProgress :active-index="2" />
@@ -147,14 +147,13 @@ async function startJobSearch() {
             <div class="job-search-setup-row">
               <span class="job-search-setup-label">Search Source</span>
               <n-radio-group v-model:value="selectedSearchSource">
-                <n-radio-button value="curated_crawler">Curated Sites</n-radio-button>
-                <n-radio-button value="tavily">Tavily Web Search</n-radio-button>
+                <n-radio-button value="cuhksz_career">CUHKSZ Career</n-radio-button>
                 <n-radio-button value="mock">Local Demo</n-radio-button>
               </n-radio-group>
             </div>
 
             <div class="job-search-setup-row">
-              <span class="job-search-setup-label">Use LLM-assisted search</span>
+              <span class="job-search-setup-label">Use LLM-assisted analysis</span>
               <n-switch
                 v-model:value="useLlm"
                 :disabled="selectedSearchSource === 'mock'"
@@ -188,7 +187,7 @@ async function startJobSearch() {
             </div>
 
             <p class="flow-meta">
-              Curated crawler fetches only allowlisted public job pages with simple GET requests. The frontend never stores API keys.
+              Current live provider: CUHKSZ Career at `https://career.cuhk.edu.cn/job/search`. No login, captcha handling, or anti-bot bypassing is used.
             </p>
           </div>
         </n-card>

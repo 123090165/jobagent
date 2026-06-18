@@ -8,4 +8,6 @@ class JobSearchProviderStatusResponse(BaseModel):
     configured: bool
     available_providers: list[str] = Field(default_factory=list)
     reason: str | None = None
+    base_url: str | None = None
+    search_url: str | None = None
     allowlisted_domains: list[str] = Field(default_factory=list)

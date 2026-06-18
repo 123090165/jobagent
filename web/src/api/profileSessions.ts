@@ -143,7 +143,7 @@ export async function getLlmStatus(): Promise<LlmStatus> {
 }
 
 export async function getJobSearchProviderStatus(
-  provider?: "mock" | "tavily" | "curated_crawler"
+  provider?: "mock" | "cuhksz_career"
 ): Promise<JobSearchProviderStatus> {
   const response = await client.get<JobSearchProviderStatus>("/api/v1/job-search-providers/status", {
     params: { provider }

@@ -650,7 +650,7 @@ Backend scope:
 ```text
 - extend JobSearchRun with search_mode, llm_enabled, search_provider, status, error_message
 - persist trace steps in job_search_trace_steps
-- add provider abstraction with mock and Tavily-backed implementations
+- add provider abstraction with mock and a focused public-site implementation
 - add search planner and candidate filter services with deterministic fallback behavior
 - reuse JDAnalysisAgent for candidate description analysis
 - expose GET /api/v1/llm/status
@@ -678,17 +678,17 @@ Acceptance criteria:
 - Vue build passes
 ```
 
-### v4.5c - Curated Job Crawler Provider
+### v4.5c - CUHKSZ Career Provider
 
 Goal:
 
-Prefer a controlled allowlisted crawler over broad web discovery while keeping Tavily optional and mock deterministic.
+Prefer one controlled allowlisted public job board over broad web discovery while keeping `mock` deterministic.
 
 Backend scope:
 
 ```text
-- add curated crawler provider with allowlisted adapters
-- add Greenhouse-like and Lever-like deterministic parsers
+- add a CUHKSZ Career provider for https://career.cuhk.edu.cn/job/search
+- keep the JobSearchProvider abstraction so future providers can be added later
 - add provider status API
 - preserve traced run behavior and persisted provider metadata
 ```
@@ -696,7 +696,7 @@ Backend scope:
 Frontend scope:
 
 ```text
-- replace simple live/local selector with curated/tavily/mock source selector
+- replace simple live/local selector with CUHKSZ Career vs Local Demo source options
 - show provider status from backend
 - keep the LLM-assisted toggle
 ```
@@ -704,10 +704,10 @@ Frontend scope:
 Acceptance criteria:
 
 ```text
-- curated crawler is the preferred live provider
-- Tavily remains optional, not mandatory
+- CUHKSZ Career is the current live provider
 - only allowlisted public pages are fetched
 - no anti-bot bypassing is added
+- no login, captcha handling, or browser automation is added
 - tests remain network-free
 - backend tests pass
 - Vue build passes
@@ -862,7 +862,7 @@ Then start:
 v4.1 Resume Intake Flow
 ```
 
-The current next product step after v4.5b is v4.5c curated crawler provider, not imported JD search and not LangGraph orchestration.
+The current next product step after v4.5b is v4.5c CUHKSZ Career provider, not imported JD search and not LangGraph orchestration.
 
 ## 15. Hardening References
 

@@ -66,8 +66,9 @@ Frontend rule:
 
 Provider notes:
 
-- `curated_crawler` is the preferred live source and fetches only allowlisted public pages.
-- `tavily` remains optional broad discovery, not the only live-search strategy.
+- `cuhksz_career` is the current live source and fetches only allowlisted public pages from `https://career.cuhk.edu.cn/job/search`.
+- `mock` remains the deterministic demo and test source.
+- No login, captcha handling, anti-bot bypassing, or browser automation is in scope for the live provider.
 - Tests must not require external network for any provider path.
 
 ## Local Development
