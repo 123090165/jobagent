@@ -1,36 +1,38 @@
 # JobAgent
 
-> This repository is currently being refactored toward the v4 ProfileSession flow. Some older tracker/demo documentation may be legacy and is tracked in [docs/CLEANUP_AUDIT.md](docs/CLEANUP_AUDIT.md).
+JobAgent is being refactored toward the v4 ProfileSession product flow: a
+FastAPI backend plus a Vue frontend for turning a resume into a confirmed,
+search-ready profile and then into job search results and job briefs.
 
-## What Is JobAgent?
-
-JobAgent 是一个面向求职准备场景的本地工作台，用来把岗位来源、候选岗位、投递 tracker、单岗位深度分析和 evidence-based report 串成可复盘流程。
-
-它不是一个单纯的 chatbot，也不是一个通用爬虫项目。当前重点是把求职闭环做扎实、做可测试、做可解释。
-
-## Core Loop
+Current mainline:
 
 ```text
-Job Source
-  -> SearchResultItem
-  -> JobImportCandidate
-  -> ApplicationRecord
-  -> Application Deep Analysis
-  -> Evidence-based Final Report
+Resume Intake
+-> Resume Review
+-> Profile Draft
+-> Confirmed Profile
+-> Job Search
+-> Job Brief
 ```
 
-## Key Features
+## Current Frontend
 
-- Search providers: `mock` / `local_db` / `gemini_cli` / `cuhksz_live`
-- Candidate-to-tracker workflow
-- Application deep analysis
-- Requirement-level evidence matching
-- Evidence-based resume rewrite suggestions
-- Grounded project challenge questions
-- JD-Resume Evidence Chain report
-- Analysis Quality Gate
-- Optional LLM enhancement with fallback
-- SQLite persistence and workflow trace
+`web/` is the current Vue frontend and the main user-facing product surface.
+
+`frontend/` is legacy Streamlit demo/admin code. It is still kept for now
+because a small amount of backend quality-evaluation code imports helpers from
+`frontend/profile_review_state.py`, but it is not the main user frontend.
+
+## Current Providers
+
+The current v4 job-search provider path uses:
+
+- `mock`
+- `cuhksz_career`
+
+Older names such as `local_db`, `gemini_cli`, and `cuhksz_live` still appear in
+legacy routes, tests, scripts, and older documentation. They are not the current
+mainline provider set and should not be presented as the primary product path.
 
 ## Quick Start
 
@@ -41,7 +43,7 @@ python -m venv .venv
 .venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
 
-Run tests:
+Run backend tests:
 
 ```powershell
 .venv\Scripts\python.exe -m pytest
@@ -59,95 +61,52 @@ Open API docs:
 http://127.0.0.1:8000/docs
 ```
 
-Optional: start the Streamlit demo:
+Build the Vue frontend:
 
 ```powershell
-.venv\Scripts\python.exe -m streamlit run frontend/streamlit_app.py
+cd web
+npm install
+npm run build
 ```
 
-Stable demo mode recommendation:
+## Main Directories
 
-- prefer `mock` or `local_db`
-- treat `cuhksz_live` as optional live demo only
-- treat LLM as optional enhancement, not main-path dependency
-
-## Demo Path
-
-Recommended 3-5 minute walkthrough:
-
-1. Run the backend and open `/docs`
-2. Search jobs through `mock` or `local_db`
-3. Review `SearchResultItem` metadata and warnings
-4. Create or review `JobImportCandidate`
-5. Import the candidate into `ApplicationRecord`
-6. Run `POST /applications/{application_id}/analyze`
-7. Open the final report and explain the evidence chain plus analysis quality
-
-More detail: [Demo Guide](docs/DEMO_GUIDE.md)
-
-## Project Architecture
-
-Main directories:
-
-- `app/api`: FastAPI route layer and API boundaries
-- `app/agents`: resume, JD, match, optimization, challenge, and report agents
-- `app/services`: business orchestration and provider-facing services
-- `app/workflows`: explicit workflow orchestration and trace handling
-- `app/schemas`: shared Pydantic contracts
-- `app/storage`: SQLite connection and repositories
-- `tests`: unit and integration coverage
-- `docs`: architecture, demo, workflow, and boundary docs
-
-Architecture docs:
-
-- [Architecture Overview](docs/ARCHITECTURE_OVERVIEW.md)
-- [Workflow Architecture](docs/WORKFLOW_ARCHITECTURE.md)
+- `app/api/v1`: current v4 FastAPI resource API
+- `app/application`: v4 usecase layer
+- `app/repositories`: persistence repositories
+- `app/schemas`: Pydantic contracts
+- `app/services`: business services and provider integrations
+- `app/storage`: SQLite connection and storage helpers
+- `web`: current Vue frontend
+- `frontend`: legacy Streamlit demo/admin surface
+- `tests`: backend and legacy regression coverage
+- `docs`: product, architecture, cleanup, and legacy documentation
+- `_archive`: archived historical notes and generated demo output snapshots
 
 ## Documentation
 
-Core docs:
-
-- [Demo Guide](docs/DEMO_GUIDE.md)
-- [Architecture Overview](docs/ARCHITECTURE_OVERVIEW.md)
-- [Workflow Architecture](docs/WORKFLOW_ARCHITECTURE.md)
-- [Live Job Provider](docs/LIVE_JOB_PROVIDER.md)
-- [Application Tracker](docs/APPLICATION_TRACKER.md)
-- [Job Import Candidate](docs/JOB_IMPORT_CANDIDATE.md)
+- [Cleanup Audit](docs/CLEANUP_AUDIT.md)
+- [Legacy Map](docs/LEGACY_MAP.md)
+- [v4 Product Refactor Plan](docs/V4_PRODUCT_REFACTOR_PLAN.md)
 - [Search Provider](docs/SEARCH_PROVIDER.md)
 
 ## Current Boundaries
 
 Current non-goals:
 
-- AI Interview session
-- RAG question bank
-- multi-site generic crawler
 - auto apply
-- email/calendar reminders
-- multi-user auth
-- PDF/DOCX export
-
-Also intentionally out of scope for the current phase:
-
 - login flows
 - captcha handling
 - browser automation
+- email/calendar reminders
+- multi-user auth
 - unsupported resume fabrication
 
 ## Development Notes
 
-- deterministic core first
-- mock-first and testable
-- LLM optional / fallback
-- schema-first
-- no unsupported resume fabrication
-
-## Notes For Reviewers
-
-What this project should be judged on:
-
-- whether the core loop is clear and runnable
-- whether the analysis result is evidence-based instead of score-only
-- whether tracker and analysis boundaries are explicit
-- whether the system remains useful without real-time LLM dependencies
-- whether the behavior is testable and locally reproducible
+- Keep v4 work centered on ProfileSession resources.
+- Prefer `web/` for user-facing frontend work.
+- Treat `frontend/`, unversioned tracker routes, and old workflow docs as
+  legacy until they are deliberately retired.
+- Do not remove dependencies or legacy modules until import checks and the full
+  test suite confirm the removal is safe.
