@@ -207,6 +207,13 @@ Important caveats:
 - Search results are not saved to SQLite.
 - Streamlit does not expose search yet; this round is API-only by design.
 
+## Current CUHKSZ Provider Notes
+
+- `cuhksz_career` is the only active live provider in the product flow right now.
+- Provider-stage filtering is intentionally loose: valid CUHKSZ candidates are kept even when the user query is English or does not match list-page text directly.
+- Precision is delegated downstream to candidate filtering, JD analysis, and profile matching.
+- Planner internals now prepare bilingual search signals so future English providers can use expanded English aliases without changing the current CUHKSZ-only product scope.
+
 ## Why This Shape
 
 This keeps provider-specific logic outside API routes and outside workflows, so later providers can be added with small, isolated changes.

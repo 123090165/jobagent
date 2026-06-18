@@ -4,6 +4,7 @@ import re
 import urllib.error
 import urllib.request
 from collections.abc import Callable
+from urllib.parse import urlparse
 
 from bs4 import BeautifulSoup
 
@@ -14,6 +15,19 @@ CUHKSZ_CAREER_BASE_URL = "https://career.cuhk.edu.cn"
 CUHKSZ_CAREER_SEARCH_URL = "https://career.cuhk.edu.cn/job/search"
 CUHKSZ_CAREER_ALLOWED_DOMAINS = ["career.cuhk.edu.cn"]
 CUHKSZ_CAREER_USER_AGENT = "JobAgent/0.1 cuhksz-career-provider"
+NO_PROVIDER_MATCH_WARNING = "No provider-side keyword match; kept for downstream ranking."
+
+COMPANY_LABELS = ["鍏徃鍚嶇О", "浼佷笟鍚嶇О"]
+LOCATION_LABELS = ["宸ヤ綔鍦扮偣", "鍦扮偣"]
+EMPLOYMENT_TYPE_LABELS = ["宸ヤ綔鎬ц川", "鑱屼綅鎬ц川"]
+CATEGORY_LABELS = ["鑱屼綅绫诲埆", "宀椾綅绫诲埆"]
+HEADCOUNT_LABELS = ["鎷涜仒浜烘暟", "浜烘暟"]
+SALARY_LABELS = ["钖祫", "钖祫寰呴亣"]
+PUBLISHED_DATE_LABELS = ["鍙戝竷鏃堕棿"]
+END_DATE_LABELS = ["缁撴潫鏃堕棿", "鎴鏃堕棿"]
+JOB_DESCRIPTION_LABELS = ["宸ヤ綔鍐呭鎻忚堪", "宀椾綅鑱岃矗", "鑱屼綅鎻忚堪", "浠昏亴瑕佹眰"]
+COMPANY_INTRO_LABELS = ["浼佷笟绠€浠?", "鍏徃绠€浠?"]
+CONTACT_INFO_LABELS = ["鑱旂郴鏂瑰紡", "鐢宠鏂瑰紡", "鎶曢€掓柟寮?"]
 
 
 class CUHKSZCareerProvider:
@@ -41,28 +55,18 @@ class CUHKSZCareerProvider:
 
         candidates: list[RawJobCandidate] = []
         for item in list_items:
-            snippet_lines = [
-                part
-                for part in [
-                    item.company,
-                    item.location,
-                    item.job_type,
-                    item.education,
-                    _format_dates(item.published_at, item.deadline),
-                ]
-                if part
-            ]
-            candidate = RawJobCandidate(
-                title=item.title,
-                company=item.company,
-                location=item.location,
-                source_url=item.detail_url,
-                source_provider=self.provider_name,
-                snippet=" | ".join(snippet_lines) or item.title,
-                raw_description=None,
-            )
-            if not _matches(candidate, query_terms=query_terms, location_terms=location_terms):
+            candidate = _build_list_candidate(item, provider_name=self.provider_name)
+            if candidate is None:
                 continue
+
+            if query_terms or location_terms:
+                if not _matches(candidate, query_terms=query_terms, location_terms=location_terms):
+                    candidate = candidate.model_copy(
+                        update={
+                            "provider_warnings": candidate.provider_warnings + [NO_PROVIDER_MATCH_WARNING],
+                        }
+                    )
+
             candidates.append(self.fetch_job_detail(candidate))
             if len(candidates) >= limit:
                 break
@@ -123,27 +127,59 @@ class CUHKSZCareerProvider:
             raise JobSearchProviderError(f"CUHKSZ request timed out for {url}") from exc
 
 
+def _build_list_candidate(item: object, *, provider_name: str) -> RawJobCandidate | None:
+    title = _clean_text(getattr(item, "title", ""))
+    detail_url = _clean_text(getattr(item, "detail_url", ""))
+    if not title or not detail_url or not _is_allowed_detail_url(detail_url):
+        return None
+
+    company = _clean_text(getattr(item, "company", ""))
+    location = _clean_text(getattr(item, "location", ""))
+    snippet_lines = [
+        part
+        for part in [
+            company,
+            location,
+            _clean_text(getattr(item, "job_type", "")),
+            _clean_text(getattr(item, "education", "")),
+            _format_dates(getattr(item, "published_at", None), getattr(item, "deadline", None)),
+        ]
+        if part
+    ]
+    return RawJobCandidate(
+        title=title,
+        company=company or None,
+        location=location or None,
+        source_url=detail_url,
+        source_provider=provider_name,
+        snippet=" | ".join(snippet_lines) or title,
+        raw_description=None,
+    )
+
+
+def _is_allowed_detail_url(url: str) -> bool:
+    parsed = urlparse(url)
+    return parsed.scheme in {"http", "https"} and parsed.netloc in CUHKSZ_CAREER_ALLOWED_DOMAINS
+
+
 def _parse_detail_fields(detail_html: str) -> dict[str, str | None]:
     soup = BeautifulSoup(detail_html, "html.parser")
     for node in soup.select("script,style,noscript"):
         node.decompose()
 
     title = _first_text(soup, ["h1", ".job_name", ".position_name"])
-    company = _search_label(detail_html, ["鍏徃鍚嶇О", "浼佷笟鍚嶇О"])
-    location = _search_label(detail_html, ["宸ヤ綔鍦扮偣", "鍦扮偣"])
-    employment_type = _search_label(detail_html, ["宸ヤ綔鎬ц川", "鑱屼綅鎬ц川"])
-    category = _search_label(detail_html, ["鑱屼綅绫诲埆", "宀椾綅绫诲埆"])
-    headcount = _search_label(detail_html, ["鎷涜仒浜烘暟", "浜烘暟"])
-    salary = _search_label(detail_html, ["钖祫", "钖叕寰呴亣"])
-    published_date = _search_label(detail_html, ["鍙戝竷鏃堕棿"])
-    end_date = _search_label(detail_html, ["缁撴潫鏃堕棿", "鎴鏃堕棿"])
+    company = _search_label(detail_html, COMPANY_LABELS)
+    location = _search_label(detail_html, LOCATION_LABELS)
+    employment_type = _search_label(detail_html, EMPLOYMENT_TYPE_LABELS)
+    category = _search_label(detail_html, CATEGORY_LABELS)
+    headcount = _search_label(detail_html, HEADCOUNT_LABELS)
+    salary = _search_label(detail_html, SALARY_LABELS)
+    published_date = _search_label(detail_html, PUBLISHED_DATE_LABELS)
+    end_date = _search_label(detail_html, END_DATE_LABELS)
     extracted_jd_text, _warnings = extract_cuhksz_jd_text(detail_html)
-    job_description = _extract_section(
-        detail_html,
-        ["宸ヤ綔鍐呭鎻忚堪", "宀椾綅鑱岃矗", "鑱屼綅鎻忚堪"],
-    ) or extracted_jd_text
-    company_intro = _extract_section(detail_html, ["浼佷笟绠€浠?", "鍏徃绠€浠?"])
-    contact_info = _extract_section(detail_html, ["鑱旂郴鏂瑰紡", "鐢宠鏂瑰紡", "鎶曢€掓柟寮?"])
+    job_description = _extract_section(detail_html, JOB_DESCRIPTION_LABELS) or extracted_jd_text
+    company_intro = _extract_section(detail_html, COMPANY_INTRO_LABELS)
+    contact_info = _extract_section(detail_html, CONTACT_INFO_LABELS)
 
     return {
         "title": title,
@@ -221,7 +257,7 @@ def _extract_section(html: str, labels: list[str]) -> str | None:
             for child in parent.children:
                 if child is heading:
                     continue
-                text = _clean_text(getattr(child, "get_text", lambda *args, **kwargs: str(child))(" ", strip=True))
+                text = _extract_text_fragment(child)
                 if text:
                     section_parts.append(text)
         else:
@@ -229,7 +265,7 @@ def _extract_section(html: str, labels: list[str]) -> str | None:
                 sibling_name = getattr(sibling, "name", None)
                 if sibling_name in {"h1", "h2", "h3"}:
                     break
-                text = _clean_text(getattr(sibling, "get_text", lambda *args, **kwargs: str(sibling))(" ", strip=True))
+                text = _extract_text_fragment(sibling)
                 if text:
                     section_parts.append(text)
 
@@ -237,6 +273,12 @@ def _extract_section(html: str, labels: list[str]) -> str | None:
         if section_text:
             return section_text
     return None
+
+
+def _extract_text_fragment(node: object) -> str:
+    if hasattr(node, "get_text"):
+        return _clean_text(node.get_text(" ", strip=True))
+    return _clean_text(str(node))
 
 
 def _clean_text(text: str) -> str:

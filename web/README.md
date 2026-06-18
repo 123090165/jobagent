@@ -68,6 +68,7 @@ Provider notes:
 
 - `cuhksz_career` is the current live source and fetches only allowlisted public pages from `https://career.cuhk.edu.cn/job/search`.
 - `mock` remains the deterministic demo and test source.
+- Provider-side recall is intentionally broad; downstream ranking decides which CUHKSZ candidates are most relevant.
 - No login, captcha handling, anti-bot bypassing, or browser automation is in scope for the live provider.
 - Tests must not require external network for any provider path.
 

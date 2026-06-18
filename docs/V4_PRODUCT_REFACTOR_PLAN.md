@@ -689,6 +689,7 @@ Backend scope:
 ```text
 - add a CUHKSZ Career provider for https://career.cuhk.edu.cn/job/search
 - keep the JobSearchProvider abstraction so future providers can be added later
+- keep provider-stage recall broad and delegate ranking precision downstream
 - add provider status API
 - preserve traced run behavior and persisted provider metadata
 ```

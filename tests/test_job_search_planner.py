@@ -3,6 +3,7 @@ from __future__ import annotations
 from app.schemas.confirmed_profile import ConfirmedProfile
 from app.services.job_search_planner import build_search_plan
 from app.services.llm_service import LLMServiceError
+from app.services.search_signal_normalizer import build_bilingual_search_signals
 
 
 class FakePlannerLLM:
@@ -62,3 +63,33 @@ def test_job_search_planner_fallback_path() -> None:
     assert plan.mode == "fallback"
     assert plan.fallback_reason == "LLMServiceError"
     assert plan.queries
+
+
+def test_build_bilingual_search_signals_expands_chinese_aliases() -> None:
+    signals = build_bilingual_search_signals(
+        target_roles=["鍚庣宸ョ▼甯?"],
+        keywords=["璇煶璇嗗埆", "鍏夌數瀹圭Н鑴夋悘娉?"],
+        core_skills=["Python", "鏈哄櫒瀛︿範"],
+    )
+
+    assert "璇煶璇嗗埆" in signals["zh_terms"]
+    assert "speech recognition" in signals["en_terms"]
+    assert "ASR" in signals["normalized_signals"]
+    assert signals["aliases"]["鍏夌數瀹圭Н鑴夋悘娉?"] == ["PPG", "photoplethysmography"]
+
+
+def test_deterministic_plan_keeps_bilingual_signals_for_future_english_sources() -> None:
+    profile = _confirmed_profile().model_copy(
+        update={
+            "target_roles": ["鍚庣宸ョ▼甯?"],
+            "search_keywords": ["璇煶璇嗗埆"],
+            "core_skills": ["Python", "ASR"],
+        }
+    )
+
+    plan = build_search_plan(profile, use_llm=False)
+
+    assert plan.mode == "deterministic"
+    assert "璇煶璇嗗埆" in " ".join(plan.queries)
+    assert "ASR" in plan.must_have_signals
+    assert "Future English providers should use expanded English aliases" in plan.ranking_policy

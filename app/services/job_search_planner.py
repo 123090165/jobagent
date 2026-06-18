@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 from app.schemas.confirmed_profile import ConfirmedProfile
 from app.services.llm_provider import JSONChatLLM
 from app.services.llm_service import LLMServiceError
+from app.services.search_signal_normalizer import build_bilingual_search_signals
 
 
 class JobSearchPlan(BaseModel):
@@ -83,7 +84,12 @@ def build_search_plan(
 
 def _build_deterministic_plan(confirmed_profile: ConfirmedProfile) -> JobSearchPlan:
     target_roles = _dedupe(confirmed_profile.target_roles)
-    keywords = _dedupe(confirmed_profile.search_keywords + confirmed_profile.core_skills)
+    signals = build_bilingual_search_signals(
+        confirmed_profile.target_roles,
+        confirmed_profile.search_keywords,
+        confirmed_profile.core_skills,
+    )
+    keywords = _dedupe(_query_signal_seed(signals, confirmed_profile.search_keywords, confirmed_profile.core_skills))
     locations = _dedupe(confirmed_profile.preferred_locations)
     queries: list[str] = []
 
@@ -105,14 +111,21 @@ def _build_deterministic_plan(confirmed_profile: ConfirmedProfile) -> JobSearchP
         warnings.append("No preferred locations found; search will include remote-friendly defaults.")
     if not confirmed_profile.search_keywords:
         warnings.append("Search keywords were sparse; core skills were used to build the plan.")
+    if signals["zh_terms"] and signals["en_terms"]:
+        warnings.append(
+            "Bilingual search signals were prepared for future English providers; CUHKSZ planning still prioritizes Chinese terms and common acronyms."
+        )
 
     return JobSearchPlan(
         queries=_dedupe(queries),
         locations=locations,
         target_roles=target_roles,
-        must_have_signals=keyword_seed,
+        must_have_signals=_dedupe(signals["normalized_signals"])[:10],
         avoid_signals=_dedupe(confirmed_profile.risks)[:5],
-        ranking_policy="Prefer target role overlap, skill overlap, and clear source metadata.",
+        ranking_policy=(
+            "Prefer target role overlap, skill overlap, and clear source metadata. "
+            "Future English providers should use expanded English aliases from normalized search signals."
+        ),
         mode="deterministic",
         fallback_reason=None,
         quality_warnings=warnings,
@@ -150,3 +163,20 @@ def _dedupe(values: list[str]) -> list[str]:
         seen.add(key)
         items.append(text)
     return items
+
+
+def _query_signal_seed(
+    signals: dict[str, object],
+    search_keywords: list[str],
+    core_skills: list[str],
+) -> list[str]:
+    zh_terms = [str(value) for value in signals.get("zh_terms", [])]
+    en_terms = [str(value) for value in signals.get("en_terms", [])]
+    acronyms = [term for term in en_terms if _looks_like_acronym(term)]
+    english_fallback = [term for term in en_terms if not _looks_like_acronym(term)]
+    return _dedupe(zh_terms + acronyms + search_keywords + core_skills + english_fallback)
+
+
+def _looks_like_acronym(value: str) -> bool:
+    stripped = value.strip()
+    return 2 <= len(stripped) <= 8 and stripped.upper() == stripped and any(char.isalpha() for char in stripped)
