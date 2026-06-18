@@ -67,22 +67,25 @@ def test_job_search_planner_fallback_path() -> None:
 
 def test_build_bilingual_search_signals_expands_chinese_aliases() -> None:
     signals = build_bilingual_search_signals(
-        target_roles=["鍚庣宸ョ▼甯?"],
-        keywords=["璇煶璇嗗埆", "鍏夌數瀹圭Н鑴夋悘娉?"],
-        core_skills=["Python", "鏈哄櫒瀛︿範"],
+        target_roles=[],
+        keywords=["语音识别", "生理信号处理", "可穿戴健康"],
+        core_skills=["PPG", "ECG"],
     )
 
-    assert "璇煶璇嗗埆" in signals["zh_terms"]
+    assert "语音识别" in signals["zh_terms"]
     assert "speech recognition" in signals["en_terms"]
     assert "ASR" in signals["normalized_signals"]
-    assert signals["aliases"]["鍏夌數瀹圭Н鑴夋悘娉?"] == ["PPG", "photoplethysmography"]
+    assert "physiological signal processing" in signals["en_terms"]
+    assert "wearable health" in signals["en_terms"]
+    assert "PPG" in signals["normalized_signals"]
+    assert "ECG" in signals["normalized_signals"]
 
 
 def test_deterministic_plan_keeps_bilingual_signals_for_future_english_sources() -> None:
     profile = _confirmed_profile().model_copy(
         update={
-            "target_roles": ["鍚庣宸ョ▼甯?"],
-            "search_keywords": ["璇煶璇嗗埆"],
+            "target_roles": ["后端工程师"],
+            "search_keywords": ["语音识别"],
             "core_skills": ["Python", "ASR"],
         }
     )
@@ -90,6 +93,6 @@ def test_deterministic_plan_keeps_bilingual_signals_for_future_english_sources()
     plan = build_search_plan(profile, use_llm=False)
 
     assert plan.mode == "deterministic"
-    assert "璇煶璇嗗埆" in " ".join(plan.queries)
+    assert "语音识别" in " ".join(plan.queries)
     assert "ASR" in plan.must_have_signals
     assert "Future English providers should use expanded English aliases" in plan.ranking_policy

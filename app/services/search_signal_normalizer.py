@@ -3,28 +3,28 @@ from __future__ import annotations
 from collections.abc import Iterable
 
 SIGNAL_ALIAS_MAP: dict[str, list[str]] = {
-    "璇煶璇嗗埆": ["speech recognition", "ASR", "automatic speech recognition"],
-    "鐢熺悊淇″彿": ["physiological signal", "biosignal"],
-    "鐢熺悊淇″彿澶勭悊": [
+    "语音识别": ["speech recognition", "ASR", "automatic speech recognition"],
+    "生理信号": ["physiological signal", "biosignal"],
+    "生理信号处理": [
         "physiological signal processing",
         "biosignal processing",
         "biomedical signal processing",
     ],
-    "鍙┛鎴?": ["wearable", "wearable devices"],
-    "鍙┛鎴村仴搴?": ["wearable health", "digital health", "health sensing"],
-    "蹇冪數": ["ECG", "electrocardiogram"],
-    "鍏夌數瀹圭Н鑴夋悘娉?": ["PPG", "photoplethysmography"],
-    "宓屽叆寮?": ["embedded systems", "embedded software", "firmware"],
-    "鍗曠墖鏈?": ["MCU", "microcontroller"],
-    "娣卞害瀛︿範": ["deep learning"],
-    "鏈哄櫒瀛︿範": ["machine learning"],
-    "閫氫俊": ["communication", "wireless communication"],
-    "璇箟閫氫俊": ["semantic communication"],
-    "绠楁硶": ["algorithm"],
-    "鍚庣": ["backend"],
-    "鍓嶇": ["frontend"],
-    "鍏ㄦ爤": ["full stack"],
-    "鏁版嵁": ["data"],
+    "可穿戴": ["wearable", "wearable devices"],
+    "可穿戴健康": ["wearable health", "digital health", "health sensing"],
+    "心电": ["ECG", "electrocardiogram"],
+    "光电容积脉搏波": ["PPG", "photoplethysmography"],
+    "嵌入式": ["embedded systems", "embedded software", "firmware"],
+    "单片机": ["MCU", "microcontroller"],
+    "深度学习": ["deep learning"],
+    "机器学习": ["machine learning"],
+    "通信": ["communication", "wireless communication"],
+    "语义通信": ["semantic communication"],
+    "算法": ["algorithm"],
+    "后端": ["backend"],
+    "前端": ["frontend"],
+    "全栈": ["full stack"],
+    "数据": ["data"],
 }
 
 
@@ -44,7 +44,9 @@ def build_bilingual_search_signals(
             aliases[term] = _dedupe(mapped)
             en_terms.extend(mapped)
 
-    normalized_signals = _dedupe([*source_terms, *zh_terms, *en_terms, *[alias for values in aliases.values() for alias in values]])
+    normalized_signals = _dedupe(
+        [*source_terms, *zh_terms, *en_terms, *[alias for values in aliases.values() for alias in values]]
+    )
     return {
         "zh_terms": _dedupe(zh_terms),
         "en_terms": _dedupe(en_terms),

@@ -13,6 +13,7 @@ from tests.test_job_search_live_api import FakeJSONLLM, _create_session_with_con
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 PROVIDER_SOURCE = Path("app/services/job_search_providers/cuhksz_career_provider.py")
+SIGNAL_NORMALIZER_SOURCE = Path("app/services/search_signal_normalizer.py")
 
 
 def read_fixture(name: str) -> str:
@@ -82,13 +83,16 @@ def test_cuhksz_detail_fetch_failure_keeps_candidate_with_warning() -> None:
     assert candidate.source_url == "https://career.cuhk.edu.cn/job/view/id/468293"
 
 
-def test_cuhksz_provider_source_does_not_contain_regressed_mojibake_labels() -> None:
-    source = PROVIDER_SOURCE.read_text(encoding="utf-8")
+def test_source_files_do_not_contain_mojibake_fragments() -> None:
+    provider_source = PROVIDER_SOURCE.read_text(encoding="utf-8")
+    signal_source = SIGNAL_NORMALIZER_SOURCE.read_text(encoding="utf-8")
 
-    assert "閸忣剙寰冮崥宥囆" not in source
-    assert "瀹搞儰缍旈崷鎵仯" not in source
-    assert "閽栴亣绁" not in source
-    assert 'COMPANY_LABELS = ["鍏徃鍚嶇О", "浼佷笟鍚嶇О"]' in source
+    for fragment in ["鍏徃", "宸ヤ綔", "钖祫", "璇煶", "鐢熺悊", "鍙┛", "蹇冪數", "宓屽叆"]:
+        assert fragment not in provider_source
+        assert fragment not in signal_source
+
+    assert 'COMPANY_LABELS = ["公司名称", "企业名称"]' in provider_source
+    assert '"语音识别": ["speech recognition", "ASR", "automatic speech recognition"]' in signal_source
 
 
 def test_live_search_use_case_works_with_fake_cuhksz_provider(monkeypatch, tmp_path) -> None:

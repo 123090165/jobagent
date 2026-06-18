@@ -17,17 +17,17 @@ CUHKSZ_CAREER_ALLOWED_DOMAINS = ["career.cuhk.edu.cn"]
 CUHKSZ_CAREER_USER_AGENT = "JobAgent/0.1 cuhksz-career-provider"
 NO_PROVIDER_MATCH_WARNING = "No provider-side keyword match; kept for downstream ranking."
 
-COMPANY_LABELS = ["鍏徃鍚嶇О", "浼佷笟鍚嶇О"]
-LOCATION_LABELS = ["宸ヤ綔鍦扮偣", "鍦扮偣"]
-EMPLOYMENT_TYPE_LABELS = ["宸ヤ綔鎬ц川", "鑱屼綅鎬ц川"]
-CATEGORY_LABELS = ["鑱屼綅绫诲埆", "宀椾綅绫诲埆"]
-HEADCOUNT_LABELS = ["鎷涜仒浜烘暟", "浜烘暟"]
-SALARY_LABELS = ["钖祫", "钖祫寰呴亣"]
-PUBLISHED_DATE_LABELS = ["鍙戝竷鏃堕棿"]
-END_DATE_LABELS = ["缁撴潫鏃堕棿", "鎴鏃堕棿"]
-JOB_DESCRIPTION_LABELS = ["宸ヤ綔鍐呭鎻忚堪", "宀椾綅鑱岃矗", "鑱屼綅鎻忚堪", "浠昏亴瑕佹眰"]
-COMPANY_INTRO_LABELS = ["浼佷笟绠€浠?", "鍏徃绠€浠?"]
-CONTACT_INFO_LABELS = ["鑱旂郴鏂瑰紡", "鐢宠鏂瑰紡", "鎶曢€掓柟寮?"]
+COMPANY_LABELS = ["公司名称", "企业名称"]
+LOCATION_LABELS = ["工作地点", "地点"]
+EMPLOYMENT_TYPE_LABELS = ["工作性质", "职位性质"]
+CATEGORY_LABELS = ["职位类别", "岗位类别"]
+HEADCOUNT_LABELS = ["招聘人数", "人数"]
+SALARY_LABELS = ["薪资", "薪资待遇"]
+PUBLISHED_DATE_LABELS = ["发布时间"]
+END_DATE_LABELS = ["结束时间", "截止时间"]
+JOB_DESCRIPTION_LABELS = ["工作内容描述", "岗位职责", "职位描述", "任职要求"]
+COMPANY_INTRO_LABELS = ["企业简介", "公司简介"]
+CONTACT_INFO_LABELS = ["联系方式", "申请方式", "投递方式"]
 
 
 class CUHKSZCareerProvider:
