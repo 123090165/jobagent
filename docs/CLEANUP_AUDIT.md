@@ -63,7 +63,7 @@ Top-level areas that are not delete candidates but need review:
 | `.ai/` | needs_review | Development prompts/skills. Not runtime, but may be useful project metadata. |
 | `docs/` | needs_review | Mixed current docs, old workflow docs, and generated demo outputs. |
 | `scripts/` | needs_review | Mostly demos/evaluations; several are imported by tests. |
-| `job_agent_prepare.md` | archive_candidate | Historical preparation/planning document. |
+| `job_agent_prepare.md` | deleted | Historical preparation/planning document deleted in the follow-up repository-size cleanup. |
 | `data/*.sqlite3` | delete_candidate | Ignored local SQLite outputs, not tracked. Preserve manually if needed before local cleanup. |
 | `.venv/`, `.pytest_cache/`, `__pycache__/`, `web/dist/`, `web/node_modules/` | delete_candidate | Ignored generated/local environment artifacts. Do not commit. |
 
@@ -90,8 +90,8 @@ pass.
 | `app/agents/match_agent.py`, `app/agents/report_agent.py`, `app/agents/resume_optimize_agent.py` | archive_candidate | Primarily used by old workflow and tests. |
 | `app/agents/missing_info_agent.py`, `app/agents/project_challenge_agent.py` | archive_candidate | Primarily used by old workflow and tests. |
 | `scripts/demo_*.py`, `scripts/run_*_evaluation.py`, `scripts/run_*_experiments.py` | archive_candidate | Demo/evaluation utilities. Several are still test-covered, so archive only with test updates. |
-| `docs/demo_outputs/` | archive_candidate | Generated evaluation/demo outputs. Tracked today; should move to an archive or release artifact policy later. |
-| `docs/demo_runs/` | archive_candidate | Tracked demo run snapshot. Keep only if it remains a documented fixture. |
+| `docs/demo_outputs/` | deleted | Generated evaluation/demo outputs deleted in the follow-up repository-size cleanup. |
+| `docs/demo_runs/` | deleted | Historical demo run snapshot deleted in the follow-up repository-size cleanup. |
 
 ## Delete candidates
 
@@ -164,10 +164,11 @@ Docs that need review because they may mix old and current concepts:
 - `docs/LLM_INTEGRATION.md`
 - `docs/LLM_PROMPT_AND_QUALITY_CONTROL.md`
 
-Archive candidates:
+Deleted historical artifacts:
 
 - `docs/demo_outputs/**`
 - `docs/demo_runs/**`
+- `job_agent_prepare.md`
 
 ## Possibly unused dependencies
 
@@ -246,9 +247,9 @@ and text search for runtime dependency names.
 6. Agent/report cleanup: after workflow retirement, reclassify old match,
    report, resume optimization, missing-info, and project-challenge agents for
    archive or removal.
-7. Generated artifact cleanup: move `docs/demo_outputs/` and `docs/demo_runs/`
-   to an archive policy or remove them after confirming they are not used as
-   fixtures, documentation references, or review artifacts.
+7. Generated artifact cleanup: `docs/demo_outputs/`, `docs/demo_runs/`, and
+   `job_agent_prepare.md` were removed after confirming they were not part of
+   current runtime or tests.
 8. Dependency cleanup: remove dependencies only after import checks and full
    backend/frontend checks pass in the same cleanup branch.
 

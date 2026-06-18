@@ -81,7 +81,6 @@ npm run build
 - `frontend`: legacy Streamlit demo/admin surface
 - `tests`: backend and legacy regression coverage
 - `docs`: product, architecture, cleanup, and legacy documentation
-- `_archive`: archived historical notes and generated demo output snapshots
 
 ## Documentation
 

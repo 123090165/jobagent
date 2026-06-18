@@ -110,14 +110,17 @@ The following are archive candidates, but were intentionally not moved in Phase
 - legacy docs that describe ApplicationRecord, JobImportCandidate, LangGraph,
   Streamlit, or old demo workflows
 
-Historical generated outputs and notes that were moved in Phase 2:
+Historical generated outputs and notes removed during cleanup:
 
-- `docs/demo_outputs/` moved to `_archive/demo_outputs/docs_demo_outputs/`
-- `docs/demo_runs/` moved to `_archive/demo_outputs/docs_demo_runs/`
-- `job_agent_prepare.md` moved to `_archive/legacy_notes/job_agent_prepare.md`
+- `docs/demo_outputs/` was deleted after being identified as generated
+  evaluation/demo output.
+- `docs/demo_runs/` was deleted after being identified as a historical demo run
+  snapshot.
+- `job_agent_prepare.md` was deleted after being identified as a historical
+  preparation note.
 
-`_archive/legacy_docs/` is reserved for future doc moves once old docs have
-been relabeled or their links have been updated.
+These files were not part of the current v4 mainline and were not required by
+tests or runtime. Deleting them reduced repository file count and size.
 
 ## Dependencies blocked by legacy areas
 
@@ -148,7 +151,7 @@ retired and the full backend and frontend checks pass.
    path, then remove old `local_db`, `gemini_cli`, and `cuhksz_live` code.
 5. Reclassify old workflow agents after workflow retirement; delete only agents
    with no v4 importers and no retained tests.
-6. Move or rewrite legacy docs into `_archive/legacy_docs/` once README and doc
-   links no longer depend on them as current product documentation.
+6. Delete or rewrite legacy docs once README and doc links no longer depend on
+   them as current product documentation.
 7. Remove blocked dependencies one at a time, with import checks and full test
    runs after each dependency change.
