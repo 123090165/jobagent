@@ -196,10 +196,19 @@ export interface LlmStatus {
   reason: string | null;
 }
 
+export interface JobSearchProviderStatus {
+  provider: "mock" | "tavily" | "curated_crawler" | string;
+  configured: boolean;
+  available_providers: string[];
+  reason: string | null;
+  allowlisted_domains: string[];
+}
+
 export interface CreateJobSearchRunPayload {
   session_id: string;
   query?: string | null;
   search_mode?: "local_mock" | "live_search";
+  search_provider?: "mock" | "tavily" | "curated_crawler";
   use_llm?: boolean;
   locations?: string[];
   target_roles?: string[];

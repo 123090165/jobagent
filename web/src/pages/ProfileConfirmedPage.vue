@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { NButton, NCard, NRadioButton, NRadioGroup, NSwitch, NTag } from "naive-ui";
 
 import StepProgress from "../components/StepProgress.vue";
 import { useProfileSessionStore } from "../stores/profileSession";
 import type { CreateJobSearchRunPayload } from "../types/profileSession";
+
+type SearchSource = "curated_crawler" | "tavily" | "mock";
 
 const route = useRoute();
 const router = useRouter();
@@ -15,7 +17,7 @@ const sessionUnavailable = computed(
   () => profileSessionStore.hasLoadedSession && !profileSessionStore.session
 );
 
-const selectedSearchMode = ref<"live_search" | "local_mock">("live_search");
+const selectedSearchSource = ref<SearchSource>("curated_crawler");
 const useLlm = ref(false);
 const maxResults = ref(10);
 
@@ -33,13 +35,36 @@ const llmStatusLabel = computed(() => {
   return `${provider} unavailable${reason ? ` • ${reason}` : ""}`;
 });
 
+const providerStatusLabel = computed(() => {
+  const status = profileSessionStore.jobSearchProviderStatus;
+  if (!status) {
+    return "Provider status unavailable.";
+  }
+  if (status.configured) {
+    const domains = status.allowlisted_domains.length
+      ? ` • ${status.allowlisted_domains.join(", ")}`
+      : "";
+    return `${status.provider} ready${domains}`;
+  }
+  return `${status.provider} unavailable${status.reason ? ` • ${status.reason}` : ""}`;
+});
+
 onMounted(async () => {
   try {
     const session = await profileSessionStore.loadSession(sessionId.value);
     if (session.confirmed_profile_id) {
-      await profileSessionStore.loadConfirmedProfile(session.confirmed_profile_id);
+    await profileSessionStore.loadConfirmedProfile(session.confirmed_profile_id);
     }
     await profileSessionStore.loadLlmStatus();
+    await profileSessionStore.loadJobSearchProviderStatus(selectedSearchSource.value);
+  } catch {
+    // Error state is rendered from the store.
+  }
+});
+
+watch(selectedSearchSource, async (value) => {
+  try {
+    await profileSessionStore.loadJobSearchProviderStatus(value);
   } catch {
     // Error state is rendered from the store.
   }
@@ -56,8 +81,9 @@ async function startJobSearch() {
   try {
     const payload: CreateJobSearchRunPayload = {
       session_id: sessionId.value,
-      search_mode: selectedSearchMode.value,
-      use_llm: selectedSearchMode.value === "live_search" ? useLlm.value : false,
+      search_mode: selectedSearchSource.value === "mock" ? "local_mock" : "live_search",
+      search_provider: selectedSearchSource.value,
+      use_llm: selectedSearchSource.value !== "mock" ? useLlm.value : false,
       max_results: maxResults.value
     };
     const run = await profileSessionStore.createJobSearch(payload);
@@ -72,8 +98,7 @@ async function startJobSearch() {
   <section class="flow-page">
     <h1>Profile Confirmed</h1>
     <p class="flow-message">
-      Review the final confirmed profile, configure the next search run, and launch either live
-      provider-backed search or the local demo path.
+      Review the final confirmed profile, choose a controlled search source, and launch the next job search run.
     </p>
     <p class="flow-meta">Session {{ sessionId }}</p>
     <StepProgress :active-index="2" />
@@ -120,10 +145,11 @@ async function startJobSearch() {
         <n-card title="Job Search Setup" size="small" class="job-search-setup-card">
           <div class="job-search-setup">
             <div class="job-search-setup-row">
-              <span class="job-search-setup-label">Search Mode</span>
-              <n-radio-group v-model:value="selectedSearchMode">
-                <n-radio-button value="live_search">Live Search</n-radio-button>
-                <n-radio-button value="local_mock">Local Demo</n-radio-button>
+              <span class="job-search-setup-label">Search Source</span>
+              <n-radio-group v-model:value="selectedSearchSource">
+                <n-radio-button value="curated_crawler">Curated Sites</n-radio-button>
+                <n-radio-button value="tavily">Tavily Web Search</n-radio-button>
+                <n-radio-button value="mock">Local Demo</n-radio-button>
               </n-radio-group>
             </div>
 
@@ -131,8 +157,21 @@ async function startJobSearch() {
               <span class="job-search-setup-label">Use LLM-assisted search</span>
               <n-switch
                 v-model:value="useLlm"
-                :disabled="selectedSearchMode !== 'live_search'"
+                :disabled="selectedSearchSource === 'mock'"
               />
+            </div>
+
+            <div class="job-search-setup-row">
+              <span class="job-search-setup-label">Provider Status</span>
+              <div class="job-search-status-copy">
+                <n-tag
+                  :type="profileSessionStore.jobSearchProviderStatus?.configured ? 'success' : 'warning'"
+                  round
+                >
+                  {{ profileSessionStore.jobSearchProviderStatus?.configured ? "Configured" : "Fallback Ready" }}
+                </n-tag>
+                <span>{{ providerStatusLabel }}</span>
+              </div>
             </div>
 
             <div class="job-search-setup-row">
@@ -149,8 +188,7 @@ async function startJobSearch() {
             </div>
 
             <p class="flow-meta">
-              Live search uses backend-side provider configuration only. API keys stay on the server
-              and are never stored in the frontend.
+              Curated crawler fetches only allowlisted public job pages with simple GET requests. The frontend never stores API keys.
             </p>
           </div>
         </n-card>
@@ -162,10 +200,7 @@ async function startJobSearch() {
 
           <n-card title="Target Roles" size="small">
             <ul class="review-list">
-              <li
-                v-for="role in profileSessionStore.confirmedProfile.target_roles"
-                :key="role"
-              >
+              <li v-for="role in profileSessionStore.confirmedProfile.target_roles" :key="role">
                 {{ role }}
               </li>
             </ul>
@@ -225,10 +260,7 @@ async function startJobSearch() {
 
           <n-card title="Strengths" size="small">
             <ul class="review-list">
-              <li
-                v-for="strength in profileSessionStore.confirmedProfile.strengths"
-                :key="strength"
-              >
+              <li v-for="strength in profileSessionStore.confirmedProfile.strengths" :key="strength">
                 {{ strength }}
               </li>
             </ul>

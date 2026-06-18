@@ -678,6 +678,41 @@ Acceptance criteria:
 - Vue build passes
 ```
 
+### v4.5c - Curated Job Crawler Provider
+
+Goal:
+
+Prefer a controlled allowlisted crawler over broad web discovery while keeping Tavily optional and mock deterministic.
+
+Backend scope:
+
+```text
+- add curated crawler provider with allowlisted adapters
+- add Greenhouse-like and Lever-like deterministic parsers
+- add provider status API
+- preserve traced run behavior and persisted provider metadata
+```
+
+Frontend scope:
+
+```text
+- replace simple live/local selector with curated/tavily/mock source selector
+- show provider status from backend
+- keep the LLM-assisted toggle
+```
+
+Acceptance criteria:
+
+```text
+- curated crawler is the preferred live provider
+- Tavily remains optional, not mandatory
+- only allowlisted public pages are fetched
+- no anti-bot bypassing is added
+- tests remain network-free
+- backend tests pass
+- Vue build passes
+```
+
 ### v4.6 - Job Brief
 
 Goal:
@@ -827,7 +862,7 @@ Then start:
 v4.1 Resume Intake Flow
 ```
 
-The current next product step after v4.5a is v4.5b traced live job search, not imported JD search and not LangGraph orchestration.
+The current next product step after v4.5b is v4.5c curated crawler provider, not imported JD search and not LangGraph orchestration.
 
 ## 15. Hardening References
 

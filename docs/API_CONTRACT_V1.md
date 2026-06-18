@@ -150,6 +150,7 @@ POST /api/v1/job-search-runs
 GET  /api/v1/job-search-runs/{run_id}
 GET  /api/v1/job-search-runs/{run_id}/steps
 GET  /api/v1/profile-sessions/{session_id}/job-search-runs
+GET  /api/v1/job-search-providers/status
 GET  /api/v1/llm/status
 
 POST /api/v1/job-search-runs/{run_id}/brief
@@ -163,6 +164,7 @@ GET  /api/v1/briefs/{brief_id}
 {
   "session_id": "uuid",
   "search_mode": "live_search",
+  "search_provider": "curated_crawler",
   "use_llm": false,
   "locations": [],
   "target_roles": [],
@@ -175,9 +177,12 @@ Notes:
 
 - `search_mode=local_mock` keeps the deterministic demo path.
 - `search_mode=live_search` creates a traced run and returns quickly with `pending` or `running`.
+- `search_provider` can be `mock`, `tavily`, or `curated_crawler`.
+- `GET /api/v1/job-search-providers/status` reports the active backend provider, whether it is configured, and curated allowlisted domains.
 - Frontend polling should use `GET /api/v1/job-search-runs/{run_id}` every 1-2 seconds until `completed` or `failed`.
 - Live job cards must preserve `source_provider` and `source_url` from the backend provider result.
 - `/api/v1/llm/status` is for display/configuration feedback only and does not execute a live LLM request.
+- Curated crawling is restricted to allowlisted public pages with simple HTTP GET requests only; no anti-bot bypassing is in scope.
 
 Generation endpoints are idempotent by default. If a current result already exists, return it unless `regenerate=true` is explicitly requested.
 

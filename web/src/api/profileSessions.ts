@@ -2,6 +2,7 @@ import { client } from "./client";
 import type {
   CreateJobSearchRunPayload,
   ConfirmedProfileResponse,
+  JobSearchProviderStatus,
   JobSearchTraceStepListResponse,
   JobSearchRunListResponse,
   JobSearchRunResponse,
@@ -138,6 +139,15 @@ export async function createJobSearchRun(
 
 export async function getLlmStatus(): Promise<LlmStatus> {
   const response = await client.get<LlmStatus>("/api/v1/llm/status");
+  return response.data;
+}
+
+export async function getJobSearchProviderStatus(
+  provider?: "mock" | "tavily" | "curated_crawler"
+): Promise<JobSearchProviderStatus> {
+  const response = await client.get<JobSearchProviderStatus>("/api/v1/job-search-providers/status", {
+    params: { provider }
+  });
   return response.data;
 }
 

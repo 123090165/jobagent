@@ -73,6 +73,7 @@ class JobSearchRunCreateRequest(BaseModel):
     session_id: str
     query: str | None = None
     search_mode: JobSearchMode = "live_search"
+    search_provider: str | None = None
     use_llm: bool = False
     locations: list[str] = Field(default_factory=list)
     target_roles: list[str] = Field(default_factory=list)

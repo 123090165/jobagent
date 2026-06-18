@@ -7,6 +7,7 @@ import {
   createProfileDraft,
   createProfileSession,
   getConfirmedProfile,
+  getJobSearchProviderStatus,
   getJobSearchRun,
   getJobSearchRunSteps,
   getLlmStatus,
@@ -22,6 +23,7 @@ import {
 import type {
   CreateJobSearchRunPayload,
   ConfirmedProfile,
+  JobSearchProviderStatus,
   JobSearchRun,
   JobSearchTraceStep,
   LlmStatus,
@@ -41,6 +43,7 @@ interface ProfileSessionState {
   jobSearchRun: JobSearchRun | null;
   jobSearchRuns: JobSearchRun[];
   jobSearchSteps: JobSearchTraceStep[];
+  jobSearchProviderStatus: JobSearchProviderStatus | null;
   llmStatus: LlmStatus | null;
   isCreating: boolean;
   isSubmitting: boolean;
@@ -72,6 +75,7 @@ export const useProfileSessionStore = defineStore("profileSession", {
     jobSearchRun: null,
     jobSearchRuns: [],
     jobSearchSteps: [],
+    jobSearchProviderStatus: null,
     llmStatus: null,
     isCreating: false,
     isSubmitting: false,
@@ -325,6 +329,19 @@ export const useProfileSessionStore = defineStore("profileSession", {
         throw error;
       } finally {
         this.isLlmStatusLoading = false;
+      }
+    },
+    async loadJobSearchProviderStatus(
+      provider?: "mock" | "tavily" | "curated_crawler"
+    ): Promise<JobSearchProviderStatus> {
+      this.error = null;
+      try {
+        this.jobSearchProviderStatus = await getJobSearchProviderStatus(provider);
+        return this.jobSearchProviderStatus;
+      } catch (error) {
+        this.jobSearchProviderStatus = null;
+        this.error = toApiErrorMessage(error, "Failed to load job search provider status.");
+        throw error;
       }
     },
     async createJobSearch(

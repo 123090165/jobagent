@@ -125,7 +125,7 @@ def create_job_search_run(
         )
 
     provider_name = normalize_job_search_provider_name(
-        getattr(job_search_provider, "provider_name", None)
+        getattr(job_search_provider, "provider_name", None) or payload.search_provider
     )
     run = search_repository.create_pending(
         session_id=session.session_id,
@@ -219,11 +219,12 @@ def execute_job_search_run(
         )
 
         provider_step = steps[1]
-        provider_mode = "mock" if getattr(provider, "provider_name", "mock") == "mock" else "provider"
+        provider_name = getattr(provider, "provider_name", "mock")
+        provider_mode = "mock" if provider_name == "mock" else "provider"
         search_repository.mark_trace_step_running(
             provider_step.step_id,
             mode=provider_mode,
-            summary="Collecting provider-backed job candidates.",
+            summary=f"Collecting provider-backed job candidates from {provider_name}.",
             guardrails=ASSEMBLY_GUARDRAILS,
         )
         raw_candidates = _run_provider_search(
@@ -234,7 +235,7 @@ def execute_job_search_run(
         search_repository.complete_trace_step(
             provider_step.step_id,
             mode=provider_mode,
-            summary=f"Collected {len(raw_candidates)} provider candidate(s).",
+            summary=f"Collected {len(raw_candidates)} candidates from {provider_name}.",
             guardrails=ASSEMBLY_GUARDRAILS,
         )
 

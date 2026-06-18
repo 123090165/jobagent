@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class JobSearchProviderError(RuntimeError):
@@ -17,6 +17,7 @@ class RawJobCandidate(BaseModel):
     source_provider: str
     snippet: str
     raw_description: str | None = None
+    provider_warnings: list[str] = Field(default_factory=list)
 
 
 class JobSearchProvider(Protocol):

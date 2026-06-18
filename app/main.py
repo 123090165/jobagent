@@ -19,6 +19,7 @@ from app.api.routes_resume_profile_review import router as resume_profile_review
 from app.api.routes_resume_versions import router as resume_versions_router
 from app.api.routes_search import router as search_router
 from app.api.v1.confirmed_profiles import router as confirmed_profiles_v1_router
+from app.api.v1.job_search_providers import router as job_search_providers_v1_router
 from app.api.v1.job_search_runs import router as job_search_runs_v1_router
 from app.api.v1.llm import router as llm_v1_router
 from app.api.v1.profile_drafts import router as profile_drafts_v1_router
@@ -69,6 +70,7 @@ def create_app() -> FastAPI:
     api.include_router(profile_drafts_v1_router)
     api.include_router(confirmed_profiles_v1_router)
     api.include_router(job_search_runs_v1_router)
+    api.include_router(job_search_providers_v1_router)
     api.include_router(llm_v1_router)
     return api
 
