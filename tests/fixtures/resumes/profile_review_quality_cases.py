@@ -13,6 +13,11 @@ class ProfileReviewQualityCase(BaseModel):
     expected_sections: list[str] = Field(default_factory=list)
     should_have_warnings: bool
     expected_confidence_without_llm: str | None = None
+    regression_skills: list[str] = Field(default_factory=list)
+    regression_project_keywords: list[str] = Field(default_factory=list)
+    regression_work_keywords: list[str] = Field(default_factory=list)
+    regression_education_keywords: list[str] = Field(default_factory=list)
+    regression_missing_info: list[str] = Field(default_factory=list)
 
 
 PROFILE_REVIEW_QUALITY_CASES = [
@@ -46,6 +51,10 @@ Highlights: Improved profile review reliability and released reproducible evalua
         expected_sections=["projects", "work_experiences", "education", "highlights"],
         should_have_warnings=False,
         expected_confidence_without_llm="strong",
+        regression_skills=["Python", "FastAPI", "LangGraph", "SQLite"],
+        regression_project_keywords=["JobAgent", "FastAPI", "evaluation"],
+        regression_work_keywords=["Backend Intern", "Example AI Lab"],
+        regression_education_keywords=["Computer Science", "Shenzhen University"],
     ),
     ProfileReviewQualityCase(
         case_id="embedded_stm32",
@@ -68,6 +77,10 @@ Highlights: Completed lab integration and improved hardware debugging efficiency
         expected_sections=["projects", "education", "highlights"],
         should_have_warnings=False,
         expected_confidence_without_llm="medium",
+        regression_skills=["C", "STM32", "UART", "GPIO", "DMA"],
+        regression_project_keywords=["STM32 Environment Monitor System", "sensor data"],
+        regression_education_keywords=["Electronic Information Engineering", "South China University"],
+        regression_missing_info=["work experience"],
     ),
     ProfileReviewQualityCase(
         case_id="ml_audio_asr",
@@ -94,6 +107,10 @@ Highlights: Improved model accuracy and documented dataset quality issues.
         expected_sections=["projects", "work_experiences", "education", "highlights"],
         should_have_warnings=False,
         expected_confidence_without_llm="strong",
+        regression_skills=["PyTorch", "Librosa", "MFCC", "STFT", "CNN"],
+        regression_project_keywords=["Audio Classification Benchmark", "ASR Error Analysis Tool"],
+        regression_work_keywords=["Research Assistant", "Audio Intelligence Lab"],
+        regression_education_keywords=["Data Science", "City University"],
     ),
     ProfileReviewQualityCase(
         case_id="finance_fa_analysis",
@@ -118,6 +135,10 @@ Highlights: Completed investor meeting notes and delivered structured research r
         expected_sections=["projects", "work_experiences", "education", "highlights"],
         should_have_warnings=False,
         expected_confidence_without_llm="medium",
+        regression_skills=["Excel", "PowerPoint", "Wind", "CRM"],
+        regression_project_keywords=["New Energy Sector Research", "competitive landscape"],
+        regression_work_keywords=["FA Intern", "Horizon Capital"],
+        regression_education_keywords=["Finance", "CUHKSZ"],
     ),
     ProfileReviewQualityCase(
         case_id="mixed_language_resume",
@@ -143,6 +164,10 @@ Python, FastAPI, SQLite, Streamlit, Git
         expected_sections=["projects", "work_experiences", "education", "highlights"],
         should_have_warnings=False,
         expected_confidence_without_llm="medium",
+        regression_skills=["Python", "FastAPI", "SQLite", "Streamlit"],
+        regression_project_keywords=["FastAPI", "SQLite", "Streamlit"],
+        regression_work_keywords=["Research Assistant", "Vision Lab"],
+        regression_education_keywords=["Software Engineering", "Xidian University"],
     ),
     ProfileReviewQualityCase(
         case_id="weak_resume",
@@ -156,6 +181,8 @@ I know Python and want an AI job.
         expected_sections=["projects"],
         should_have_warnings=True,
         expected_confidence_without_llm="weak",
+        regression_skills=["Python"],
+        regression_missing_info=["project evidence", "work experience", "measurable outcomes"],
     ),
     ProfileReviewQualityCase(
         case_id="anker_ai_health_algorithm",
@@ -276,6 +303,22 @@ AI health algorithm, physiological signal processing, PPG, ECG, ACC, blood oxyge
         expected_sections=["projects", "education", "highlights"],
         should_have_warnings=False,
         expected_confidence_without_llm="strong",
+        regression_skills=[
+            "Python",
+            "MATLAB",
+            "TensorFlow",
+            "PPG",
+            "ECG",
+            "ACC",
+            "data cleaning",
+            "feature extraction",
+        ],
+        regression_project_keywords=[
+            "Physiological Signal Processing",
+            "Deep Learning Model",
+            "AI Health Analytics",
+        ],
+        regression_education_keywords=["Information Engineering", "University in Shenzhen"],
     ),
     ProfileReviewQualityCase(
         case_id="realistic_noisy_chinese_resume",
@@ -304,6 +347,8 @@ AI health algorithm, physiological signal processing, PPG, ECG, ACC, blood oxyge
         expected_sections=["projects", "education"],
         should_have_warnings=True,
         expected_confidence_without_llm="medium",
+        regression_skills=["Python", "FastAPI", "Streamlit", "SQLite", "PyTorch", "Librosa"],
+        regression_project_keywords=["FastAPI", "Streamlit", "SQLite"],
     ),
     ProfileReviewQualityCase(
         case_id="realistic_business_resume_unstructured",
@@ -328,5 +373,8 @@ AI health algorithm, physiological signal processing, PPG, ECG, ACC, blood oxyge
         expected_sections=["work_experiences", "highlights"],
         should_have_warnings=True,
         expected_confidence_without_llm="medium",
+        regression_skills=["Wind", "Excel", "PowerPoint", "CRM"],
+        regression_project_keywords=["Wind", "CRM", "Excel"],
+        regression_work_keywords=["FA", "CRM"],
     ),
 ]

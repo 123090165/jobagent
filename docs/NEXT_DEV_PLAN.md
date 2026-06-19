@@ -18,14 +18,15 @@ Job Brief is postponed until resume analysis is reliable. The immediate priority
 - stop deterministic parser fallback from inventing work experience from whole-resume text
 - make Resume Review UI show LLM toggle state, analysis mode, provider status, and fallback warnings
 
-## v4.6.2 Parser Regression Corpus
+## v4.6.2 Parser Regression Corpus (current)
 
 - turn existing realistic resume cases into stricter parser regression fixtures
 - assert key positive behavior: real project, work, education, skill, and highlight extraction
 - assert key negative behavior: no fabricated projects, no fabricated work items, no separator pollution
 - keep tests deterministic and free of real LLM/network dependencies
+- intentionally establish a stable regression baseline before deeper deterministic parser changes
 
-## v4.6.3 Deterministic Parser Hardening
+## v4.6.3 Deterministic Parser Hardening (next)
 
 - improve section heading coverage for English, Chinese, and mixed resumes
 - improve multi-line project grouping

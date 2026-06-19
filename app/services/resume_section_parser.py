@@ -415,16 +415,25 @@ def _looks_like_education_line(line: str) -> bool:
 
 def _looks_like_target_role_line(line: str) -> bool:
     prefix, _value = _split_heading_value(line)
-    if not prefix:
-        return False
-    return _normalize_heading_text(prefix) in {
+    normalized_prefix = _normalize_heading_text(prefix) if prefix else ""
+    if normalized_prefix in {
         "target role",
         "target roles",
         "target direction",
         "target directions",
         "desired role",
         "desired roles",
-    }
+    }:
+        return True
+    normalized_line = _normalize_heading_text(line)
+    return normalized_line.startswith(
+        (
+            "目标方向",
+            "目标岗位",
+            "求职方向",
+            "求职目标",
+        )
+    )
 
 
 def _parse_education_line(line: str) -> EducationItem:
