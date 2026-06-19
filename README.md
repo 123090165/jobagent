@@ -82,10 +82,10 @@ npm run build
 
 ## Documentation
 
-- [Cleanup Audit](docs/CLEANUP_AUDIT.md)
-- [Legacy Map](docs/LEGACY_MAP.md)
-- [v4 Product Refactor Plan](docs/V4_PRODUCT_REFACTOR_PLAN.md)
+- [Docs Index](docs/INDEX.md)
+- [API Contract V1](docs/API_CONTRACT_V1.md)
 - [Search Provider](docs/SEARCH_PROVIDER.md)
+- [Next Development Plan](docs/NEXT_DEV_PLAN.md)
 
 ## Current Boundaries
 

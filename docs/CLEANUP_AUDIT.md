@@ -2,10 +2,7 @@
 
 Audit date: 2026-06-19.
 
-This audit now records the completed destructive cleanup pass that followed the
-earlier non-destructive inventory.
-
-## Current mainline architecture
+## Current Mainline Architecture
 
 ```text
 Resume Intake
@@ -16,78 +13,33 @@ Resume Intake
 -> Job Brief
 ```
 
-Runtime shape:
+Current runtime:
 
-- FastAPI v4 API under `app/api/v1/`.
-- Usecase layer under `app/application/`.
-- Persistence repositories under `app/repositories/`.
-- Current schemas and services under `app/schemas/` and `app/services/`.
-- SQLite connection helpers under `app/storage/`.
-- Vue frontend under `web/`.
-- Current regression tests under `tests/`.
+- backend: `app/`
+- API: `app/api/v1`
+- frontend: `web/`
+- providers: `mock`, `cuhksz_career`
 
-## Keep
+## Deleted Runtime Areas
 
-- `app/api/v1/`
-- `app/application/`
-- `app/repositories/`
-- `app/schemas/`
-- `app/services/`
-- `app/storage/`
-- `app/main.py`
-- `web/`
-- `tests/`
-- `README.md`
-- Current docs including `docs/V4_PRODUCT_REFACTOR_PLAN.md`,
-  `docs/SEARCH_PROVIDER.md`, and this cleanup documentation.
+- Streamlit `frontend/`
+- old unversioned FastAPI routes
+- old workflow/LangGraph runtime
+- old workflow-only agents
+- old ApplicationRecord tracker flow
+- old JobImportCandidate flow
+- old provider paths for `local_db`, `gemini_cli`, and `cuhksz_live`
+- old demo/evaluation scripts
 
-## Archive candidates
+## Deleted Docs
 
-No `_archive/` folder is used. The obvious obsolete artifacts were deleted
-instead of moved.
+Docs centered on deleted runtime paths were removed, including old API,
+architecture, storage, agent, Streamlit, workflow, tracker/import, old provider,
+and demo/evaluation docs.
 
-## Delete candidates
+## Dependency Findings
 
-Handled in this cleanup:
-
-- Streamlit `frontend/`.
-- Old unversioned API routes.
-- Old full-analysis/LangGraph workflow and workflow-only agents.
-- Old tracker/import services and schemas.
-- Old `/search/jobs` provider stack and old provider tests.
-- Old demo/evaluation scripts.
-- Docs that only described removed legacy flows.
-
-Remaining possible delete candidates require a doc-by-doc review:
-
-- Mixed-era docs such as `docs/API.md`, `docs/ARCHITECTURE.md`,
-  `docs/ARCHITECTURE_OVERVIEW.md`, `docs/DATA_SCHEMA.md`, and `docs/STORAGE.md`.
-
-## Outdated docs
-
-Deleted during this cleanup:
-
-- Application tracker and job import docs.
-- Streamlit docs.
-- LangGraph/workflow docs.
-- Batch brief/rerank docs.
-- Old live/local/Gemini provider docs.
-- Old demo and evaluation docs.
-
-Needs review rather than automatic deletion:
-
-- `docs/API.md`
-- `docs/ARCHITECTURE.md`
-- `docs/ARCHITECTURE_OVERVIEW.md`
-- `docs/DATA_SCHEMA.md`
-- `docs/STORAGE.md`
-- `docs/AGENTS.md`
-- `docs/AGENT_BOUNDARIES.md`
-- `docs/AGENT_TRACE.md`
-
-## Possibly unused dependencies
-
-Removed after import checks and passing tests:
+Removed:
 
 - `streamlit`
 - `langgraph`
@@ -95,43 +47,61 @@ Removed after import checks and passing tests:
 
 Kept:
 
-- `beautifulsoup4`: current CUHKSZ provider uses `bs4`.
-- `httpx`: test client dependency.
-- `python-multipart`: FastAPI upload endpoint dependency.
+- `beautifulsoup4`: current CUHKSZ provider parsing
+- `httpx`: FastAPI/Starlette test client
+- `python-multipart`: upload endpoints
 
-## Import dependency findings
+## Docs Classification
 
-- `app/main.py` now includes only health plus `/api/v1` routers.
-- `frontend/` has no remaining backend importers; helper code moved to
-  `app/services/profile_review_state_helpers.py`.
-- `app/workflows/` and workflow-only agents had no current v4 callers after old
-  routes/tests were retired.
-- Old provider paths had no v4 callers after the current CUHKSZ parser helpers
-  were moved into `app/services/job_search_providers/cuhksz_career_provider.py`.
-- No `streamlit`, `langgraph`, or `requests` imports remain.
+| Doc | Classification | Notes |
+| --- | --- | --- |
+| `README.md` | keep | Project entry point. |
+| `docs/INDEX.md` | rewrite | Canonical docs entry point added in this pass. |
+| `docs/API_CONTRACT_V1.md` | rewrite | Current route contract. |
+| `docs/V4_PRODUCT_REFACTOR_PLAN.md` | rewrite | Current product plan. |
+| `docs/SEARCH_PROVIDER.md` | rewrite | Current provider architecture. |
+| `docs/NEXT_DEV_PLAN.md` | rewrite | v4.6 plan added in this pass. |
+| `docs/CLEANUP_AUDIT.md` | rewrite | Cleanup record. |
+| `docs/LEGACY_MAP.md` | rewrite | Removed legacy map. |
+| `docs/V4_STATE_MACHINE.md` | keep | State rules. |
+| `docs/V4_ERROR_CONTRACT.md` | keep | Error rules. |
+| `docs/V4_FRONTEND_ROUTE_GUARDS.md` | keep | Frontend routing rules. |
+| `docs/CONFIRMED_PROFILE_PERSISTENCE.md` | keep | Current persistence detail. |
+| `docs/LLM_ASSISTED_PROFILE_ENRICHMENT.md` | keep | Current enrichment behavior. |
+| `docs/LLM_PROMPT_AND_QUALITY_CONTROL.md` | keep | Current LLM safety guidance. |
+| `docs/PROFILE_FLOW_DECOUPLING.md` | keep | Current flow decoupling context. |
+| `docs/PROFILE_REVIEW_QUALITY_EVALUATION.md` | keep | Current evaluation notes. |
+| `docs/SEARCH_READY_PROFILE_LAYER.md` | keep | Current profile layer. |
+| `docs/SECTION_BASED_RESUME_PARSER.md` | keep | Current parser design. |
+| `docs/GIT_WORKFLOW.md` | rewrite | Current development process. |
+| `docs/API.md` | delete | Deleted legacy unversioned API doc. |
+| `docs/ARCHITECTURE.md` | delete | Deleted legacy Streamlit/workflow architecture doc. |
+| `docs/ARCHITECTURE_OVERVIEW.md` | delete | Deleted legacy mixed-era architecture overview. |
+| `docs/STORAGE.md` | delete | Deleted legacy analysis-record storage doc. |
+| `docs/AGENTS.md` | delete | Deleted legacy workflow-agent doc. |
+| `docs/AGENT_BOUNDARIES.md` | delete | Deleted legacy workflow-agent boundary doc. |
+| `docs/AGENT_TRACE.md` | delete | Deleted legacy workflow-trace doc. |
+| `docs/DATA_SCHEMA.md` | delete | Deleted legacy schema overview. |
+| `docs/DECISIONS.md` | delete | Deleted legacy decision log. |
+| `docs/DEVELOPMENT_REVIEW_GUIDE.md` | delete | Deleted legacy development guide. |
+| `docs/EXAMPLE_PROJECTS.md` | delete | Deleted old portfolio/example planning doc. |
+| `docs/FRONTEND_SEPARATION_PLAN.md` | delete | Deleted Streamlit separation plan after Streamlit removal. |
+| `docs/HELLO_AGENTS_NOTES.md` | delete | Deleted legacy agent notes. |
+| `docs/JD_QUALITY_GATE.md` | delete | Deleted old provider/JD quality doc. |
+| `docs/JD_URL_IMPORT.md` | delete | Deleted old unversioned import route doc. |
+| `docs/LLM_INTEGRATION.md` | delete | Deleted legacy workflow-agent LLM doc. |
+| `docs/PORTFOLIO_PITCH.md` | delete | Deleted old portfolio pitch. |
+| `docs/PRD.md` | delete | Deleted old PRD superseded by v4 docs. |
+| `docs/PROFILE_DRAFT_EDITING_UI.md` | delete | Deleted old UI doc superseded by v4 flow docs. |
+| `docs/REFERENCES.md` | delete | Deleted old research/reference notes. |
+| `docs/RESUME_FILE_PARSER.md` | delete | Deleted old unversioned route parser doc. |
+| `docs/RESUME_PROFILE_PARSER_EVALUATION.md` | delete | Deleted old evaluation-script doc. |
+| `docs/ROADMAP.md` | delete | Deleted old roadmap superseded by next dev plan. |
+| `docs/SCREENSHOT_GUIDE.md` | delete | Deleted old screenshot guide. |
+| `docs/SLATE_LIKE_PROFILE_REVIEW_UI.md` | delete | Deleted old Streamlit UI doc. |
+| `docs/V4_ARCHITECTURE_PLAN.md` | delete | Deleted overlapping architecture plan merged into index/product plan. |
 
-## Recommended cleanup phases
+## Recommended Next Cleanup
 
-Completed in this pass:
-
-1. Remove Streamlit frontend.
-2. Retire old unversioned routers.
-3. Remove workflow/tracker/import code.
-4. Consolidate providers around `mock` and `cuhksz_career`.
-5. Remove legacy-only dependencies and docs.
-
-Recommended next phase:
-
-1. Review mixed-era docs and align or delete them.
-2. Run a schema/storage review for old SQLite tables that may remain in local
-   developer databases.
-3. Keep v4 API and frontend tests as the safety rail for future cleanup.
-
-## Files changed in this cleanup
-
-See the commit diff for the full staged deletion list. The main additions were:
-
-- `app/services/profile_review_state_helpers.py`
-- Updated `README.md`
-- Updated `docs/CLEANUP_AUDIT.md`
-- Updated `docs/LEGACY_MAP.md`
+Review remaining supporting docs periodically and merge any repeated information
+into `docs/INDEX.md`, `docs/API_CONTRACT_V1.md`, or `docs/NEXT_DEV_PLAN.md`.

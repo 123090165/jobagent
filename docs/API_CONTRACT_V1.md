@@ -1,123 +1,83 @@
 # API Contract V1
 
-## Boundary
+`/api/v1` is the only current public product API surface for the Vue frontend in
+`web/`.
 
-`/api/v1` is the contract between the FastAPI backend in `app/` and the Vue 3 frontend in `web/`.
+The frontend must call HTTP endpoints and must not import backend services.
 
-The frontend must not import backend services directly. All user-facing product flows should call `/api/v1`.
+## Current Product Flow
 
-## Resources
+```text
+Resume Intake
+-> Resume Review
+-> Profile Draft
+-> Confirmed Profile
+-> Job Search
+-> Job Brief
+```
+
+## Implemented Resources
 
 ### ProfileSession
 
-Primary workflow resource for one resume-to-search-ready-profile flow.
+Primary workflow resource for one resume-to-job-search flow.
 
-Fields:
+Linked current-resource ids:
 
-- `session_id`
-- `status`
-- `created_at`
-- `updated_at`
 - `resume_document_id`
 - `parsed_review_id`
 - `profile_draft_id`
 - `confirmed_profile_id`
-- `current_step`
 
-Allowed `status` values:
+Important `current_step` values include:
 
-- `active`
-- `completed`
-- `archived`
-
-Allowed `current_step` values:
-
-- `resume_intake`
 - `created`
 - `resume_empty`
 - `resume_ready`
 - `resume_review`
 - `profile_draft`
-- `profile_confirmed`
 - `job_search_ready`
 - `job_search_running`
 - `job_search_completed`
 - `brief_ready`
 - `archived`
 
-`resume_intake` is the v4.0 skeleton value. New v4.1+ work should prefer the hardened state machine in `docs/V4_STATE_MACHINE.md`.
-
 ### ResumeDocument
 
-Uploaded or pasted resume input linked from `ProfileSession.resume_document_id`.
-
-Starting in v4.1, `ProfileSession` and `ResumeDocument` must be persisted and recoverable. The v4.0 in-memory repository is only acceptable for the skeleton and tests.
+Uploaded or pasted resume input linked from a `ProfileSession`.
 
 ### ParsedResumeReview
 
-Structured review output produced from a resume document and linked from `ProfileSession.parsed_review_id`.
+Structured resume review generated from a `ResumeDocument`.
 
 ### ProfileDraft
 
-Editable profile generated from parsed resume review and linked from `ProfileSession.profile_draft_id`.
+Editable search-ready draft generated from a parsed review.
 
 ### ConfirmedProfile
 
-Search-ready profile confirmed by the user and linked from `ProfileSession.confirmed_profile_id`.
+User-confirmed, search-ready profile.
 
 ### JobSearchRun
 
-A search run created from a confirmed profile.
+Tracked job-search execution created from a confirmed profile.
 
-Current fields include:
+The current search pipeline records trace steps for:
 
-- `search_mode`: `local_mock | live_search`
-- `llm_enabled`: `true | false`
-- `search_provider`: backend-selected provider name or `null`
-- `status`: `pending | running | completed | failed`
-- `error_message`: nullable failure detail
-
-Each run also returns `results[]` and `steps[]`.
-
-### JobSearchTraceStep
-
-Trace record for one pipeline step within a `JobSearchRun`.
-
-Fields:
-
-- `step_id`
-- `job_search_run_id`
-- `step_index`
-- `name`
-- `status`
-- `mode`
-- `summary`
-- `fallback_reason`
-- `guardrails`
-- `quality_warnings`
-- `started_at`
-- `completed_at`
-- `duration_ms`
+- Search planning
+- Provider search
+- Candidate filtering
+- JD analysis
+- Profile matching
+- Result assembly
 
 ### JobBrief
 
-A brief generated for a job search result.
+Next planned v4.6 resource. It is not implemented in the current API yet.
 
-## Resource Relationship
+## Implemented Routes
 
-```text
-ProfileSession
-  -> ResumeDocument
-  -> ParsedResumeReview
-  -> ProfileDraft
-  -> ConfirmedProfile
-  -> JobSearchRun
-  -> JobBrief
-```
-
-## Routes
-
-Implemented in this skeleton:
+### Profile Session And Resume Intake
 
 ```text
 POST /api/v1/profile-sessions
@@ -125,37 +85,44 @@ GET  /api/v1/profile-sessions/{session_id}
 POST /api/v1/profile-sessions/{session_id}/resume-text
 POST /api/v1/profile-sessions/{session_id}/resume-file
 GET  /api/v1/profile-sessions/{session_id}/resume
+```
+
+### Resume Review
+
+```text
 POST /api/v1/profile-sessions/{session_id}/parse-resume
 GET  /api/v1/profile-sessions/{session_id}/parsed-review
 ```
 
-Planned contract routes:
+`parse-resume` accepts query flags:
+
+- `regenerate`
+- `use_llm`
+
+### Profile Draft
 
 ```text
-POST /api/v1/profile-sessions/{session_id}/resume-text
-POST /api/v1/profile-sessions/{session_id}/resume-file
-
-POST /api/v1/profile-sessions/{session_id}/parse-resume
-POST /api/v1/profile-sessions/{session_id}/parse-resume?regenerate=true
-GET  /api/v1/profile-sessions/{session_id}/parsed-review
-
 POST  /api/v1/profile-sessions/{session_id}/profile-draft
-POST  /api/v1/profile-sessions/{session_id}/profile-draft?regenerate=true
 GET   /api/v1/profile-drafts/{draft_id}
 PATCH /api/v1/profile-drafts/{draft_id}
 POST  /api/v1/profile-drafts/{draft_id}/confirm
-GET   /api/v1/confirmed-profiles/{confirmed_profile_id}
+```
 
+`profile-draft` accepts `regenerate`.
+
+### Confirmed Profile
+
+```text
+GET /api/v1/confirmed-profiles/{confirmed_profile_id}
+```
+
+### Job Search
+
+```text
 POST /api/v1/job-search-runs
 GET  /api/v1/job-search-runs/{run_id}
 GET  /api/v1/job-search-runs/{run_id}/steps
 GET  /api/v1/profile-sessions/{session_id}/job-search-runs
-GET  /api/v1/job-search-providers/status
-GET  /api/v1/llm/status
-
-POST /api/v1/job-search-runs/{run_id}/brief
-POST /api/v1/job-search-runs/{run_id}/brief?regenerate=true
-GET  /api/v1/briefs/{brief_id}
 ```
 
 `POST /api/v1/job-search-runs` accepts:
@@ -173,67 +140,36 @@ GET  /api/v1/briefs/{brief_id}
 }
 ```
 
-Notes:
+Supported providers:
 
-- `search_mode=local_mock` keeps the deterministic demo path.
-- `search_mode=live_search` creates a traced run and returns quickly with `pending` or `running`.
-- `search_provider` can be `mock` or `cuhksz_career`.
-- `GET /api/v1/job-search-providers/status` reports the active backend provider, whether it is configured, the public search URL, and allowlisted domains.
-- Frontend polling should use `GET /api/v1/job-search-runs/{run_id}` every 1-2 seconds until `completed` or `failed`.
-- Live job cards must preserve `source_provider` and `source_url` from the backend provider result.
-- `/api/v1/llm/status` is for display/configuration feedback only and does not execute a live LLM request.
-- The current live provider is the public CUHKSZ Career board at `https://career.cuhk.edu.cn/job/search`.
-- Live fetching is restricted to allowlisted public pages with simple HTTP GET requests only; no login, captcha handling, browser automation, or anti-bot bypassing is in scope.
+- `mock`
+- `cuhksz_career`
 
-Generation endpoints are idempotent by default. If a current result already exists, return it unless `regenerate=true` is explicitly requested.
+### Provider And LLM Status
 
-## Current Response Examples
-
-`POST /api/v1/profile-sessions`
-
-```json
-{
-  "session_id": "uuid",
-  "status": "active",
-  "created_at": "2026-06-14T00:00:00Z",
-  "updated_at": "2026-06-14T00:00:00Z",
-  "resume_document_id": null,
-  "parsed_review_id": null,
-  "profile_draft_id": null,
-  "confirmed_profile_id": null,
-  "current_step": "created"
-}
+```text
+GET /api/v1/job-search-providers/status
+GET /api/v1/llm/status
 ```
 
-`GET /api/v1/profile-sessions/{session_id}` returns the same `ProfileSession` resource.
+Provider status accepts optional `provider`.
 
-Unknown sessions return:
+## Planned v4.6 Job Brief Routes
 
-```json
-{
-  "detail": "Profile session not found.",
-  "error_code": "profile_session_not_found"
-}
+```text
+POST /api/v1/job-search-runs/{run_id}/results/{result_id}/brief
+GET  /api/v1/job-briefs/{brief_id}
 ```
 
-`GET /api/v1/profile-sessions/{session_id}/resume` returns the current `ResumeDocument` resource for that session.
+The brief resource should be tied to:
 
-If the session exists but no current resume has been stored yet, the endpoint returns:
-
-```json
-{
-  "detail": "Resume document not found for this session.",
-  "error_code": "resume_document_not_found"
-}
-```
-
-## Persistence Note
-
-The current implementation uses an in-memory repository stub to make the v4.0 contract executable and testable. Starting in v4.1, user workflow resources must be persisted. Future persistence should preserve these response shapes and route paths.
+- `job_search_run_id`
+- `job_result_id`
+- `confirmed_profile_id`
 
 ## Error Contract
 
-All product-flow `/api/v1` errors should use:
+All product-flow errors use:
 
 ```json
 {
@@ -242,4 +178,4 @@ All product-flow `/api/v1` errors should use:
 }
 ```
 
-Recommended error codes and frontend handling rules are defined in `docs/V4_ERROR_CONTRACT.md`.
+See `docs/V4_ERROR_CONTRACT.md` for frontend handling guidance.
