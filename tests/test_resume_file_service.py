@@ -10,7 +10,13 @@ from app.services.resume_file_service import (
     get_resume_file_type,
     normalize_resume_filename,
 )
-from tests.test_mock_pipeline import SAMPLE_RESUME
+
+SAMPLE_RESUME = """
+Backend Engineer
+Skills: Python, FastAPI, SQL
+Projects:
+JobAgent - Built profile session APIs and resume intake flow.
+""".strip()
 
 
 def test_extract_text_from_txt_file() -> None:

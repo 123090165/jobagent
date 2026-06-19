@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from frontend.profile_review_state import (
+from app.services.profile_review_state_helpers import (
     apply_suggestion_to_profile_draft,
     build_confirmed_profile_save_payload,
     build_confirm_user_edits_from_profile_draft,

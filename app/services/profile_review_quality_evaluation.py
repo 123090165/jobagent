@@ -17,7 +17,7 @@ from app.services.resume_profile_review_service import (
     confirm_resume_profile,
 )
 from app.services.errors import JobAgentError
-from frontend.profile_review_state import (
+from app.services.profile_review_state_helpers import (
     apply_suggestion_to_profile_draft,
     build_confirmed_profile_save_payload,
     build_confirm_user_edits_from_profile_draft,

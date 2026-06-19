@@ -19,9 +19,9 @@ Resume Intake
 
 `web/` is the current Vue frontend and the main user-facing product surface.
 
-`frontend/` is legacy Streamlit demo/admin code. It is still kept for now
-because a small amount of backend quality-evaluation code imports helpers from
-`frontend/profile_review_state.py`, but it is not the main user frontend.
+The legacy Streamlit `frontend/` surface has been removed. Shared profile-review
+helper logic that was still useful to backend quality checks now lives under
+`app/services/profile_review_state_helpers.py`.
 
 ## Current Providers
 
@@ -30,9 +30,8 @@ The current v4 job-search provider path uses:
 - `mock`
 - `cuhksz_career`
 
-Older names such as `local_db`, `gemini_cli`, and `cuhksz_live` still appear in
-legacy routes, tests, scripts, and older documentation. They are not the current
-mainline provider set and should not be presented as the primary product path.
+Older provider names such as `local_db`, `gemini_cli`, and `cuhksz_live` were
+removed with the legacy `/search/jobs` provider stack.
 
 ## Quick Start
 
@@ -78,9 +77,8 @@ npm run build
 - `app/services`: business services and provider integrations
 - `app/storage`: SQLite connection and storage helpers
 - `web`: current Vue frontend
-- `frontend`: legacy Streamlit demo/admin surface
-- `tests`: backend and legacy regression coverage
-- `docs`: product, architecture, cleanup, and legacy documentation
+- `tests`: backend regression coverage for the current v4 flow
+- `docs`: product, architecture, and cleanup documentation
 
 ## Documentation
 
@@ -105,7 +103,7 @@ Current non-goals:
 
 - Keep v4 work centered on ProfileSession resources.
 - Prefer `web/` for user-facing frontend work.
-- Treat `frontend/`, unversioned tracker routes, and old workflow docs as
-  legacy until they are deliberately retired.
-- Do not remove dependencies or legacy modules until import checks and the full
-  test suite confirm the removal is safe.
+- Keep runtime work centered on `app/api/v1`, `app/application`,
+  `app/repositories`, `app/services`, and `web`.
+- Remove future legacy leftovers only after import checks and the full backend
+  and frontend checks pass.

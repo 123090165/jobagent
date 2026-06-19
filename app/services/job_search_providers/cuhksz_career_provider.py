@@ -4,11 +4,11 @@ import re
 import urllib.error
 import urllib.request
 from collections.abc import Callable
-from urllib.parse import urlparse
+from types import SimpleNamespace
+from urllib.parse import urljoin, urlparse
 
 from bs4 import BeautifulSoup
 
-from app.services.cuhksz_career_service import extract_cuhksz_jd_text, parse_cuhksz_job_list
 from app.services.job_search_providers.base import JobSearchProviderError, RawJobCandidate
 
 CUHKSZ_CAREER_BASE_URL = "https://career.cuhk.edu.cn"
@@ -28,6 +28,51 @@ END_DATE_LABELS = ["结束时间", "截止时间"]
 JOB_DESCRIPTION_LABELS = ["工作内容描述", "岗位职责", "职位描述", "任职要求"]
 COMPANY_INTRO_LABELS = ["企业简介", "公司简介"]
 CONTACT_INFO_LABELS = ["联系方式", "申请方式", "投递方式"]
+
+
+def parse_cuhksz_job_list(html: str, base_url: str) -> list[SimpleNamespace]:
+    soup = BeautifulSoup(html, "html.parser")
+    items: list[SimpleNamespace] = []
+    for row in soup.select("li"):
+        title_node = row.select_one("a.f18") or row.find("a", href=re.compile(r"/job/view/id/"))
+        if title_node is None:
+            continue
+        href = str(title_node.get("href") or "").strip()
+        if not href:
+            continue
+        company_node = row.select_one(".sousuo_list_com a")
+        meta_node = row.select_one(".mt10.mb10")
+        meta_text = _clean_text(meta_node.get_text(" ", strip=True)) if meta_node else ""
+        meta_parts = [part.strip() for part in re.split(r"[|锝-]+", meta_text) if part.strip()]
+        time_node = row.select_one(".sousuo_list_time")
+        time_text = _clean_text(time_node.get_text(" ", strip=True)) if time_node else ""
+        dates = re.findall(r"\d{3,4}-\d{2}-\d{2}", time_text)
+        items.append(
+            SimpleNamespace(
+                title=_clean_text(title_node.get_text(" ", strip=True)),
+                company=_clean_text(company_node.get_text(" ", strip=True)) if company_node else None,
+                location=meta_parts[0] if meta_parts else None,
+                job_type=meta_parts[1] if len(meta_parts) > 1 else None,
+                education=meta_parts[2] if len(meta_parts) > 2 else None,
+                published_at=dates[0] if dates else None,
+                deadline=dates[1] if len(dates) > 1 else None,
+                detail_url=urljoin(base_url, href),
+                source="cuhksz_career",
+            )
+        )
+    return items
+
+
+def extract_cuhksz_jd_text(detail_html: str) -> tuple[str, list[str]]:
+    soup = BeautifulSoup(detail_html, "html.parser")
+    for node in soup.select("script,style,noscript,header,footer,nav"):
+        node.decompose()
+    main = soup.select_one("main") or soup.body or soup
+    text = _clean_text(main.get_text(" ", strip=True))
+    warnings: list[str] = []
+    if len(text) < 120:
+        warnings.append("jd_text_too_short")
+    return text, warnings
 
 
 class CUHKSZCareerProvider:

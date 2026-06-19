@@ -16,31 +16,6 @@ PROFILE_FLOW_STEPS = {
     "profile_saved",
 }
 
-PROFILE_REVIEW_STATE_KEYS = {
-    "resume_text",
-    "target_roles",
-    "baseline_review",
-    "enrichment_result",
-    "profile_flow_profile_draft",
-    "profile_draft",
-    "accepted_suggestions",
-    "rejected_suggestions",
-    "edited_suggestions",
-    "confirmed_profile_result",
-    "missing_info_answers",
-    "saved_confirmed_profile_id",
-    "profile_draft_confirmed_payload",
-    "profile_flow_uploaded_filename",
-    "profile_flow_uploaded_file_type",
-    "profile_flow_uploaded_text_length",
-    "profile_flow_sample_resume",
-    "profile_flow_resume_input_source",
-    "profile_flow_upload_error",
-    PROFILE_FLOW_STEP_KEY,
-    PROFILE_FLOW_PROVIDER_KEY,
-    PROFILE_FLOW_PROVIDER_META_KEY,
-}
-
 LIST_FIELD_ALIASES = {
     "skill": "skills",
     "skills": "skills",
@@ -80,7 +55,6 @@ def set_profile_draft_state(
     draft: ProfileDraft,
 ) -> None:
     session_state["profile_flow_profile_draft"] = draft
-    # Backward-compatible alias for older tests or helper paths.
     session_state["profile_draft"] = draft
     session_state["profile_draft_confirmed_payload"] = None
 
