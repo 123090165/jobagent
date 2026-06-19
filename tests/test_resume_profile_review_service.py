@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from app.services.llm_service import LLMServiceError
 from app.services.resume_profile_review_service import build_resume_profile_review
 
 
@@ -33,6 +34,14 @@ class FakeResumeReviewLLM:
 class InvalidResumeReviewLLM:
     def chat_completion_json(self, *, system_prompt: str, user_prompt: str) -> dict:
         return {"resume_profile": {"name": 123, "skills": "not-a-list"}}
+
+
+class FailingResumeReviewLLM:
+    def __init__(self, message: str) -> None:
+        self.message = message
+
+    def chat_completion_json(self, *, system_prompt: str, user_prompt: str) -> dict:
+        raise LLMServiceError(self.message)
 
 
 def test_build_resume_profile_review_use_llm_false_keeps_deterministic_mode() -> None:
@@ -70,6 +79,40 @@ def test_build_resume_profile_review_invalid_llm_json_falls_back() -> None:
     assert review.analysis_mode == "fallback"
     assert review.analysis_warnings
     assert any("fallback triggered" in warning for warning in review.quality_warnings)
+
+
+def test_build_resume_profile_review_fallback_warning_includes_safe_reason() -> None:
+    review = build_resume_profile_review(
+        "Skills: Python\nProject: Built APIs.",
+        use_llm=True,
+        llm_service=FailingResumeReviewLLM("DeepSeek provider is not configured."),
+    )
+
+    assert review.analysis_mode == "fallback"
+    assert review.parsed_profile.skills == ["Python"]
+    assert review.analysis_warnings == [
+        "LLM resume analysis fallback triggered: LLMServiceError: "
+        "DeepSeek provider is not configured."
+    ]
+
+
+def test_build_resume_profile_review_fallback_warning_masks_secrets() -> None:
+    review = build_resume_profile_review(
+        "Skills: Python\nProject: Built APIs.",
+        use_llm=True,
+        llm_service=FailingResumeReviewLLM(
+            "Request failed with Bearer sk-live-secret-token-1234567890 "
+            "DEEPSEEK_API_KEY=abc1234567890abcdef1234567890abcd "
+            "token: zyxwvutsrqponmlkjihgfedcba987654321"
+        ),
+    )
+
+    warning = review.analysis_warnings[0]
+    assert "Bearer [masked]" in warning
+    assert "DEEPSEEK_API_KEY=[masked]" in warning
+    assert "token=[masked]" in warning
+    assert "abc1234567890abcdef1234567890abcd" not in warning
+    assert "zyxwvutsrqponmlkjihgfedcba987654321" not in warning
 
 
 def test_build_resume_profile_review_unavailable_llm_falls_back() -> None:

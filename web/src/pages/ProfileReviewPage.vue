@@ -16,6 +16,11 @@ const sessionUnavailable = computed(
 const hasResume = computed(() => Boolean(profileSessionStore.session?.resume_document_id));
 const parsedReview = computed(() => profileSessionStore.parsedReview);
 const useLlmResumeAnalysis = ref(false);
+const llmStatus = computed(() => profileSessionStore.llmStatus);
+const llmToggleLabel = computed(() => (useLlmResumeAnalysis.value ? "Enabled" : "Disabled"));
+const shouldForceLlmRegeneration = computed(
+  () => useLlmResumeAnalysis.value && parsedReview.value?.analysis_mode !== "llm"
+);
 const analysisModeLabel = computed(() => {
   if (!parsedReview.value) {
     return "Not analyzed";
@@ -65,6 +70,7 @@ onMounted(async () => {
     if (session.current_step === "resume_review" && session.parsed_review_id) {
       await profileSessionStore.loadParsedReview(sessionId.value);
     }
+    await profileSessionStore.loadLlmStatus();
   } catch {
     // Error state is rendered from the store.
   }
@@ -72,7 +78,12 @@ onMounted(async () => {
 
 async function analyzeResume(regenerate = false) {
   try {
-    await profileSessionStore.analyzeResume(sessionId.value, regenerate, useLlmResumeAnalysis.value);
+    const shouldRegenerate = regenerate || shouldForceLlmRegeneration.value;
+    await profileSessionStore.analyzeResume(
+      sessionId.value,
+      shouldRegenerate,
+      useLlmResumeAnalysis.value
+    );
   } catch {
     // Error state is rendered from the store.
   }
@@ -162,6 +173,20 @@ async function continueToDraft() {
           <div class="job-search-status-copy">
             <n-tag :type="analysisModeTagType" round>{{ analysisModeLabel }}</n-tag>
           </div>
+          <ul class="review-list">
+            <li>LLM toggle: {{ llmToggleLabel }}</li>
+            <li v-if="llmStatus">
+              Provider: {{ llmStatus.provider }}
+              <span v-if="llmStatus.model"> / {{ llmStatus.model }}</span>
+            </li>
+            <li v-if="llmStatus">
+              LLM configured: {{ llmStatus.configured ? "yes" : "no" }}
+            </li>
+            <li v-if="llmStatus?.reason">LLM status: {{ llmStatus.reason }}</li>
+            <li v-if="shouldForceLlmRegeneration">
+              Next analysis will regenerate so LLM can run against the current resume.
+            </li>
+          </ul>
           <ul v-if="parsedReview.analysis_warnings.length" class="review-list">
             <li v-for="warning in parsedReview.analysis_warnings" :key="warning">
               {{ warning }}

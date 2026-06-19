@@ -116,12 +116,34 @@ JobAgent - delivered 20 APIs, passed 300 tests, and reached 95% accuracy.
     assert any("300 tests" in item for item in highlights)
 
 
-def test_unstructured_resume_still_returns_profile() -> None:
+def test_unstructured_resume_does_not_fabricate_project_or_work() -> None:
     profile = mock_resume_parse("I know Python and want an AI job.")
 
     assert profile.raw_text
     assert "Python" in profile.skills
-    assert profile.projects
+    assert profile.projects == []
+    assert profile.work_experiences == []
+    assert "project evidence" in profile.missing_info
+    assert "work experience" in profile.missing_info
+
+
+def test_resume_parser_does_not_fabricate_work_from_keywords() -> None:
+    profile = mock_resume_parse(
+        "Target Role: Backend Engineer Intern\nSkills: Python, FastAPI"
+    )
+
+    assert profile.work_experiences == []
+    assert "work experience" in profile.missing_info
+
+
+def test_resume_parser_does_not_create_general_project_when_absent() -> None:
+    profile = mock_resume_parse(
+        "Skills: Python, FastAPI\nEducation: B.S. Computer Science, CUHKSZ"
+    )
+
+    assert profile.projects == []
+    assert all(project.name != "General project" for project in profile.projects)
+    assert "project evidence" in profile.missing_info
 
 
 def test_parser_extracts_ai_health_audio_and_business_terms() -> None:

@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 
 from app.schemas.job import JobAnalysis
-from app.schemas.resume import EducationItem, ProjectExperience, ResumeProfile, WorkExperience
+from app.schemas.resume import EducationItem, ResumeProfile
 from app.services.resume_section_parser import (
     KNOWN_RESUME_SKILLS,
     extract_highlights_from_sections,
@@ -102,33 +102,14 @@ def mock_resume_parse(resume_text: str) -> ResumeProfile:
 
     if not skills:
         skills = _extract_skills(text)
-    if not projects:
-        project_text = _clean_lines(text)[0] if _clean_lines(text) else text[:120]
-        projects = [
-            ProjectExperience(
-                name="General project",
-                description=project_text,
-                technologies=skills[:5],
-                highlights=highlights[:3],
-                raw_text=project_text,
-            )
-        ]
     if not education and any(token in text.lower() for token in ["university", "college", "b.s.", "m.s."]):
         education = [EducationItem(raw_text=text[:120])]
-    if not work_experiences and any(token in text.lower() for token in ["intern", "assistant", "engineer"]):
-        work_experiences = [
-            WorkExperience(
-                role=None,
-                company=None,
-                description=text[:160],
-                technologies=skills[:5],
-                raw_text=text[:160],
-            )
-        ]
 
     missing_info: list[str] = []
     if not skills:
         missing_info.append("skills")
+    if not projects:
+        missing_info.append("project evidence")
     if not work_experiences:
         missing_info.append("work experience")
     if not highlights:

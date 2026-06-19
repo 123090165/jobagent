@@ -250,12 +250,16 @@ def parse_work_experience_from_sections(
 ) -> list[WorkExperience]:
     experience_lines = _section_lines(sections, "experience")
     candidate_lines = experience_lines or [
-        line for line in _all_lines(sections) if _contains_any(line, WORK_KEYWORDS)
+        line
+        for line in _all_lines(sections)
+        if _contains_any(line, WORK_KEYWORDS) and not _looks_like_target_role_line(line)
     ]
 
     work_items: list[WorkExperience] = []
     for line in candidate_lines:
         if not experience_lines and not _contains_any(line, WORK_KEYWORDS):
+            continue
+        if _looks_like_target_role_line(line):
             continue
         role, company = _extract_role_company(line)
         work_items.append(
@@ -407,6 +411,20 @@ def _looks_like_education_line(line: str) -> bool:
             "博士",
         ],
     )
+
+
+def _looks_like_target_role_line(line: str) -> bool:
+    prefix, _value = _split_heading_value(line)
+    if not prefix:
+        return False
+    return _normalize_heading_text(prefix) in {
+        "target role",
+        "target roles",
+        "target direction",
+        "target directions",
+        "desired role",
+        "desired roles",
+    }
 
 
 def _parse_education_line(line: str) -> EducationItem:

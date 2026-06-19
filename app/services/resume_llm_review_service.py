@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from typing import Literal
 
 from pydantic import ValidationError
@@ -33,9 +34,10 @@ def build_llm_assisted_resume_review(
         profile_payload = payload.get("resume_profile", payload)
         improved_profile = ResumeProfile.model_validate(profile_payload)
     except (LLMServiceError, ValidationError, ValueError, TypeError) as exc:
+        reason = _sanitize_fallback_reason(str(exc))
         return (
             deterministic_profile,
-            [f"LLM resume analysis fallback triggered: {type(exc).__name__}"],
+            [f"LLM resume analysis fallback triggered: {type(exc).__name__}: {reason}"],
             "fallback",
         )
 
@@ -93,3 +95,19 @@ def _clean_warnings(values: object) -> list[str]:
         seen.add(key)
         cleaned.append(text)
     return cleaned
+
+
+def _sanitize_fallback_reason(reason: str) -> str:
+    text = reason.strip() or "No error details provided."
+    text = re.sub(r"Bearer\s+[A-Za-z0-9._~+/=-]+", "Bearer [masked]", text, flags=re.IGNORECASE)
+    text = re.sub(
+        r"(?i)(DEEPSEEK_API_KEY|JOBAGENT_LLM_API_KEY|api[_-]?key|token|secret)\s*[:=]\s*['\"]?[^'\"\s,;]+",
+        r"\1=[masked]",
+        text,
+    )
+    text = re.sub(
+        r"\b(sk-[A-Za-z0-9_-]{8,}|[A-Za-z0-9_-]{32,})\b",
+        "[masked]",
+        text,
+    )
+    return text

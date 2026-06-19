@@ -50,7 +50,11 @@ def parse_resume_for_review(
     if not regenerate:
         if session.parsed_review_id:
             existing = parsed_review_repository.get(session.parsed_review_id)
-            if existing is not None and existing.resume_document_id == resume_document.resume_document_id:
+            if (
+                existing is not None
+                and existing.resume_document_id == resume_document.resume_document_id
+                and _can_reuse_parsed_review(existing.analysis_mode, use_llm=use_llm)
+            ):
                 return ParsedResumeReviewResponse(
                     parsed_review=existing,
                     profile_session=session,
@@ -59,7 +63,10 @@ def parse_resume_for_review(
             session_id=session.session_id,
             resume_document_id=resume_document.resume_document_id,
         )
-        if existing_for_resume is not None:
+        if existing_for_resume is not None and _can_reuse_parsed_review(
+            existing_for_resume.analysis_mode,
+            use_llm=use_llm,
+        ):
             updated_session = session_repository.attach_parsed_review(
                 session_id=session.session_id,
                 parsed_review_id=existing_for_resume.parsed_review_id,
@@ -162,6 +169,12 @@ def _build_target_signals(profile: object) -> list[str]:
     if not signals and skills:
         signals.append("Technical skill signal detected")
     return _dedupe_signals(signals)
+
+
+def _can_reuse_parsed_review(analysis_mode: str, *, use_llm: bool) -> bool:
+    if not use_llm:
+        return True
+    return analysis_mode == "llm"
 
 
 def _dedupe_signals(signals: list[str]) -> list[str]:
