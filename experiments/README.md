@@ -28,6 +28,18 @@ This directory contains local-only experiments for comparing DeepSeek-based resu
 
 Do not commit private input resumes or experiment outputs. Reports are written to `experiments/output/`, which is gitignored.
 
+## Metrics
+
+Each report includes schema-valid rate, evidence-valid rate, unsupported field count, expected signal coverage, and output stability. The evaluator now also records wall-clock elapsed seconds for every run and the logical LLM request count for each mode, then reports per-mode averages in both JSON and Markdown summaries. This makes it easier to compare extraction quality against latency and request cost.
+
+Evidence entries must use the standard shape:
+
+```json
+{ "value": "...", "quote": "..." }
+```
+
+Malformed evidence is normalized safely in the saved output, but still counted as invalid during evaluation.
+
 ## Environment
 
 The experiment reads environment variables only from the file passed with `--env-file`, defaulting to `.env.deepseek.local`. Required:
@@ -42,4 +54,3 @@ Optional values follow the existing project conventions:
 - `JOBAGENT_LLM_TEMPERATURE`
 
 Secrets are not printed in reports or terminal output.
-

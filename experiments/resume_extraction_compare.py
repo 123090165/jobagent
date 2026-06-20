@@ -3,11 +3,14 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from itertools import combinations
 from pathlib import Path
 from typing import Any
+
+from pydantic import BaseModel, ConfigDict, StrictStr, ValidationError
 
 from app.agents.resume_parse_agent import parse_resume
 from app.services.llm_provider import DEFAULT_DEEPSEEK_BASE_URL, DEFAULT_DEEPSEEK_MODEL
@@ -68,8 +71,51 @@ class RunResult:
     output: dict[str, Any]
     evidence_validation: EvidenceValidation
     coverage: dict[str, Any]
+    elapsed_seconds: float
+    request_count: int
     call_errors: list[str] = field(default_factory=list)
     model_warnings: list[str] = field(default_factory=list)
+
+
+class ExperimentEvidenceItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    value: StrictStr
+    quote: StrictStr
+
+
+class ExperimentEvidence(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    target_roles: list[ExperimentEvidenceItem]
+    education: list[ExperimentEvidenceItem]
+    skills: list[ExperimentEvidenceItem]
+    projects: list[ExperimentEvidenceItem]
+    work_experiences: list[ExperimentEvidenceItem]
+    certificates: list[ExperimentEvidenceItem]
+    highlights: list[ExperimentEvidenceItem]
+
+
+class ExperimentResumeProfile(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    name: StrictStr | None
+    target_roles: list[Any]
+    education: list[Any]
+    skills: list[Any]
+    projects: list[Any]
+    work_experiences: list[Any]
+    certificates: list[Any]
+    highlights: list[Any]
+    missing_info: list[Any]
+
+
+class ExperimentOutput(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    resume_profile: ExperimentResumeProfile
+    evidence: ExperimentEvidence
+    quality_warnings: list[Any]
 
 
 def parse_env_file(path: str | Path) -> dict[str, str]:
@@ -223,21 +269,29 @@ def normalize_output(payload: dict[str, Any] | None) -> dict[str, Any]:
     if isinstance(evidence, dict):
         normalized_evidence = normalized["evidence"]
         for key in normalized_evidence:
-            normalized_evidence[key] = _as_list(evidence.get(key))
+            normalized_evidence[key] = [
+                normalize_evidence_item(item) for item in _as_list(evidence.get(key))
+            ]
 
     normalized["quality_warnings"] = _as_list(payload.get("quality_warnings"))
     return normalized
 
 
 def is_schema_valid(payload: dict[str, Any] | None) -> bool:
+    return validate_experiment_output(payload) == []
+
+
+def validate_experiment_output(payload: dict[str, Any] | None) -> list[str]:
     if not isinstance(payload, dict):
-        return False
-    if not isinstance(payload.get("resume_profile"), dict):
-        return False
-    if not isinstance(payload.get("evidence"), dict):
-        return False
-    normalized = normalize_output(payload)
-    return set(normalized.keys()) == {"resume_profile", "evidence", "quality_warnings"}
+        return ["output must be a JSON object"]
+    try:
+        ExperimentOutput.model_validate(payload)
+    except ValidationError as exc:
+        return [
+            f"{'.'.join(str(part) for part in error['loc'])}: {error['msg']}"
+            for error in exc.errors()
+        ]
+    return []
 
 
 def validate_evidence(output: dict[str, Any], resume_text: str) -> EvidenceValidation:
@@ -245,6 +299,10 @@ def validate_evidence(output: dict[str, Any], resume_text: str) -> EvidenceValid
     evidence_items = collect_evidence_items(output)
     errors: list[str] = []
     unsupported_count = 0
+
+    malformed_errors = collect_malformed_evidence_errors(output)
+    errors.extend(malformed_errors)
+    unsupported_count += len(malformed_errors)
 
     for label, value, evidence_key in required_values:
         matching_items = [
@@ -315,14 +373,44 @@ def collect_evidence_items(output: dict[str, Any]) -> dict[str, list[dict[str, s
         result[key] = []
         for item in _as_list(evidence.get(key) if isinstance(evidence, dict) else []):
             if isinstance(item, dict):
-                value = str(item.get("value") or item.get("field") or item.get("name") or "").strip()
-                quote = str(item.get("quote") or item.get("source_quote") or "").strip()
+                value = str(item.get("value") or "").strip()
+                quote = str(item.get("quote") or "").strip()
             else:
-                value = str(item).strip()
-                quote = str(item).strip()
+                value = ""
+                quote = ""
             if value or quote:
                 result[key].append({"value": value, "quote": quote})
     return result
+
+
+def normalize_evidence_item(item: Any) -> dict[str, str]:
+    if not isinstance(item, dict):
+        return {"value": "", "quote": ""}
+    return {
+        "value": str(item.get("value") or "").strip(),
+        "quote": str(item.get("quote") or "").strip(),
+    }
+
+
+def collect_malformed_evidence_errors(output: dict[str, Any]) -> list[str]:
+    evidence = output.get("evidence", {})
+    if not isinstance(evidence, dict):
+        return ["evidence must be an object"]
+    errors: list[str] = []
+    for key in SHARED_SCHEMA_EXAMPLE["evidence"]:
+        raw_items = evidence.get(key, [])
+        if not isinstance(raw_items, list):
+            errors.append(f"{key} evidence must be a list")
+            continue
+        for index, item in enumerate(raw_items):
+            if not isinstance(item, dict):
+                errors.append(f"{key}[{index}] evidence must use value/quote object")
+                continue
+            if set(item.keys()) != {"value", "quote"}:
+                errors.append(f"{key}[{index}] evidence must contain only value and quote")
+            if not isinstance(item.get("value"), str) or not isinstance(item.get("quote"), str):
+                errors.append(f"{key}[{index}] evidence value and quote must be strings")
+    return errors
 
 
 def evaluate_coverage(
@@ -371,12 +459,20 @@ def aggregate_report(results: list[RunResult]) -> dict[str, Any]:
         unsupported_count = sum(
             result.evidence_validation.unsupported_count for result in mode_results
         )
+        elapsed_values = [result.elapsed_seconds for result in mode_results]
+        request_counts = [result.request_count for result in mode_results]
         mode_summaries[mode] = {
             "runs": total,
             "schema_valid_rate": safe_rate(schema_valid, total),
             "evidence_valid_rate": safe_rate(evidence_valid, total),
             "unsupported_field_count": unsupported_count,
             "stability": calculate_stability([result.output for result in mode_results]),
+            "average_elapsed_seconds": (
+                sum(elapsed_values) / len(elapsed_values) if elapsed_values else 0.0
+            ),
+            "average_request_count": (
+                sum(request_counts) / len(request_counts) if request_counts else 0.0
+            ),
             "call_error_count": sum(len(result.call_errors) for result in mode_results),
             "model_warning_count": sum(len(result.model_warnings) for result in mode_results),
             "coverage": aggregate_coverage([result.coverage for result in mode_results]),
@@ -448,6 +544,8 @@ def run_experiment(
         for run_index in range(1, runs + 1):
             payload: dict[str, Any] = {}
             errors: list[str] = []
+            request_count = logical_request_count_for_mode(mode)
+            started_at = time.perf_counter()
             try:
                 if mode == "direct_one_shot":
                     payload = run_direct_one_shot(service, resume_text)
@@ -459,10 +557,14 @@ def run_experiment(
                     raise ValueError(f"Unsupported mode: {mode}")
             except (LLMServiceError, ValueError, TypeError) as exc:
                 errors.append(sanitize_error(str(exc)))
+            elapsed_seconds = time.perf_counter() - started_at
 
             schema_valid = is_schema_valid(payload)
+            evidence_validation = validate_evidence(
+                payload if isinstance(payload, dict) else {},
+                resume_text,
+            )
             normalized = normalize_output(payload)
-            evidence_validation = validate_evidence(normalized, resume_text)
             results.append(
                 RunResult(
                     mode=mode,
@@ -471,6 +573,8 @@ def run_experiment(
                     output=normalized,
                     evidence_validation=evidence_validation,
                     coverage=evaluate_coverage(normalized, case),
+                    elapsed_seconds=elapsed_seconds,
+                    request_count=request_count,
                     call_errors=errors,
                     model_warnings=[
                         str(item)
@@ -480,6 +584,14 @@ def run_experiment(
                 )
             )
     return results
+
+
+def logical_request_count_for_mode(mode: str) -> int:
+    if mode == "direct_fieldwise":
+        return len(FIELD_GROUPS) + 1
+    if mode in {"direct_one_shot", "guided_reconciliation"}:
+        return 1
+    return 0
 
 
 def write_reports(
@@ -514,6 +626,8 @@ def serialize_run_result(result: RunResult) -> dict[str, Any]:
         "schema_valid": result.schema_valid,
         "evidence_valid": result.evidence_validation.evidence_valid,
         "unsupported_count": result.evidence_validation.unsupported_count,
+        "elapsed_seconds": result.elapsed_seconds,
+        "request_count": result.request_count,
         "evidence_errors": result.evidence_validation.errors,
         "coverage": result.coverage,
         "call_errors": result.call_errors,
@@ -533,18 +647,20 @@ def render_markdown_summary(report: dict[str, Any]) -> str:
         "",
         "## Mode Summary",
         "",
-        "| Mode | Runs | Schema Valid | Evidence Valid | Unsupported Fields | Stability | Call Errors |",
-        "| --- | ---: | ---: | ---: | ---: | ---: | ---: |",
+        "| Mode | Runs | Schema Valid | Evidence Valid | Unsupported Fields | Stability | Avg Seconds | Avg Requests | Call Errors |",
+        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
     ]
     for mode, summary in report["mode_summary"].items():
         lines.append(
-            "| {mode} | {runs} | {schema:.2f} | {evidence:.2f} | {unsupported} | {stability:.2f} | {errors} |".format(
+            "| {mode} | {runs} | {schema:.2f} | {evidence:.2f} | {unsupported} | {stability:.2f} | {seconds:.2f} | {requests:.2f} | {errors} |".format(
                 mode=mode,
                 runs=summary["runs"],
                 schema=summary["schema_valid_rate"],
                 evidence=summary["evidence_valid_rate"],
                 unsupported=summary["unsupported_field_count"],
                 stability=summary["stability"],
+                seconds=summary["average_elapsed_seconds"],
+                requests=summary["average_request_count"],
                 errors=summary["call_error_count"],
             )
         )
