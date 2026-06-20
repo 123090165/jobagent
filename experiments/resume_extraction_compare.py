@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import sys
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -11,6 +12,10 @@ from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, StrictStr, ValidationError
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
 from app.agents.resume_parse_agent import parse_resume
 from app.services.llm_provider import DEFAULT_DEEPSEEK_BASE_URL, DEFAULT_DEEPSEEK_MODEL

@@ -174,7 +174,7 @@ def _build_target_signals(profile: object) -> list[str]:
 def _can_reuse_parsed_review(analysis_mode: str, *, use_llm: bool) -> bool:
     if not use_llm:
         return True
-    return analysis_mode == "llm"
+    return analysis_mode == "llm_guided"
 
 
 def _dedupe_signals(signals: list[str]) -> list[str]:

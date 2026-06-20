@@ -58,7 +58,7 @@ def test_parse_resume_for_review_stores_final_llm_profile(monkeypatch, tmp_path)
     )
 
     review = response.parsed_review
-    assert review.analysis_mode == "llm"
+    assert review.analysis_mode == "llm_guided"
     assert review.raw_parser_output is not None
     assert review.raw_parser_output["name"] == "Alex Chen"
     assert "AI Health Signal Processing Engineer" in review.raw_parser_output["target_roles"]
@@ -87,7 +87,7 @@ def test_deterministic_cached_review_does_not_block_llm_run(monkeypatch, tmp_pat
     )
 
     assert deterministic_response.parsed_review.analysis_mode == "deterministic"
-    assert llm_response.parsed_review.analysis_mode == "llm"
+    assert llm_response.parsed_review.analysis_mode == "llm_guided"
     assert llm_response.parsed_review.parsed_review_id != (
         deterministic_response.parsed_review.parsed_review_id
     )
@@ -117,7 +117,7 @@ def test_existing_llm_review_can_be_reused_without_regenerate(monkeypatch, tmp_p
     )
 
     assert second.parsed_review.parsed_review_id == first.parsed_review.parsed_review_id
-    assert second.parsed_review.analysis_mode == "llm"
+    assert second.parsed_review.analysis_mode == "llm_guided"
     assert second.parsed_review.basic_info["name"] == "Cached Alex"
 
 
@@ -144,6 +144,6 @@ def test_regenerate_bypasses_existing_llm_cache(monkeypatch, tmp_path) -> None:
     )
 
     assert second.parsed_review.parsed_review_id != first.parsed_review.parsed_review_id
-    assert second.parsed_review.analysis_mode == "llm"
+    assert second.parsed_review.analysis_mode == "llm_guided"
     assert second.parsed_review.basic_info["name"] == "Regenerated Alex"
     assert service.calls == 1

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+from dataclasses import dataclass
 from typing import Literal
 
 from pydantic import ValidationError
@@ -10,7 +11,14 @@ from app.schemas.resume import ResumeProfile
 from app.services.llm_provider import JSONChatLLM
 from app.services.llm_service import LLMServiceError
 
-ResumeReviewMode = Literal["llm", "fallback"]
+ResumeReviewMode = Literal["llm_guided", "fallback"]
+
+
+@dataclass(frozen=True)
+class ResumeReviewBuildResult:
+    parsed_profile: ResumeProfile
+    analysis_warnings: list[str]
+    analysis_mode: ResumeReviewMode
 
 
 def build_llm_assisted_resume_review(
@@ -19,38 +27,65 @@ def build_llm_assisted_resume_review(
     *,
     llm_service: JSONChatLLM | None,
 ) -> tuple[ResumeProfile, list[str], ResumeReviewMode]:
+    result = build_guided_llm_resume_review(
+        raw_resume_text=resume_text,
+        deterministic_profile=deterministic_profile,
+        llm_service=llm_service,
+    )
+    return result.parsed_profile, result.analysis_warnings, result.analysis_mode
+
+
+def build_guided_llm_resume_review(
+    raw_resume_text: str,
+    deterministic_profile: ResumeProfile,
+    llm_service: JSONChatLLM | None,
+) -> ResumeReviewBuildResult:
     if llm_service is None:
-        return (
-            deterministic_profile,
-            ["LLM resume analysis fallback triggered: llm_service_unavailable"],
-            "fallback",
+        return ResumeReviewBuildResult(
+            parsed_profile=deterministic_profile,
+            analysis_warnings=[
+                "LLM resume analysis fallback triggered: llm_service_unavailable"
+            ],
+            analysis_mode="fallback",
         )
 
     try:
         payload = llm_service.chat_completion_json(
             system_prompt=_system_prompt(),
-            user_prompt=_user_prompt(resume_text, deterministic_profile),
+            user_prompt=_user_prompt(raw_resume_text, deterministic_profile),
         )
+        if not isinstance(payload, dict):
+            raise ValueError("LLM response must be a JSON object.")
         profile_payload = payload.get("resume_profile", payload)
         improved_profile = ResumeProfile.model_validate(profile_payload)
     except (LLMServiceError, ValidationError, ValueError, TypeError) as exc:
         reason = _sanitize_fallback_reason(str(exc))
-        return (
-            deterministic_profile,
-            [f"LLM resume analysis fallback triggered: {type(exc).__name__}: {reason}"],
-            "fallback",
+        return ResumeReviewBuildResult(
+            parsed_profile=deterministic_profile,
+            analysis_warnings=[
+                f"LLM resume analysis fallback triggered: {type(exc).__name__}: {reason}"
+            ],
+            analysis_mode="fallback",
         )
 
-    return improved_profile, _clean_warnings(payload.get("quality_warnings", [])), "llm"
+    return ResumeReviewBuildResult(
+        parsed_profile=improved_profile,
+        analysis_warnings=_clean_warnings(payload.get("quality_warnings", [])),
+        analysis_mode="llm_guided",
+    )
 
 
 def _system_prompt() -> str:
     return (
-        "You are a careful resume analysis assistant. Correct and enrich the deterministic "
-        "parser output only when the raw resume text supports it. Do not invent schools, "
-        "degrees, employers, internships, projects, outcomes, certificates, or skills. "
-        "If evidence is uncertain, preserve uncertainty in missing_info or quality_warnings. "
-        "Return only JSON."
+        "You are a careful guided resume extraction assistant. Return JSON only. "
+        "The raw resume text is authoritative and is the only source of truth. "
+        "The deterministic profile is only a non-authoritative candidate hint and may be "
+        "incomplete or wrong. Verify, reject, merge, correct, or supplement candidates "
+        "based only on the raw resume. Do not invent schools, companies, projects, "
+        "skills, certificates, dates, metrics, target roles, locations, or outcomes. "
+        "If uncertain, use empty fields and quality_warnings or missing_info rather than "
+        "guessing. Preserve explicit target roles and preferred locations when clearly "
+        "stated in the raw text."
     )
 
 
@@ -73,8 +108,13 @@ def _user_prompt(resume_text: str, deterministic_profile: ResumeProfile) -> str:
     return (
         "Raw resume text:\n"
         f"{resume_text}\n\n"
-        "Deterministic parser output JSON:\n"
+        "Non-authoritative deterministic candidate profile JSON:\n"
         f"{json.dumps(deterministic_profile.model_dump(mode='json'), ensure_ascii=False)}\n\n"
+        "Instructions:\n"
+        "- Produce the final production ResumeProfile only from raw resume evidence.\n"
+        "- Correct or remove deterministic candidates that the raw text does not support.\n"
+        "- Use [] for absent list fields and null for absent optional scalar fields.\n"
+        "- Put uncertainty or absent evidence in resume_profile.missing_info and quality_warnings.\n\n"
         "Required output schema JSON:\n"
         f"{json.dumps(schema, ensure_ascii=False)}"
     )

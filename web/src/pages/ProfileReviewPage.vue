@@ -19,22 +19,25 @@ const useLlmResumeAnalysis = ref(false);
 const llmStatus = computed(() => profileSessionStore.llmStatus);
 const llmToggleLabel = computed(() => (useLlmResumeAnalysis.value ? "Enabled" : "Disabled"));
 const shouldForceLlmRegeneration = computed(
-  () => useLlmResumeAnalysis.value && parsedReview.value?.analysis_mode !== "llm"
+  () => useLlmResumeAnalysis.value && parsedReview.value?.analysis_mode !== "llm_guided"
 );
 const analysisModeLabel = computed(() => {
   if (!parsedReview.value) {
     return "Not analyzed";
   }
+  if (parsedReview.value.analysis_mode === "llm_guided") {
+    return "Guided LLM";
+  }
   if (parsedReview.value.analysis_mode === "llm") {
     return "LLM-assisted parser";
   }
   if (parsedReview.value.analysis_mode === "fallback") {
-    return "Fallback parser";
+    return "Fallback";
   }
   return "Deterministic parser";
 });
 const analysisModeTagType = computed(() => {
-  if (parsedReview.value?.analysis_mode === "llm") {
+  if (parsedReview.value?.analysis_mode === "llm_guided") {
     return "success";
   }
   if (parsedReview.value?.analysis_mode === "fallback") {
@@ -189,6 +192,7 @@ async function continueToDraft() {
           </ul>
           <ul v-if="parsedReview.analysis_warnings.length" class="review-list">
             <li v-for="warning in parsedReview.analysis_warnings" :key="warning">
+              <span v-if="parsedReview.analysis_mode === 'fallback'">Reason: </span>
               {{ warning }}
             </li>
           </ul>

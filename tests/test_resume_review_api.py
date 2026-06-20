@@ -119,7 +119,7 @@ def test_parse_resume_accepts_use_llm_true(monkeypatch, tmp_path) -> None:
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload["parsed_review"]["analysis_mode"] == "llm"
+    assert payload["parsed_review"]["analysis_mode"] == "llm_guided"
     assert payload["parsed_review"]["raw_parser_output"]["name"] == "Jane Doe"
 
 

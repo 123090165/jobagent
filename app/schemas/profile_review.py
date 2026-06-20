@@ -20,7 +20,7 @@ class ResumeProfileReviewResult(BaseModel):
     suggested_edits: list[str] = Field(default_factory=list)
     editable_sections: list[str] = Field(default_factory=list)
     confidence_label: str = "medium"
-    analysis_mode: Literal["deterministic", "llm", "fallback"] = "deterministic"
+    analysis_mode: Literal["deterministic", "llm", "llm_guided", "fallback"] = "deterministic"
     analysis_warnings: list[str] = Field(default_factory=list)
 
 

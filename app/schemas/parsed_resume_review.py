@@ -22,7 +22,7 @@ class ParsedResumeReview(BaseModel):
     quality_warnings: list[str] = Field(default_factory=list)
     missing_info_questions: list[str] = Field(default_factory=list)
     raw_parser_output: dict[str, Any] | None = None
-    analysis_mode: Literal["deterministic", "llm", "fallback"] = "deterministic"
+    analysis_mode: Literal["deterministic", "llm", "llm_guided", "fallback"] = "deterministic"
     analysis_warnings: list[str] = Field(default_factory=list)
     created_at: datetime
     updated_at: datetime

@@ -18,7 +18,7 @@ Job Brief is postponed until resume analysis is reliable. The immediate priority
 - stop deterministic parser fallback from inventing work experience from whole-resume text
 - make Resume Review UI show LLM toggle state, analysis mode, provider status, and fallback warnings
 
-## v4.6.2 Parser Regression Corpus (current)
+## v4.6.2 Parser Regression Corpus
 
 - turn existing realistic resume cases into stricter parser regression fixtures
 - assert key positive behavior: real project, work, education, skill, and highlight extraction
@@ -26,15 +26,22 @@ Job Brief is postponed until resume analysis is reliable. The immediate priority
 - keep tests deterministic and free of real LLM/network dependencies
 - intentionally establish a stable regression baseline before deeper deterministic parser changes
 
-## v4.6.3 Deterministic Parser Hardening (next)
+## v4.6.3 Guided LLM Resume Review Integration (current)
 
-- improve section heading coverage for English, Chinese, and mixed resumes
-- improve multi-line project grouping
-- improve education/work/project boundary detection
-- improve missing-info and quality-warning precision
-- avoid a large parser architecture split until behavior is pinned by tests
+- use deterministic parsing as a non-authoritative candidate profile
+- send raw resume text plus the deterministic candidate into guided LLM review
+- treat raw resume text as the only source of truth
+- persist successful guided review as `analysis_mode="llm_guided"`
+- keep deterministic fallback with sanitized warnings when LLM is unavailable, fails, or returns invalid output
+- keep tests deterministic with fake JSON LLMs and no real DeepSeek/network calls
 
-## v4.6.4 Evidence-based LLM Resume Extraction
+## v4.6.4 CUHKSZ Live Job Search Verification (next)
+
+- verify live CUHKSZ provider behavior end to end against the existing job search flow
+- keep provider behavior scoped and observable
+- do not resume Job Brief until resume analysis and live search basics are trustworthy
+
+## v4.6.5 Evidence-based extraction contract hardening
 
 - require structured LLM output with evidence quotes for core fields
 - validate LLM output with Python schemas
