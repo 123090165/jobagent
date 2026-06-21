@@ -227,7 +227,24 @@ class CUHKSZCareerProvider:
                 }
             )
 
-        raw_description = _build_raw_description(fields)
+        merged_title = _prefer_detail_value(
+            fields["title"],
+            candidate.title,
+            invalid_values=LOW_QUALITY_DETAIL_TITLES,
+        )
+        merged_company = _prefer_detail_value(
+            fields["company"],
+            candidate.company,
+            invalid_values=LOW_QUALITY_COMPANY_VALUES,
+        )
+        merged_location = _prefer_detail_value(fields["location"], candidate.location)
+        merged_fields = {
+            **fields,
+            "title": merged_title,
+            "company": merged_company,
+            "location": merged_location,
+        }
+        raw_description = _build_raw_description(merged_fields)
         detail_snippet = (fields["job_description"] or raw_description or "").strip()
         if candidate.snippet and detail_snippet:
             snippet = f"{candidate.snippet} | {detail_snippet}"[:320].strip()
@@ -235,9 +252,9 @@ class CUHKSZCareerProvider:
             snippet = (detail_snippet or candidate.snippet or "")[:320].strip()
         return candidate.model_copy(
             update={
-                "title": fields["title"] or candidate.title,
-                "company": fields["company"] or candidate.company,
-                "location": fields["location"] or candidate.location,
+                "title": merged_title,
+                "company": merged_company,
+                "location": merged_location,
                 "snippet": snippet or candidate.snippet,
                 "raw_description": raw_description or candidate.raw_description,
             }
@@ -330,16 +347,29 @@ def _dedupe(values: list[str]) -> list[str]:
     return result
 
 
+LOW_QUALITY_DETAIL_TITLES = {"招聘信息", "职位详情", "岗位详情"}
+LOW_QUALITY_COMPANY_VALUES = {"：", ":", "-", "不限"}
+
+
 def _is_low_quality_candidate(candidate: RawJobCandidate) -> bool:
     title = _clean_text(candidate.title or "")
-    company = _clean_text(candidate.company or "")
-    if title in {"招聘信息", "职位详情", "岗位详情"}:
-        return True
-    if company in {"：", ":", "-", "不限"}:
-        return True
     if not title or not candidate.source_url:
         return True
     return False
+
+
+def _prefer_detail_value(
+    detail_value: str | None,
+    fallback_value: str | None,
+    *,
+    invalid_values: set[str] | None = None,
+) -> str | None:
+    fallback = _clean_text(fallback_value or "")
+    detail = _clean_text(detail_value or "")
+    invalid = invalid_values or set()
+    if detail and detail not in invalid:
+        return detail
+    return fallback or None
 
 
 def _is_allowed_detail_url(url: str) -> bool:

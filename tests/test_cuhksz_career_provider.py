@@ -8,9 +8,11 @@ from app.services.job_search_providers.cuhksz_career_provider import (
     CUHKSZ_CAREER_SEARCH_URL,
     NO_PROVIDER_MATCH_WARNING,
     CUHKSZCareerProvider,
+    _is_low_quality_candidate,
     build_cuhksz_search_url,
     build_cuhksz_title_terms,
 )
+from app.services.job_search_providers.base import RawJobCandidate
 from tests.test_job_search_live_api import FakeJSONLLM, _create_session_with_confirmed_profile
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
@@ -119,6 +121,59 @@ def test_cuhksz_detail_page_parsing_extracts_description() -> None:
 
     assert candidate.raw_description is not None
     assert "Job Description:" in candidate.raw_description
+
+
+def test_cuhksz_detail_generic_title_does_not_replace_list_metadata() -> None:
+    source_url = "https://career.cuhk.edu.cn/job/view/id/468293"
+    provider = CUHKSZCareerProvider(
+        detail_pages={
+            source_url: """
+            <html>
+              <body>
+                <h1>招聘信息</h1>
+                <p>公司名称：：</p>
+                <p>工作地点：广东省 - 深圳市</p>
+                <section>
+                  <h2>岗位职责</h2>
+                  <p>AI健康算法工程师实习生（生理信号方向），负责PPG和ECG信号处理。</p>
+                </section>
+              </body>
+            </html>
+            """,
+        },
+    )
+    candidate = RawJobCandidate(
+        title="安克创新AI健康算法工程师实习生（生理信号方向）",
+        company="安克创新",
+        location="广东省 - 深圳市",
+        source_url=source_url,
+        source_provider="cuhksz_career",
+        snippet="安克创新 | 广东省 - 深圳市 | 实习",
+    )
+
+    detailed = provider.fetch_job_detail(candidate)
+
+    assert detailed.title == "安克创新AI健康算法工程师实习生（生理信号方向）"
+    assert detailed.company == "安克创新"
+    assert detailed.source_url == source_url
+    assert detailed.raw_description is not None
+    assert "Title: 安克创新AI健康算法工程师实习生（生理信号方向）" in detailed.raw_description
+    assert "Company: 安克创新" in detailed.raw_description
+    assert "PPG" in detailed.raw_description
+    assert _is_low_quality_candidate(detailed) is False
+
+
+def test_cuhksz_low_quality_filter_keeps_candidates_with_missing_company() -> None:
+    candidate = RawJobCandidate(
+        title="AI健康算法工程师实习生（生理信号方向）",
+        company=None,
+        location="广东省 - 深圳市",
+        source_url="https://career.cuhk.edu.cn/job/view/id/468293",
+        source_provider="cuhksz_career",
+        snippet="广东省 - 深圳市 | 实习",
+    )
+
+    assert _is_low_quality_candidate(candidate) is False
 
 
 def test_cuhksz_detail_fetch_failure_keeps_candidate_with_warning() -> None:
