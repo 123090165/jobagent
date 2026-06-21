@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from fastapi.testclient import TestClient
+from types import SimpleNamespace
 
 from app.application.job_search_usecases import create_job_search_run, execute_job_search_run
 from app.main import app
@@ -78,6 +79,13 @@ def _create_session_with_confirmed_profile(tmp_path, monkeypatch, name: str) -> 
 def test_live_search_create_returns_running_or_completed(monkeypatch, tmp_path) -> None:
     confirmed = _create_session_with_confirmed_profile(tmp_path, monkeypatch, "job-search-live-create.sqlite3")
     monkeypatch.setenv("JOBAGENT_JOB_SEARCH_PROVIDER", "mock")
+    monkeypatch.setattr(
+        "app.application.job_search_usecases.resolve_llm_provider_for_switch",
+        lambda *, use_deepseek: SimpleNamespace(
+            provider="deepseek" if use_deepseek else "ollama",
+            service=FakeJSONLLM(),
+        ),
+    )
 
     response = client.post(
         "/api/v1/job-search-runs",
@@ -145,6 +153,7 @@ def test_live_run_steps_endpoint_returns_trace(monkeypatch, tmp_path) -> None:
     execute_job_search_run(
         run_response.job_search_run.job_search_run_id,
         job_search_provider=FakeProvider(),
+        llm_service=FakeJSONLLM(),
         max_results=5,
     )
 
@@ -160,3 +169,5 @@ def test_live_run_steps_endpoint_returns_trace(monkeypatch, tmp_path) -> None:
         "Profile matching",
         "Result assembly",
     ]
+    assert items[0]["mode"] == "llm"
+    assert run_response.job_search_run.llm_enabled is False

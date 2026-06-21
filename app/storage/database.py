@@ -177,6 +177,7 @@ def init_database(connection: sqlite3.Connection) -> None:
             missing_info_questions_json TEXT NOT NULL,
             raw_parser_output_json TEXT,
             analysis_mode TEXT NOT NULL DEFAULT 'deterministic',
+            analysis_provider TEXT,
             analysis_warnings_json TEXT NOT NULL DEFAULT '[]',
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL,
@@ -279,6 +280,7 @@ def init_database(connection: sqlite3.Connection) -> None:
     _ensure_column(connection, "job_search_runs", "search_provider", "TEXT")
     _ensure_column(connection, "job_search_runs", "error_message", "TEXT")
     _ensure_column(connection, "parsed_resume_reviews", "analysis_mode", "TEXT DEFAULT 'deterministic'")
+    _ensure_column(connection, "parsed_resume_reviews", "analysis_provider", "TEXT")
     _ensure_column(connection, "parsed_resume_reviews", "analysis_warnings_json", "TEXT DEFAULT '[]'")
     connection.commit()
 

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { NButton, NCard, NCode, NCollapse, NCollapseItem, NSwitch, NTag, NThing } from "naive-ui";
 
@@ -17,9 +17,15 @@ const hasResume = computed(() => Boolean(profileSessionStore.session?.resume_doc
 const parsedReview = computed(() => profileSessionStore.parsedReview);
 const useLlmResumeAnalysis = ref(false);
 const llmStatus = computed(() => profileSessionStore.llmStatus);
-const llmToggleLabel = computed(() => (useLlmResumeAnalysis.value ? "Enabled" : "Disabled"));
+const selectedLlmProvider = computed(() => (useLlmResumeAnalysis.value ? "deepseek" : "ollama"));
+const llmToggleLabel = computed(() =>
+  useLlmResumeAnalysis.value ? "DeepSeek API" : "Local Ollama"
+);
 const shouldForceLlmRegeneration = computed(
-  () => useLlmResumeAnalysis.value && parsedReview.value?.analysis_mode !== "llm_guided"
+  () =>
+    !parsedReview.value ||
+    parsedReview.value.analysis_mode !== "llm_guided" ||
+    parsedReview.value.analysis_provider !== selectedLlmProvider.value
 );
 const analysisModeLabel = computed(() => {
   if (!parsedReview.value) {
@@ -73,7 +79,15 @@ onMounted(async () => {
     if (session.current_step === "resume_review" && session.parsed_review_id) {
       await profileSessionStore.loadParsedReview(sessionId.value);
     }
-    await profileSessionStore.loadLlmStatus();
+    await profileSessionStore.loadLlmStatus(useLlmResumeAnalysis.value);
+  } catch {
+    // Error state is rendered from the store.
+  }
+});
+
+watch(useLlmResumeAnalysis, async (value) => {
+  try {
+    await profileSessionStore.loadLlmStatus(value);
   } catch {
     // Error state is rendered from the store.
   }
@@ -137,7 +151,7 @@ async function continueToDraft() {
     <div v-else class="review-layout">
       <div class="review-actions">
         <div class="job-search-setup-row">
-          <span class="job-search-setup-label">Use LLM-assisted resume analysis</span>
+          <span class="job-search-setup-label">Use DeepSeek API for resume analysis</span>
           <n-switch v-model:value="useLlmResumeAnalysis" />
         </div>
         <n-button
@@ -178,6 +192,10 @@ async function continueToDraft() {
           </div>
           <ul class="review-list">
             <li>LLM toggle: {{ llmToggleLabel }}</li>
+            <li>Selected LLM provider: {{ selectedLlmProvider }}</li>
+            <li v-if="parsedReview.analysis_provider">
+              Review provider: {{ parsedReview.analysis_provider }}
+            </li>
             <li v-if="llmStatus">
               Provider: {{ llmStatus.provider }}
               <span v-if="llmStatus.model"> / {{ llmStatus.model }}</span>

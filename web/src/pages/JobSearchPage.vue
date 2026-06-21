@@ -44,6 +44,15 @@ function goBackToConfirmed() {
   void router.push({ name: "profile-confirmed", params: { sessionId } });
 }
 
+function goBackToSearchPreview() {
+  const sessionId = profileSessionStore.session?.session_id;
+  if (!sessionId) {
+    void router.push({ name: "home" });
+    return;
+  }
+  void router.push({ name: "search-preview", params: { sessionId } });
+}
+
 function showJobBriefHint() {
   jobBriefHint.value = "Job Brief will be implemented in v4.6.";
 }
@@ -86,6 +95,7 @@ function statusTagType(status: string) {
     <div v-else class="job-search-layout">
       <div class="review-actions">
         <n-button secondary @click="goBackToConfirmed">Back to Confirmed Profile</n-button>
+        <n-button secondary @click="goBackToSearchPreview">Back to Search Preview</n-button>
       </div>
 
       <n-card title="Run Status" size="small" class="job-search-summary">
@@ -111,7 +121,16 @@ function statusTagType(status: string) {
           <strong>Locations:</strong>
           {{ profileSessionStore.jobSearchRun.locations.join(", ") || "Not set" }}
         </p>
-        <p><strong>LLM Assisted:</strong> {{ profileSessionStore.jobSearchRun.llm_enabled ? "Yes" : "No" }}</p>
+        <p>
+          <strong>LLM Provider:</strong>
+          {{
+            profileSessionStore.jobSearchRun.search_mode === "local_mock"
+              ? "Local demo"
+              : profileSessionStore.jobSearchRun.llm_enabled
+                ? "DeepSeek API"
+                : "Local Ollama"
+          }}
+        </p>
         <p v-if="profileSessionStore.jobSearchRun.error_message">
           <strong>Error:</strong> {{ profileSessionStore.jobSearchRun.error_message }}
         </p>

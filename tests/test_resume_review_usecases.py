@@ -59,25 +59,27 @@ def test_parse_resume_for_review_stores_final_llm_profile(monkeypatch, tmp_path)
 
     review = response.parsed_review
     assert review.analysis_mode == "llm_guided"
+    assert review.analysis_provider == "deepseek"
     assert review.raw_parser_output is not None
     assert review.raw_parser_output["name"] == "Alex Chen"
     assert "AI Health Signal Processing Engineer" in review.raw_parser_output["target_roles"]
     assert "AI Health Signal Processing Engineer" in review.target_signals
 
 
-def test_deterministic_cached_review_does_not_block_llm_run(monkeypatch, tmp_path) -> None:
-    monkeypatch.setenv("JOBAGENT_DB_PATH", str(tmp_path / "resume-review-cache.sqlite3"))
+def test_local_ollama_review_does_not_block_deepseek_run(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("JOBAGENT_DB_PATH", str(tmp_path / "resume-review-provider-cache.sqlite3"))
     session = create_profile_session()
     submit_resume_text(
         session.session_id,
         "Name: Alex Chen\nSkills: Python\nProject: Built a FastAPI parser.",
     )
-    deterministic_response = parse_resume_for_review(
+    local_response = parse_resume_for_review(
         session.session_id,
         regenerate=True,
         use_llm=False,
+        llm_service=FakeResumeReviewLLM(name="Local Alex"),
     )
-    service = FakeResumeReviewLLM(name="LLM Alex")
+    service = FakeResumeReviewLLM(name="DeepSeek Alex")
 
     llm_response = parse_resume_for_review(
         session.session_id,
@@ -86,12 +88,14 @@ def test_deterministic_cached_review_does_not_block_llm_run(monkeypatch, tmp_pat
         llm_service=service,
     )
 
-    assert deterministic_response.parsed_review.analysis_mode == "deterministic"
+    assert local_response.parsed_review.analysis_mode == "llm_guided"
+    assert local_response.parsed_review.analysis_provider == "ollama"
     assert llm_response.parsed_review.analysis_mode == "llm_guided"
+    assert llm_response.parsed_review.analysis_provider == "deepseek"
     assert llm_response.parsed_review.parsed_review_id != (
-        deterministic_response.parsed_review.parsed_review_id
+        local_response.parsed_review.parsed_review_id
     )
-    assert llm_response.parsed_review.basic_info["name"] == "LLM Alex"
+    assert llm_response.parsed_review.basic_info["name"] == "DeepSeek Alex"
     assert service.calls == 1
 
 
@@ -118,6 +122,7 @@ def test_existing_llm_review_can_be_reused_without_regenerate(monkeypatch, tmp_p
 
     assert second.parsed_review.parsed_review_id == first.parsed_review.parsed_review_id
     assert second.parsed_review.analysis_mode == "llm_guided"
+    assert second.parsed_review.analysis_provider == "deepseek"
     assert second.parsed_review.basic_info["name"] == "Cached Alex"
 
 
@@ -145,5 +150,6 @@ def test_regenerate_bypasses_existing_llm_cache(monkeypatch, tmp_path) -> None:
 
     assert second.parsed_review.parsed_review_id != first.parsed_review.parsed_review_id
     assert second.parsed_review.analysis_mode == "llm_guided"
+    assert second.parsed_review.analysis_provider == "deepseek"
     assert second.parsed_review.basic_info["name"] == "Regenerated Alex"
     assert service.calls == 1

@@ -10,6 +10,25 @@ from app.services.llm_provider import JSONChatLLM
 from app.services.llm_service import LLMServiceError
 from app.services.search_signal_normalizer import build_bilingual_search_signals
 
+GENERIC_SUPPORTING_SIGNAL_TERMS = {
+    "api",
+    "apis",
+    "c",
+    "c++",
+    "docker",
+    "excel",
+    "fastapi",
+    "git",
+    "matlab",
+    "numpy",
+    "pandas",
+    "python",
+    "pytorch",
+    "sql",
+    "sqlite",
+    "tensorflow",
+}
+
 
 class JobSearchPlan(BaseModel):
     queries: list[str] = Field(default_factory=list)
@@ -89,20 +108,18 @@ def _build_deterministic_plan(confirmed_profile: ConfirmedProfile) -> JobSearchP
         confirmed_profile.search_keywords,
         confirmed_profile.core_skills,
     )
-    keywords = _dedupe(_query_signal_seed(signals, confirmed_profile.search_keywords, confirmed_profile.core_skills))
+    keywords = _dedupe(
+        _query_signal_seed(signals, confirmed_profile.search_keywords, confirmed_profile.core_skills)
+    )
+    provider_terms = _provider_query_signal_seed(
+        signals,
+        target_roles=target_roles,
+        search_keywords=confirmed_profile.search_keywords,
+        core_skills=confirmed_profile.core_skills,
+    )
     locations = _dedupe(confirmed_profile.preferred_locations)
-    queries: list[str] = []
+    queries = build_focused_provider_queries(target_roles, provider_terms)
 
-    role_seed = target_roles[:4] or ["Software Engineer"]
-    keyword_seed = keywords[:6]
-    for role in role_seed:
-        base_query = role
-        if keyword_seed:
-            base_query = f"{role} {' '.join(keyword_seed[:3])}"
-        queries.append(base_query.strip())
-
-    if not queries and keyword_seed:
-        queries.append(" ".join(keyword_seed[:5]))
     if not queries:
         queries.append("Software Engineer")
 
@@ -150,6 +167,27 @@ def _normalize_plan(plan: JobSearchPlan, *, fallback: JobSearchPlan) -> JobSearc
     )
 
 
+def build_focused_provider_queries(target_roles: list[str], search_signal_terms: list[str]) -> list[str]:
+    keyword_seed = _dedupe(search_signal_terms)[:6]
+    role_seed = _dedupe(target_roles)[:4]
+    if not role_seed:
+        return [" ".join(keyword_seed[:5])] if keyword_seed else []
+
+    queries: list[str] = []
+    for role in role_seed:
+        role_terms = [
+            term
+            for term in keyword_seed
+            if not _overlaps_target_role(term, [role])
+            and not _is_generic_supporting_signal(term)
+        ]
+        base_query = role
+        if role_terms:
+            base_query = f"{role} {' '.join(role_terms[:2])}"
+        queries.append(base_query.strip())
+    return _dedupe(queries)
+
+
 def _dedupe(values: list[str]) -> list[str]:
     items: list[str] = []
     seen: set[str] = set()
@@ -175,6 +213,52 @@ def _query_signal_seed(
     acronyms = [term for term in en_terms if _looks_like_acronym(term)]
     english_fallback = [term for term in en_terms if not _looks_like_acronym(term)]
     return _dedupe(zh_terms + acronyms + search_keywords + core_skills + english_fallback)
+
+
+def _provider_query_signal_seed(
+    signals: dict[str, object],
+    *,
+    target_roles: list[str],
+    search_keywords: list[str],
+    core_skills: list[str],
+) -> list[str]:
+    zh_terms = [str(value) for value in signals.get("zh_terms", [])]
+    en_terms = [str(value) for value in signals.get("en_terms", [])]
+    acronyms = [term for term in en_terms if _looks_like_acronym(term)]
+    english_fallback = [term for term in en_terms if not _looks_like_acronym(term)]
+    candidates = _dedupe(
+        zh_terms[:1]
+        + acronyms
+        + zh_terms[1:]
+        + search_keywords
+        + core_skills
+        + english_fallback
+    )
+    focused = [
+        term
+        for term in candidates
+        if not _overlaps_target_role(term, target_roles)
+        and not _is_generic_supporting_signal(term)
+    ]
+    if focused:
+        return _dedupe(focused)
+    return _dedupe([term for term in candidates if not _overlaps_target_role(term, target_roles)])
+
+
+def _overlaps_target_role(term: str, target_roles: list[str]) -> bool:
+    term_key = term.strip().lower()
+    if not term_key:
+        return True
+    for role in target_roles:
+        role_key = role.strip().lower()
+        if role_key and (term_key == role_key or term_key in role_key or role_key in term_key):
+            return True
+    return False
+
+
+def _is_generic_supporting_signal(term: str) -> bool:
+    normalized = term.strip().lower()
+    return normalized in GENERIC_SUPPORTING_SIGNAL_TERMS
 
 
 def _looks_like_acronym(value: str) -> bool:

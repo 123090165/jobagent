@@ -14,6 +14,7 @@ JobSearchStepMode: TypeAlias = Literal["deterministic", "llm", "provider", "fall
 JobSearchResultSource: TypeAlias = Literal["local_mock", "live_search"]
 JobSearchAnalysisMode: TypeAlias = Literal["deterministic", "llm", "fallback", "mock"]
 JobSearchConfidenceLabel: TypeAlias = Literal["strong", "medium", "limited", "weak"]
+JobSearchPlanningMode: TypeAlias = Literal["deterministic", "llm", "fallback"]
 
 
 class JobSearchResult(BaseModel):
@@ -85,6 +86,28 @@ class JobSearchRunResponse(BaseModel):
     job_search_run: JobSearchRun
     profile_session: ProfileSession
     steps: list[JobSearchTraceStep] = Field(default_factory=list)
+
+
+class JobSearchPreviewResponse(BaseModel):
+    session_id: str
+    confirmed_profile_id: str
+    search_mode: JobSearchMode
+    search_provider: str | None = None
+    llm_enabled: bool = False
+    llm_provider: str | None = None
+    query: str
+    locations: list[str] = Field(default_factory=list)
+    target_roles: list[str] = Field(default_factory=list)
+    keywords: list[str] = Field(default_factory=list)
+    provider_queries: list[str] = Field(default_factory=list)
+    provider_search_terms: list[str] = Field(default_factory=list)
+    provider_search_urls: list[str] = Field(default_factory=list)
+    search_signal_terms: list[str] = Field(default_factory=list)
+    excluded_signals: list[str] = Field(default_factory=list)
+    ranking_policy: str
+    planning_mode: JobSearchPlanningMode
+    fallback_reason: str | None = None
+    quality_warnings: list[str] = Field(default_factory=list)
 
 
 class JobSearchRunListResponse(BaseModel):

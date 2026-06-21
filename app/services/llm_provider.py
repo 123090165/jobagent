@@ -105,6 +105,10 @@ def resolve_llm_provider(provider: str | None = None) -> LLMProviderResolution:
     )
 
 
+def resolve_llm_provider_for_switch(*, use_deepseek: bool) -> LLMProviderResolution:
+    return resolve_llm_provider("deepseek" if use_deepseek else "ollama")
+
+
 def normalize_llm_provider(provider: str | None) -> LLMProviderName:
     normalized = (provider or DEFAULT_LLM_PROVIDER).strip().lower()
     if normalized not in {"mock", "ollama", "deepseek"}:

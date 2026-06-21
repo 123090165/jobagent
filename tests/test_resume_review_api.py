@@ -61,6 +61,32 @@ def test_parse_resume_creates_review_and_updates_session(monkeypatch, tmp_path) 
 def test_parse_resume_is_idempotent_by_default(monkeypatch, tmp_path) -> None:
     session = _create_session_with_resume(tmp_path, monkeypatch, "idempotent.sqlite3")
 
+    class FakeResumeReviewLLM:
+        def chat_completion_json(self, *, system_prompt: str, user_prompt: str) -> dict:
+            return {
+                "resume_profile": {
+                    "raw_text": "Name: Jane Doe\nSkills: Python",
+                    "name": "Jane Doe",
+                    "target_roles": [],
+                    "education": [],
+                    "skills": ["Python"],
+                    "projects": [],
+                    "work_experiences": [],
+                    "certificates": [],
+                    "highlights": [],
+                    "missing_info": [],
+                },
+                "quality_warnings": [],
+            }
+
+    monkeypatch.setattr(
+        "app.application.resume_review_usecases.resolve_llm_provider_for_switch",
+        lambda *, use_deepseek: SimpleNamespace(
+            provider="deepseek" if use_deepseek else "ollama",
+            service=FakeResumeReviewLLM(),
+        ),
+    )
+
     first = client.post(f"/api/v1/profile-sessions/{session['session_id']}/parse-resume").json()
     second = client.post(f"/api/v1/profile-sessions/{session['session_id']}/parse-resume").json()
 
@@ -109,8 +135,11 @@ def test_parse_resume_accepts_use_llm_true(monkeypatch, tmp_path) -> None:
             }
 
     monkeypatch.setattr(
-        "app.application.resume_review_usecases.resolve_llm_provider",
-        lambda: SimpleNamespace(service=FakeResumeReviewLLM()),
+        "app.application.resume_review_usecases.resolve_llm_provider_for_switch",
+        lambda *, use_deepseek: SimpleNamespace(
+            provider="deepseek" if use_deepseek else "ollama",
+            service=FakeResumeReviewLLM(),
+        ),
     )
 
     response = client.post(
@@ -120,6 +149,7 @@ def test_parse_resume_accepts_use_llm_true(monkeypatch, tmp_path) -> None:
     assert response.status_code == 200
     payload = response.json()
     assert payload["parsed_review"]["analysis_mode"] == "llm_guided"
+    assert payload["parsed_review"]["analysis_provider"] == "deepseek"
     assert payload["parsed_review"]["raw_parser_output"]["name"] == "Jane Doe"
 
 

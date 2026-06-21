@@ -56,6 +56,7 @@ def build_resume_profile_review(
     *,
     use_llm: bool = False,
     llm_service: JSONChatLLM | None = None,
+    llm_provider: str | None = None,
 ) -> ResumeProfileReviewResult:
     normalized_resume = resume_text.strip()
     if not normalized_resume:
@@ -66,9 +67,11 @@ def build_resume_profile_review(
 
     deterministic_profile = parse_resume(normalized_resume)
     analysis_mode = "deterministic"
+    analysis_provider: str | None = None
     analysis_warnings: list[str] = []
     parsed_profile = deterministic_profile
     if use_llm:
+        analysis_provider = llm_provider
         parsed_profile, analysis_warnings, analysis_mode = build_llm_assisted_resume_review(
             normalized_resume,
             deterministic_profile,
@@ -92,6 +95,7 @@ def build_resume_profile_review(
         editable_sections=EDITABLE_SECTIONS.copy(),
         confidence_label=confidence_label,
         analysis_mode=analysis_mode,
+        analysis_provider=analysis_provider,
         analysis_warnings=analysis_warnings,
     )
 

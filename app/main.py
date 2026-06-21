@@ -3,6 +3,7 @@ from __future__ import annotations
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
+from app.config.env_loader import load_local_env
 from app.api.v1.confirmed_profiles import router as confirmed_profiles_v1_router
 from app.api.v1.job_search_providers import router as job_search_providers_v1_router
 from app.api.v1.job_search_runs import router as job_search_runs_v1_router
@@ -16,6 +17,8 @@ API_VERSION = "0.3.0"
 
 
 def create_app() -> FastAPI:
+    load_local_env()
+
     api = FastAPI(
         title="JobAgent API",
         version=API_VERSION,

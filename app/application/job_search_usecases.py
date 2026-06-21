@@ -22,6 +22,7 @@ from app.repositories.profile_session_repository import (
 from app.schemas.confirmed_profile import ConfirmedProfile
 from app.schemas.job_search import (
     JobSearchResult,
+    JobSearchPreviewResponse,
     JobSearchRun,
     JobSearchRunCreateRequest,
     JobSearchRunResponse,
@@ -34,6 +35,7 @@ from app.services.job_candidate_filter import (
 )
 from app.services.job_search_planner import (
     JobSearchPlan,
+    build_focused_provider_queries,
     build_search_plan,
 )
 from app.services.job_search_providers import (
@@ -42,7 +44,11 @@ from app.services.job_search_providers import (
     normalize_job_search_provider_name,
     resolve_job_search_provider,
 )
-from app.services.llm_provider import JSONChatLLM, resolve_llm_provider
+from app.services.job_search_providers.cuhksz_career_provider import (
+    build_cuhksz_search_url,
+    build_cuhksz_title_terms,
+)
+from app.services.llm_provider import JSONChatLLM, resolve_llm_provider_for_switch
 
 TRACE_STEP_NAMES = [
     "Search planning",
@@ -188,8 +194,9 @@ def execute_job_search_run(
             status_code=404,
         )
 
-    llm_resolution = resolve_llm_provider()
+    llm_resolution = resolve_llm_provider_for_switch(use_deepseek=run.llm_enabled)
     effective_llm_service = llm_service if llm_service is not None else llm_resolution.service
+    use_llm_analysis = run.search_mode == "live_search"
     provider = job_search_provider or resolve_job_search_provider(run.search_provider)
     steps = _ensure_trace_steps(run_id, search_repository)
     session_repository.mark_job_search_running(session_id=run.session_id)
@@ -199,13 +206,13 @@ def execute_job_search_run(
         planning_step = steps[0]
         search_repository.mark_trace_step_running(
             planning_step.step_id,
-            mode="llm" if run.llm_enabled else "deterministic",
+            mode="llm" if use_llm_analysis else "deterministic",
             summary="Building search plan from the confirmed profile.",
             guardrails=PLANNING_GUARDRAILS,
         )
         search_plan = build_search_plan(
             confirmed_profile,
-            use_llm=run.llm_enabled,
+            use_llm=use_llm_analysis,
             llm_service=effective_llm_service,
         )
         search_plan = _augment_search_plan(search_plan, run)
@@ -242,7 +249,7 @@ def execute_job_search_run(
         filter_step = steps[2]
         search_repository.mark_trace_step_running(
             filter_step.step_id,
-            mode="llm" if run.llm_enabled else "deterministic",
+            mode="llm" if use_llm_analysis else "deterministic",
             summary="Ranking the provider candidates for profile fit.",
             guardrails=FILTER_GUARDRAILS,
         )
@@ -250,7 +257,7 @@ def execute_job_search_run(
             confirmed_profile,
             search_plan,
             raw_candidates,
-            use_llm=run.llm_enabled,
+            use_llm=use_llm_analysis,
             llm_service=effective_llm_service,
             limit=max_results,
         )
@@ -266,13 +273,13 @@ def execute_job_search_run(
         jd_step = steps[3]
         search_repository.mark_trace_step_running(
             jd_step.step_id,
-            mode="llm" if run.llm_enabled else "mock",
+            mode="llm" if use_llm_analysis else "mock",
             summary="Analyzing candidate descriptions with the JD analysis agent.",
             guardrails=ASSEMBLY_GUARDRAILS,
         )
         analyses = _analyze_candidates(
             filtered,
-            use_llm=run.llm_enabled,
+            use_llm=use_llm_analysis,
             llm_service=effective_llm_service,
         )
         search_repository.complete_trace_step(
@@ -390,6 +397,80 @@ def list_job_search_runs(
     return search_repository.list_recent_by_session(session_id)
 
 
+def preview_job_search_run(
+    payload: JobSearchRunCreateRequest,
+    *,
+    session_repository: ProfileSessionRepository = profile_session_repository,
+    confirmed_repository: ConfirmedProfileRepository = confirmed_profile_repository,
+    llm_service: JSONChatLLM | None = None,
+) -> JobSearchPreviewResponse:
+    session = get_profile_session(payload.session_id, repository=session_repository)
+    if session.confirmed_profile_id is None:
+        raise JobAgentError(
+            message="Confirmed profile is required before previewing job search.",
+            error_code="confirmed_profile_required",
+            status_code=409,
+        )
+
+    confirmed_profile = confirmed_repository.get(session.confirmed_profile_id)
+    if confirmed_profile is None:
+        raise JobAgentError(
+            message="Confirmed profile not found.",
+            error_code="confirmed_profile_not_found",
+            status_code=404,
+        )
+
+    query, locations, target_roles, keywords = _resolve_search_inputs(payload, confirmed_profile)
+    use_llm_analysis = payload.search_mode == "live_search"
+    llm_provider: str | None = None
+    effective_llm_service = llm_service
+    if use_llm_analysis:
+        llm_resolution = resolve_llm_provider_for_switch(use_deepseek=payload.use_llm)
+        llm_provider = llm_resolution.provider
+        effective_llm_service = llm_service if llm_service is not None else llm_resolution.service
+
+    search_plan = build_search_plan(
+        confirmed_profile,
+        use_llm=use_llm_analysis,
+        llm_service=effective_llm_service,
+    )
+    search_plan = _augment_search_plan_from_inputs(
+        search_plan,
+        query=query,
+        locations=locations,
+        target_roles=target_roles,
+        keywords=keywords,
+    )
+
+    provider_name = normalize_job_search_provider_name(payload.search_provider)
+    provider_search_terms, provider_search_urls = _build_provider_preview_searches(
+        provider_name,
+        search_plan.queries,
+    )
+
+    return JobSearchPreviewResponse(
+        session_id=session.session_id,
+        confirmed_profile_id=confirmed_profile.confirmed_profile_id,
+        search_mode=payload.search_mode,
+        search_provider=provider_name,
+        llm_enabled=payload.use_llm,
+        llm_provider=llm_provider,
+        query=query,
+        locations=search_plan.locations,
+        target_roles=search_plan.target_roles,
+        keywords=keywords,
+        provider_queries=search_plan.queries,
+        provider_search_terms=provider_search_terms,
+        provider_search_urls=provider_search_urls,
+        search_signal_terms=search_plan.must_have_signals,
+        excluded_signals=search_plan.avoid_signals,
+        ranking_policy=search_plan.ranking_policy,
+        planning_mode=search_plan.mode,
+        fallback_reason=search_plan.fallback_reason,
+        quality_warnings=search_plan.quality_warnings,
+    )
+
+
 def _resolve_search_inputs(
     payload: JobSearchRunCreateRequest,
     confirmed_profile: ConfirmedProfile,
@@ -403,10 +484,23 @@ def _resolve_search_inputs(
     )
     query = (payload.query or "").strip()
     if not query:
-        query = " ".join((target_roles + keywords)[:8]).strip()
+        query = (target_roles[0] if target_roles else " ".join(keywords[:3])).strip()
     if not query:
         query = "Software Engineer"
     return query, locations, target_roles, keywords
+
+
+def _build_provider_preview_searches(
+    provider_name: str | None,
+    provider_queries: list[str],
+) -> tuple[list[str], list[str]]:
+    if provider_name != "cuhksz_career":
+        return [], []
+    terms: list[str] = []
+    for query in provider_queries[:3]:
+        terms.extend(build_cuhksz_title_terms(query))
+    terms = _clean_list(terms)[:8]
+    return terms, [build_cuhksz_search_url(term) for term in terms]
 
 
 def _build_local_mock_results(
@@ -543,15 +637,33 @@ def _ensure_trace_steps(run_id: str, repository: JobSearchRepository) -> list[Jo
 
 
 def _augment_search_plan(plan: JobSearchPlan, run: JobSearchRun) -> JobSearchPlan:
-    queries = _clean_list([run.query] + plan.queries)
-    locations = _clean_list(run.locations + plan.locations)
-    target_roles = _clean_list(run.target_roles + plan.target_roles)
-    must_have = _clean_list(run.keywords + plan.must_have_signals)
+    return _augment_search_plan_from_inputs(
+        plan,
+        query=run.query,
+        locations=run.locations,
+        target_roles=run.target_roles,
+        keywords=run.keywords,
+    )
+
+
+def _augment_search_plan_from_inputs(
+    plan: JobSearchPlan,
+    *,
+    query: str,
+    locations: list[str],
+    target_roles: list[str],
+    keywords: list[str],
+) -> JobSearchPlan:
+    input_queries = build_focused_provider_queries(target_roles, keywords)
+    queries = _clean_list([query] + input_queries + plan.queries)
+    merged_locations = _clean_list(locations + plan.locations)
+    merged_roles = _clean_list(target_roles + plan.target_roles)
+    must_have = _clean_list(keywords + plan.must_have_signals)
     return plan.model_copy(
         update={
             "queries": queries,
-            "locations": locations,
-            "target_roles": target_roles,
+            "locations": merged_locations,
+            "target_roles": merged_roles,
             "must_have_signals": must_have,
         }
     )

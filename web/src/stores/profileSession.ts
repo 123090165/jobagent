@@ -16,6 +16,7 @@ import {
   getProfileSession,
   listJobSearchRuns,
   parseResumeForReview,
+  previewJobSearchRun,
   submitResumeFile,
   submitResumeText,
   updateProfileDraft
@@ -24,6 +25,7 @@ import type {
   CreateJobSearchRunPayload,
   ConfirmedProfile,
   JobSearchProviderStatus,
+  JobSearchPreview,
   JobSearchRun,
   JobSearchTraceStep,
   LlmStatus,
@@ -40,6 +42,7 @@ interface ProfileSessionState {
   parsedReview: ParsedResumeReview | null;
   profileDraft: ProfileDraft | null;
   confirmedProfile: ConfirmedProfile | null;
+  jobSearchPreview: JobSearchPreview | null;
   jobSearchRun: JobSearchRun | null;
   jobSearchRuns: JobSearchRun[];
   jobSearchSteps: JobSearchTraceStep[];
@@ -53,6 +56,7 @@ interface ProfileSessionState {
   isConfirming: boolean;
   isConfirmedLoading: boolean;
   isJobSearchCreating: boolean;
+  isJobSearchPreviewLoading: boolean;
   isJobSearchLoading: boolean;
   isJobSearchPolling: boolean;
   isLlmStatusLoading: boolean;
@@ -72,6 +76,7 @@ export const useProfileSessionStore = defineStore("profileSession", {
     parsedReview: null,
     profileDraft: null,
     confirmedProfile: null,
+    jobSearchPreview: null,
     jobSearchRun: null,
     jobSearchRuns: [],
     jobSearchSteps: [],
@@ -85,6 +90,7 @@ export const useProfileSessionStore = defineStore("profileSession", {
     isConfirming: false,
     isConfirmedLoading: false,
     isJobSearchCreating: false,
+    isJobSearchPreviewLoading: false,
     isJobSearchLoading: false,
     isJobSearchPolling: false,
     isLlmStatusLoading: false,
@@ -134,6 +140,7 @@ export const useProfileSessionStore = defineStore("profileSession", {
         this.parsedReview = null;
         this.profileDraft = null;
         this.confirmedProfile = null;
+        this.jobSearchPreview = null;
         this.jobSearchRun = null;
         this.jobSearchRuns = [];
         this.jobSearchSteps = [];
@@ -152,6 +159,7 @@ export const useProfileSessionStore = defineStore("profileSession", {
         this.parsedReview = null;
         this.profileDraft = null;
         this.confirmedProfile = null;
+        this.jobSearchPreview = null;
         this.jobSearchRun = null;
         this.jobSearchRuns = [];
         this.jobSearchSteps = [];
@@ -174,6 +182,7 @@ export const useProfileSessionStore = defineStore("profileSession", {
         this.parsedReview = null;
         this.profileDraft = null;
         this.confirmedProfile = null;
+        this.jobSearchPreview = null;
         this.jobSearchRun = null;
         this.jobSearchRuns = [];
         this.jobSearchSteps = [];
@@ -240,6 +249,7 @@ export const useProfileSessionStore = defineStore("profileSession", {
         this.session = response.profile_session;
         this.profileDraft = response.profile_draft;
         this.confirmedProfile = null;
+        this.jobSearchPreview = null;
         this.jobSearchRun = null;
         this.jobSearchRuns = [];
         this.jobSearchSteps = [];
@@ -279,6 +289,7 @@ export const useProfileSessionStore = defineStore("profileSession", {
         this.session = response.profile_session;
         this.profileDraft = response.profile_draft;
         this.confirmedProfile = null;
+        this.jobSearchPreview = null;
         this.jobSearchRun = null;
         this.jobSearchRuns = [];
         this.jobSearchSteps = [];
@@ -297,6 +308,7 @@ export const useProfileSessionStore = defineStore("profileSession", {
         const response = await confirmProfileDraft(draftId);
         this.session = response.profile_session;
         this.confirmedProfile = response.confirmed_profile;
+        this.jobSearchPreview = null;
         return response.confirmed_profile;
       } catch (error) {
         this.error = toApiErrorMessage(error, "Failed to confirm profile.");
@@ -321,11 +333,11 @@ export const useProfileSessionStore = defineStore("profileSession", {
         this.isConfirmedLoading = false;
       }
     },
-    async loadLlmStatus(): Promise<LlmStatus> {
+    async loadLlmStatus(useDeepseek = false): Promise<LlmStatus> {
       this.isLlmStatusLoading = true;
       this.error = null;
       try {
-        this.llmStatus = await getLlmStatus();
+        this.llmStatus = await getLlmStatus(useDeepseek);
         return this.llmStatus;
       } catch (error) {
         this.llmStatus = null;
@@ -367,6 +379,22 @@ export const useProfileSessionStore = defineStore("profileSession", {
         throw error;
       } finally {
         this.isJobSearchCreating = false;
+      }
+    },
+    async previewJobSearch(
+      payload: CreateJobSearchRunPayload
+    ): Promise<JobSearchPreview> {
+      this.isJobSearchPreviewLoading = true;
+      this.error = null;
+      try {
+        this.jobSearchPreview = await previewJobSearchRun(payload);
+        return this.jobSearchPreview;
+      } catch (error) {
+        this.jobSearchPreview = null;
+        this.error = toApiErrorMessage(error, "Failed to preview job search.");
+        throw error;
+      } finally {
+        this.isJobSearchPreviewLoading = false;
       }
     },
     async loadJobSearchRun(runId: string): Promise<JobSearchRun> {

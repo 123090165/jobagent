@@ -6,6 +6,7 @@ from app.services.llm_provider import (
     DEFAULT_DEEPSEEK_MODEL,
     DEFAULT_OLLAMA_MODEL,
     normalize_llm_provider,
+    resolve_llm_provider_for_switch,
     resolve_llm_provider,
 )
 from app.services.llm_service import LLMService
@@ -70,3 +71,21 @@ def test_resolve_deepseek_provider_uses_default_model(monkeypatch) -> None:
     assert resolution.model == DEFAULT_DEEPSEEK_MODEL
     assert resolution.base_url == DEFAULT_DEEPSEEK_BASE_URL
     assert isinstance(resolution.service, LLMService)
+
+
+def test_resolve_llm_provider_for_switch_maps_false_to_ollama(monkeypatch) -> None:
+    monkeypatch.setenv("OLLAMA_BASE_URL", "http://localhost:11434")
+
+    resolution = resolve_llm_provider_for_switch(use_deepseek=False)
+
+    assert resolution.provider == "ollama"
+    assert resolution.model == DEFAULT_OLLAMA_MODEL
+
+
+def test_resolve_llm_provider_for_switch_maps_true_to_deepseek(monkeypatch) -> None:
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "test-key")
+
+    resolution = resolve_llm_provider_for_switch(use_deepseek=True)
+
+    assert resolution.provider == "deepseek"
+    assert resolution.model == DEFAULT_DEEPSEEK_MODEL

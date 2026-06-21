@@ -5,7 +5,7 @@ import urllib.error
 import urllib.request
 from collections.abc import Callable
 from types import SimpleNamespace
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urlencode, urljoin, urlparse
 
 from bs4 import BeautifulSoup
 
@@ -16,6 +16,23 @@ CUHKSZ_CAREER_SEARCH_URL = "https://career.cuhk.edu.cn/job/search"
 CUHKSZ_CAREER_ALLOWED_DOMAINS = ["career.cuhk.edu.cn"]
 CUHKSZ_CAREER_USER_AGENT = "JobAgent/0.1 cuhksz-career-provider"
 NO_PROVIDER_MATCH_WARNING = "No provider-side keyword match; kept for downstream ranking."
+CUHKSZ_TITLE_TYPE_KEYWORD = "1"
+MAX_CUHKSZ_TITLE_TERMS = 4
+GENERIC_CUHKSZ_QUERY_TOKENS = {
+    "engineer",
+    "intern",
+    "internship",
+    "python",
+    "matlab",
+    "pytorch",
+    "tensorflow",
+    "fastapi",
+    "sql",
+    "backend",
+    "application",
+    "software",
+    "developer",
+}
 
 COMPANY_LABELS = ["公司名称", "企业名称"]
 LOCATION_LABELS = ["工作地点", "地点"]
@@ -28,6 +45,40 @@ END_DATE_LABELS = ["结束时间", "截止时间"]
 JOB_DESCRIPTION_LABELS = ["工作内容描述", "岗位职责", "职位描述", "任职要求"]
 COMPANY_INTRO_LABELS = ["企业简介", "公司简介"]
 CONTACT_INFO_LABELS = ["联系方式", "申请方式", "投递方式"]
+
+
+def build_cuhksz_search_url(title: str, *, city: str | None = None) -> str:
+    params = {
+        "title": title.strip(),
+        "title_type": CUHKSZ_TITLE_TYPE_KEYWORD,
+        "city": (city or "").strip(),
+        "d_industry": "",
+        "nature": "",
+        "d_skill": "",
+        "d_category": "",
+    }
+    return f"{CUHKSZ_CAREER_SEARCH_URL}?{urlencode(params)}"
+
+
+def build_cuhksz_title_terms(query: str, *, limit: int = MAX_CUHKSZ_TITLE_TERMS) -> list[str]:
+    raw_query = _clean_text(query)
+    if not raw_query:
+        return []
+
+    terms: list[str] = []
+    cjk_chunks = re.findall(r"[\u4e00-\u9fff]{2,}", raw_query)
+    for chunk in cjk_chunks:
+        terms.extend(_expand_cjk_query_chunk(chunk))
+
+    latin_tokens = re.findall(r"[A-Za-z][A-Za-z0-9+#.-]{1,}", raw_query)
+    for token in latin_tokens:
+        normalized = token.strip()
+        if normalized.lower() in GENERIC_CUHKSZ_QUERY_TOKENS:
+            continue
+        if len(normalized) <= 8 or normalized.isupper():
+            terms.append(normalized)
+
+    return _dedupe(terms)[:limit]
 
 
 def parse_cuhksz_job_list(html: str, base_url: str) -> list[SimpleNamespace]:
@@ -93,26 +144,40 @@ class CUHKSZCareerProvider:
         self.detail_pages = detail_pages or {}
 
     def search_jobs(self, *, query: str, location: str | None, limit: int) -> list[RawJobCandidate]:
-        list_html = self.list_page_html if self.list_page_html is not None else self._fetch(self.search_url)
-        list_items = parse_cuhksz_job_list(list_html, self.search_url)
+        title_terms = build_cuhksz_title_terms(query) or [_clean_text(query)]
+        search_urls = (
+            [self.search_url]
+            if self.list_page_html is not None
+            else [build_cuhksz_search_url(term) for term in title_terms if term]
+        )
         query_terms = _tokenize(query)
         location_terms = _tokenize(location)
 
         candidates: list[RawJobCandidate] = []
-        for item in list_items:
-            candidate = _build_list_candidate(item, provider_name=self.provider_name)
-            if candidate is None:
-                continue
+        seen_urls: set[str] = set()
+        for search_url in search_urls:
+            list_html = self.list_page_html if self.list_page_html is not None else self._fetch(search_url)
+            list_items = parse_cuhksz_job_list(list_html, search_url)
+            for item in list_items:
+                candidate = _build_list_candidate(item, provider_name=self.provider_name)
+                if candidate is None or not candidate.source_url or candidate.source_url.lower() in seen_urls:
+                    continue
+                seen_urls.add(candidate.source_url.lower())
 
-            if query_terms or location_terms:
-                if not _matches(candidate, query_terms=query_terms, location_terms=location_terms):
-                    candidate = candidate.model_copy(
-                        update={
-                            "provider_warnings": candidate.provider_warnings + [NO_PROVIDER_MATCH_WARNING],
-                        }
-                    )
+                if self.list_page_html is not None and (query_terms or location_terms):
+                    if not _matches(candidate, query_terms=query_terms, location_terms=location_terms):
+                        candidate = candidate.model_copy(
+                            update={
+                                "provider_warnings": candidate.provider_warnings + [NO_PROVIDER_MATCH_WARNING],
+                            }
+                        )
 
-            candidates.append(self.fetch_job_detail(candidate))
+                detailed = self.fetch_job_detail(candidate)
+                if _is_low_quality_candidate(detailed):
+                    continue
+                candidates.append(detailed)
+                if len(candidates) >= limit:
+                    break
             if len(candidates) >= limit:
                 break
         return candidates[:limit]
@@ -200,6 +265,48 @@ def _build_list_candidate(item: object, *, provider_name: str) -> RawJobCandidat
         snippet=" | ".join(snippet_lines) or title,
         raw_description=None,
     )
+
+
+def _expand_cjk_query_chunk(chunk: str) -> list[str]:
+    terms = [chunk]
+    suffixes = ["实习生", "工程师", "岗位", "职位"]
+    for suffix in suffixes:
+        if chunk.endswith(suffix) and len(chunk) > len(suffix) + 1:
+            terms.append(chunk[: -len(suffix)])
+    if "算法" in chunk:
+        terms.append("算法")
+    if "生理信号" in chunk:
+        terms.append("生理信号")
+    if "健康" in chunk and "算法" in chunk:
+        terms.append("健康算法")
+    return terms
+
+
+def _dedupe(values: list[str]) -> list[str]:
+    result: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        item = value.strip()
+        if not item:
+            continue
+        key = item.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        result.append(item)
+    return result
+
+
+def _is_low_quality_candidate(candidate: RawJobCandidate) -> bool:
+    title = _clean_text(candidate.title or "")
+    company = _clean_text(candidate.company or "")
+    if title in {"招聘信息", "职位详情", "岗位详情"}:
+        return True
+    if company in {"：", ":", "-", "不限"}:
+        return True
+    if not title or not candidate.source_url:
+        return True
+    return False
 
 
 def _is_allowed_detail_url(url: str) -> bool:

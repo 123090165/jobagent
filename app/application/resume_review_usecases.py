@@ -19,7 +19,7 @@ from app.schemas.parsed_resume_review import (
     ParsedResumeReviewResponse,
 )
 from app.services.errors import JobAgentError
-from app.services.llm_provider import JSONChatLLM, resolve_llm_provider
+from app.services.llm_provider import JSONChatLLM, resolve_llm_provider_for_switch
 from app.services.resume_profile_review_service import build_resume_profile_review
 
 
@@ -47,13 +47,19 @@ def parse_resume_for_review(
         resume_repository=resume_repository,
     )
 
+    requested_llm_provider = "deepseek" if use_llm else "ollama"
+
     if not regenerate:
         if session.parsed_review_id:
             existing = parsed_review_repository.get(session.parsed_review_id)
             if (
                 existing is not None
                 and existing.resume_document_id == resume_document.resume_document_id
-                and _can_reuse_parsed_review(existing.analysis_mode, use_llm=use_llm)
+                and _can_reuse_parsed_review(
+                    existing.analysis_mode,
+                    existing.analysis_provider,
+                    requested_provider=requested_llm_provider,
+                )
             ):
                 return ParsedResumeReviewResponse(
                     parsed_review=existing,
@@ -65,7 +71,8 @@ def parse_resume_for_review(
         )
         if existing_for_resume is not None and _can_reuse_parsed_review(
             existing_for_resume.analysis_mode,
-            use_llm=use_llm,
+            existing_for_resume.analysis_provider,
+            requested_provider=requested_llm_provider,
         ):
             updated_session = session_repository.attach_parsed_review(
                 session_id=session.session_id,
@@ -77,13 +84,21 @@ def parse_resume_for_review(
             )
 
     resolved_llm_service = llm_service
+    resolved_llm_provider = requested_llm_provider
     if use_llm and resolved_llm_service is None:
-        resolved_llm_service = resolve_llm_provider().service
+        resolution = resolve_llm_provider_for_switch(use_deepseek=True)
+        resolved_llm_service = resolution.service
+        resolved_llm_provider = resolution.provider
+    elif not use_llm and resolved_llm_service is None:
+        resolution = resolve_llm_provider_for_switch(use_deepseek=False)
+        resolved_llm_service = resolution.service
+        resolved_llm_provider = resolution.provider
 
     review_result = build_resume_profile_review(
         resume_document.text,
-        use_llm=use_llm,
+        use_llm=True,
         llm_service=resolved_llm_service,
+        llm_provider=resolved_llm_provider,
     )
     parsed_review = parsed_review_repository.create(
         session_id=session.session_id,
@@ -112,6 +127,7 @@ def parse_resume_for_review(
         missing_info_questions=review_result.missing_info_questions,
         raw_parser_output=review_result.parsed_profile.model_dump(mode="json"),
         analysis_mode=review_result.analysis_mode,
+        analysis_provider=review_result.analysis_provider,
         analysis_warnings=review_result.analysis_warnings,
     )
     updated_session = session_repository.attach_parsed_review(
@@ -171,10 +187,13 @@ def _build_target_signals(profile: object) -> list[str]:
     return _dedupe_signals(signals)
 
 
-def _can_reuse_parsed_review(analysis_mode: str, *, use_llm: bool) -> bool:
-    if not use_llm:
-        return True
-    return analysis_mode == "llm_guided"
+def _can_reuse_parsed_review(
+    analysis_mode: str,
+    analysis_provider: str | None,
+    *,
+    requested_provider: str,
+) -> bool:
+    return analysis_mode == "llm_guided" and analysis_provider == requested_provider
 
 
 def _dedupe_signals(signals: list[str]) -> list[str]:

@@ -6,6 +6,7 @@ import JobSearchPage from "../pages/JobSearchPage.vue";
 import ProfileConfirmedPage from "../pages/ProfileConfirmedPage.vue";
 import ProfileDraftPage from "../pages/ProfileDraftPage.vue";
 import ProfileReviewPage from "../pages/ProfileReviewPage.vue";
+import SearchPreviewPage from "../pages/SearchPreviewPage.vue";
 
 async function requireSessionStep(sessionId: string, allowedSteps: string[]) {
   const profileSessionStore = useProfileSessionStore();
@@ -47,6 +48,18 @@ const router = createRouter({
       beforeEnter: async (to) =>
         requireSessionStep(String(to.params.sessionId), [
           "profile_draft",
+          "profile_confirmed",
+          "job_search_ready",
+          "job_search_running",
+          "job_search_completed"
+        ])
+    },
+    {
+      path: "/profile/:sessionId/search-preview",
+      name: "search-preview",
+      component: SearchPreviewPage,
+      beforeEnter: async (to) =>
+        requireSessionStep(String(to.params.sessionId), [
           "profile_confirmed",
           "job_search_ready",
           "job_search_running",

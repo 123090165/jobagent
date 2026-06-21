@@ -1,13 +1,10 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onMounted } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { NButton, NCard, NRadioButton, NRadioGroup, NSwitch, NTag } from "naive-ui";
+import { NButton, NCard } from "naive-ui";
 
 import StepProgress from "../components/StepProgress.vue";
 import { useProfileSessionStore } from "../stores/profileSession";
-import type { CreateJobSearchRunPayload } from "../types/profileSession";
-
-type SearchSource = "cuhksz_career" | "mock";
 
 const route = useRoute();
 const router = useRouter();
@@ -17,54 +14,12 @@ const sessionUnavailable = computed(
   () => profileSessionStore.hasLoadedSession && !profileSessionStore.session
 );
 
-const selectedSearchSource = ref<SearchSource>("cuhksz_career");
-const useLlm = ref(false);
-const maxResults = ref(10);
-
-const llmStatusLabel = computed(() => {
-  if (profileSessionStore.isLlmStatusLoading) {
-    return "Checking LLM provider...";
-  }
-  if (!profileSessionStore.llmStatus) {
-    return "LLM status unavailable.";
-  }
-  const { provider, configured, model, reason } = profileSessionStore.llmStatus;
-  if (configured) {
-    return `${provider}${model ? ` • ${model}` : ""}`;
-  }
-  return `${provider} unavailable${reason ? ` • ${reason}` : ""}`;
-});
-
-const providerStatusLabel = computed(() => {
-  const status = profileSessionStore.jobSearchProviderStatus;
-  if (!status) {
-    return "Provider status unavailable.";
-  }
-  if (status.provider === "mock") {
-    return "Local demo provider ready";
-  }
-  if (status.configured) {
-    return `CUHKSZ Career ready${status.search_url ? ` • ${status.search_url}` : ""}`;
-  }
-  return `CUHKSZ Career unavailable${status.reason ? ` • ${status.reason}` : ""}`;
-});
-
 onMounted(async () => {
   try {
     const session = await profileSessionStore.loadSession(sessionId.value);
     if (session.confirmed_profile_id) {
       await profileSessionStore.loadConfirmedProfile(session.confirmed_profile_id);
     }
-    await profileSessionStore.loadLlmStatus();
-    await profileSessionStore.loadJobSearchProviderStatus(selectedSearchSource.value);
-  } catch {
-    // Error state is rendered from the store.
-  }
-});
-
-watch(selectedSearchSource, async (value) => {
-  try {
-    await profileSessionStore.loadJobSearchProviderStatus(value);
   } catch {
     // Error state is rendered from the store.
   }
@@ -78,19 +33,7 @@ async function startJobSearch() {
   if (!profileSessionStore.session?.confirmed_profile_id) {
     return;
   }
-  try {
-    const payload: CreateJobSearchRunPayload = {
-      session_id: sessionId.value,
-      search_mode: selectedSearchSource.value === "mock" ? "local_mock" : "live_search",
-      search_provider: selectedSearchSource.value === "mock" ? "mock" : "cuhksz_career",
-      use_llm: selectedSearchSource.value === "mock" ? false : useLlm.value,
-      max_results: maxResults.value
-    };
-    const run = await profileSessionStore.createJobSearch(payload);
-    await router.push({ name: "job-search", params: { runId: run.job_search_run_id } });
-  } catch {
-    // Error state is rendered from the store.
-  }
+  void router.push({ name: "search-preview", params: { sessionId: sessionId.value } });
 }
 </script>
 
@@ -127,10 +70,9 @@ async function startJobSearch() {
         <n-button
           type="primary"
           :disabled="!profileSessionStore.confirmedProfile"
-          :loading="profileSessionStore.isJobSearchCreating"
           @click="startJobSearch"
         >
-          Start Job Search
+          Preview Job Search
         </n-button>
       </div>
 
@@ -142,56 +84,6 @@ async function startJobSearch() {
       </div>
 
       <template v-else-if="profileSessionStore.confirmedProfile">
-        <n-card title="Job Search Setup" size="small" class="job-search-setup-card">
-          <div class="job-search-setup">
-            <div class="job-search-setup-row">
-              <span class="job-search-setup-label">Search Source</span>
-              <n-radio-group v-model:value="selectedSearchSource">
-                <n-radio-button value="cuhksz_career">CUHKSZ Career</n-radio-button>
-                <n-radio-button value="mock">Local Demo</n-radio-button>
-              </n-radio-group>
-            </div>
-
-            <div class="job-search-setup-row">
-              <span class="job-search-setup-label">Use LLM-assisted analysis</span>
-              <n-switch
-                v-model:value="useLlm"
-                :disabled="selectedSearchSource === 'mock'"
-              />
-            </div>
-
-            <div class="job-search-setup-row">
-              <span class="job-search-setup-label">Provider Status</span>
-              <div class="job-search-status-copy">
-                <n-tag
-                  :type="profileSessionStore.jobSearchProviderStatus?.configured ? 'success' : 'warning'"
-                  round
-                >
-                  {{ profileSessionStore.jobSearchProviderStatus?.configured ? "Configured" : "Fallback Ready" }}
-                </n-tag>
-                <span>{{ providerStatusLabel }}</span>
-              </div>
-            </div>
-
-            <div class="job-search-setup-row">
-              <span class="job-search-setup-label">LLM Status</span>
-              <div class="job-search-status-copy">
-                <n-tag
-                  :type="profileSessionStore.llmStatus?.configured ? 'success' : 'warning'"
-                  round
-                >
-                  {{ profileSessionStore.llmStatus?.configured ? "Configured" : "Fallback Ready" }}
-                </n-tag>
-                <span>{{ llmStatusLabel }}</span>
-              </div>
-            </div>
-
-            <p class="flow-meta">
-              Current live provider: CUHKSZ Career at `https://career.cuhk.edu.cn/job/search`. No login, captcha handling, or anti-bot bypassing is used.
-            </p>
-          </div>
-        </n-card>
-
         <div class="confirmed-grid">
           <n-card title="Summary" size="small">
             <p class="confirmed-summary">{{ profileSessionStore.confirmedProfile.summary }}</p>

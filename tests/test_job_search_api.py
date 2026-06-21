@@ -54,6 +54,68 @@ def test_job_search_requires_confirmed_profile(monkeypatch, tmp_path) -> None:
     assert response.json()["error_code"] == "confirmed_profile_required"
 
 
+def test_job_search_preview_requires_confirmed_profile(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("JOBAGENT_DB_PATH", str(tmp_path / "job-search-preview-no-confirmed.sqlite3"))
+    session = client.post("/api/v1/profile-sessions").json()
+
+    response = client.post("/api/v1/job-search-runs/preview", json={"session_id": session["session_id"]})
+
+    assert response.status_code == 409
+    assert response.json()["error_code"] == "confirmed_profile_required"
+
+
+def test_job_search_preview_returns_plan_without_creating_run(monkeypatch, tmp_path) -> None:
+    confirmed = _create_session_with_confirmed_profile(tmp_path, monkeypatch, "job-search-preview.sqlite3")
+    session_id = confirmed["profile_session"]["session_id"]
+
+    response = client.post(
+        "/api/v1/job-search-runs/preview",
+        json={
+            "session_id": session_id,
+            "search_mode": "local_mock",
+            "target_roles": ["健康算法实习生"],
+            "keywords": ["生理信号处理", "PPG", "ECG"],
+            "locations": ["深圳"],
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["confirmed_profile_id"] == confirmed["confirmed_profile"]["confirmed_profile_id"]
+    assert payload["planning_mode"] == "deterministic"
+    assert payload["query"] == "健康算法实习生"
+    assert payload["provider_queries"][0].startswith("健康算法实习生")
+    assert "健康算法实习生 生理信号处理 PPG" in payload["provider_queries"]
+    assert payload["locations"] == ["深圳"]
+    assert "PPG" in payload["search_signal_terms"]
+    assert "ECG" in payload["search_signal_terms"]
+
+    runs = client.get(f"/api/v1/profile-sessions/{session_id}/job-search-runs")
+    assert runs.status_code == 200
+    assert runs.json()["items"] == []
+
+
+def test_job_search_preview_returns_cuhksz_search_urls(monkeypatch, tmp_path) -> None:
+    confirmed = _create_session_with_confirmed_profile(tmp_path, monkeypatch, "job-search-preview-cuhksz.sqlite3")
+    session_id = confirmed["profile_session"]["session_id"]
+
+    response = client.post(
+        "/api/v1/job-search-runs/preview",
+        json={
+            "session_id": session_id,
+            "search_mode": "live_search",
+            "search_provider": "cuhksz_career",
+            "target_roles": ["健康算法实习生"],
+            "keywords": ["PPG", "ECG"],
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert "健康算法实习生" in payload["provider_search_terms"]
+    assert any("title=%E5%81%A5%E5%BA%B7%E7%AE%97%E6%B3%95" in url for url in payload["provider_search_urls"])
+
+
 def test_job_search_creates_run_and_updates_session(monkeypatch, tmp_path) -> None:
     confirmed = _create_session_with_confirmed_profile(tmp_path, monkeypatch, "job-search-create.sqlite3")
 

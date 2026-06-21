@@ -8,6 +8,8 @@ from app.services.job_search_providers.cuhksz_career_provider import (
     CUHKSZ_CAREER_SEARCH_URL,
     NO_PROVIDER_MATCH_WARNING,
     CUHKSZCareerProvider,
+    build_cuhksz_search_url,
+    build_cuhksz_title_terms,
 )
 from tests.test_job_search_live_api import FakeJSONLLM, _create_session_with_confirmed_profile
 
@@ -39,6 +41,41 @@ def test_cuhksz_list_page_fixture_parsing_extracts_expected_fields() -> None:
     assert first.source_provider == "cuhksz_career"
     assert first.source_url == "https://career.cuhk.edu.cn/job/view/id/468293"
     assert "Published 2026-05-30" in first.snippet or "Published Date" in (first.raw_description or "")
+
+
+def test_cuhksz_search_url_uses_title_query_params() -> None:
+    url = build_cuhksz_search_url("算法")
+
+    assert url.startswith(CUHKSZ_CAREER_SEARCH_URL)
+    assert "title=%E7%AE%97%E6%B3%95" in url
+    assert "title_type=1" in url
+    assert "d_industry=" in url
+    assert "d_skill=" in url
+
+
+def test_cuhksz_title_terms_adapt_preview_query_to_short_terms() -> None:
+    terms = build_cuhksz_title_terms("健康算法实习生 PPG ECG Python")
+
+    assert terms[:4] == ["健康算法实习生", "健康算法", "算法", "PPG"]
+    assert "Python" not in terms
+
+
+def test_cuhksz_provider_fetches_search_url_with_title_params() -> None:
+    fetched_urls: list[str] = []
+
+    def fetcher(url: str) -> str:
+        fetched_urls.append(url)
+        if "/job/view/id/" in url:
+            return read_fixture("cuhksz_job_detail_sample.html")
+        return read_fixture("cuhksz_job_list_sample.html")
+
+    provider = CUHKSZCareerProvider(fetcher=fetcher)
+
+    provider.search_jobs(query="算法", location=None, limit=1)
+
+    assert fetched_urls[0].startswith(CUHKSZ_CAREER_SEARCH_URL)
+    assert "title=%E7%AE%97%E6%B3%95" in fetched_urls[0]
+    assert fetched_urls[0] != CUHKSZ_CAREER_SEARCH_URL
 
 
 def test_cuhksz_provider_keeps_candidates_without_provider_side_match() -> None:

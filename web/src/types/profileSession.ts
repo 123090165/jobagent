@@ -63,6 +63,7 @@ export interface ParsedResumeReview {
   missing_info_questions: string[];
   raw_parser_output: Record<string, unknown> | null;
   analysis_mode: "deterministic" | "llm" | "llm_guided" | "fallback";
+  analysis_provider: string | null;
   analysis_warnings: string[];
   created_at: string;
   updated_at: string;
@@ -180,6 +181,28 @@ export interface JobSearchRunResponse {
   job_search_run: JobSearchRun;
   profile_session: ProfileSession;
   steps: JobSearchTraceStep[];
+}
+
+export interface JobSearchPreview {
+  session_id: string;
+  confirmed_profile_id: string;
+  search_mode: "local_mock" | "live_search";
+  search_provider: string | null;
+  llm_enabled: boolean;
+  llm_provider: string | null;
+  query: string;
+  locations: string[];
+  target_roles: string[];
+  keywords: string[];
+  provider_queries: string[];
+  provider_search_terms: string[];
+  provider_search_urls: string[];
+  search_signal_terms: string[];
+  excluded_signals: string[];
+  ranking_policy: string;
+  planning_mode: "deterministic" | "llm" | "fallback";
+  fallback_reason: string | null;
+  quality_warnings: string[];
 }
 
 export interface JobSearchRunListResponse {

@@ -3,6 +3,7 @@ import type {
   CreateJobSearchRunPayload,
   ConfirmedProfileResponse,
   JobSearchProviderStatus,
+  JobSearchPreview,
   JobSearchTraceStepListResponse,
   JobSearchRunListResponse,
   JobSearchRunResponse,
@@ -138,8 +139,17 @@ export async function createJobSearchRun(
   return response.data;
 }
 
-export async function getLlmStatus(): Promise<LlmStatus> {
-  const response = await client.get<LlmStatus>("/api/v1/llm/status");
+export async function previewJobSearchRun(
+  payload: CreateJobSearchRunPayload
+): Promise<JobSearchPreview> {
+  const response = await client.post<JobSearchPreview>("/api/v1/job-search-runs/preview", payload);
+  return response.data;
+}
+
+export async function getLlmStatus(useDeepseek = false): Promise<LlmStatus> {
+  const response = await client.get<LlmStatus>("/api/v1/llm/status", {
+    params: { use_deepseek: useDeepseek }
+  });
   return response.data;
 }
 

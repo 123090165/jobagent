@@ -96,3 +96,24 @@ def test_deterministic_plan_keeps_bilingual_signals_for_future_english_sources()
     assert "语音识别" in " ".join(plan.queries)
     assert "ASR" in plan.must_have_signals
     assert "Future English providers should use expanded English aliases" in plan.ranking_policy
+
+
+def test_deterministic_plan_uses_focused_provider_queries_for_health_algorithm() -> None:
+    profile = _confirmed_profile().model_copy(
+        update={
+            "summary": "健康算法方向，侧重生理信号和可穿戴健康。",
+            "target_roles": ["健康算法实习生", "生理信号算法实习生"],
+            "target_directions": ["医疗 AI", "可穿戴健康"],
+            "search_keywords": ["生理信号处理", "PPG", "ECG", "可穿戴健康"],
+            "core_skills": ["Python", "MATLAB", "PyTorch"],
+        }
+    )
+
+    plan = build_search_plan(profile, use_llm=False)
+
+    assert plan.queries[0] == "健康算法实习生 PPG ECG"
+    assert plan.queries[1] == "生理信号算法实习生 PPG ECG"
+    assert "Python" not in plan.queries[0]
+    assert "MATLAB" not in plan.queries[0]
+    assert "PPG" in plan.must_have_signals
+    assert "ECG" in plan.must_have_signals

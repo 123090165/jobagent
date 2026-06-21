@@ -6,8 +6,10 @@ from app.application.job_search_usecases import (
     create_job_search_run,
     get_job_search_run,
     list_job_search_trace_steps,
+    preview_job_search_run,
 )
 from app.schemas.job_search import (
+    JobSearchPreviewResponse,
     JobSearchRunCreateRequest,
     JobSearchRunResponse,
     JobSearchTraceStepListResponse,
@@ -22,6 +24,11 @@ def create_job_search_run_endpoint(
     payload: JobSearchRunCreateRequest,
 ) -> JobSearchRunResponse:
     return create_job_search_run(payload, background_tasks=background_tasks)
+
+
+@router.post("/preview", response_model=JobSearchPreviewResponse)
+def preview_job_search_run_endpoint(payload: JobSearchRunCreateRequest) -> JobSearchPreviewResponse:
+    return preview_job_search_run(payload)
 
 
 @router.get("/{run_id}", response_model=JobSearchRunResponse)

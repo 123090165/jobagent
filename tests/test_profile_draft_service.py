@@ -36,7 +36,8 @@ def test_create_profile_draft_builds_search_ready_profile() -> None:
     assert draft.source_profile_snapshot
 
 
-def test_create_profile_draft_accepts_deepseek_provider() -> None:
+def test_create_profile_draft_accepts_deepseek_provider(monkeypatch) -> None:
+    monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
     case = _case("ai_agent_backend")
     review = build_resume_profile_review(case.resume_text, target_roles=case.target_roles)
 
