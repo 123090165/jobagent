@@ -54,10 +54,25 @@ def test_cuhksz_search_url_uses_title_query_params() -> None:
 
 
 def test_cuhksz_title_terms_adapt_preview_query_to_short_terms() -> None:
-    terms = build_cuhksz_title_terms("健康算法实习生 PPG ECG Python")
+    query = "\u5065\u5eb7\u7b97\u6cd5\u5b9e\u4e60\u751f PPG ECG Python"
+    terms = build_cuhksz_title_terms(query)
 
-    assert terms[:4] == ["健康算法实习生", "健康算法", "算法", "PPG"]
+    assert terms[:4] == ["算法", "健康算法", "PPG", "ECG"]
     assert "Python" not in terms
+
+
+def test_cuhksz_title_terms_translate_english_health_queries_to_chinese_broad_terms() -> None:
+    assert build_cuhksz_title_terms("AI Health Algorithm Intern PPG ECG") == [
+        "算法",
+        "健康算法",
+        "PPG",
+        "ECG",
+    ]
+    assert build_cuhksz_title_terms("Physiological Signal Processing Intern PPG ECG") == [
+        "生理信号",
+        "PPG",
+        "ECG",
+    ]
 
 
 def test_cuhksz_provider_fetches_search_url_with_title_params() -> None:

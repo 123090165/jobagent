@@ -112,7 +112,9 @@ def test_job_search_preview_returns_cuhksz_search_urls(monkeypatch, tmp_path) ->
 
     assert response.status_code == 200
     payload = response.json()
-    assert "健康算法实习生" in payload["provider_search_terms"]
+    assert payload["provider_search_terms"][:4] == ["算法", "健康算法", "PPG", "ECG"]
+    assert "健康算法实习生" not in payload["provider_search_terms"]
+    assert any("title=%E7%AE%97%E6%B3%95" in url for url in payload["provider_search_urls"])
     assert any("title=%E5%81%A5%E5%BA%B7%E7%AE%97%E6%B3%95" in url for url in payload["provider_search_urls"])
 
 

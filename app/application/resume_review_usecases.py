@@ -169,16 +169,26 @@ def get_parsed_resume_review(
 def _build_target_signals(profile: object) -> list[str]:
     skills = list(getattr(profile, "skills", []) or [])
     target_roles = list(getattr(profile, "target_roles", []) or [])
-    lowered = " ".join([*skills, *target_roles]).lower()
+    raw_text = str(getattr(profile, "raw_text", "") or "")
+    lowered = " ".join([raw_text, *skills, *target_roles]).lower()
+    lowered_roles = " ".join(target_roles).lower()
     signals: list[str] = []
-    if any(token in lowered for token in ["python", "fastapi", "api", "sql"]):
-        signals.append("Backend engineering signal")
-    if any(token in lowered for token in ["llm", "langgraph", "langchain", "agent"]):
-        signals.append("AI application signal")
-    if any(token in lowered for token in ["embedded", "stm32", "c++", "rtos"]):
-        signals.append("Embedded systems signal")
     if any(token in lowered for token in ["health", "physiological", "biosignal", "signal processing", "ppg", "ecg"]):
         signals.append("AI health and physiological signal processing signal")
+    if (
+        any(token in lowered_roles for token in ["backend", "后端"])
+        or "backend" in lowered
+        or "后端" in lowered
+        or ("fastapi" in lowered and any(token in lowered for token in ["api", "sql", "route"]))
+    ):
+        signals.append("Backend engineering signal")
+    if any(token in lowered for token in ["ai agent", "llm", "langgraph", "langchain", "rag", "agentops"]):
+        signals.append("AI application signal")
+    if (
+        any(token in lowered_roles for token in ["embedded", "嵌入式"])
+        or any(token in lowered for token in ["embedded", "嵌入式", "stm32", "rtos", "firmware", "uart", "usart", "mcu"])
+    ):
+        signals.append("Embedded systems signal")
     for role in target_roles:
         if isinstance(role, str) and role.strip():
             signals.append(role.strip())

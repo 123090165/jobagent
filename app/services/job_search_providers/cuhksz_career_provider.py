@@ -27,6 +27,15 @@ GENERIC_CUHKSZ_QUERY_TOKENS = {
     "pytorch",
     "tensorflow",
     "fastapi",
+    "ai",
+    "health",
+    "algorithm",
+    "algorithms",
+    "signal",
+    "signals",
+    "processing",
+    "physiological",
+    "biomedical",
     "sql",
     "backend",
     "application",
@@ -66,6 +75,8 @@ def build_cuhksz_title_terms(query: str, *, limit: int = MAX_CUHKSZ_TITLE_TERMS)
         return []
 
     terms: list[str] = []
+    terms.extend(_expand_english_health_query(raw_query))
+
     cjk_chunks = re.findall(r"[\u4e00-\u9fff]{2,}", raw_query)
     for chunk in cjk_chunks:
         terms.extend(_expand_cjk_query_chunk(chunk))
@@ -79,6 +90,20 @@ def build_cuhksz_title_terms(query: str, *, limit: int = MAX_CUHKSZ_TITLE_TERMS)
             terms.append(normalized)
 
     return _dedupe(terms)[:limit]
+
+
+def _expand_english_health_query(query: str) -> list[str]:
+    lowered = query.lower()
+    terms: list[str] = []
+    if "algorithm" in lowered or "algorithms" in lowered:
+        terms.append("算法")
+    if "physiological signal" in lowered or "biosignal" in lowered:
+        terms.append("生理信号")
+    if ("health" in lowered or "biomedical" in lowered) and (
+        "algorithm" in lowered or "ai" in lowered
+    ):
+        terms.append("健康算法")
+    return terms
 
 
 def parse_cuhksz_job_list(html: str, base_url: str) -> list[SimpleNamespace]:
@@ -268,17 +293,25 @@ def _build_list_candidate(item: object, *, provider_name: str) -> RawJobCandidat
 
 
 def _expand_cjk_query_chunk(chunk: str) -> list[str]:
-    terms = [chunk]
-    suffixes = ["实习生", "工程师", "岗位", "职位"]
-    for suffix in suffixes:
-        if chunk.endswith(suffix) and len(chunk) > len(suffix) + 1:
-            terms.append(chunk[: -len(suffix)])
+    terms: list[str] = []
     if "算法" in chunk:
         terms.append("算法")
     if "生理信号" in chunk:
         terms.append("生理信号")
     if "健康" in chunk and "算法" in chunk:
         terms.append("健康算法")
+
+    suffixes = ["实习生", "工程师", "岗位", "职位"]
+    stripped = chunk
+    for suffix in suffixes:
+        if chunk.endswith(suffix) and len(chunk) > len(suffix) + 1:
+            stripped = chunk[: -len(suffix)]
+            break
+
+    if not terms:
+        terms.append(stripped)
+        if stripped != chunk:
+            terms.append(chunk)
     return terms
 
 

@@ -22,6 +22,44 @@ from app.schemas.profile_draft import (
 )
 from app.services.errors import JobAgentError
 
+HEALTH_TARGET_ROLES = [
+    "AI Health Algorithm Intern",
+    "Physiological Signal Processing Intern",
+    "Biomedical AI Intern",
+]
+HEALTH_FOCUS_TERMS = [
+    "health",
+    "physiological",
+    "biosignal",
+    "biomedical",
+    "signal processing",
+    "ppg",
+    "ecg",
+    "wearable",
+    "blood oxygen",
+    "heart rate",
+]
+HEALTH_SKILL_PRIORITY_TERMS = [
+    "ppg",
+    "ecg",
+    "acc",
+    "physiological signal",
+    "biosignal",
+    "wearable",
+    "blood oxygen",
+    "heart rate",
+    "blood pressure",
+    "time-series",
+    "feature extraction",
+    "signal segmentation",
+    "denoising",
+    "data cleaning",
+    "pytorch",
+    "tensorflow",
+    "deep learning",
+    "machine learning",
+]
+
 
 def create_profile_draft(
     session_id: str,
@@ -153,9 +191,10 @@ def _build_profile_draft_seed(parsed_review: ParsedResumeReview) -> dict[str, ob
     highlights = _clean_list(parsed_review.basic_info.get("highlights", []))
     roles = _derive_target_roles(skill_items, target_signals, parsed_review.work_experience)
     directions = _derive_target_directions(target_signals)
-    core_skills = skill_items[:8]
-    supporting_skills = skill_items[8:16]
-    search_keywords = _clean_list(roles + core_skills + target_signals)[:16]
+    prioritized_skills = _prioritize_core_skills(skill_items, target_signals)
+    core_skills = prioritized_skills[:8]
+    supporting_skills = prioritized_skills[8:16]
+    search_keywords = _clean_list(roles + prioritized_skills + target_signals)[:16]
     strengths = _clean_list(highlights + _derive_strengths(parsed_review))
     risks = _clean_list(parsed_review.quality_warnings)
     missing_questions = _clean_list(parsed_review.missing_info_questions)
@@ -194,23 +233,29 @@ def _derive_target_roles(
     roles: list[str] = []
     lowered_skills = " ".join(skill_items).lower()
     lowered_signals = " ".join(target_signals).lower()
+    combined = f"{lowered_signals} {lowered_skills}"
 
-    if "backend" in lowered_signals or any(
-        token in lowered_skills for token in ["python", "fastapi", "sql", "api"]
+    for signal in target_signals:
+        if _looks_like_explicit_role(signal):
+            roles.append(signal)
+    if _has_health_focus(combined):
+        roles.extend(HEALTH_TARGET_ROLES)
+    if "backend engineering signal" in lowered_signals or any(
+        token in lowered_signals for token in ["backend engineer", "backend intern", "后端"]
     ):
         roles.append("Backend Engineer")
-    if "ai" in lowered_signals or any(
-        token in lowered_skills for token in ["llm", "langgraph", "langchain", "rag"]
+    if "ai application signal" in lowered_signals or any(
+        token in lowered_signals for token in ["ai agent", "agent engineer", "llm"]
     ):
         roles.append("AI Application Engineer")
-    if "embedded" in lowered_signals or any(
-        token in lowered_skills for token in ["stm32", "rtos", "embedded", "c++"]
+    if "embedded systems signal" in lowered_signals or any(
+        token in lowered_signals for token in ["embedded engineer", "embedded intern", "嵌入式"]
     ):
         roles.append("Embedded Software Engineer")
 
     for item in work_experience:
         role = item.get("role")
-        if isinstance(role, str) and role.strip():
+        if not roles and isinstance(role, str) and role.strip():
             roles.append(role.strip())
             break
 
@@ -220,15 +265,55 @@ def _derive_target_roles(
 def _derive_target_directions(target_signals: list[str]) -> list[str]:
     directions: list[str] = []
     lowered = " ".join(target_signals).lower()
+    if _has_health_focus(lowered):
+        directions.append("AI health algorithms and physiological signal processing")
     if "backend" in lowered:
         directions.append("Backend platform and API delivery")
-    if "ai" in lowered:
+    if "ai application" in lowered or "ai agent" in lowered:
         directions.append("Applied AI tooling and workflow automation")
     if "embedded" in lowered:
         directions.append("Embedded systems and edge device software")
     if not directions:
         directions.append("General software engineering")
     return directions
+
+
+def _prioritize_core_skills(skill_items: list[str], target_signals: list[str]) -> list[str]:
+    if not _has_health_focus(" ".join([*skill_items, *target_signals]).lower()):
+        return skill_items
+
+    prioritized: list[str] = []
+    for term in HEALTH_SKILL_PRIORITY_TERMS:
+        for skill in skill_items:
+            if term in skill.lower():
+                prioritized.append(skill)
+    prioritized.extend(skill_items)
+    return _clean_list(prioritized)
+
+
+def _has_health_focus(text: str) -> bool:
+    lowered = text.lower()
+    return any(term in lowered for term in HEALTH_FOCUS_TERMS)
+
+
+def _looks_like_explicit_role(signal: str) -> bool:
+    lowered = signal.strip().lower()
+    if not lowered or lowered.endswith(" signal"):
+        return False
+    role_terms = [
+        "engineer",
+        "intern",
+        "analyst",
+        "assistant",
+        "developer",
+        "scientist",
+        "researcher",
+        "岗位",
+        "实习",
+        "工程师",
+        "分析师",
+    ]
+    return any(term in lowered for term in role_terms)
 
 
 def _derive_strengths(parsed_review: ParsedResumeReview) -> list[str]:
