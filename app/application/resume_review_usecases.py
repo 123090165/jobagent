@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 from app.application.profile_session_usecases import get_profile_session
 from app.application.resume_intake_usecases import get_resume_document
 from app.repositories.parsed_resume_review_repository import (
@@ -166,6 +168,58 @@ def get_parsed_resume_review(
     )
 
 
+DOMAIN_SIGNAL_HINTS = [
+    (
+        "Marketing and consumer insight signal",
+        [
+            "brand marketing",
+            "consumer insight",
+            "campaign",
+            "social media",
+            "copywriting",
+            "content operations",
+            "market research",
+        ],
+    ),
+    (
+        "Museum education and cultural research signal",
+        [
+            "museum",
+            "cultural research",
+            "public history",
+            "heritage",
+            "archival",
+            "exhibition",
+            "curatorial",
+        ],
+    ),
+    (
+        "Supply chain and logistics signal",
+        [
+            "supply chain",
+            "procurement",
+            "logistics",
+            "inventory",
+            "sourcing",
+            "purchase order",
+            "international trade",
+        ],
+    ),
+    (
+        "Finance and risk analysis signal",
+        [
+            "finance",
+            "financial analysis",
+            "investment",
+            "banking",
+            "credit risk",
+            "risk management",
+            "accounting",
+        ],
+    ),
+]
+
+
 def _build_target_signals(profile: object) -> list[str]:
     skills = list(getattr(profile, "skills", []) or [])
     target_roles = list(getattr(profile, "target_roles", []) or [])
@@ -182,13 +236,19 @@ def _build_target_signals(profile: object) -> list[str]:
         or ("fastapi" in lowered and any(token in lowered for token in ["api", "sql", "route"]))
     ):
         signals.append("Backend engineering signal")
-    if any(token in lowered for token in ["ai agent", "llm", "langgraph", "langchain", "rag", "agentops"]):
+    if (
+        any(token in lowered for token in ["ai agent", "langgraph", "langchain", "agentops"])
+        or any(_word_in_text(token, lowered) for token in ["llm", "rag"])
+    ):
         signals.append("AI application signal")
     if (
         any(token in lowered_roles for token in ["embedded", "嵌入式"])
         or any(token in lowered for token in ["embedded", "嵌入式", "stm32", "rtos", "firmware", "uart", "usart", "mcu"])
     ):
         signals.append("Embedded systems signal")
+    for label, tokens in DOMAIN_SIGNAL_HINTS:
+        if any(token in lowered for token in tokens):
+            signals.append(label)
     for role in target_roles:
         if isinstance(role, str) and role.strip():
             signals.append(role.strip())
@@ -219,3 +279,7 @@ def _dedupe_signals(signals: list[str]) -> list[str]:
         seen.add(key)
         result.append(text)
     return result
+
+
+def _word_in_text(token: str, text: str) -> bool:
+    return bool(re.search(rf"(?<![a-z0-9]){re.escape(token.lower())}(?![a-z0-9])", text))

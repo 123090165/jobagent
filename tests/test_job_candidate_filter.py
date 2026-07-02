@@ -156,3 +156,53 @@ def test_candidate_filter_fallback_path() -> None:
     assert result.fallback_reason == "LLMServiceError"
     assert result.selected_candidates
     assert result.scorecards
+    assert result.scorecards[0].score_breakdown["role_alignment"] >= 20
+    assert result.scorecards[0].score_breakdown["jd_evidence_quality"] > 0
+    assert result.scorecards[0].evidence_quotes
+
+
+def test_candidate_filter_deterministic_scorecard_prefers_role_and_domain_evidence() -> None:
+    candidates = [
+        RawJobCandidate(
+            title="Python Developer",
+            company="Generic Tools",
+            location="Remote",
+            source_url="https://example.com/tools",
+            source_provider="mock",
+            snippet="Python Docker SQL scripting for internal tools.",
+            raw_description="Python Docker SQL scripting for internal tools.",
+        ),
+        RawJobCandidate(
+            title="Backend Engineer",
+            company="API Product",
+            location="Remote",
+            source_url="https://example.com/backend",
+            source_provider="mock",
+            snippet="Backend Engineer building FastAPI APIs and SQL-backed services for LLM applications.",
+            raw_description="Backend Engineer building FastAPI APIs and SQL-backed services for LLM applications.",
+        ),
+    ]
+
+    result = filter_candidates(
+        _confirmed_profile(),
+        _plan(),
+        candidates,
+        use_llm=False,
+    )
+
+    assert result.mode == "deterministic"
+    assert result.selected_indexes[0] == 1
+    top = result.scorecards[0]
+    assert set(top.score_breakdown) == {
+        "role_alignment",
+        "domain_alignment",
+        "skill_evidence",
+        "seniority_and_work_type",
+        "location_fit",
+        "jd_evidence_quality",
+        "risk_penalty",
+    }
+    assert top.score_breakdown["role_alignment"] == 25
+    assert top.score_breakdown["domain_alignment"] > 0
+    assert top.match_reasons
+    assert top.evidence_quotes

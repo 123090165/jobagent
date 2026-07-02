@@ -125,7 +125,7 @@ Do not:
 Latest local check:
 
 ```text
-experiments/output/20260702T123345Z_multidomain_flow_check.md
+experiments/output/20260702T124629Z_multidomain_flow_check.md
 Cases: 3/3 passed
 ```
 
@@ -135,20 +135,19 @@ Findings:
   domain for brand marketing, museum/cultural research, or supply-chain resumes;
 - the experiment now uses an injected fake JSON LLM and does not call local
   Ollama, DeepSeek, or live providers;
-- resume `target_signals` are still too technology-biased for non-technical
-  profiles, for example "Technical skill signal detected";
+- non-technical resume `target_signals` now use domain-specific labels such as
+  marketing, museum/cultural research, and supply-chain/logistics;
 - deterministic skill extraction can still admit noisy tokens such as `Git`,
   `ACC`, and `FA` in humanities-style samples;
-- generalized intent is usable, but some role families/provider queries still
-  include overly broad terms such as `data` or `operations`.
+- generalized intent still exposes broad role families such as `data` or
+  `operations`, but provider queries no longer use those low-value terms as
+  standalone searches when explicit roles are available.
 
 Follow-up tasks:
 
-- refine target signal labels so non-technical resumes get domain-specific
-  signals instead of generic technical labels;
 - reduce short/acronym skill noise in deterministic extraction;
-- keep broad provider recall, but avoid low-value one-word provider queries
-  unless they are paired with role/domain evidence.
+- continue calibrating when broad role families should remain visible as intent
+  labels versus executable provider queries.
 
 ## v4.7.2 Ranking Rubric Hardening
 
@@ -176,6 +175,16 @@ Implementation constraints:
 - explicit evidence quotes/snippets when available;
 - no invented companies, URLs, duties, or requirements;
 - tests use fake LLM responses and fixtures.
+
+Current implementation notes:
+
+- the LLM ranking prompt defines role, domain, skill, seniority/work-type,
+  location, JD evidence, and risk-penalty dimensions;
+- deterministic fallback now emits the same scorecard shape, including bounded
+  `score_breakdown`, match reasons, risks, and evidence snippets;
+- generic tools are treated as weaker support than role/domain evidence;
+- sparse JD details or missing source URLs reduce confidence but do not
+  automatically discard candidates.
 
 ## v4.7.3 Provider Recall Calibration
 

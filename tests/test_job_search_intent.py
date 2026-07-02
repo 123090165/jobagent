@@ -108,6 +108,25 @@ def test_deterministic_intent_handles_marketing_profile_with_tool_as_weak_signal
     assert "Python" not in intent.generic_tools
     assert intent.tool_queries
     assert intent.tool_queries[0].startswith("Growth Marketing Intern")
+    all_queries = intent.broad_queries + intent.domain_queries + intent.evidence_queries + intent.tool_queries
+    assert "marketing" not in [query.lower() for query in all_queries]
+
+
+def test_deterministic_intent_avoids_low_value_standalone_role_family_queries() -> None:
+    intent = build_search_intent(
+        _profile(
+            target_roles=["Supply Chain Operations Intern"],
+            target_directions=["Supply chain operations", "procurement", "logistics"],
+            core_skills=["Excel"],
+            search_keywords=["inventory", "supplier management"],
+        ),
+        use_llm=False,
+    )
+
+    all_queries = intent.broad_queries + intent.domain_queries + intent.evidence_queries + intent.tool_queries
+    assert "operations" not in [query.lower() for query in all_queries]
+    assert all(query.lower() != "data" for query in all_queries)
+    assert "Supply Chain Operations Intern" in intent.broad_queries
 
 
 def test_llm_intent_success_is_schema_normalized() -> None:

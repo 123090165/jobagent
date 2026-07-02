@@ -49,6 +49,14 @@ ROLE_FAMILY_HINTS = {
     "hr": ["human resources", "recruiting", "talent"],
 }
 
+LOW_VALUE_STANDALONE_QUERIES = set(ROLE_FAMILY_HINTS.keys()) | {
+    "data",
+    "research",
+    "operations",
+    "marketing",
+    "engineering",
+}
+
 INTENT_SYSTEM_PROMPT = """
 You extract generic job-search intent from one confirmed profile.
 
@@ -233,12 +241,14 @@ def normalize_search_intent(
 
 
 def build_queries_from_intent(intent: JobSearchIntent) -> list[str]:
-    return _dedupe(
+    queries = _dedupe(
         intent.broad_queries
         + intent.domain_queries
         + intent.evidence_queries
         + intent.tool_queries
     )
+    filtered = [query for query in queries if not _is_low_value_standalone_query(query)]
+    return filtered or queries
 
 
 def is_generic_tool_term(term: str) -> bool:
@@ -247,7 +257,11 @@ def is_generic_tool_term(term: str) -> bool:
 
 
 def _build_broad_queries(role_titles: list[str], role_families: list[str]) -> list[str]:
-    return _dedupe(role_titles[:4] + role_families[:2])
+    if role_titles:
+        return _dedupe(role_titles[:4])
+    return _dedupe(
+        [family for family in role_families[:3] if not _is_low_value_standalone_query(family)]
+    ) or _dedupe(role_families[:1])
 
 
 def _build_domain_queries(
@@ -307,6 +321,10 @@ def _overlaps_any(term: str, values: list[str]) -> bool:
 
 def _normalize_key(value: str) -> str:
     return " ".join(str(value).strip().lower().split())
+
+
+def _is_low_value_standalone_query(query: str) -> bool:
+    return _normalize_key(query) in LOW_VALUE_STANDALONE_QUERIES
 
 
 def _dedupe(values: Iterable[str]) -> list[str]:

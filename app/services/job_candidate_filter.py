@@ -6,6 +6,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from app.schemas.confirmed_profile import ConfirmedProfile
+from app.services.job_search_intent import is_generic_tool_term
 from app.services.job_search_planner import JobSearchPlan
 from app.services.job_search_providers.base import RawJobCandidate
 from app.services.llm_provider import JSONChatLLM
@@ -159,37 +160,31 @@ def _deterministic_filter(
     *,
     limit: int | None = None,
 ) -> CandidateFilterResult:
-    signals = _dedupe_list(
-        confirmed_profile.target_roles
-        + confirmed_profile.search_keywords
-        + confirmed_profile.core_skills
-        + search_plan.must_have_signals
-    )
+    signals = _ranking_signals(confirmed_profile, search_plan)
     avoid_signals = [item.lower() for item in search_plan.avoid_signals]
-    scored: list[tuple[int, int, list[str]]] = []
+    scored: list[tuple[int, int, int, int, CandidateScorecard]] = []
     for index, candidate in enumerate(candidates):
-        text = " ".join(
-            filter(
-                None,
-                [
-                    candidate.title or "",
-                    candidate.company or "",
-                    candidate.location or "",
-                    candidate.snippet or "",
-                    candidate.raw_description or "",
-                ],
+        scorecard = _deterministic_scorecard(
+            index,
+            candidate,
+            confirmed_profile=confirmed_profile,
+            search_plan=search_plan,
+            signals=signals,
+            avoid_signals=avoid_signals,
+        )
+        scored.append(
+            (
+                index,
+                scorecard.match_score,
+                scorecard.score_breakdown.get("role_alignment", 0),
+                scorecard.score_breakdown.get("domain_alignment", 0),
+                scorecard,
             )
-        ).lower()
-        overlap = sum(1 for signal in signals if signal.lower() in text)
-        penalty = sum(1 for signal in avoid_signals if signal and signal in text)
-        matched = [signal for signal in signals if signal.lower() in text]
-        scored.append((index, overlap * 10 - penalty * 3, matched))
-    scored.sort(key=lambda item: item[1], reverse=True)
-    ranked_indexes = [index for index, _score, _matched in scored]
-    if limit is not None:
-        ranked_indexes = ranked_indexes[:limit]
-    score_by_index = {index: score for index, score, _matched in scored}
-    matched_by_index = {index: matched for index, _score, matched in scored}
+        )
+    scored.sort(key=lambda item: (-item[1], -item[2], -item[3], item[0]))
+    selected = scored[:limit] if limit is not None else scored
+    ranked_indexes = [index for index, _score, _role, _domain, _scorecard in selected]
+    scorecards = [scorecard for _index, _score, _role, _domain, scorecard in selected]
 
     warnings: list[str] = []
     if not signals:
@@ -197,27 +192,265 @@ def _deterministic_filter(
     return CandidateFilterResult(
         selected_candidates=[candidates[index] for index in ranked_indexes],
         selected_indexes=ranked_indexes,
-        scorecards=[
-            CandidateScorecard(
-                candidate_index=index,
-                match_score=max(0, min(100, 45 + score_by_index[index])),
-                confidence_label=_confidence_label_for_score(max(0, min(100, 45 + score_by_index[index]))),
-                score_breakdown={},
-                matched_keywords=matched_by_index[index][:6],
-                match_reasons=(
-                    ["Matched profile/search-plan signals: " + ", ".join(matched_by_index[index][:5]) + "."]
-                    if matched_by_index[index]
-                    else ["Candidate remains in scope based on broad search-plan alignment."]
-                ),
-                risks=[],
-                evidence_quotes=[],
-            )
-            for index in ranked_indexes
-        ],
+        scorecards=scorecards,
         mode="deterministic",
         fallback_reason=None,
         quality_warnings=warnings,
     )
+
+
+def _deterministic_scorecard(
+    index: int,
+    candidate: RawJobCandidate,
+    *,
+    confirmed_profile: ConfirmedProfile,
+    search_plan: JobSearchPlan,
+    signals: list[str],
+    avoid_signals: list[str],
+) -> CandidateScorecard:
+    text = _candidate_text(candidate)
+    title_text = (candidate.title or "").lower()
+    matched = [signal for signal in signals if _contains_signal(text, signal)]
+    domain_terms = _domain_terms(confirmed_profile, search_plan)
+    domain_matches = [term for term in domain_terms if _contains_signal(text, term)]
+    skill_terms = _skill_terms(confirmed_profile, search_plan)
+    skill_matches = [term for term in skill_terms if _contains_signal(text, term)]
+
+    role_alignment = _role_alignment_score(confirmed_profile, search_plan, title_text, text)
+    domain_alignment = _domain_alignment_score(domain_matches)
+    skill_evidence = min(20, len(skill_matches) * 4 + len([term for term in skill_matches if not is_generic_tool_term(term)]) * 2)
+    seniority_and_work_type, seniority_risks = _seniority_score_and_risks(confirmed_profile, candidate, text)
+    location_fit, location_risks = _location_score_and_risks(confirmed_profile, candidate)
+    jd_evidence_quality, evidence_risks = _jd_evidence_score_and_risks(candidate)
+    avoid_hits = [signal for signal in avoid_signals if signal and signal in text]
+    risk_penalty = min(
+        30,
+        len(avoid_hits) * 6
+        + len(seniority_risks) * 5
+        + len(location_risks) * 3
+        + len(evidence_risks) * 3
+        + (6 if role_alignment <= 7 and domain_alignment <= 9 else 0),
+    )
+    breakdown = {
+        "role_alignment": role_alignment,
+        "domain_alignment": domain_alignment,
+        "skill_evidence": skill_evidence,
+        "seniority_and_work_type": seniority_and_work_type,
+        "location_fit": location_fit,
+        "jd_evidence_quality": jd_evidence_quality,
+        "risk_penalty": risk_penalty,
+    }
+    score = _score_from_breakdown(breakdown)
+    risks = _dedupe_list(
+        avoid_hits
+        + seniority_risks
+        + location_risks
+        + evidence_risks
+        + (["Weak role/domain evidence for this profile."] if role_alignment <= 7 and domain_alignment <= 9 else [])
+    )
+    reasons = _deterministic_reasons(
+        role_alignment=role_alignment,
+        domain_alignment=domain_alignment,
+        skill_evidence=skill_evidence,
+        matched=matched,
+        domain_matches=domain_matches,
+        skill_matches=skill_matches,
+    )
+    return CandidateScorecard(
+        candidate_index=index,
+        match_score=score,
+        confidence_label=_confidence_label_for_score(score),
+        score_breakdown=breakdown,
+        matched_keywords=_dedupe_list(matched + domain_matches + skill_matches)[:8],
+        match_reasons=reasons,
+        risks=risks[:6],
+        evidence_quotes=_evidence_quotes(candidate, matched + domain_matches + skill_matches),
+    )
+
+
+def _ranking_signals(confirmed_profile: ConfirmedProfile, search_plan: JobSearchPlan) -> list[str]:
+    return _dedupe_list(
+        confirmed_profile.target_roles
+        + confirmed_profile.target_directions
+        + confirmed_profile.search_keywords
+        + confirmed_profile.core_skills
+        + confirmed_profile.supporting_skills
+        + search_plan.must_have_signals
+    )
+
+
+def _candidate_text(candidate: RawJobCandidate) -> str:
+    return " ".join(
+        filter(
+            None,
+            [
+                candidate.title or "",
+                candidate.company or "",
+                candidate.location or "",
+                candidate.snippet or "",
+                candidate.raw_description or "",
+                " ".join(candidate.provider_warnings),
+            ],
+        )
+    ).lower()
+
+
+def _contains_signal(text: str, signal: str) -> bool:
+    return bool(signal and signal.lower() in text)
+
+
+def _domain_terms(confirmed_profile: ConfirmedProfile, search_plan: JobSearchPlan) -> list[str]:
+    intent = search_plan.search_intent
+    return _dedupe_list(
+        confirmed_profile.target_directions
+        + confirmed_profile.search_keywords
+        + (intent.industry_domains if intent else [])
+        + (intent.evidence_skills if intent else [])
+    )
+
+
+def _skill_terms(confirmed_profile: ConfirmedProfile, search_plan: JobSearchPlan) -> list[str]:
+    intent = search_plan.search_intent
+    return _dedupe_list(
+        confirmed_profile.core_skills
+        + confirmed_profile.supporting_skills
+        + search_plan.must_have_signals
+        + (intent.generic_tools if intent else [])
+    )
+
+
+def _role_alignment_score(
+    confirmed_profile: ConfirmedProfile,
+    search_plan: JobSearchPlan,
+    title_text: str,
+    text: str,
+) -> int:
+    roles = _dedupe_list(confirmed_profile.target_roles + search_plan.target_roles)
+    if any(role.lower() in title_text for role in roles):
+        return 25
+    if any(role.lower() in text for role in roles):
+        return 20
+    role_tokens = {
+        token
+        for role in roles
+        for token in role.lower().replace("/", " ").split()
+        if len(token) >= 4 and token not in {"intern", "assistant"}
+    }
+    title_hits = sum(1 for token in role_tokens if token in title_text)
+    text_hits = sum(1 for token in role_tokens if token in text)
+    if title_hits >= 2:
+        return 18
+    if title_hits == 1:
+        return 12
+    if text_hits:
+        return 8
+    return 3 if roles else 8
+
+
+def _domain_alignment_score(domain_matches: list[str]) -> int:
+    distinctive_matches = [term for term in domain_matches if not is_generic_tool_term(term)]
+    if len(distinctive_matches) >= 4:
+        return 25
+    if len(distinctive_matches) >= 2:
+        return 18
+    if distinctive_matches:
+        return 11
+    return 0
+
+
+def _seniority_score_and_risks(
+    confirmed_profile: ConfirmedProfile,
+    candidate: RawJobCandidate,
+    text: str,
+) -> tuple[int, list[str]]:
+    profile_level = " ".join(confirmed_profile.target_roles + confirmed_profile.search_keywords).lower()
+    candidate_title = (candidate.title or "").lower()
+    wants_early = any(token in profile_level for token in ["intern", "assistant", "graduate", "entry"])
+    candidate_early = any(token in text for token in ["intern", "assistant", "graduate", "entry level", "junior"])
+    candidate_senior = any(token in candidate_title for token in ["senior", "lead", "principal", "manager", "director"])
+    if wants_early and candidate_early:
+        return 10, []
+    if wants_early and candidate_senior:
+        return 2, ["Candidate appears more senior than the target profile."]
+    if candidate_senior:
+        return 5, ["Candidate seniority may be higher than the profile target."]
+    return 7, []
+
+
+def _location_score_and_risks(
+    confirmed_profile: ConfirmedProfile,
+    candidate: RawJobCandidate,
+) -> tuple[int, list[str]]:
+    location = (candidate.location or "").lower()
+    preferred = [item.lower() for item in confirmed_profile.preferred_locations]
+    arrangements = " ".join(confirmed_profile.work_arrangements).lower()
+    if not location:
+        return 5, ["Candidate location is missing."]
+    if "remote" in location and "remote" in arrangements:
+        return 10, []
+    if any(pref and (pref in location or location in pref) for pref in preferred):
+        return 10, []
+    if "remote" in location:
+        return 7, []
+    return 4, ["Candidate location may not match preferred locations."]
+
+
+def _jd_evidence_score_and_risks(candidate: RawJobCandidate) -> tuple[int, list[str]]:
+    evidence_text = " ".join([candidate.snippet or "", candidate.raw_description or ""]).strip()
+    risks: list[str] = []
+    if not candidate.source_url:
+        risks.append("Candidate source URL is missing.")
+    if candidate.provider_warnings:
+        risks.extend(candidate.provider_warnings[:2])
+    if len(evidence_text) >= 180 and candidate.source_url:
+        return (8 if candidate.provider_warnings else 10), risks
+    if len(evidence_text) >= 60:
+        return 6, risks
+    risks.append("Candidate JD evidence is sparse.")
+    return 3, risks
+
+
+def _deterministic_reasons(
+    *,
+    role_alignment: int,
+    domain_alignment: int,
+    skill_evidence: int,
+    matched: list[str],
+    domain_matches: list[str],
+    skill_matches: list[str],
+) -> list[str]:
+    reasons: list[str] = []
+    if role_alignment >= 20:
+        reasons.append("Strong role-title alignment with the confirmed profile.")
+    elif role_alignment >= 12:
+        reasons.append("Partial role-function alignment with the confirmed profile.")
+    if domain_alignment >= 18:
+        reasons.append("Strong domain evidence overlap: " + ", ".join(domain_matches[:4]) + ".")
+    elif domain_alignment >= 11:
+        reasons.append("Some domain evidence overlap: " + ", ".join(domain_matches[:3]) + ".")
+    if skill_evidence:
+        reasons.append("Matched skill/search signals: " + ", ".join(skill_matches[:5] or matched[:5]) + ".")
+    if not reasons:
+        reasons.append("Candidate remains in the pool but has limited direct profile evidence.")
+    return _dedupe_list(reasons)[:6]
+
+
+def _evidence_quotes(candidate: RawJobCandidate, terms: list[str]) -> list[str]:
+    sources = [
+        candidate.title or "",
+        candidate.snippet or "",
+        candidate.raw_description or "",
+    ]
+    quotes: list[str] = []
+    lowered_terms = [term.lower() for term in _dedupe_list(terms) if term]
+    for source in sources:
+        text = " ".join(source.split())
+        lowered = text.lower()
+        if text and (not lowered_terms or any(term in lowered for term in lowered_terms)):
+            quotes.append(text[:220])
+        if len(quotes) >= 3:
+            break
+    return _dedupe_list(quotes)
 
 
 def _validate_llm_scorecards(

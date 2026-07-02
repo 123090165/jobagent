@@ -27,7 +27,7 @@ def test_multidomain_resume_reaches_truthful_search_preview(
     session = client.post("/api/v1/profile-sessions").json()
     session_id = session["session_id"]
     client.post(f"/api/v1/profile-sessions/{session_id}/resume-text", json={"text": resume_text})
-    parse_resume_for_review(session_id, llm_service=_DeterministicReviewLLM())
+    review = parse_resume_for_review(session_id, llm_service=_DeterministicReviewLLM()).parsed_review
 
     draft_response = client.post(f"/api/v1/profile-sessions/{session_id}/profile-draft")
     assert draft_response.status_code == 200
@@ -58,6 +58,10 @@ def test_multidomain_resume_reaches_truthful_search_preview(
     assert intent["role_titles"]
     assert preview["provider_queries"]
     assert preview["provider_queries"][0] == intent["broad_queries"][0]
+    assert "Technical skill signal detected" not in review.target_signals
+    assert "AI application signal" not in review.target_signals
+    assert "data" not in [query.lower() for query in preview["provider_queries"]]
+    assert "operations" not in [query.lower() for query in preview["provider_queries"]]
 
     combined_output = " ".join(
         confirmed["target_roles"]
