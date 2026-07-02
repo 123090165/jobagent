@@ -191,6 +191,9 @@ def test_execute_live_run_with_fake_provider_completes(monkeypatch, tmp_path) ->
     provider_step = next(step for step in completed.steps if step.name == "Provider search")
     assert provider_step.details["raw_candidate_count"] >= 2
     assert provider_step.details["deduped_candidate_count"] >= 2
+    assert provider_step.details["missing_detail_count"] == 0
+    assert provider_step.details["source_stats"][0]["source_provider"] == "mock"
+    assert provider_step.details["source_stats"][0]["detail_coverage_rate"] == 1.0
     assert provider_step.details["query_stats"]
 
 
@@ -227,4 +230,6 @@ def test_live_run_steps_endpoint_returns_trace(monkeypatch, tmp_path) -> None:
     assert items[0]["mode"] == "llm"
     assert "details" in items[1]
     assert items[1]["details"]["query_count"] >= 1
+    assert "source_stats" in items[1]["details"]
+    assert "logical_provider_call_count" in items[1]["details"]
     assert run_response.job_search_run.llm_enabled is False

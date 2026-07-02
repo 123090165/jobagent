@@ -71,7 +71,7 @@ Completed work:
 Current stable commit:
 
 ```text
-92a0fbf feat: harden job search recall flow
+bc63480 feat: harden job search ranking rubric
 ```
 
 ## Current Stage: v4.7 Job Search Reliability
@@ -196,10 +196,25 @@ Purpose:
   relevance;
 - tune provider query limits and candidate pool caps.
 
-Likely improvements:
+Current implementation notes:
 
-- provider-specific query budgeting;
-- source-level trace details in UI;
+- provider-specific query budgeting is estimated in Search Preview using the
+  same executable query cap used by Job Search runs;
+- provider search trace details include per-source raw counts, deduped counts,
+  missing URL/detail counts, detail coverage, warning counts, duplicate count,
+  and truncation count;
+- `experiments/provider_recall_calibration.py` supersedes the older
+  Serper-only recall check and can run `multi_source`, individual source
+  providers, or `serper_web`;
+- experiment tests use fake providers and do not call live providers, DeepSeek,
+  Ollama, or protected pages.
+
+Remaining calibration work:
+
+- run live calibration for CUHKSZ Career, LinkedIn discovery, and RemoteOK with
+  representative profiles;
+- tune provider query limits and per-source candidate pool caps from measured
+  recall rather than guesses;
 - clear warning when a selected source is configured but weak for the current
   profile domain;
 - optional larger recall pool before ranking.

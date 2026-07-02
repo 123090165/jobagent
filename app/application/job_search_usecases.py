@@ -40,6 +40,10 @@ from app.services.job_search_planner import (
     build_focused_provider_queries,
     build_search_plan,
 )
+from app.services.job_search_recall_metrics import (
+    build_source_recall_stats,
+    candidate_recall_key,
+)
 from app.services.job_search_providers import (
     JobSearchProvider,
     RawJobCandidate,
@@ -93,6 +97,8 @@ class ProviderQueryStat:
     requested_limit: int
     returned_count: int
     new_candidate_count: int
+    source_count: int = 1
+    logical_request_count: int = 1
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -101,6 +107,8 @@ class ProviderQueryStat:
             "requested_limit": self.requested_limit,
             "returned_count": self.returned_count,
             "new_candidate_count": self.new_candidate_count,
+            "source_count": self.source_count,
+            "logical_request_count": self.logical_request_count,
         }
 
 
@@ -110,20 +118,28 @@ class ProviderRecallResult:
     provider_name: str
     provider_kind: str
     query_stats: list[ProviderQueryStat] = field(default_factory=list)
+    raw_candidates: list[RawJobCandidate] = field(default_factory=list, repr=False)
     raw_candidate_count: int = 0
     duplicate_count: int = 0
+    truncated_candidate_count: int = 0
     candidate_pool_cap: int = 0
 
     def details(self) -> dict[str, object]:
+        source_stats = build_source_recall_stats(self.raw_candidates, self.candidates)
         return {
             "provider": self.provider_name,
             "source_kind": self.provider_kind,
             "selected_sources": selected_sources_from_provider_name(self.provider_name),
             "source_candidate_counts": dict(Counter(candidate.source_provider for candidate in self.candidates)),
+            "source_stats": [item.to_dict() for item in source_stats],
             "query_count": len(self.query_stats),
+            "logical_provider_call_count": sum(item.logical_request_count for item in self.query_stats),
             "raw_candidate_count": self.raw_candidate_count,
             "duplicate_count": self.duplicate_count,
+            "truncated_candidate_count": self.truncated_candidate_count,
             "deduped_candidate_count": len(self.candidates),
+            "missing_source_url_count": sum(item.missing_url_count for item in source_stats),
+            "missing_detail_count": sum(item.missing_detail_count for item in source_stats),
             "candidate_pool_cap": self.candidate_pool_cap,
             "query_stats": [item.to_dict() for item in self.query_stats],
         }
@@ -655,16 +671,16 @@ def _build_provider_preview_searches(
             urls.extend(source_urls)
         return _clean_list(terms)[:MAX_PROVIDER_PREVIEW_TERMS * max(1, len(selected_sources))], _clean_list(urls)
     if provider_name == "linkedin":
-        queries = _clean_list(provider_queries)[:MAX_PROVIDER_PREVIEW_TERMS]
+        queries = _clean_list(provider_queries)[:MAX_PROVIDER_QUERIES_PER_RUN]
         return queries, [
             build_serper_preview_search_url(query, search_sites=["linkedin.com/jobs"])
             for query in queries
         ]
     if provider_name == "remoteok":
-        queries = _clean_list(provider_queries)[:MAX_PROVIDER_PREVIEW_TERMS]
+        queries = _clean_list(provider_queries)[:MAX_PROVIDER_QUERIES_PER_RUN]
         return queries, [REMOTEOK_API_URL]
     if provider_name == "serper_web":
-        queries = _clean_list(provider_queries)[:MAX_PROVIDER_PREVIEW_TERMS]
+        queries = _clean_list(provider_queries)[:MAX_PROVIDER_QUERIES_PER_RUN]
         sites = configured_serper_search_sites()
         return queries, [
             build_serper_preview_search_url(query, search_sites=sites)
@@ -767,6 +783,7 @@ def _estimate_query_budget(
         f"Provider search executes at most {MAX_PROVIDER_QUERIES_PER_RUN} provider query groups.",
         f"Candidate pool is capped at roughly 2x max_results before filtering.",
     ]
+    detail_request_count = 0
 
     if provider_name == "cuhksz_career":
         title_terms: list[str] = []
@@ -774,6 +791,7 @@ def _estimate_query_budget(
             title_terms.extend(build_cuhksz_title_terms(query))
         unique_title_terms = _clean_list(title_terms)
         list_request_count = len(unique_title_terms)
+        detail_request_count = candidate_pool_size
         notes.append("CUHKSZ expands provider queries into deduped title search terms.")
         notes.append("CUHKSZ location preferences are used for ranking context, not repeated live URL calls.")
     elif provider_name in {"serper_web", "linkedin"}:
@@ -788,10 +806,27 @@ def _estimate_query_budget(
         list_request_count = 1
         notes.append("RemoteOK uses its public JSON API and filters the returned feed locally.")
     elif provider_name == "multi_source" or provider_name.startswith("multi_source:"):
+        selected_sources = selected_sources_from_provider_name(provider_name)
+        list_request_count = 0
+        detail_request_count = 0
+        for source in selected_sources:
+            if source == "cuhksz_career":
+                title_terms = []
+                for query in executable_queries:
+                    title_terms.extend(build_cuhksz_title_terms(query))
+                list_request_count += len(_clean_list(title_terms))
+                detail_request_count += candidate_pool_size
+            elif source == "remoteok":
+                list_request_count += 1
+            else:
+                list_request_count += len(executable_queries) * len(executable_locations)
         notes.append("Multi-source search runs selected providers into one deduped candidate pool.")
         notes.append("LinkedIn candidates are external links; CUHKSZ and RemoteOK can provide structured details.")
 
-    estimated_provider_requests = list_request_count + candidate_pool_size
+    estimated_provider_requests = list_request_count + detail_request_count
+    notes.append(
+        f"Estimated provider requests split: search/list {list_request_count}, detail {detail_request_count}."
+    )
     planning_requests = 1 if llm_planning_enabled else 0
     filtering_requests = 1 if llm_filtering_enabled and candidate_pool_size else 0
     analysis_requests = min(max_results, candidate_pool_size) if llm_analysis_enabled else 0
@@ -987,22 +1022,29 @@ def _run_provider_search(
     per_call_limit = max(1, min(max_results, 5))
     candidate_pool_cap = max_results * 2
     deduped: dict[str, RawJobCandidate] = {}
+    seen_keys: set[str] = set()
     stats: list[ProviderQueryStat] = []
+    raw_candidates: list[RawJobCandidate] = []
     raw_candidate_count = 0
     duplicate_count = 0
+    truncated_candidate_count = 0
+    source_count = _provider_source_count(provider, provider_name)
     for query in queries:
         for location in locations:
             before_count = len(deduped)
             returned = provider.search_jobs(query=query, location=location, limit=per_call_limit)
+            raw_candidates.extend(returned)
             raw_candidate_count += len(returned)
             for candidate in returned:
-                key = (candidate.source_url or f"{candidate.title}:{candidate.company}:{candidate.location}").lower()
-                if key in deduped:
+                key = candidate_recall_key(candidate)
+                if key in seen_keys:
                     duplicate_count += 1
+                    continue
+                seen_keys.add(key)
+                if len(deduped) >= candidate_pool_cap:
+                    truncated_candidate_count += 1
                 else:
                     deduped[key] = candidate
-                if len(deduped) >= candidate_pool_cap:
-                    break
             stats.append(
                 ProviderQueryStat(
                     query=query,
@@ -1010,6 +1052,8 @@ def _run_provider_search(
                     requested_limit=per_call_limit,
                     returned_count=len(returned),
                     new_candidate_count=max(0, len(deduped) - before_count),
+                    source_count=source_count,
+                    logical_request_count=source_count,
                 )
             )
             if len(deduped) >= candidate_pool_cap:
@@ -1021,10 +1065,19 @@ def _run_provider_search(
         provider_name=provider_name,
         provider_kind=provider_kind,
         query_stats=stats,
+        raw_candidates=raw_candidates,
         raw_candidate_count=raw_candidate_count,
         duplicate_count=duplicate_count,
+        truncated_candidate_count=truncated_candidate_count,
         candidate_pool_cap=candidate_pool_cap,
     )
+
+
+def _provider_source_count(provider: JobSearchProvider, provider_name: str) -> int:
+    source_names = getattr(provider, "source_names", None)
+    if isinstance(source_names, list) and source_names:
+        return len(source_names)
+    return max(1, len(selected_sources_from_provider_name(provider_name)) or 1)
 
 
 def _effective_provider_locations(provider_name: str | None, locations: list[str]) -> list[str | None]:

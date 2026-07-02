@@ -183,6 +183,35 @@ before the shared filtering/ranking stage. It is currently the main frontend
 path for live search because it lets the user choose CUHKSZ Career, LinkedIn,
 and RemoteOK independently.
 
+## Recall Calibration
+
+Use the provider recall calibration experiment before changing query limits or
+ranking behavior:
+
+```powershell
+.venv\Scripts\python.exe experiments\provider_recall_calibration.py `
+  --env-file .env.deepseek.local `
+  --queries-per-case 2 `
+  --limit-per-query 5
+```
+
+The experiment supports:
+
+- `--provider multi_source` with `--source cuhksz_career`, `--source linkedin`,
+  and/or `--source remoteok`;
+- `--provider cuhksz_career`;
+- `--provider linkedin`;
+- `--provider remoteok`;
+- `--provider serper_web`.
+
+The report measures raw candidates, deduped candidates, duplicates, truncated
+candidates, missing source URLs, missing detail text, detail coverage, provider
+warnings, source-provider counts, and top candidate links. It uses deterministic
+search intent during setup and does not call DeepSeek or build Job Brief.
+
+Runtime `Provider search` trace details use the same source-level recall metric
+shape so frontend/manual debugging and experiment reports share one vocabulary.
+
 ## Safety Rules
 
 - Only fetch allowlisted public pages.

@@ -2,7 +2,9 @@
 
 ## Current product flow
 
-Resume Intake -> Resume Review -> Profile Draft -> Confirmed Profile -> Job Search -> Job Brief
+Resume Intake -> Resume Review -> Profile Draft -> Confirmed Profile -> Search Preview -> Job Search
+
+Job Brief is postponed until Job Search recall and ranking are reliable.
 
 ## Canonical docs
 
@@ -14,6 +16,7 @@ Resume Intake -> Resume Review -> Profile Draft -> Confirmed Profile -> Job Sear
 - [docs/NEXT_DEV_PLAN.md](NEXT_DEV_PLAN.md)
 - [docs/CLEANUP_AUDIT.md](CLEANUP_AUDIT.md)
 - [docs/DELETED_FILES_2026_06_25.md](DELETED_FILES_2026_06_25.md)
+- [docs/DELETED_FILES_2026_07_02.md](DELETED_FILES_2026_07_02.md)
 - [docs/LEGACY_MAP.md](LEGACY_MAP.md)
 
 ## Current architecture
@@ -21,11 +24,11 @@ Resume Intake -> Resume Review -> Profile Draft -> Confirmed Profile -> Job Sear
 - backend: `app/`
 - API: `app/api/v1`
 - frontend: `web/`
-- providers: `mock`, `cuhksz_career`
+- providers: `mock`, `cuhksz_career`, `linkedin`, `remoteok`, `serper_web`, `multi_source`
 
 ## Next development plan
 
-v4.6 Job Brief
+v4.7 Job Search Reliability
 
 See [docs/NEXT_DEV_PLAN.md](NEXT_DEV_PLAN.md).
 

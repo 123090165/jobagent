@@ -41,13 +41,6 @@ def build_search_plan(
     return _build_plan_from_intent(confirmed_profile, intent)
 
 
-def _build_deterministic_plan(confirmed_profile: ConfirmedProfile) -> JobSearchPlan:
-    return _build_plan_from_intent(
-        confirmed_profile,
-        build_search_intent(confirmed_profile, use_llm=False),
-    )
-
-
 def _build_plan_from_intent(
     confirmed_profile: ConfirmedProfile,
     intent: JobSearchIntent,
@@ -96,24 +89,6 @@ def _build_plan_from_intent(
     )
 
 
-def _normalize_plan(plan: JobSearchPlan, *, fallback: JobSearchPlan) -> JobSearchPlan:
-    queries = _dedupe(plan.queries) or fallback.queries
-    locations = _dedupe(plan.locations) or fallback.locations
-    target_roles = _dedupe(plan.target_roles) or fallback.target_roles
-    must_have = _dedupe(plan.must_have_signals) or fallback.must_have_signals
-    avoid = _dedupe(plan.avoid_signals)
-    return plan.model_copy(
-        update={
-            "queries": queries,
-            "locations": locations,
-            "target_roles": target_roles,
-            "must_have_signals": must_have,
-            "avoid_signals": avoid,
-            "quality_warnings": _dedupe(plan.quality_warnings),
-        }
-    )
-
-
 def build_focused_provider_queries(target_roles: list[str], search_signal_terms: list[str]) -> list[str]:
     keyword_seed = _dedupe(search_signal_terms)[:6]
     role_seed = _dedupe(target_roles)[:4]
@@ -150,48 +125,6 @@ def _dedupe(values: list[str]) -> list[str]:
     return items
 
 
-def _query_signal_seed(
-    signals: dict[str, object],
-    search_keywords: list[str],
-    core_skills: list[str],
-) -> list[str]:
-    zh_terms = [str(value) for value in signals.get("zh_terms", [])]
-    en_terms = [str(value) for value in signals.get("en_terms", [])]
-    acronyms = [term for term in en_terms if _looks_like_acronym(term)]
-    english_fallback = [term for term in en_terms if not _looks_like_acronym(term)]
-    return _dedupe(zh_terms + acronyms + search_keywords + core_skills + english_fallback)
-
-
-def _provider_query_signal_seed(
-    signals: dict[str, object],
-    *,
-    target_roles: list[str],
-    search_keywords: list[str],
-    core_skills: list[str],
-) -> list[str]:
-    zh_terms = [str(value) for value in signals.get("zh_terms", [])]
-    en_terms = [str(value) for value in signals.get("en_terms", [])]
-    acronyms = [term for term in en_terms if _looks_like_acronym(term)]
-    english_fallback = [term for term in en_terms if not _looks_like_acronym(term)]
-    candidates = _dedupe(
-        zh_terms[:1]
-        + acronyms
-        + zh_terms[1:]
-        + search_keywords
-        + core_skills
-        + english_fallback
-    )
-    focused = [
-        term
-        for term in candidates
-        if not _overlaps_target_role(term, target_roles)
-        and not is_generic_tool_term(term)
-    ]
-    if focused:
-        return _dedupe(focused)
-    return _dedupe([term for term in candidates if not _overlaps_target_role(term, target_roles)])
-
-
 def _overlaps_target_role(term: str, target_roles: list[str]) -> bool:
     term_key = term.strip().lower()
     if not term_key:
@@ -201,8 +134,3 @@ def _overlaps_target_role(term: str, target_roles: list[str]) -> bool:
         if role_key and (term_key == role_key or term_key in role_key or role_key in term_key):
             return True
     return False
-
-
-def _looks_like_acronym(value: str) -> bool:
-    stripped = value.strip()
-    return 2 <= len(stripped) <= 8 and stripped.upper() == stripped and any(char.isalpha() for char in stripped)

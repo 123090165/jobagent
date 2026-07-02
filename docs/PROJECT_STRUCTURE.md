@@ -1,6 +1,6 @@
 # JobAgent Project Structure
 
-Last reviewed: 2026-06-22  
+Last reviewed: 2026-07-02
 Branch reviewed: `codex/v4-curated-job-crawler-provider`
 
 This document is a working map of the current repository before starting the
@@ -41,7 +41,7 @@ resume truthfulness, search recall, candidate preservation, and ranking quality.
 | `web/` | live runtime | Vue 3 + Pinia + Naive UI frontend. |
 | `tests/` | active | Backend, service, API, parser, provider, and frontend-helper regression tests. |
 | `docs/` | active but partly drifted | Product, API, architecture, cleanup, and planning docs. |
-| `experiments/` | experiment-only | Local DeepSeek resume extraction comparison; not production runtime. |
+| `experiments/` | experiment-only | Local DeepSeek resume extraction comparison, multidomain flow checks, and provider recall calibration; not production runtime. |
 | `data/` | local runtime data | SQLite database and local generated state. Should not be treated as source. |
 | `.ai/` | local/supporting | Local assistant or project-support metadata. Not part of the app runtime. |
 | `.github/` | repo support | GitHub configuration if present. |
@@ -74,7 +74,7 @@ Live public API surface used by the Vue frontend.
 | `profile_drafts.py` | live | Get/update profile drafts and confirm a draft. |
 | `confirmed_profiles.py` | live | Load a persisted confirmed profile. |
 | `job_search_runs.py` | live | Preview search, create a run, fetch run status, fetch trace steps. |
-| `job_search_providers.py` | live | Provider status endpoint for `mock` and `cuhksz_career`. |
+| `job_search_providers.py` | live | Provider status endpoint for mock, native job-board/API, search-engine, and multi-source providers. |
 | `llm.py` | live | LLM status endpoint; off means local Ollama, on means DeepSeek API. |
 
 ### `app/application/`
@@ -175,9 +175,14 @@ current Vue `/api/v1` flow and should be treated carefully before deletion.
 | --- | --- | --- |
 | `job_search_planner.py` | live and central | Builds search plan and focused provider queries from confirmed profile plus user inputs. |
 | `job_candidate_filter.py` | live | Ranks provider-returned candidates before analysis. Should not invent candidates. |
+| `job_search_recall_metrics.py` | live support/experiment support | Shared source-level recall metrics for runtime trace details and provider calibration reports. |
 | `job_search_providers/base.py` | live | Shared provider interface and `RawJobCandidate`. |
 | `job_search_providers/mock_provider.py` | live/test/demo | Deterministic provider for tests and local fallback. |
 | `job_search_providers/cuhksz_career_provider.py` | live | Public CUHKSZ search/list/detail parser. Current main live provider. |
+| `job_search_providers/linkedin_discovery_provider.py` | live | Serper-backed public LinkedIn job-link discovery; does not scrape LinkedIn detail pages. |
+| `job_search_providers/remoteok_provider.py` | live | RemoteOK public JSON API provider. |
+| `job_search_providers/serper_web_provider.py` | optional live | Serper Google Search API provider for public job-link discovery. |
+| `job_search_providers/multi_source_provider.py` | live | Aggregates selected source providers into one candidate pool. |
 | `jd_analysis_quality.py` | live | Quality gate for LLM JD extraction. |
 | `jd_quality_service.py` | live/tested | JD quality scoring helpers. |
 | `mock_pipeline.py` | live support | Deterministic legacy-style parser/profile support still used indirectly by profile review paths. |
@@ -272,8 +277,9 @@ aligned with `app/schemas/*`.
 
 ## Experiments
 
-`experiments/resume_extraction_compare.py` is not part of production runtime.
-It compares DeepSeek extraction modes:
+Experiment scripts are not production runtime.
+
+`experiments/resume_extraction_compare.py` compares DeepSeek extraction modes:
 
 - `direct_one_shot`
 - `direct_fieldwise`
@@ -283,6 +289,14 @@ It imports app/test fixtures and calls DeepSeek only when explicitly run with an
 env file. Outputs go under `experiments/output/`, which should not be committed.
 
 `experiments/README.md` is current for this experiment.
+
+`experiments/multidomain_flow_check.py` runs synthetic resumes through resume
+review, profile draft, confirmed profile, and search preview without live LLMs
+or live providers.
+
+`experiments/provider_recall_calibration.py` runs live provider recall checks
+for `multi_source`, individual sources, or `serper_web`; setup uses
+deterministic search intent and does not call DeepSeek.
 
 ## Tests
 
@@ -299,10 +313,13 @@ The test suite is active and broad. Important clusters:
   `test_resume_profile_enrichment_service.py`
 - Job search: `test_job_search_planner.py`,
   `test_job_candidate_filter.py`, `test_cuhksz_career_provider.py`,
+  `test_linkedin_discovery_provider.py`, `test_remoteok_provider.py`,
+  `test_serper_web_provider.py`, `test_job_search_recall_metrics.py`,
   `test_job_search_provider_status_api.py`, `test_job_search_trace_repository.py`
 - Frontend helper/flow coverage: `test_frontend_profile_review_helpers.py`,
   `test_frontend_search_preview_flow.py`
-- Experiment: `test_resume_extraction_compare_experiment.py`
+- Experiment: `test_resume_extraction_compare_experiment.py`,
+  `test_provider_recall_calibration_experiment.py`
 
 The latest local focused provider check before this document was:
 
@@ -316,11 +333,11 @@ The latest local focused provider check before this document was:
 | Doc | Current usefulness | Notes |
 | --- | --- | --- |
 | `README.md` | current entry point | Good quick-start and high-level directory summary. Mentions Job Brief as future. |
-| `docs/INDEX.md` | partially outdated | Still says next development is v4.6 Job Brief, but current direction has shifted through resume hardening and search work. |
+| `docs/INDEX.md` | current | Points to v4.7 Job Search Reliability and current cleanup records. |
 | `docs/API_CONTRACT_V1.md` | partially current | Useful route contract, but missing `/api/v1/job-search-runs/preview` and still frames Job Brief as planned v4.6. |
 | `docs/V4_PRODUCT_REFACTOR_PLAN.md` | partially outdated | Good architecture history, but current next step no longer directly Job Brief. |
-| `docs/NEXT_DEV_PLAN.md` | outdated/current-history mix | Captures v4.6 hardening, but labels guided LLM integration as current and CUHKSZ verification as next even though search preview/provider work has moved forward. |
-| `docs/SEARCH_PROVIDER.md` | current | Good provider boundary and pipeline doc. Should be extended for v4.7 candidate pool/source stats/ranking bands. |
+| `docs/NEXT_DEV_PLAN.md` | current | Tracks v4.7 search reliability stages and postpones Job Brief until search/ranking are reliable. |
+| `docs/SEARCH_PROVIDER.md` | current | Provider boundary, multi-source path, source-level recall stats, and calibration experiment. |
 | `docs/SEARCH_READY_PROFILE_LAYER.md` | mostly current, version wording old | Describes profile layer well, but refers to v3.9a/v3.9b naming. |
 | `docs/V4_STATE_MACHINE.md` | mostly current | Useful state and invalidation rules. May need Search Preview mention. |
 | `docs/V4_ERROR_CONTRACT.md` | current | Error shape and codes still relevant. |
@@ -340,21 +357,23 @@ The latest local focused provider check before this document was:
 
 These are not immediate blockers, but they matter before larger v4.7 work:
 
-1. `docs/INDEX.md`, `docs/API_CONTRACT_V1.md`, `docs/V4_PRODUCT_REFACTOR_PLAN.md`,
-   and `docs/NEXT_DEV_PLAN.md` should be refreshed after the v4.7 plan is chosen.
+1. `docs/API_CONTRACT_V1.md` and `docs/V4_PRODUCT_REFACTOR_PLAN.md` still need
+   a later refresh to reflect the Search Preview and multi-source provider path.
 2. `docs/API_CONTRACT_V1.md` should include Search Preview:
    `POST /api/v1/job-search-runs/preview`.
-3. Some docs still say v4.6 Job Brief is next. The current practical next step
-   is better described as Job Search recall/ranking hardening.
+3. Older historical docs may still mention v4.6 Job Brief as the immediate next
+   step. The canonical current plan is `docs/NEXT_DEV_PLAN.md`.
 4. `app/storage/database.py` contains older pre-v4 tables. They are probably
    harmless, but the live v4 table set should be made explicit before any DB
    cleanup.
 5. `confirmed_profile_storage_service.py`, `jd_url_service.py`, and
    `search_query_service.py` were removed in the 2026-06-25 cleanup. See
    `docs/DELETED_FILES_2026_06_25.md`.
-6. Some enrichment/project-challenge prompt paths are tested or preserved, but
+6. `experiments/web_search_recall_check.py` was removed in the 2026-07-02
+   provider recall cleanup. See `docs/DELETED_FILES_2026_07_02.md`.
+7. Some enrichment/project-challenge prompt paths are tested or preserved, but
    not central to the current runtime flow.
-7. Frontend route guards are implemented but simpler than the recommended doc.
+8. Frontend route guards are implemented but simpler than the recommended doc.
    This is acceptable for now, but should be revisited when search/brief routes
    become more complex.
 
@@ -372,6 +391,7 @@ future cleanup can be discussed and tested deliberately.
 | `app/prompts/profile_enrichment/` | older enrichment prompts | Supports the older enrichment service rather than the current guided review path. | Keep with the service for now; do not expand unless the older enrichment path is revived. |
 | `app/prompts/project_challenge/` | dormant future feature | No current product route for project challenge questions. | Keep as dormant prompt assets. Reassess when implementing interview/job brief follow-up features. |
 | `app/services/search_query_service.py` | deleted 2026-06-25 | Current Search Preview and provider query logic lives in `job_search_planner.py`, `job_search_intent.py`, and provider-specific mapping. | See `docs/DELETED_FILES_2026_06_25.md` for restore notes. |
+| `experiments/web_search_recall_check.py` | deleted 2026-07-02 | Serper-only recall experiment was superseded by generic provider recall calibration. | See `docs/DELETED_FILES_2026_07_02.md` for restore notes. |
 | `app/services/mock_pipeline.py` | suspicious name, still useful | Despite the name, current resume/profile review paths may still depend on deterministic parsing helpers. | Do not remove without import-level and behavior-level tests. Rename later only if it remains part of the live deterministic parser path. |
 
 Cleanup rule for these markers:
@@ -386,9 +406,14 @@ Before starting v4.7, the files most likely to matter are:
 
 - `app/application/job_search_usecases.py`
 - `app/services/job_search_planner.py`
+- `app/services/job_search_recall_metrics.py`
 - `app/services/job_candidate_filter.py`
 - `app/services/job_search_providers/base.py`
 - `app/services/job_search_providers/cuhksz_career_provider.py`
+- `app/services/job_search_providers/linkedin_discovery_provider.py`
+- `app/services/job_search_providers/remoteok_provider.py`
+- `app/services/job_search_providers/serper_web_provider.py`
+- `app/services/job_search_providers/multi_source_provider.py`
 - `app/repositories/job_search_repository.py`
 - `app/schemas/job_search.py`
 - `web/src/pages/SearchPreviewPage.vue`

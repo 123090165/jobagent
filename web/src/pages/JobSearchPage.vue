@@ -54,7 +54,7 @@ function goBackToSearchPreview() {
 }
 
 function showJobBriefHint() {
-  jobBriefHint.value = "Job Brief will be implemented in v4.6.";
+  jobBriefHint.value = "Job Brief is postponed until search recall and ranking are reliable.";
 }
 
 function statusTagType(status: string) {
