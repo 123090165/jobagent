@@ -1,66 +1,206 @@
 # Next Development Plan
 
-## v4.6 Resume Analysis Hardening
+Last updated: 2026-07-02
 
-Goal:
+## Current Status
+
+The current product flow is:
+
+```text
+Resume Intake
+-> Resume Review
+-> Profile Draft
+-> Confirmed Profile
+-> Search Preview
+-> Job Search Run
+-> Job Brief later
+```
+
+Job Brief remains postponed. The next priority is to make Job Search recall,
+ranking, and explanation reliable enough that later Job Brief output can be
+grounded in real provider candidates and real JD evidence.
+
+## Completed Baseline
+
+### v4.6 Resume Analysis Hardening
+
+Completed work:
+
+- `v4.6.1` Truthfulness Fix
+- `v4.6.2` Parser Regression Corpus
+- guided LLM resume review with deterministic fallback
+- sanitized LLM fallback warnings
+- frontend visibility for analysis mode/provider/fallback warnings
+- regression protection against fabricated projects and work experience
+
+Outcome:
 
 ```text
 ResumeDocument -> trustworthy ParsedResumeReview -> trustworthy ProfileDraft
 ```
 
-Job Brief is postponed until resume analysis is reliable. The immediate priority is to make parser and LLM behavior honest, observable, and regression-tested before downstream job search matching or brief generation depends on it.
+Remaining limitation:
 
-## v4.6.1 Truthfulness Fix
+- deterministic resume extraction is safer, but not yet high-quality across all
+  domains;
+- future parser/LLM extraction work should remain evidence-based and
+  regression-tested.
 
-- ensure `use_llm=true` is not blocked by cached deterministic parsed reviews
-- show useful sanitized LLM fallback reasons
-- stop deterministic parser fallback from inventing `General project`
-- stop deterministic parser fallback from inventing work experience from whole-resume text
-- make Resume Review UI show LLM toggle state, analysis mode, provider status, and fallback warnings
+### v4.7 Baseline Job Search Hardening
 
-## v4.6.2 Parser Regression Corpus
+Completed work:
 
-- turn existing realistic resume cases into stricter parser regression fixtures
-- assert key positive behavior: real project, work, education, skill, and highlight extraction
-- assert key negative behavior: no fabricated projects, no fabricated work items, no separator pollution
-- keep tests deterministic and free of real LLM/network dependencies
-- intentionally establish a stable regression baseline before deeper deterministic parser changes
+- Search Preview split from Job Search execution
+- focused provider query generation from confirmed profile/search intent
+- broader candidate preservation; candidates are not dropped only because
+  company/location/detail fields are incomplete
+- scorecard-style candidate filtering/ranking
+- multi-source provider support:
+  - `cuhksz_career`
+  - `linkedin` via Serper-backed public job-link discovery
+  - `remoteok` via public JSON API
+  - `serper_web`
+  - `multi_source`
+- frontend checkboxes for selected recruiting websites
+- provider status and selected-source visibility
+- multidomain flow experiment scaffolding
+- web search recall experiment scaffolding
+- old unused service cleanup documented in
+  `docs/DELETED_FILES_2026_06_25.md`
 
-## v4.6.3 Guided LLM Resume Review Integration (current)
-
-- use deterministic parsing as a non-authoritative candidate profile
-- send raw resume text plus the deterministic candidate into guided LLM review
-- treat raw resume text as the only source of truth
-- persist successful guided review as `analysis_mode="llm_guided"`
-- keep deterministic fallback with sanitized warnings when LLM is unavailable, fails, or returns invalid output
-- keep tests deterministic with fake JSON LLMs and no real DeepSeek/network calls
-
-## v4.6.4 CUHKSZ Live Job Search Verification (next)
-
-- verify live CUHKSZ provider behavior end to end against the existing job search flow
-- keep provider behavior scoped and observable
-- do not resume Job Brief until resume analysis and live search basics are trustworthy
-
-## v4.6.5 Evidence-based extraction contract hardening
-
-- require structured LLM output with evidence quotes for core fields
-- validate LLM output with Python schemas
-- reject or downgrade unsupported claims rather than merging hallucinated data
-- keep deterministic parser as a safe baseline and use LLM as evidence-checked enrichment
-
-## Later: Job Brief
-
-Resume-dependent Job Brief work should resume only after `ParsedResumeReview` and `ConfirmedProfile` are reliable enough to support downstream matching claims.
-
-Planned later output:
+Current stable commit:
 
 ```text
-JobSearchResult -> JobBrief
+92a0fbf feat: harden job search recall flow
 ```
 
-- match summary
-- why this job matches
-- risks and gaps
-- resume tailoring suggestions
-- interview/project challenge questions
-- application strategy
+## Current Stage: v4.7 Job Search Reliability
+
+Goal:
+
+```text
+ConfirmedProfile
+-> SearchIntent
+-> provider-specific broad recall
+-> preserved candidate pool
+-> evidence-based ranking
+-> explainable top results
+```
+
+Primary engineering objective:
+
+- improve recall without turning provider queries into long, over-constrained
+  keyword strings;
+- keep platform retrieval broad and cheap;
+- move precision into ranking and evidence checks;
+- keep every final result traceable to provider URL/snippet/detail evidence.
+
+## v4.7.1 Multidomain Flow Evaluation
+
+Purpose:
+
+- verify that the chain works beyond the original health-algorithm test resume;
+- use realistic resumes from different domains;
+- inspect each intermediate artifact:
+  - resume review
+  - profile draft
+  - confirmed profile
+  - search intent
+  - provider queries
+  - provider candidates
+  - ranking output
+
+Expected output:
+
+- one Markdown report under `experiments/output/`
+- pass/fail notes for each domain
+- concrete bugs or weak assumptions converted into targeted tasks
+
+Do not:
+
+- tune only for one resume/domain;
+- add a large new framework;
+- require real LLM/network calls in pytest.
+
+## v4.7.2 Ranking Rubric Hardening
+
+Purpose:
+
+- make LLM-assisted ranking more stable and auditable;
+- keep deterministic fallback available;
+- ensure top results are ranked by JD evidence, not just query overlap.
+
+Required scoring dimensions:
+
+- role alignment
+- domain/industry alignment
+- skill evidence
+- experience/project evidence
+- location/work arrangement fit
+- seniority fit
+- missing evidence / uncertainty
+- risk flags
+
+Implementation constraints:
+
+- structured scorecard output;
+- bounded scores;
+- explicit evidence quotes/snippets when available;
+- no invented companies, URLs, duties, or requirements;
+- tests use fake LLM responses and fixtures.
+
+## v4.7.3 Provider Recall Calibration
+
+Purpose:
+
+- compare CUHKSZ direct search, LinkedIn discovery, RemoteOK API, and optional
+  Serper broader web search;
+- measure useful candidate count, duplicate rate, missing detail rate, and top10
+  relevance;
+- tune provider query limits and candidate pool caps.
+
+Likely improvements:
+
+- provider-specific query budgeting;
+- source-level trace details in UI;
+- clear warning when a selected source is configured but weak for the current
+  profile domain;
+- optional larger recall pool before ranking.
+
+## v4.7.4 Frontend Search Result Usability
+
+Purpose:
+
+- make Search Preview and Search Result easier to audit manually;
+- expose enough details to diagnose bad search output.
+
+Likely UI additions:
+
+- selected provider/source badges;
+- provider query list grouped by source;
+- candidate source URL and detail status;
+- score breakdown;
+- evidence/risk sections;
+- "why this ranked here" explanation.
+
+Do not:
+
+- spend time on visual polish before recall/ranking quality is acceptable.
+
+## Later: Job Follow-up And Job Brief
+
+Only after Search top results are reliable:
+
+- ask follow-up questions about a specific job;
+- explain strengths and risks;
+- suggest resume tailoring;
+- generate application strategy;
+- generate Job Brief.
+
+Target later flow:
+
+```text
+JobSearchResult -> Job Detail Q&A -> Job Brief
+```
+
+Job Brief should not be built on weak search results.
