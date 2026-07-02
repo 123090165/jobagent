@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import json
+
 import pytest
 from fastapi.testclient import TestClient
 
+from app.application.resume_review_usecases import parse_resume_for_review
 from app.main import app
 from tests.fixtures.resumes.multidomain_flow_cases import (
     MULTIDOMAIN_FLOW_CASES,
@@ -24,8 +27,7 @@ def test_multidomain_resume_reaches_truthful_search_preview(
     session = client.post("/api/v1/profile-sessions").json()
     session_id = session["session_id"]
     client.post(f"/api/v1/profile-sessions/{session_id}/resume-text", json={"text": resume_text})
-    review_response = client.post(f"/api/v1/profile-sessions/{session_id}/parse-resume")
-    assert review_response.status_code == 200
+    parse_resume_for_review(session_id, llm_service=_DeterministicReviewLLM())
 
     draft_response = client.post(f"/api/v1/profile-sessions/{session_id}/profile-draft")
     assert draft_response.status_code == 200
@@ -75,3 +77,14 @@ def _assert_any_terms_present(values: list[str], expected_terms: tuple[str, ...]
     assert any(term.lower() in combined for term in expected_terms), (
         f"Expected one of {expected_terms!r} in {values!r}"
     )
+
+
+class _DeterministicReviewLLM:
+    def chat_completion_json(self, *, system_prompt: str, user_prompt: str) -> dict:
+        marker = "Non-authoritative deterministic candidate profile JSON:\n"
+        start = user_prompt.index(marker) + len(marker)
+        end = user_prompt.index("\n\nInstructions:", start)
+        return {
+            "resume_profile": json.loads(user_prompt[start:end]),
+            "quality_warnings": [],
+        }

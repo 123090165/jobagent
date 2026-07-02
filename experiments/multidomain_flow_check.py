@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import sys
 import tempfile
@@ -14,6 +15,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from fastapi.testclient import TestClient
 
+from app.application.resume_review_usecases import parse_resume_for_review
 from app.main import app
 from tests.fixtures.resumes.multidomain_flow_cases import (
     MULTIDOMAIN_FLOW_CASES,
@@ -53,7 +55,10 @@ def _run_case(client: TestClient, case: MultidomainFlowCase) -> dict[str, Any]:
     session = client.post("/api/v1/profile-sessions").json()
     session_id = session["session_id"]
     client.post(f"/api/v1/profile-sessions/{session_id}/resume-text", json={"text": resume_text})
-    review = client.post(f"/api/v1/profile-sessions/{session_id}/parse-resume").json()["parsed_review"]
+    review = parse_resume_for_review(
+        session_id,
+        llm_service=_DeterministicReviewLLM(),
+    ).parsed_review.model_dump(mode="json")
     draft = client.post(f"/api/v1/profile-sessions/{session_id}/profile-draft").json()["profile_draft"]
     confirmed = client.post(f"/api/v1/profile-drafts/{draft['profile_draft_id']}/confirm").json()[
         "confirmed_profile"
@@ -78,6 +83,17 @@ def _run_case(client: TestClient, case: MultidomainFlowCase) -> dict[str, Any]:
         "checks": checks,
         "passed": all(check["passed"] for check in checks),
     }
+
+
+class _DeterministicReviewLLM:
+    def chat_completion_json(self, *, system_prompt: str, user_prompt: str) -> dict:
+        marker = "Non-authoritative deterministic candidate profile JSON:\n"
+        start = user_prompt.index(marker) + len(marker)
+        end = user_prompt.index("\n\nInstructions:", start)
+        return {
+            "resume_profile": json.loads(user_prompt[start:end]),
+            "quality_warnings": [],
+        }
 
 
 def _build_checks(

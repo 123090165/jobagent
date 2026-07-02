@@ -122,6 +122,34 @@ Do not:
 - add a large new framework;
 - require real LLM/network calls in pytest.
 
+Latest local check:
+
+```text
+experiments/output/20260702T123345Z_multidomain_flow_check.md
+Cases: 3/3 passed
+```
+
+Findings:
+
+- the chain no longer drifts back to the original health-algorithm/backend test
+  domain for brand marketing, museum/cultural research, or supply-chain resumes;
+- the experiment now uses an injected fake JSON LLM and does not call local
+  Ollama, DeepSeek, or live providers;
+- resume `target_signals` are still too technology-biased for non-technical
+  profiles, for example "Technical skill signal detected";
+- deterministic skill extraction can still admit noisy tokens such as `Git`,
+  `ACC`, and `FA` in humanities-style samples;
+- generalized intent is usable, but some role families/provider queries still
+  include overly broad terms such as `data` or `operations`.
+
+Follow-up tasks:
+
+- refine target signal labels so non-technical resumes get domain-specific
+  signals instead of generic technical labels;
+- reduce short/acronym skill noise in deterministic extraction;
+- keep broad provider recall, but avoid low-value one-word provider queries
+  unless they are paired with role/domain evidence.
+
 ## v4.7.2 Ranking Rubric Hardening
 
 Purpose:
