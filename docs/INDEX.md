@@ -8,10 +8,12 @@ Resume Intake -> Resume Review -> Profile Draft -> Confirmed Profile -> Job Sear
 
 - [README.md](../README.md)
 - [docs/API_CONTRACT_V1.md](API_CONTRACT_V1.md)
+- [docs/PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md)
 - [docs/V4_PRODUCT_REFACTOR_PLAN.md](V4_PRODUCT_REFACTOR_PLAN.md)
 - [docs/SEARCH_PROVIDER.md](SEARCH_PROVIDER.md)
 - [docs/NEXT_DEV_PLAN.md](NEXT_DEV_PLAN.md)
 - [docs/CLEANUP_AUDIT.md](CLEANUP_AUDIT.md)
+- [docs/DELETED_FILES_2026_06_25.md](DELETED_FILES_2026_06_25.md)
 - [docs/LEGACY_MAP.md](LEGACY_MAP.md)
 
 ## Current architecture

@@ -1,0 +1,142 @@
+Synthetic Resume for Product Testing Only
+This is a fictional, anonymized profile designed to test job-matching and resume-parsing systems.
+
+Name: Mei Zhao
+Location: Guangzhou, China
+Email: mei.zhao@example.com
+Phone: Not provided
+Target Role: Supply Chain Operations Intern / Procurement Assistant / International Trade Operations Intern
+
+============================================================
+SUMMARY
+============================================================
+
+Business undergraduate with coursework and project experience in procurement workflow mapping, inventory tracking, supplier comparison, and cross-border trade documentation. Detail-oriented and comfortable working with spreadsheets, timelines, status reports, and structured operational processes. Interested in supply-chain operations, sourcing, logistics coordination, and import-export business support.
+
+============================================================
+EDUCATION
+============================================================
+
+B.B.A. in Logistics Management and International Business
+University in Guangzhou
+Expected Graduation: 2027
+
+Relevant Coursework:
+- Supply Chain Management
+- Procurement and Sourcing
+- International Trade Practice
+- Operations Management
+- Inventory Management
+- Business Analytics
+- International Logistics
+- Business Communication
+
+============================================================
+CORE SKILLS
+============================================================
+
+Supply Chain & Operations:
+- procurement process support
+- supplier comparison
+- purchase-order tracking
+- inventory monitoring
+- demand planning basics
+- shipment-status follow-up
+- logistics documentation
+
+Data & Reporting:
+- Excel
+- pivot tables
+- VLOOKUP / XLOOKUP
+- data cleaning
+- simple dashboards
+- weekly operations reporting
+- cost and lead-time comparison
+
+Business Coordination:
+- vendor communication support
+- meeting notes
+- task tracking
+- document filing
+- cross-functional follow-up
+- process documentation
+- bilingual email drafting
+
+Languages:
+- Mandarin Chinese
+- English: working proficiency
+
+============================================================
+PROJECT EXPERIENCE
+============================================================
+
+Retail Supply Chain Planning Simulation
+Project Type: Operations Management Course Project
+
+- Built a basic demand and replenishment plan for a simulated seasonal consumer-goods retailer.
+- Consolidated sales assumptions, delivery lead times, minimum-order quantities, and safety-stock rules into a spreadsheet model.
+- Compared several replenishment options using stockout risk, holding cost, and delivery timing.
+- Produced a weekly operations dashboard tracking inventory level, expected arrivals, delayed orders, and key exceptions.
+- Presented recommendations for reducing stockout exposure during a high-demand sales period.
+
+Supplier Evaluation and Sourcing Comparison Project
+Project Type: Procurement Course Project
+
+- Researched a set of potential suppliers for a simulated consumer-product sourcing task.
+- Created a supplier comparison matrix covering price, quality consistency, minimum order quantity, payment terms, delivery reliability, and communication responsiveness.
+- Drafted a basic request-for-quotation template and a supplier follow-up checklist.
+- Identified trade-offs between unit cost, speed, and procurement risk.
+- Prepared a sourcing recommendation memo for a mock procurement manager.
+
+Cross-Border E-Commerce Fulfillment Workflow Analysis
+Project Type: International Trade Practice Project
+
+- Mapped the end-to-end order process from customer purchase through warehouse handling, customs documentation, international shipping, and final delivery.
+- Identified common operational risks such as incomplete documents, inventory mismatch, customs delay, and tracking information gaps.
+- Proposed a simple exception-handling workflow that assigned ownership and escalation timing for each issue.
+- Prepared a bilingual glossary of frequently used trade and logistics terms.
+- Delivered a process diagram and a concise operating manual for classmates.
+
+============================================================
+SELECTED EXPERIENCE
+============================================================
+
+Spreadsheet and Data Accuracy
+- Comfortable maintaining structured trackers and checking data consistency across multiple sheets.
+- Able to organize operational information into clear status reports.
+- Familiar with basic inventory, order, supplier, and shipment data fields.
+
+Process Thinking
+- Understands how purchasing, inventory, warehousing, logistics, and customer delivery affect one another.
+- Can document workflows, identify bottlenecks, and propose practical handoff improvements.
+- Pays attention to deadlines, exceptions, and traceability.
+
+Coordination and Documentation
+- Able to support meeting preparation, follow-up lists, document filing, and progress updates.
+- Communicates clearly with teammates and can keep small operational tasks organized.
+- Interested in structured, detail-heavy business operations.
+
+============================================================
+INTERNSHIP AVAILABILITY
+============================================================
+
+- Available for a stable internship period.
+- Open to roles in manufacturing, consumer goods, e-commerce, logistics companies, trading firms, and procurement teams.
+- Interested in supply-chain operations, sourcing, inventory planning, vendor coordination, and international trade support.
+
+============================================================
+ROLE MATCHING KEYWORDS
+============================================================
+
+supply chain
+procurement
+sourcing
+inventory
+logistics
+international trade
+purchase order
+supplier management
+shipment tracking
+operations analyst
+warehouse
+cross-border e-commerce

@@ -63,6 +63,13 @@ function statusTagType(status: string) {
   if (status === "running") return "warning";
   return "default";
 }
+
+function formatTraceDetail(value: unknown) {
+  if (Array.isArray(value) || (value && typeof value === "object")) {
+    return JSON.stringify(value);
+  }
+  return String(value ?? "");
+}
 </script>
 
 <template>
@@ -153,6 +160,14 @@ function statusTagType(status: string) {
             </div>
             <p>{{ step.summary }}</p>
             <p v-if="step.fallback_reason"><strong>Fallback:</strong> {{ step.fallback_reason }}</p>
+            <div v-if="Object.keys(step.details).length" class="job-card-section">
+              <strong>Trace Details</strong>
+              <ul class="review-list">
+                <li v-for="[key, value] in Object.entries(step.details)" :key="key">
+                  {{ key }}: {{ formatTraceDetail(value) }}
+                </li>
+              </ul>
+            </div>
             <p v-if="step.quality_warnings.length">
               <strong>Warnings:</strong> {{ step.quality_warnings.join(" • ") }}
             </p>
@@ -207,10 +222,31 @@ function statusTagType(status: string) {
             </div>
           </div>
 
+          <div v-if="Object.keys(result.score_breakdown).length" class="job-card-section">
+            <strong>Score Breakdown</strong>
+            <div class="job-chip-row">
+              <n-tag
+                v-for="entry in Object.entries(result.score_breakdown)"
+                :key="entry[0]"
+                size="small"
+                round
+              >
+                {{ entry[0] }} {{ entry[1] }}
+              </n-tag>
+            </div>
+          </div>
+
           <div class="job-card-section">
             <strong>Match Reasons</strong>
             <ul class="review-list">
               <li v-for="reason in result.match_reasons" :key="reason">{{ reason }}</li>
+            </ul>
+          </div>
+
+          <div v-if="result.evidence_quotes.length" class="job-card-section">
+            <strong>Evidence</strong>
+            <ul class="review-list">
+              <li v-for="quote in result.evidence_quotes" :key="quote">{{ quote }}</li>
             </ul>
           </div>
 

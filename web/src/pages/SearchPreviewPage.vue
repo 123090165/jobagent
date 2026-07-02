@@ -1,22 +1,24 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { NButton, NCard, NRadioButton, NRadioGroup, NSwitch, NTag } from "naive-ui";
+import { NButton, NCard, NCheckbox, NCheckboxGroup, NSwitch, NTag } from "naive-ui";
 
 import StepProgress from "../components/StepProgress.vue";
 import { useProfileSessionStore } from "../stores/profileSession";
 import type { CreateJobSearchRunPayload, JobSearchRun } from "../types/profileSession";
 
-type SearchSource = "cuhksz_career" | "mock";
+type SearchSource = "cuhksz_career" | "linkedin" | "remoteok";
 
 const route = useRoute();
 const router = useRouter();
 const profileSessionStore = useProfileSessionStore();
 const sessionId = computed(() => String(route.params.sessionId ?? ""));
-const selectedSearchSource = ref<SearchSource>("cuhksz_career");
+const selectedSearchSources = ref<SearchSource[]>(["cuhksz_career"]);
+const useLocalDemo = ref(false);
 const useLlm = ref(false);
 const maxResults = ref(10);
 const selectedLlmProvider = computed(() => (useLlm.value ? "deepseek" : "ollama"));
+const canStartSearch = computed(() => useLocalDemo.value || selectedSearchSources.value.length > 0);
 
 const latestResultRun = computed<JobSearchRun | null>(() => {
   return (
@@ -43,12 +45,28 @@ const llmStatusLabel = computed(() => {
 });
 
 const providerStatusLabel = computed(() => {
+  if (useLocalDemo.value) {
+    return "Local demo provider ready";
+  }
+  const selected = selectedSearchSources.value.join(", ") || "none";
   const status = profileSessionStore.jobSearchProviderStatus;
   if (!status) {
-    return "Provider status unavailable.";
+    return `Selected sources: ${selected}`;
+  }
+  if (status.provider === "multi_source") {
+    if (status.configured) {
+      return `Selected sources: ${selected}${status.reason ? ` - ${status.reason}` : ""}`;
+    }
+    return `Provider unavailable${status.reason ? ` - ${status.reason}` : ""}`;
   }
   if (status.provider === "mock") {
     return "Local demo provider ready";
+  }
+  if (status.provider === "serper_web") {
+    if (status.configured) {
+      return `Web search ready${status.search_url ? ` - ${status.search_url}` : ""}`;
+    }
+    return `Web search unavailable${status.reason ? ` - ${status.reason}` : ""}`;
   }
   if (status.configured) {
     return `CUHKSZ Career ready${status.search_url ? ` • ${status.search_url}` : ""}`;
@@ -59,9 +77,10 @@ const providerStatusLabel = computed(() => {
 function buildPayload(): CreateJobSearchRunPayload {
   return {
     session_id: sessionId.value,
-    search_mode: selectedSearchSource.value === "mock" ? "local_mock" : "live_search",
-    search_provider: selectedSearchSource.value === "mock" ? "mock" : "cuhksz_career",
-    use_llm: selectedSearchSource.value === "mock" ? false : useLlm.value,
+    search_mode: useLocalDemo.value ? "local_mock" : "live_search",
+    search_provider: useLocalDemo.value ? "mock" : "multi_source",
+    selected_sources: useLocalDemo.value ? [] : selectedSearchSources.value,
+    use_llm: useLocalDemo.value ? false : useLlm.value,
     max_results: maxResults.value
   };
 }
@@ -81,16 +100,28 @@ onMounted(async () => {
     }
     await profileSessionStore.loadJobSearchRuns(sessionId.value);
     await profileSessionStore.loadLlmStatus(useLlm.value);
-    await profileSessionStore.loadJobSearchProviderStatus(selectedSearchSource.value);
+    await profileSessionStore.loadJobSearchProviderStatus(useLocalDemo.value ? "mock" : "multi_source");
     await refreshPreview();
   } catch {
     // Error state is rendered from the store.
   }
 });
 
-watch(selectedSearchSource, async (value) => {
+watch(selectedSearchSources, async () => {
   try {
-    await profileSessionStore.loadJobSearchProviderStatus(value);
+    await profileSessionStore.loadJobSearchProviderStatus(useLocalDemo.value ? "mock" : "multi_source");
+    await refreshPreview();
+  } catch {
+    // Error state is rendered from the store.
+  }
+}, { deep: true });
+
+watch(useLocalDemo, async (value) => {
+  if (value) {
+    useLlm.value = false;
+  }
+  try {
+    await profileSessionStore.loadJobSearchProviderStatus(value ? "mock" : "multi_source");
     await refreshPreview();
   } catch {
     // Error state is rendered from the store.
@@ -145,7 +176,7 @@ function seeResult() {
         <n-button secondary @click="goBackToConfirmed">Back to Confirmed Profile</n-button>
         <n-button
           type="primary"
-          :disabled="!profileSessionStore.jobSearchPreview"
+          :disabled="!profileSessionStore.jobSearchPreview || !canStartSearch"
           :loading="profileSessionStore.isJobSearchCreating"
           @click="startJobSearch"
         >
@@ -157,16 +188,22 @@ function seeResult() {
       <n-card title="Search Setup" size="small" class="job-search-setup-card">
         <div class="job-search-setup">
           <div class="job-search-setup-row">
-            <span class="job-search-setup-label">Search Source</span>
-            <n-radio-group v-model:value="selectedSearchSource">
-              <n-radio-button value="cuhksz_career">CUHKSZ Career</n-radio-button>
-              <n-radio-button value="mock">Local Demo</n-radio-button>
-            </n-radio-group>
+            <span class="job-search-setup-label">Recruiting Websites</span>
+            <n-checkbox-group v-model:value="selectedSearchSources" :disabled="useLocalDemo">
+              <n-checkbox value="cuhksz_career">CUHKSZ Career</n-checkbox>
+              <n-checkbox value="linkedin">LinkedIn</n-checkbox>
+              <n-checkbox value="remoteok">RemoteOK</n-checkbox>
+            </n-checkbox-group>
+          </div>
+
+          <div class="job-search-setup-row">
+            <span class="job-search-setup-label">Use Local Demo</span>
+            <n-switch v-model:value="useLocalDemo" />
           </div>
 
           <div class="job-search-setup-row">
             <span class="job-search-setup-label">Use DeepSeek API for analysis</span>
-            <n-switch v-model:value="useLlm" :disabled="selectedSearchSource === 'mock'" />
+            <n-switch v-model:value="useLlm" :disabled="useLocalDemo" />
           </div>
 
           <div class="job-search-setup-row">
@@ -208,10 +245,15 @@ function seeResult() {
         <n-card title="Provider Queries" size="small" class="job-search-summary">
           <div class="job-status-row">
             <n-tag round>{{ profileSessionStore.jobSearchPreview.planning_mode }}</n-tag>
+            <n-tag round>{{ profileSessionStore.jobSearchPreview.search_source_kind }}</n-tag>
             <span>
               Query: {{ profileSessionStore.jobSearchPreview.query }}
             </span>
           </div>
+          <p>
+            <strong>Selected Sources:</strong>
+            {{ profileSessionStore.jobSearchPreview.selected_sources.join(", ") || "None" }}
+          </p>
           <ul class="review-list">
             <li
               v-for="query in profileSessionStore.jobSearchPreview.provider_queries"
@@ -229,8 +271,164 @@ function seeResult() {
           </p>
         </n-card>
 
+        <n-card title="Recall And Ranking Plan" size="small" class="job-search-summary">
+          <div class="confirmed-grid">
+            <div>
+              <strong>Recall Queries</strong>
+              <ul class="review-list">
+                <li
+                  v-for="query in profileSessionStore.jobSearchPreview.recall_queries"
+                  :key="query"
+                >
+                  {{ query }}
+                </li>
+              </ul>
+            </div>
+            <div>
+              <strong>Ranking Signals</strong>
+              <div class="job-chip-row">
+                <n-tag
+                  v-for="signal in profileSessionStore.jobSearchPreview.ranking_signals"
+                  :key="signal"
+                  size="small"
+                  round
+                >
+                  {{ signal }}
+                </n-tag>
+              </div>
+            </div>
+          </div>
+          <ul
+            v-if="profileSessionStore.jobSearchPreview.search_source_notes.length"
+            class="review-list"
+          >
+            <li
+              v-for="note in profileSessionStore.jobSearchPreview.search_source_notes"
+              :key="note"
+            >
+              {{ note }}
+            </li>
+          </ul>
+        </n-card>
+
+        <n-card
+          v-if="profileSessionStore.jobSearchPreview.search_intent"
+          title="Search Intent"
+          size="small"
+          class="job-search-summary"
+        >
+          <div class="confirmed-grid">
+            <div>
+              <strong>Role Titles</strong>
+              <div class="job-chip-row">
+                <n-tag
+                  v-for="item in profileSessionStore.jobSearchPreview.search_intent.role_titles"
+                  :key="item"
+                  size="small"
+                  round
+                >
+                  {{ item }}
+                </n-tag>
+              </div>
+            </div>
+            <div>
+              <strong>Role Families</strong>
+              <div class="job-chip-row">
+                <n-tag
+                  v-for="item in profileSessionStore.jobSearchPreview.search_intent.role_families"
+                  :key="item"
+                  size="small"
+                  round
+                >
+                  {{ item }}
+                </n-tag>
+              </div>
+            </div>
+            <div>
+              <strong>Industry Domains</strong>
+              <div class="job-chip-row">
+                <n-tag
+                  v-for="item in profileSessionStore.jobSearchPreview.search_intent.industry_domains"
+                  :key="item"
+                  size="small"
+                  round
+                >
+                  {{ item }}
+                </n-tag>
+              </div>
+            </div>
+            <div>
+              <strong>Evidence Skills</strong>
+              <div class="job-chip-row">
+                <n-tag
+                  v-for="item in profileSessionStore.jobSearchPreview.search_intent.evidence_skills"
+                  :key="item"
+                  size="small"
+                  round
+                >
+                  {{ item }}
+                </n-tag>
+              </div>
+            </div>
+            <div>
+              <strong>Generic Tools</strong>
+              <div class="job-chip-row">
+                <n-tag
+                  v-for="item in profileSessionStore.jobSearchPreview.search_intent.generic_tools"
+                  :key="item"
+                  size="small"
+                  round
+                >
+                  {{ item }}
+                </n-tag>
+              </div>
+            </div>
+            <div>
+              <strong>Constraints</strong>
+              <p>{{ profileSessionStore.jobSearchPreview.search_intent.constraints.join(", ") || "None" }}</p>
+            </div>
+          </div>
+        </n-card>
+
+        <n-card title="Query Budget" size="small" class="job-search-summary">
+          <div class="confirmed-grid">
+            <div>
+              <strong>Provider query groups</strong>
+              <p>{{ profileSessionStore.jobSearchPreview.provider_query_count }}</p>
+            </div>
+            <div>
+              <strong>Estimated provider requests</strong>
+              <p>{{ profileSessionStore.jobSearchPreview.estimated_provider_requests }}</p>
+            </div>
+            <div>
+              <strong>Candidate pool cap</strong>
+              <p>{{ profileSessionStore.jobSearchPreview.estimated_candidate_pool_size }}</p>
+            </div>
+            <div>
+              <strong>Estimated LLM requests</strong>
+              <p>{{ profileSessionStore.jobSearchPreview.estimated_total_llm_requests }}</p>
+            </div>
+          </div>
+          <p class="flow-meta">
+            Planning {{ profileSessionStore.jobSearchPreview.estimated_llm_planning_requests }},
+            filtering {{ profileSessionStore.jobSearchPreview.estimated_llm_filtering_requests }},
+            JD analysis {{ profileSessionStore.jobSearchPreview.estimated_llm_analysis_requests }}
+          </p>
+          <ul
+            v-if="profileSessionStore.jobSearchPreview.query_strategy_notes.length"
+            class="review-list"
+          >
+            <li
+              v-for="note in profileSessionStore.jobSearchPreview.query_strategy_notes"
+              :key="note"
+            >
+              {{ note }}
+            </li>
+          </ul>
+        </n-card>
+
         <div class="confirmed-grid">
-          <n-card title="CUHKSZ Search Terms" size="small">
+          <n-card title="Provider Search Terms" size="small">
             <div class="job-chip-row">
               <n-tag
                 v-for="term in profileSessionStore.jobSearchPreview.provider_search_terms"
@@ -249,7 +447,7 @@ function seeResult() {
             </div>
           </n-card>
 
-          <n-card title="CUHKSZ Search URLs" size="small">
+          <n-card title="Provider Search URLs" size="small">
             <ul class="review-list">
               <li
                 v-for="url in profileSessionStore.jobSearchPreview.provider_search_urls"

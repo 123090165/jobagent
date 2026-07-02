@@ -5,6 +5,7 @@ from app.services.job_search_providers.base import RawJobCandidate
 
 class MockJobSearchProvider:
     provider_name = "mock"
+    provider_kind = "mock"
 
     def search_jobs(self, *, query: str, location: str | None, limit: int) -> list[RawJobCandidate]:
         base_location = location or "Remote"
@@ -49,6 +50,9 @@ class MockJobSearchProvider:
                     source_provider=self.provider_name,
                     snippet=snippet,
                     raw_description=snippet,
+                    discovery_query=query,
+                    discovery_rank=index + 1,
+                    detail_status="mock_inline",
                 )
             )
         return items

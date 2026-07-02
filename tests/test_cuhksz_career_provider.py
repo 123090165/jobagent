@@ -95,6 +95,25 @@ def test_cuhksz_provider_fetches_search_url_with_title_params() -> None:
     assert fetched_urls[0] != CUHKSZ_CAREER_SEARCH_URL
 
 
+def test_cuhksz_provider_reuses_cached_fetches_for_same_url() -> None:
+    fetched_urls: list[str] = []
+
+    def fetcher(url: str) -> str:
+        fetched_urls.append(url)
+        if "/job/view/id/" in url:
+            return read_fixture("cuhksz_job_detail_sample.html")
+        return read_fixture("cuhksz_job_list_sample.html")
+
+    provider = CUHKSZCareerProvider(fetcher=fetcher)
+
+    provider.search_jobs(query="AI Health Algorithm Intern PPG ECG", location=None, limit=1)
+    provider.search_jobs(query="AI Health Algorithm Intern PPG ECG", location=None, limit=1)
+
+    assert len(fetched_urls) == 2
+    assert any("title=%E7%AE%97%E6%B3%95" in url for url in fetched_urls)
+    assert any("/job/view/id/" in url for url in fetched_urls)
+
+
 def test_cuhksz_provider_keeps_candidates_without_provider_side_match() -> None:
     provider = CUHKSZCareerProvider(
         list_page_html=read_fixture("cuhksz_job_list_sample.html"),

@@ -138,6 +138,8 @@ export interface JobSearchResult {
   match_reasons: string[];
   risks: string[];
   match_score: number;
+  score_breakdown: Record<string, number>;
+  evidence_quotes: string[];
   recommended_action: string;
   analysis_mode: "deterministic" | "llm" | "fallback" | "mock";
   confidence_label: "strong" | "medium" | "limited" | "weak";
@@ -154,6 +156,7 @@ export interface JobSearchTraceStep {
   fallback_reason: string | null;
   guardrails: string[];
   quality_warnings: string[];
+  details: Record<string, unknown>;
   started_at: string | null;
   completed_at: string | null;
   duration_ms: number | null;
@@ -170,6 +173,7 @@ export interface JobSearchRun {
   search_mode: "local_mock" | "live_search";
   llm_enabled: boolean;
   search_provider: string | null;
+  selected_sources: string[];
   status: "pending" | "running" | "completed" | "failed";
   error_message: string | null;
   results: JobSearchResult[];
@@ -181,6 +185,23 @@ export interface JobSearchRunResponse {
   job_search_run: JobSearchRun;
   profile_session: ProfileSession;
   steps: JobSearchTraceStep[];
+}
+
+export interface JobSearchIntent {
+  role_titles: string[];
+  role_families: string[];
+  industry_domains: string[];
+  evidence_skills: string[];
+  generic_tools: string[];
+  constraints: string[];
+  negative_signals: string[];
+  broad_queries: string[];
+  domain_queries: string[];
+  evidence_queries: string[];
+  tool_queries: string[];
+  mode: "deterministic" | "llm" | "fallback";
+  fallback_reason: string | null;
+  quality_warnings: string[];
 }
 
 export interface JobSearchPreview {
@@ -195,8 +216,22 @@ export interface JobSearchPreview {
   target_roles: string[];
   keywords: string[];
   provider_queries: string[];
+  search_intent: JobSearchIntent | null;
+  selected_sources: string[];
+  search_source_kind: "mock" | "native_job_board" | "native_api" | "search_engine" | "direct_crawler" | "hybrid";
+  search_source_notes: string[];
+  recall_queries: string[];
+  ranking_signals: string[];
   provider_search_terms: string[];
   provider_search_urls: string[];
+  provider_query_count: number;
+  estimated_provider_requests: number;
+  estimated_candidate_pool_size: number;
+  estimated_llm_planning_requests: number;
+  estimated_llm_filtering_requests: number;
+  estimated_llm_analysis_requests: number;
+  estimated_total_llm_requests: number;
+  query_strategy_notes: string[];
   search_signal_terms: string[];
   excluded_signals: string[];
   ranking_policy: string;
@@ -229,13 +264,16 @@ export interface JobSearchProviderStatus {
   base_url: string | null;
   search_url: string | null;
   allowlisted_domains: string[];
+  source_kind: "mock" | "native_job_board" | "native_api" | "search_engine" | "direct_crawler" | "hybrid" | string;
+  detail_strategy: string;
 }
 
 export interface CreateJobSearchRunPayload {
   session_id: string;
   query?: string | null;
   search_mode?: "local_mock" | "live_search";
-  search_provider?: "mock" | "cuhksz_career";
+  search_provider?: "mock" | "cuhksz_career" | "linkedin" | "remoteok" | "serper_web" | "multi_source";
+  selected_sources?: Array<"cuhksz_career" | "linkedin" | "remoteok">;
   use_llm?: boolean;
   locations?: string[];
   target_roles?: string[];

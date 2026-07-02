@@ -262,6 +262,7 @@ def init_database(connection: sqlite3.Connection) -> None:
             fallback_reason TEXT,
             guardrails_json TEXT NOT NULL,
             quality_warnings_json TEXT NOT NULL,
+            details_json TEXT NOT NULL DEFAULT '{}',
             started_at TEXT,
             completed_at TEXT,
             duration_ms REAL,
@@ -279,6 +280,7 @@ def init_database(connection: sqlite3.Connection) -> None:
     _ensure_column(connection, "job_search_runs", "llm_enabled", "INTEGER DEFAULT 0")
     _ensure_column(connection, "job_search_runs", "search_provider", "TEXT")
     _ensure_column(connection, "job_search_runs", "error_message", "TEXT")
+    _ensure_column(connection, "job_search_trace_steps", "details_json", "TEXT DEFAULT '{}'")
     _ensure_column(connection, "parsed_resume_reviews", "analysis_mode", "TEXT DEFAULT 'deterministic'")
     _ensure_column(connection, "parsed_resume_reviews", "analysis_provider", "TEXT")
     _ensure_column(connection, "parsed_resume_reviews", "analysis_warnings_json", "TEXT DEFAULT '[]'")

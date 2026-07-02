@@ -187,14 +187,30 @@ def _normalize_update_payload(payload: UpdateProfileDraftRequest) -> UpdateProfi
 
 def _build_profile_draft_seed(parsed_review: ParsedResumeReview) -> dict[str, object]:
     skill_items = _clean_list(parsed_review.skills.get("items", []))
-    target_signals = _clean_list(parsed_review.target_signals)
+    raw_text = _raw_resume_text(parsed_review)
+    explicit_roles = _extract_target_roles_from_raw_text(raw_text)
+    role_matching_keywords = _extract_role_matching_keywords(raw_text)
+    raw_skill_terms = _extract_skill_terms_from_raw_text(raw_text)
+    target_signals = _clean_list(
+        parsed_review.target_signals
+        + explicit_roles
+        + role_matching_keywords
+    )
     highlights = _clean_list(parsed_review.basic_info.get("highlights", []))
-    roles = _derive_target_roles(skill_items, target_signals, parsed_review.work_experience)
-    directions = _derive_target_directions(target_signals)
-    prioritized_skills = _prioritize_core_skills(skill_items, target_signals)
+    roles = _derive_target_roles(
+        skill_items,
+        target_signals,
+        parsed_review.work_experience,
+        explicit_roles=explicit_roles,
+    )
+    directions = _derive_target_directions(target_signals, roles)
+    prioritized_skills = _prioritize_core_skills(
+        _clean_list(skill_items + raw_skill_terms),
+        target_signals,
+    )
     core_skills = prioritized_skills[:8]
     supporting_skills = prioritized_skills[8:16]
-    search_keywords = _clean_list(roles + prioritized_skills + target_signals)[:16]
+    search_keywords = _clean_list(roles + role_matching_keywords + prioritized_skills + target_signals)[:20]
     strengths = _clean_list(highlights + _derive_strengths(parsed_review))
     risks = _clean_list(parsed_review.quality_warnings)
     missing_questions = _clean_list(parsed_review.missing_info_questions)
@@ -206,7 +222,7 @@ def _build_profile_draft_seed(parsed_review: ParsedResumeReview) -> dict[str, ob
         "core_skills": core_skills,
         "supporting_skills": supporting_skills,
         "search_keywords": search_keywords,
-        "preferred_locations": [],
+        "preferred_locations": _extract_locations_from_raw_text(raw_text),
         "work_arrangements": [],
         "strengths": strengths,
         "risks": risks,
@@ -229,8 +245,10 @@ def _derive_target_roles(
     skill_items: list[str],
     target_signals: list[str],
     work_experience: list[dict[str, object]],
+    *,
+    explicit_roles: list[str] | None = None,
 ) -> list[str]:
-    roles: list[str] = []
+    roles: list[str] = _clean_list(explicit_roles or [])
     lowered_skills = " ".join(skill_items).lower()
     lowered_signals = " ".join(target_signals).lower()
     combined = f"{lowered_signals} {lowered_skills}"
@@ -238,19 +256,21 @@ def _derive_target_roles(
     for signal in target_signals:
         if _looks_like_explicit_role(signal):
             roles.append(signal)
-    if _has_health_focus(combined):
-        roles.extend(HEALTH_TARGET_ROLES)
-    if "backend engineering signal" in lowered_signals or any(
-        token in lowered_signals for token in ["backend engineer", "backend intern", "后端"]
-    ):
-        roles.append("Backend Engineer")
-    if "ai application signal" in lowered_signals or any(
-        token in lowered_signals for token in ["ai agent", "agent engineer", "llm"]
-    ):
+    if roles and any(token in " ".join(roles).lower() for token in ["ai agent", "llm", "ai application"]):
         roles.append("AI Application Engineer")
-    if "embedded systems signal" in lowered_signals or any(
+    if not roles and _has_health_focus(combined):
+        roles.extend(HEALTH_TARGET_ROLES)
+    if not roles and ("backend engineering signal" in lowered_signals or any(
+        token in lowered_signals for token in ["backend engineer", "backend intern", "后端"]
+    )):
+        roles.append("Backend Engineer")
+    if not roles and ("ai application signal" in lowered_signals or any(
+        token in lowered_signals for token in ["ai agent", "agent engineer", "llm"]
+    )):
+        roles.append("AI Application Engineer")
+    if not roles and ("embedded systems signal" in lowered_signals or any(
         token in lowered_signals for token in ["embedded engineer", "embedded intern", "嵌入式"]
-    ):
+    )):
         roles.append("Embedded Software Engineer")
 
     for item in work_experience:
@@ -262,19 +282,33 @@ def _derive_target_roles(
     return _clean_list(roles)[:5]
 
 
-def _derive_target_directions(target_signals: list[str]) -> list[str]:
+def _derive_target_directions(target_signals: list[str], roles: list[str] | None = None) -> list[str]:
     directions: list[str] = []
-    lowered = " ".join(target_signals).lower()
+    lowered = " ".join(_clean_list((roles or []) + target_signals)).lower()
     if _has_health_focus(lowered):
         directions.append("AI health algorithms and physiological signal processing")
+    if any(token in lowered for token in ["brand", "marketing", "campaign", "consumer", "content", "social media"]):
+        directions.append("Brand marketing, content operations, and consumer insights")
+    if any(token in lowered for token in ["museum", "cultural", "heritage", "exhibition", "public history"]):
+        directions.append("Museum education, cultural research, and public history")
+    if any(token in lowered for token in ["supply chain", "procurement", "logistics", "sourcing", "inventory", "trade"]):
+        directions.append("Supply chain operations, procurement, and logistics")
+    if any(token in lowered for token in ["finance", "financial", "investment", "risk", "banking", "quant"]):
+        directions.append("Finance, risk, and investment analysis")
+    if any(token in lowered for token in ["policy", "social research", "community", "governance"]):
+        directions.append("Policy research and social research")
     if "backend" in lowered:
         directions.append("Backend platform and API delivery")
-    if "ai application" in lowered or "ai agent" in lowered:
+    explicit_ai_signal = any(
+        token in lowered
+        for token in ["ai agent", "llm", "artificial intelligence", "ai engineer", "ai application engineer"]
+    )
+    if ("ai application" in lowered or "ai agent" in lowered) and (not directions or explicit_ai_signal):
         directions.append("Applied AI tooling and workflow automation")
     if "embedded" in lowered:
         directions.append("Embedded systems and edge device software")
     if not directions:
-        directions.append("General software engineering")
+        directions.append("Role-specific search based on confirmed profile evidence")
     return directions
 
 
@@ -300,6 +334,24 @@ def _looks_like_explicit_role(signal: str) -> bool:
     lowered = signal.strip().lower()
     if not lowered or lowered.endswith(" signal"):
         return False
+    english_role_terms = {
+        "engineer",
+        "intern",
+        "analyst",
+        "assistant",
+        "developer",
+        "scientist",
+        "researcher",
+        "manager",
+        "coordinator",
+        "specialist",
+    }
+    normalized = lowered
+    for separator in ["/", "-", "_", ",", ";", "|", "(", ")"]:
+        normalized = normalized.replace(separator, " ")
+    tokens = set(normalized.split())
+    chinese_role_terms = ["岗位", "实习", "工程师", "分析师"]
+    return bool(tokens & english_role_terms) or any(term in lowered for term in chinese_role_terms)
     role_terms = [
         "engineer",
         "intern",
@@ -325,6 +377,89 @@ def _derive_strengths(parsed_review: ParsedResumeReview) -> list[str]:
     if parsed_review.skills.get("count", 0):
         strengths.append("Skill inventory is explicit enough to seed search keywords.")
     return strengths
+
+
+def _raw_resume_text(parsed_review: ParsedResumeReview) -> str:
+    raw_output = parsed_review.raw_parser_output
+    if isinstance(raw_output, dict):
+        raw_text = raw_output.get("raw_text")
+        if isinstance(raw_text, str):
+            return raw_text
+    return ""
+
+
+def _extract_target_roles_from_raw_text(raw_text: str) -> list[str]:
+    for line in raw_text.splitlines():
+        label, value = _split_label_line(line)
+        if label in {"target role", "target roles", "desired role", "desired roles"}:
+            return _split_role_values(value)
+    return []
+
+
+def _extract_locations_from_raw_text(raw_text: str) -> list[str]:
+    for line in raw_text.splitlines():
+        label, value = _split_label_line(line)
+        if label in {"location", "preferred location", "preferred locations"}:
+            return _clean_list([value])
+    return []
+
+
+def _extract_role_matching_keywords(raw_text: str) -> list[str]:
+    return _extract_simple_section_items(raw_text, "role matching keywords", max_items=24)
+
+
+def _extract_skill_terms_from_raw_text(raw_text: str) -> list[str]:
+    terms: list[str] = []
+    for section_name in ["core skills", "skills"]:
+        terms.extend(_extract_simple_section_items(raw_text, section_name, max_items=32))
+    return _clean_list(terms)
+
+
+def _extract_simple_section_items(raw_text: str, section_name: str, *, max_items: int) -> list[str]:
+    lines = raw_text.splitlines()
+    in_section = False
+    items: list[str] = []
+    target = section_name.lower()
+    for line in lines:
+        stripped = line.strip()
+        if not stripped:
+            if in_section and items:
+                break
+            continue
+        if set(stripped) <= {"="}:
+            continue
+        lowered = stripped.lower().rstrip(":")
+        if not in_section and lowered == target:
+            in_section = True
+            continue
+        if in_section and stripped.isupper() and " " in stripped and items:
+            break
+        if in_section:
+            item = stripped.lstrip("-•* ").strip()
+            if ":" in item and len(item.split(":", 1)[0]) < 40:
+                continue
+            items.append(item)
+            if len(items) >= max_items:
+                break
+    return _clean_list(items)
+
+
+def _split_label_line(line: str) -> tuple[str, str]:
+    if ":" not in line:
+        return "", ""
+    label, value = line.split(":", 1)
+    return label.strip().lower(), value.strip()
+
+
+def _split_role_values(value: str) -> list[str]:
+    separators = [" / ", "/", ";", "|", ","]
+    values = [value]
+    for separator in separators:
+        split_values: list[str] = []
+        for item in values:
+            split_values.extend(item.split(separator))
+        values = split_values
+    return _clean_list(values)
 
 
 def _clean_list(values: list[object]) -> list[str]:

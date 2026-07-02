@@ -9,12 +9,17 @@ from app.services.search_signal_normalizer import build_bilingual_search_signals
 class FakePlannerLLM:
     def chat_completion_json(self, *, system_prompt: str, user_prompt: str) -> dict:
         return {
-            "queries": ["Backend Engineer Python FastAPI", "Platform Engineer Docker Python"],
-            "locations": ["Remote", "Tokyo"],
-            "target_roles": ["Backend Engineer", "Platform Engineer"],
-            "must_have_signals": ["Python", "FastAPI", "Docker"],
-            "avoid_signals": ["onsite only"],
-            "ranking_policy": "Prefer backend API work with platform depth.",
+            "role_titles": ["Backend Engineer", "Platform Engineer"],
+            "role_families": ["engineering"],
+            "industry_domains": ["Platform", "AI applications"],
+            "evidence_skills": ["APIs", "LLM applications"],
+            "generic_tools": ["Python", "FastAPI", "Docker"],
+            "constraints": ["Remote", "Tokyo"],
+            "negative_signals": ["onsite only"],
+            "broad_queries": ["Backend Engineer", "Platform Engineer"],
+            "domain_queries": ["Backend Engineer Platform"],
+            "evidence_queries": ["Backend Engineer APIs LLM applications"],
+            "tool_queries": ["Backend Engineer Python FastAPI"],
             "quality_warnings": [],
         }
 
@@ -55,6 +60,8 @@ def test_job_search_planner_llm_success_path() -> None:
     assert plan.mode == "llm"
     assert "Backend Engineer Python FastAPI" in plan.queries
     assert "Python" in plan.must_have_signals
+    assert plan.search_intent is not None
+    assert plan.search_intent.role_families == ["engineering"]
 
 
 def test_job_search_planner_fallback_path() -> None:
@@ -95,7 +102,7 @@ def test_deterministic_plan_keeps_bilingual_signals_for_future_english_sources()
     assert plan.mode == "deterministic"
     assert "语音识别" in " ".join(plan.queries)
     assert "ASR" in plan.must_have_signals
-    assert "Future English providers should use expanded English aliases" in plan.ranking_policy
+    assert "profile-derived role overlap" in plan.ranking_policy
 
 
 def test_deterministic_plan_uses_focused_provider_queries_for_health_algorithm() -> None:
@@ -111,8 +118,9 @@ def test_deterministic_plan_uses_focused_provider_queries_for_health_algorithm()
 
     plan = build_search_plan(profile, use_llm=False)
 
-    assert plan.queries[0] == "健康算法实习生 PPG ECG"
-    assert plan.queries[1] == "生理信号算法实习生 PPG ECG"
+    assert plan.queries[0] == "健康算法实习生"
+    assert any("健康算法实习生" in query and "PPG" in query for query in plan.queries)
+    assert any("生理信号算法实习生" in query and "PPG" in query for query in plan.queries)
     assert "Python" not in plan.queries[0]
     assert "MATLAB" not in plan.queries[0]
     assert "PPG" in plan.must_have_signals

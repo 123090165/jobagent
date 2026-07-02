@@ -153,6 +153,8 @@ def extract_cuhksz_jd_text(detail_html: str) -> tuple[str, list[str]]:
 
 class CUHKSZCareerProvider:
     provider_name = "cuhksz_career"
+    provider_kind = "native_job_board"
+    detail_strategy = "native_list_and_detail_crawl"
     base_url = CUHKSZ_CAREER_BASE_URL
     search_url = CUHKSZ_CAREER_SEARCH_URL
     allowed_domains = CUHKSZ_CAREER_ALLOWED_DOMAINS
@@ -167,6 +169,7 @@ class CUHKSZCareerProvider:
         self.fetcher = fetcher
         self.list_page_html = list_page_html
         self.detail_pages = detail_pages or {}
+        self._fetch_cache: dict[str, str] = {}
 
     def search_jobs(self, *, query: str, location: str | None, limit: int) -> list[RawJobCandidate]:
         title_terms = build_cuhksz_title_terms(query) or [_clean_text(query)]
@@ -187,6 +190,13 @@ class CUHKSZCareerProvider:
                 candidate = _build_list_candidate(item, provider_name=self.provider_name)
                 if candidate is None or not candidate.source_url or candidate.source_url.lower() in seen_urls:
                     continue
+                candidate = candidate.model_copy(
+                    update={
+                        "discovery_query": query,
+                        "discovery_rank": len(seen_urls) + 1,
+                        "detail_status": "detail_pending",
+                    }
+                )
                 seen_urls.add(candidate.source_url.lower())
 
                 if self.list_page_html is not None and (query_terms or location_terms):
@@ -211,6 +221,7 @@ class CUHKSZCareerProvider:
         if not candidate.source_url:
             return candidate.model_copy(
                 update={
+                    "detail_status": "detail_missing_url",
                     "provider_warnings": candidate.provider_warnings + ["Missing CUHKSZ detail URL."],
                 }
             )
@@ -223,6 +234,7 @@ class CUHKSZCareerProvider:
         except Exception as exc:
             return candidate.model_copy(
                 update={
+                    "detail_status": "detail_failed",
                     "provider_warnings": candidate.provider_warnings + [f"Detail fetch failed: {type(exc).__name__}."],
                 }
             )
@@ -257,12 +269,18 @@ class CUHKSZCareerProvider:
                 "location": merged_location,
                 "snippet": snippet or candidate.snippet,
                 "raw_description": raw_description or candidate.raw_description,
+                "detail_status": "detail_fetched",
             }
         )
 
     def _fetch(self, url: str) -> str:
+        cached = self._fetch_cache.get(url)
+        if cached is not None:
+            return cached
         if self.fetcher is not None:
-            return self.fetcher(url)
+            html = self.fetcher(url)
+            self._fetch_cache[url] = html
+            return html
         request = urllib.request.Request(
             url,
             headers={"User-Agent": CUHKSZ_CAREER_USER_AGENT},
@@ -270,7 +288,9 @@ class CUHKSZCareerProvider:
         )
         try:
             with urllib.request.urlopen(request, timeout=20.0) as response:
-                return response.read().decode("utf-8", errors="replace")
+                html = response.read().decode("utf-8", errors="replace")
+                self._fetch_cache[url] = html
+                return html
         except urllib.error.HTTPError as exc:
             raise JobSearchProviderError(f"CUHKSZ request failed with HTTP {exc.code} for {url}") from exc
         except urllib.error.URLError as exc:

@@ -29,6 +29,10 @@ def test_frontend_calls_backend_search_preview_endpoint() -> None:
     assert "jobSearchPreview" in store
     assert "provider_search_terms" in types
     assert "provider_search_urls" in types
+    assert "selected_sources" in types
+    assert "recall_queries" in types
+    assert "ranking_signals" in types
+    assert "search_source_kind" in types
 
 
 def test_confirmed_page_routes_to_preview_instead_of_creating_search_run() -> None:
@@ -41,15 +45,58 @@ def test_confirmed_page_routes_to_preview_instead_of_creating_search_run() -> No
 
 def test_job_search_result_page_can_return_to_preview() -> None:
     job_search_page = _read("pages/JobSearchPage.vue")
+    types = _read("types/profileSession.ts")
 
     assert "Back to Search Preview" in job_search_page
     assert 'name: "search-preview"' in job_search_page
+    assert "Score Breakdown" in job_search_page
+    assert "Evidence" in job_search_page
+    assert "Trace Details" in job_search_page
+    assert "score_breakdown" in types
+    assert "evidence_quotes" in types
 
 
 def test_search_preview_page_shows_provider_specific_search_urls() -> None:
     search_preview = _read("pages/SearchPreviewPage.vue")
 
-    assert "CUHKSZ Search Terms" in search_preview
-    assert "CUHKSZ Search URLs" in search_preview
+    assert "Provider Search Terms" in search_preview
+    assert "Provider Search URLs" in search_preview
     assert "provider_search_terms" in search_preview
     assert "provider_search_urls" in search_preview
+    assert "Recruiting Websites" in search_preview
+    assert "CUHKSZ Career" in search_preview
+    assert "LinkedIn" in search_preview
+    assert "RemoteOK" in search_preview
+    assert "selected_sources" in search_preview
+
+
+def test_search_preview_page_shows_query_budget() -> None:
+    search_preview = _read("pages/SearchPreviewPage.vue")
+    types = _read("types/profileSession.ts")
+
+    assert "Query Budget" in search_preview
+    assert "estimated_provider_requests" in search_preview
+    assert "estimated_total_llm_requests" in search_preview
+    assert "query_strategy_notes" in search_preview
+    assert "estimated_llm_filtering_requests" in types
+
+
+def test_search_preview_page_shows_generalized_search_intent() -> None:
+    search_preview = _read("pages/SearchPreviewPage.vue")
+    types = _read("types/profileSession.ts")
+
+    assert "Search Intent" in search_preview
+    assert "Role Families" in search_preview
+    assert "Industry Domains" in search_preview
+    assert "Evidence Skills" in search_preview
+    assert "Generic Tools" in search_preview
+    assert "search_intent" in types
+    assert "interface JobSearchIntent" in types
+
+
+def test_search_preview_page_separates_recall_queries_from_ranking_signals() -> None:
+    search_preview = _read("pages/SearchPreviewPage.vue")
+
+    assert "Recall And Ranking Plan" in search_preview
+    assert "Recall Queries" in search_preview
+    assert "Ranking Signals" in search_preview

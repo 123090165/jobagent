@@ -154,7 +154,7 @@ export async function getLlmStatus(useDeepseek = false): Promise<LlmStatus> {
 }
 
 export async function getJobSearchProviderStatus(
-  provider?: "mock" | "cuhksz_career"
+  provider?: "mock" | "cuhksz_career" | "linkedin" | "remoteok" | "serper_web" | "multi_source"
 ): Promise<JobSearchProviderStatus> {
   const response = await client.get<JobSearchProviderStatus>("/api/v1/job-search-providers/status", {
     params: { provider }

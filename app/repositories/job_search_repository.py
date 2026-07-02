@@ -9,6 +9,7 @@ from app.schemas.job_search import (
     JobSearchRun,
     JobSearchTraceStep,
 )
+from app.services.job_search_providers import selected_sources_from_provider_name
 from app.storage.database import get_connection, init_database
 
 
@@ -174,6 +175,7 @@ class JobSearchRepository:
         fallback_reason: str | None = None,
         guardrails: list[str] | None = None,
         quality_warnings: list[str] | None = None,
+        details: dict[str, object] | None = None,
     ) -> JobSearchTraceStep:
         now = _utc_now()
         step = JobSearchTraceStep(
@@ -187,6 +189,7 @@ class JobSearchRepository:
             fallback_reason=fallback_reason,
             guardrails=guardrails or [],
             quality_warnings=quality_warnings or [],
+            details=details or {},
             started_at=None,
             completed_at=None,
             duration_ms=None,
@@ -206,13 +209,14 @@ class JobSearchRepository:
                     fallback_reason,
                     guardrails_json,
                     quality_warnings_json,
+                    details_json,
                     started_at,
                     completed_at,
                     duration_ms,
                     created_at,
                     updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     step.step_id,
@@ -225,6 +229,7 @@ class JobSearchRepository:
                     step.fallback_reason,
                     json.dumps(step.guardrails),
                     json.dumps(step.quality_warnings),
+                    json.dumps(step.details),
                     None,
                     None,
                     None,
@@ -243,6 +248,7 @@ class JobSearchRepository:
         summary: str,
         guardrails: list[str] | None = None,
         quality_warnings: list[str] | None = None,
+        details: dict[str, object] | None = None,
     ) -> JobSearchTraceStep | None:
         now = _utc_now()
         with get_connection() as connection:
@@ -257,6 +263,7 @@ class JobSearchRepository:
                     fallback_reason = NULL,
                     guardrails_json = ?,
                     quality_warnings_json = ?,
+                    details_json = ?,
                     started_at = COALESCE(started_at, ?),
                     updated_at = ?
                 WHERE step_id = ?
@@ -267,6 +274,7 @@ class JobSearchRepository:
                     summary,
                     json.dumps(guardrails or []),
                     json.dumps(quality_warnings or []),
+                    json.dumps(details or {}),
                     now.isoformat(),
                     now.isoformat(),
                     step_id,
@@ -286,6 +294,7 @@ class JobSearchRepository:
         fallback_reason: str | None = None,
         guardrails: list[str] | None = None,
         quality_warnings: list[str] | None = None,
+        details: dict[str, object] | None = None,
     ) -> JobSearchTraceStep | None:
         return self._finalize_trace_step(
             step_id,
@@ -295,6 +304,7 @@ class JobSearchRepository:
             fallback_reason=fallback_reason,
             guardrails=guardrails,
             quality_warnings=quality_warnings,
+            details=details,
         )
 
     def fail_trace_step(
@@ -306,6 +316,7 @@ class JobSearchRepository:
         fallback_reason: str | None = None,
         guardrails: list[str] | None = None,
         quality_warnings: list[str] | None = None,
+        details: dict[str, object] | None = None,
     ) -> JobSearchTraceStep | None:
         return self._finalize_trace_step(
             step_id,
@@ -315,6 +326,7 @@ class JobSearchRepository:
             fallback_reason=fallback_reason,
             guardrails=guardrails,
             quality_warnings=quality_warnings,
+            details=details,
         )
 
     def list_trace_steps(self, run_id: str) -> list[JobSearchTraceStep]:
@@ -333,6 +345,7 @@ class JobSearchRepository:
                     fallback_reason,
                     guardrails_json,
                     quality_warnings_json,
+                    details_json,
                     started_at,
                     completed_at,
                     duration_ms
@@ -357,11 +370,12 @@ class JobSearchRepository:
                     status,
                     mode,
                     summary,
-                    fallback_reason,
-                    guardrails_json,
-                    quality_warnings_json,
-                    started_at,
-                    completed_at,
+                   fallback_reason,
+                   guardrails_json,
+                   quality_warnings_json,
+                    details_json,
+                   started_at,
+                   completed_at,
                     duration_ms
                 FROM job_search_trace_steps
                 WHERE step_id = ?
@@ -400,6 +414,7 @@ class JobSearchRepository:
             search_mode=search_mode,
             llm_enabled=llm_enabled,
             search_provider=search_provider,
+            selected_sources=selected_sources_from_provider_name(search_provider),
             status=status,
             error_message=error_message,
             results=results,
@@ -491,6 +506,7 @@ class JobSearchRepository:
         fallback_reason: str | None,
         guardrails: list[str] | None,
         quality_warnings: list[str] | None,
+        details: dict[str, object] | None,
     ) -> JobSearchTraceStep | None:
         existing = self.get_trace_step(step_id)
         if existing is None:
@@ -511,6 +527,7 @@ class JobSearchRepository:
                     fallback_reason = ?,
                     guardrails_json = ?,
                     quality_warnings_json = ?,
+                    details_json = ?,
                     started_at = ?,
                     completed_at = ?,
                     duration_ms = ?,
@@ -524,6 +541,7 @@ class JobSearchRepository:
                     fallback_reason,
                     json.dumps(guardrails or []),
                     json.dumps(quality_warnings or []),
+                    json.dumps(details if details is not None else existing.details),
                     started_at.isoformat(),
                     now.isoformat(),
                     duration_ms,
@@ -547,6 +565,7 @@ class JobSearchRepository:
             search_mode=row["search_mode"],
             llm_enabled=bool(row["llm_enabled"]),
             search_provider=row["search_provider"],
+            selected_sources=selected_sources_from_provider_name(row["search_provider"]),
             status=row["status"],
             error_message=row["error_message"],
             results=[
@@ -570,6 +589,7 @@ class JobSearchRepository:
             fallback_reason=row["fallback_reason"],
             guardrails=json.loads(row["guardrails_json"]),
             quality_warnings=json.loads(row["quality_warnings_json"]),
+            details=json.loads(row["details_json"] or "{}"),
             started_at=datetime.fromisoformat(row["started_at"]) if row["started_at"] else None,
             completed_at=(
                 datetime.fromisoformat(row["completed_at"]) if row["completed_at"] else None

@@ -15,6 +15,32 @@ JobSearchResultSource: TypeAlias = Literal["local_mock", "live_search"]
 JobSearchAnalysisMode: TypeAlias = Literal["deterministic", "llm", "fallback", "mock"]
 JobSearchConfidenceLabel: TypeAlias = Literal["strong", "medium", "limited", "weak"]
 JobSearchPlanningMode: TypeAlias = Literal["deterministic", "llm", "fallback"]
+JobSearchSourceKind: TypeAlias = Literal[
+    "mock",
+    "native_job_board",
+    "native_api",
+    "search_engine",
+    "direct_crawler",
+    "hybrid",
+]
+JobSearchSelectedSource: TypeAlias = Literal["cuhksz_career", "linkedin", "remoteok"]
+
+
+class JobSearchIntent(BaseModel):
+    role_titles: list[str] = Field(default_factory=list)
+    role_families: list[str] = Field(default_factory=list)
+    industry_domains: list[str] = Field(default_factory=list)
+    evidence_skills: list[str] = Field(default_factory=list)
+    generic_tools: list[str] = Field(default_factory=list)
+    constraints: list[str] = Field(default_factory=list)
+    negative_signals: list[str] = Field(default_factory=list)
+    broad_queries: list[str] = Field(default_factory=list)
+    domain_queries: list[str] = Field(default_factory=list)
+    evidence_queries: list[str] = Field(default_factory=list)
+    tool_queries: list[str] = Field(default_factory=list)
+    mode: JobSearchPlanningMode = "deterministic"
+    fallback_reason: str | None = None
+    quality_warnings: list[str] = Field(default_factory=list)
 
 
 class JobSearchResult(BaseModel):
@@ -31,6 +57,8 @@ class JobSearchResult(BaseModel):
     match_reasons: list[str] = Field(default_factory=list)
     risks: list[str] = Field(default_factory=list)
     match_score: int
+    score_breakdown: dict[str, int] = Field(default_factory=dict)
+    evidence_quotes: list[str] = Field(default_factory=list)
     recommended_action: str
     analysis_mode: JobSearchAnalysisMode = "mock"
     confidence_label: JobSearchConfidenceLabel = "limited"
@@ -47,6 +75,7 @@ class JobSearchTraceStep(BaseModel):
     fallback_reason: str | None = None
     guardrails: list[str] = Field(default_factory=list)
     quality_warnings: list[str] = Field(default_factory=list)
+    details: dict[str, object] = Field(default_factory=dict)
     started_at: datetime | None = None
     completed_at: datetime | None = None
     duration_ms: float | None = None
@@ -63,6 +92,7 @@ class JobSearchRun(BaseModel):
     search_mode: JobSearchMode = "local_mock"
     llm_enabled: bool = False
     search_provider: str | None = None
+    selected_sources: list[str] = Field(default_factory=list)
     status: JobSearchRunStatus = "completed"
     error_message: str | None = None
     results: list[JobSearchResult] = Field(default_factory=list)
@@ -75,6 +105,7 @@ class JobSearchRunCreateRequest(BaseModel):
     query: str | None = None
     search_mode: JobSearchMode = "live_search"
     search_provider: str | None = None
+    selected_sources: list[JobSearchSelectedSource] = Field(default_factory=list)
     use_llm: bool = False
     locations: list[str] = Field(default_factory=list)
     target_roles: list[str] = Field(default_factory=list)
@@ -93,6 +124,7 @@ class JobSearchPreviewResponse(BaseModel):
     confirmed_profile_id: str
     search_mode: JobSearchMode
     search_provider: str | None = None
+    selected_sources: list[str] = Field(default_factory=list)
     llm_enabled: bool = False
     llm_provider: str | None = None
     query: str
@@ -100,8 +132,21 @@ class JobSearchPreviewResponse(BaseModel):
     target_roles: list[str] = Field(default_factory=list)
     keywords: list[str] = Field(default_factory=list)
     provider_queries: list[str] = Field(default_factory=list)
+    search_intent: JobSearchIntent | None = None
+    search_source_kind: JobSearchSourceKind = "native_job_board"
+    search_source_notes: list[str] = Field(default_factory=list)
+    recall_queries: list[str] = Field(default_factory=list)
+    ranking_signals: list[str] = Field(default_factory=list)
     provider_search_terms: list[str] = Field(default_factory=list)
     provider_search_urls: list[str] = Field(default_factory=list)
+    provider_query_count: int = 0
+    estimated_provider_requests: int = 0
+    estimated_candidate_pool_size: int = 0
+    estimated_llm_planning_requests: int = 0
+    estimated_llm_filtering_requests: int = 0
+    estimated_llm_analysis_requests: int = 0
+    estimated_total_llm_requests: int = 0
+    query_strategy_notes: list[str] = Field(default_factory=list)
     search_signal_terms: list[str] = Field(default_factory=list)
     excluded_signals: list[str] = Field(default_factory=list)
     ranking_policy: str

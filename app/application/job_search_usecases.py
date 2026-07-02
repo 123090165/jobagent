@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import Counter
+from dataclasses import dataclass, field
 from uuid import NAMESPACE_URL, uuid5
 
 from fastapi import BackgroundTasks
@@ -31,6 +32,7 @@ from app.schemas.job_search import (
 from app.services.errors import JobAgentError
 from app.services.job_candidate_filter import (
     CandidateFilterResult,
+    CandidateScorecard,
     filter_candidates,
 )
 from app.services.job_search_planner import (
@@ -41,13 +43,21 @@ from app.services.job_search_planner import (
 from app.services.job_search_providers import (
     JobSearchProvider,
     RawJobCandidate,
+    encode_selected_sources,
     normalize_job_search_provider_name,
+    normalize_job_search_source_name,
     resolve_job_search_provider,
+    selected_sources_from_provider_name,
 )
 from app.services.job_search_providers.cuhksz_career_provider import (
     build_cuhksz_search_url,
     build_cuhksz_title_terms,
 )
+from app.services.job_search_providers.serper_web_provider import (
+    build_serper_preview_search_url,
+    configured_serper_search_sites,
+)
+from app.services.job_search_providers.remoteok_provider import REMOTEOK_API_URL
 from app.services.llm_provider import JSONChatLLM, resolve_llm_provider_for_switch
 
 TRACE_STEP_NAMES = [
@@ -71,6 +81,52 @@ ASSEMBLY_GUARDRAILS = [
     "Only return jobs backed by provider results and source metadata.",
     "Do not invent source URLs or provider names.",
 ]
+MAX_PROVIDER_QUERIES_PER_RUN = 3
+MAX_PROVIDER_LOCATIONS_PER_RUN = 3
+MAX_PROVIDER_PREVIEW_TERMS = 8
+
+
+@dataclass
+class ProviderQueryStat:
+    query: str
+    location: str | None
+    requested_limit: int
+    returned_count: int
+    new_candidate_count: int
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "query": self.query,
+            "location": self.location,
+            "requested_limit": self.requested_limit,
+            "returned_count": self.returned_count,
+            "new_candidate_count": self.new_candidate_count,
+        }
+
+
+@dataclass
+class ProviderRecallResult:
+    candidates: list[RawJobCandidate]
+    provider_name: str
+    provider_kind: str
+    query_stats: list[ProviderQueryStat] = field(default_factory=list)
+    raw_candidate_count: int = 0
+    duplicate_count: int = 0
+    candidate_pool_cap: int = 0
+
+    def details(self) -> dict[str, object]:
+        return {
+            "provider": self.provider_name,
+            "source_kind": self.provider_kind,
+            "selected_sources": selected_sources_from_provider_name(self.provider_name),
+            "source_candidate_counts": dict(Counter(candidate.source_provider for candidate in self.candidates)),
+            "query_count": len(self.query_stats),
+            "raw_candidate_count": self.raw_candidate_count,
+            "duplicate_count": self.duplicate_count,
+            "deduped_candidate_count": len(self.candidates),
+            "candidate_pool_cap": self.candidate_pool_cap,
+            "query_stats": [item.to_dict() for item in self.query_stats],
+        }
 
 
 def create_job_search_run(
@@ -130,8 +186,11 @@ def create_job_search_run(
             steps=[],
         )
 
-    provider_name = normalize_job_search_provider_name(
-        getattr(job_search_provider, "provider_name", None) or payload.search_provider
+    selected_sources = _resolve_selected_sources(payload)
+    provider_name = (
+        normalize_job_search_provider_name(getattr(job_search_provider, "provider_name", None))
+        if job_search_provider is not None
+        else _provider_name_from_selected_sources(payload, selected_sources)
     )
     run = search_repository.create_pending(
         session_id=session.session_id,
@@ -223,6 +282,14 @@ def execute_job_search_run(
             fallback_reason=search_plan.fallback_reason,
             guardrails=PLANNING_GUARDRAILS,
             quality_warnings=search_plan.quality_warnings,
+            details={
+                "provider_queries": search_plan.queries,
+                "recall_queries": _recall_queries_from_plan(search_plan),
+                "ranking_signals": _ranking_signals_from_plan(search_plan),
+                "target_roles": search_plan.target_roles,
+                "locations": search_plan.locations,
+                "planning_mode": search_plan.mode,
+            },
         )
 
         provider_step = steps[1]
@@ -234,16 +301,21 @@ def execute_job_search_run(
             summary=f"Collecting provider-backed job candidates from {provider_name}.",
             guardrails=ASSEMBLY_GUARDRAILS,
         )
-        raw_candidates = _run_provider_search(
+        recall_result = _run_provider_search(
             provider,
             search_plan=search_plan,
             max_results=max_results,
         )
+        raw_candidates = recall_result.candidates
         search_repository.complete_trace_step(
             provider_step.step_id,
             mode=provider_mode,
-            summary=f"Collected {len(raw_candidates)} candidates from {provider_name}.",
+            summary=(
+                f"Collected {recall_result.raw_candidate_count} raw candidates from {provider_name}; "
+                f"{len(raw_candidates)} remained after URL/title dedupe."
+            ),
             guardrails=ASSEMBLY_GUARDRAILS,
+            details=recall_result.details(),
         )
 
         filter_step = steps[2]
@@ -268,6 +340,12 @@ def execute_job_search_run(
             fallback_reason=filtered.fallback_reason,
             guardrails=FILTER_GUARDRAILS,
             quality_warnings=filtered.quality_warnings,
+            details={
+                "input_candidate_count": len(raw_candidates),
+                "selected_candidate_count": len(filtered.selected_candidates),
+                "selected_indexes": filtered.selected_indexes,
+                "llm_request_count": 1 if use_llm_analysis and raw_candidates else 0,
+            },
         )
 
         jd_step = steps[3]
@@ -289,13 +367,18 @@ def execute_job_search_run(
             fallback_reason=analyses["fallback_reason"],
             guardrails=analyses["guardrails"],
             quality_warnings=analyses["quality_warnings"],
+            details={
+                "analyzed_candidate_count": len(analyses["items"]),
+                "llm_request_count": len(analyses["items"]) if use_llm_analysis else 0,
+            },
         )
 
         matching_step = steps[4]
+        matching_mode = "llm" if filtered.mode == "llm" else "deterministic"
         search_repository.mark_trace_step_running(
             matching_step.step_id,
-            mode="deterministic",
-            summary="Scoring profile fit against analyzed candidates.",
+            mode=matching_mode,
+            summary="Applying candidate scorecards against analyzed candidates.",
             guardrails=ASSEMBLY_GUARDRAILS,
         )
         matched_items = _match_candidates(
@@ -305,9 +388,13 @@ def execute_job_search_run(
         )
         search_repository.complete_trace_step(
             matching_step.step_id,
-            mode="deterministic",
+            mode=matching_mode,
             summary=f"Scored {len(matched_items)} candidate fit profile(s).",
             guardrails=ASSEMBLY_GUARDRAILS,
+            details={
+                "scored_candidate_count": len(matched_items),
+                "top_scores": [int(item["match_score"]) for item in matched_items[:5]],
+            },
         )
 
         assembly_step = steps[5]
@@ -325,6 +412,11 @@ def execute_job_search_run(
             mode="deterministic",
             summary=f"Assembled {len(results)} final job result(s).",
             guardrails=ASSEMBLY_GUARDRAILS,
+            details={
+                "final_result_count": len(results),
+                "visible_top_count": min(len(results), max_results),
+                "source_providers": _source_provider_counts(results),
+            },
         )
         return JobSearchRunResponse(
             job_search_run=completed_run,
@@ -442,10 +534,27 @@ def preview_job_search_run(
         keywords=keywords,
     )
 
-    provider_name = normalize_job_search_provider_name(payload.search_provider)
+    selected_sources = _resolve_selected_sources(payload)
+    provider_name = (
+        "mock"
+        if payload.search_mode == "local_mock"
+        else _provider_name_from_selected_sources(payload, selected_sources)
+    )
     provider_search_terms, provider_search_urls = _build_provider_preview_searches(
         provider_name,
         search_plan.queries,
+        selected_sources=selected_sources,
+    )
+    source_kind = _provider_source_kind(provider_name, payload.search_mode)
+    query_budget = _estimate_query_budget(
+        provider_name=provider_name,
+        search_mode=payload.search_mode,
+        provider_queries=search_plan.queries,
+        locations=search_plan.locations,
+        max_results=payload.max_results,
+        llm_planning_enabled=use_llm_analysis and effective_llm_service is not None,
+        llm_filtering_enabled=use_llm_analysis and effective_llm_service is not None,
+        llm_analysis_enabled=use_llm_analysis and effective_llm_service is not None,
     )
 
     return JobSearchPreviewResponse(
@@ -453,6 +562,7 @@ def preview_job_search_run(
         confirmed_profile_id=confirmed_profile.confirmed_profile_id,
         search_mode=payload.search_mode,
         search_provider=provider_name,
+        selected_sources=selected_sources,
         llm_enabled=payload.use_llm,
         llm_provider=llm_provider,
         query=query,
@@ -460,8 +570,21 @@ def preview_job_search_run(
         target_roles=search_plan.target_roles,
         keywords=keywords,
         provider_queries=search_plan.queries,
+        search_intent=search_plan.search_intent,
+        search_source_kind=source_kind,
+        search_source_notes=_search_source_notes(provider_name, source_kind),
+        recall_queries=_recall_queries_from_plan(search_plan),
+        ranking_signals=_ranking_signals_from_plan(search_plan),
         provider_search_terms=provider_search_terms,
         provider_search_urls=provider_search_urls,
+        provider_query_count=query_budget["provider_query_count"],
+        estimated_provider_requests=query_budget["estimated_provider_requests"],
+        estimated_candidate_pool_size=query_budget["estimated_candidate_pool_size"],
+        estimated_llm_planning_requests=query_budget["estimated_llm_planning_requests"],
+        estimated_llm_filtering_requests=query_budget["estimated_llm_filtering_requests"],
+        estimated_llm_analysis_requests=query_budget["estimated_llm_analysis_requests"],
+        estimated_total_llm_requests=query_budget["estimated_total_llm_requests"],
+        query_strategy_notes=query_budget["query_strategy_notes"],
         search_signal_terms=search_plan.must_have_signals,
         excluded_signals=search_plan.avoid_signals,
         ranking_policy=search_plan.ranking_policy,
@@ -490,17 +613,199 @@ def _resolve_search_inputs(
     return query, locations, target_roles, keywords
 
 
+def _resolve_selected_sources(payload: JobSearchRunCreateRequest) -> list[str]:
+    if payload.search_mode == "local_mock":
+        return []
+    if payload.selected_sources:
+        return _clean_list([normalize_job_search_source_name(source) for source in payload.selected_sources])
+    provider_name = normalize_job_search_provider_name(payload.search_provider)
+    provider_sources = selected_sources_from_provider_name(provider_name)
+    if provider_sources:
+        return provider_sources
+    if provider_name == "multi_source":
+        return ["cuhksz_career"]
+    return []
+
+
+def _provider_name_from_selected_sources(
+    payload: JobSearchRunCreateRequest,
+    selected_sources: list[str],
+) -> str:
+    if selected_sources:
+        return encode_selected_sources(selected_sources)
+    return normalize_job_search_provider_name(payload.search_provider)
+
+
 def _build_provider_preview_searches(
     provider_name: str | None,
     provider_queries: list[str],
+    *,
+    selected_sources: list[str] | None = None,
 ) -> tuple[list[str], list[str]]:
+    if selected_sources and (provider_name or "").startswith("multi_source:"):
+        terms: list[str] = []
+        urls: list[str] = []
+        for source in selected_sources:
+            source_terms, source_urls = _build_provider_preview_searches(
+                source,
+                provider_queries,
+                selected_sources=None,
+            )
+            terms.extend(source_terms)
+            urls.extend(source_urls)
+        return _clean_list(terms)[:MAX_PROVIDER_PREVIEW_TERMS * max(1, len(selected_sources))], _clean_list(urls)
+    if provider_name == "linkedin":
+        queries = _clean_list(provider_queries)[:MAX_PROVIDER_PREVIEW_TERMS]
+        return queries, [
+            build_serper_preview_search_url(query, search_sites=["linkedin.com/jobs"])
+            for query in queries
+        ]
+    if provider_name == "remoteok":
+        queries = _clean_list(provider_queries)[:MAX_PROVIDER_PREVIEW_TERMS]
+        return queries, [REMOTEOK_API_URL]
+    if provider_name == "serper_web":
+        queries = _clean_list(provider_queries)[:MAX_PROVIDER_PREVIEW_TERMS]
+        sites = configured_serper_search_sites()
+        return queries, [
+            build_serper_preview_search_url(query, search_sites=sites)
+            for query in queries
+        ]
     if provider_name != "cuhksz_career":
         return [], []
     terms: list[str] = []
-    for query in provider_queries[:3]:
+    for query in provider_queries[:MAX_PROVIDER_QUERIES_PER_RUN]:
         terms.extend(build_cuhksz_title_terms(query))
-    terms = _clean_list(terms)[:8]
+    terms = _clean_list(terms)[:MAX_PROVIDER_PREVIEW_TERMS]
     return terms, [build_cuhksz_search_url(term) for term in terms]
+
+
+def _provider_source_kind(provider_name: str | None, search_mode: str) -> str:
+    if search_mode == "local_mock" or provider_name == "mock":
+        return "mock"
+    if (provider_name or "").startswith("multi_source:") or provider_name == "multi_source":
+        return "hybrid"
+    if provider_name in {"serper_web", "linkedin"}:
+        return "search_engine"
+    if provider_name == "remoteok":
+        return "native_api"
+    if provider_name == "cuhksz_career":
+        return "native_job_board"
+    return "direct_crawler"
+
+
+def _search_source_notes(provider_name: str | None, source_kind: str) -> list[str]:
+    if source_kind == "mock":
+        return ["Local mock source; no external search is executed."]
+    if provider_name == "serper_web":
+        return [
+            "Search engine discovery broadens recall by finding public job pages and keeping source links.",
+            "Result snippets are retained even when a detail page is not fetched.",
+            "Optional site filters come from JOBAGENT_WEB_SEARCH_SITES, not hardcoded platform logic.",
+        ]
+    if provider_name == "cuhksz_career":
+        return [
+            "Native job board search uses short recall terms for provider-side retrieval.",
+            "Profile-specific skills are treated as ranking signals instead of mandatory title keywords.",
+            "Detail pages are fetched when the provider exposes stable public links.",
+        ]
+    if provider_name == "linkedin":
+        return [
+            "LinkedIn is used as search-engine discovery only.",
+            "Profile pages and broad LinkedIn list pages are filtered out.",
+            "Result links are preserved for the user to open; detail scraping is not performed.",
+        ]
+    if provider_name == "remoteok":
+        return [
+            "RemoteOK uses its public JSON API rather than HTML search-page scraping.",
+            "RemoteOK source links and attribution warnings are preserved.",
+        ]
+    if provider_name == "multi_source" or (provider_name or "").startswith("multi_source:"):
+        return [
+            "Selected sources are searched as one candidate pool.",
+            "CUHKSZ uses direct public list/detail crawling, LinkedIn uses external-link discovery, and RemoteOK uses its public API.",
+            "Each candidate keeps its own source provider for downstream ranking and display.",
+        ]
+    return [
+        "Provider is treated as a pluggable direct crawler/search source.",
+        "Candidate preservation and downstream ranking use the shared provider contract.",
+    ]
+
+
+def _estimate_query_budget(
+    *,
+    provider_name: str,
+    search_mode: str,
+    provider_queries: list[str],
+    locations: list[str],
+    max_results: int,
+    llm_planning_enabled: bool,
+    llm_filtering_enabled: bool,
+    llm_analysis_enabled: bool,
+) -> dict[str, object]:
+    if search_mode == "local_mock" or provider_name == "mock":
+        return {
+            "provider_query_count": 0,
+            "estimated_provider_requests": 0,
+            "estimated_candidate_pool_size": 0,
+            "estimated_llm_planning_requests": 0,
+            "estimated_llm_filtering_requests": 0,
+            "estimated_llm_analysis_requests": 0,
+            "estimated_total_llm_requests": 0,
+            "query_strategy_notes": ["Local mock search does not call external providers or LLMs."],
+        }
+
+    executable_queries = _clean_list(provider_queries)[:MAX_PROVIDER_QUERIES_PER_RUN]
+    executable_locations = _effective_provider_locations(provider_name, locations)
+    per_call_limit = max(1, min(max_results, 5))
+    source_count = max(1, len(selected_sources_from_provider_name(provider_name)))
+    candidate_pool_size = min(
+        max_results * 2,
+        len(executable_queries) * len(executable_locations) * per_call_limit * source_count,
+    )
+    list_request_count = len(executable_queries) * len(executable_locations) * source_count
+    notes = [
+        f"Provider search executes at most {MAX_PROVIDER_QUERIES_PER_RUN} provider query groups.",
+        f"Candidate pool is capped at roughly 2x max_results before filtering.",
+    ]
+
+    if provider_name == "cuhksz_career":
+        title_terms: list[str] = []
+        for query in executable_queries:
+            title_terms.extend(build_cuhksz_title_terms(query))
+        unique_title_terms = _clean_list(title_terms)
+        list_request_count = len(unique_title_terms)
+        notes.append("CUHKSZ expands provider queries into deduped title search terms.")
+        notes.append("CUHKSZ location preferences are used for ranking context, not repeated live URL calls.")
+    elif provider_name in {"serper_web", "linkedin"}:
+        notes.append("Search engine discovery keeps provider queries broad and preserves public result links.")
+        if provider_name == "linkedin":
+            notes.append("LinkedIn discovery filters out profile pages and broad list pages.")
+        elif configured_serper_search_sites():
+            notes.append("Search engine site filters are loaded from JOBAGENT_WEB_SEARCH_SITES.")
+        else:
+            notes.append("No search engine site filter is configured; results may be broader.")
+    elif provider_name == "remoteok":
+        list_request_count = 1
+        notes.append("RemoteOK uses its public JSON API and filters the returned feed locally.")
+    elif provider_name == "multi_source" or provider_name.startswith("multi_source:"):
+        notes.append("Multi-source search runs selected providers into one deduped candidate pool.")
+        notes.append("LinkedIn candidates are external links; CUHKSZ and RemoteOK can provide structured details.")
+
+    estimated_provider_requests = list_request_count + candidate_pool_size
+    planning_requests = 1 if llm_planning_enabled else 0
+    filtering_requests = 1 if llm_filtering_enabled and candidate_pool_size else 0
+    analysis_requests = min(max_results, candidate_pool_size) if llm_analysis_enabled else 0
+    total_llm_requests = planning_requests + filtering_requests + analysis_requests
+    return {
+        "provider_query_count": len(executable_queries),
+        "estimated_provider_requests": estimated_provider_requests,
+        "estimated_candidate_pool_size": candidate_pool_size,
+        "estimated_llm_planning_requests": planning_requests,
+        "estimated_llm_filtering_requests": filtering_requests,
+        "estimated_llm_analysis_requests": analysis_requests,
+        "estimated_total_llm_requests": total_llm_requests,
+        "query_strategy_notes": notes,
+    }
 
 
 def _build_local_mock_results(
@@ -674,23 +979,62 @@ def _run_provider_search(
     *,
     search_plan: JobSearchPlan,
     max_results: int,
-) -> list[RawJobCandidate]:
-    queries = search_plan.queries[: max(1, min(len(search_plan.queries), 3))]
-    locations = search_plan.locations[:3] or [None]
+) -> ProviderRecallResult:
+    provider_name = getattr(provider, "provider_name", "mock")
+    provider_kind = getattr(provider, "provider_kind", _provider_source_kind(provider_name, "live_search"))
+    queries = search_plan.queries[: max(1, min(len(search_plan.queries), MAX_PROVIDER_QUERIES_PER_RUN))]
+    locations = _effective_provider_locations(provider_name, search_plan.locations)
     per_call_limit = max(1, min(max_results, 5))
+    candidate_pool_cap = max_results * 2
     deduped: dict[str, RawJobCandidate] = {}
+    stats: list[ProviderQueryStat] = []
+    raw_candidate_count = 0
+    duplicate_count = 0
     for query in queries:
         for location in locations:
-            for candidate in provider.search_jobs(query=query, location=location, limit=per_call_limit):
+            before_count = len(deduped)
+            returned = provider.search_jobs(query=query, location=location, limit=per_call_limit)
+            raw_candidate_count += len(returned)
+            for candidate in returned:
                 key = (candidate.source_url or f"{candidate.title}:{candidate.company}:{candidate.location}").lower()
-                deduped.setdefault(key, candidate)
-                if len(deduped) >= max_results * 2:
+                if key in deduped:
+                    duplicate_count += 1
+                else:
+                    deduped[key] = candidate
+                if len(deduped) >= candidate_pool_cap:
                     break
-            if len(deduped) >= max_results * 2:
+            stats.append(
+                ProviderQueryStat(
+                    query=query,
+                    location=location,
+                    requested_limit=per_call_limit,
+                    returned_count=len(returned),
+                    new_candidate_count=max(0, len(deduped) - before_count),
+                )
+            )
+            if len(deduped) >= candidate_pool_cap:
                 break
-        if len(deduped) >= max_results * 2:
+        if len(deduped) >= candidate_pool_cap:
             break
-    return list(deduped.values())[: max_results * 2]
+    return ProviderRecallResult(
+        candidates=list(deduped.values())[:candidate_pool_cap],
+        provider_name=provider_name,
+        provider_kind=provider_kind,
+        query_stats=stats,
+        raw_candidate_count=raw_candidate_count,
+        duplicate_count=duplicate_count,
+        candidate_pool_cap=candidate_pool_cap,
+    )
+
+
+def _effective_provider_locations(provider_name: str | None, locations: list[str]) -> list[str | None]:
+    if provider_name == "cuhksz_career":
+        return [None]
+    if provider_name in {"remoteok", "linkedin"}:
+        return locations[:1] or [None]
+    if provider_name == "multi_source" or (provider_name or "").startswith("multi_source:"):
+        return locations[:1] or [None]
+    return locations[:MAX_PROVIDER_LOCATIONS_PER_RUN] or [None]
 
 
 def _analyze_candidates(
@@ -704,7 +1048,8 @@ def _analyze_candidates(
     guardrails: list[str] = []
     quality_warnings: list[str] = []
     fallback_reason: str | None = None
-    for candidate in filtered.selected_candidates:
+    scorecards_by_index = {scorecard.candidate_index: scorecard for scorecard in filtered.scorecards}
+    for candidate_index, candidate in zip(filtered.selected_indexes, filtered.selected_candidates):
         text = candidate.raw_description or candidate.snippet
         result = run_jd_analysis_agent(
             text,
@@ -726,6 +1071,7 @@ def _analyze_candidates(
                 "candidate": candidate,
                 "analysis": result.output,
                 "analysis_mode": metadata.mode,
+                "scorecard": scorecards_by_index.get(candidate_index),
             }
         )
     return {
@@ -765,6 +1111,26 @@ def _match_candidates(
     for item in analyzed_items:
         candidate = item["candidate"]
         analysis = item["analysis"]
+        scorecard = item.get("scorecard")
+        if isinstance(scorecard, CandidateScorecard):
+            matched_items.append(
+                {
+                    "candidate": candidate,
+                    "analysis": analysis,
+                    "analysis_mode": item["analysis_mode"],
+                    "match_score": scorecard.match_score,
+                    "score_breakdown": scorecard.score_breakdown,
+                    "evidence_quotes": scorecard.evidence_quotes,
+                    "matched_keywords": scorecard.matched_keywords[:6],
+                    "match_reasons": (
+                        scorecard.match_reasons
+                        or ["Candidate was selected by the shared LLM scoring rubric."]
+                    ),
+                    "risks": _clean_list(scorecard.risks + _metadata_risks(candidate, confirmed_profile)),
+                    "confidence_label": scorecard.confidence_label,
+                }
+            )
+            continue
         text_parts = [
             getattr(candidate, "title", "") or "",
             getattr(candidate, "company", "") or "",
@@ -802,6 +1168,8 @@ def _match_candidates(
                 "analysis": analysis,
                 "analysis_mode": item["analysis_mode"],
                 "match_score": score,
+                "score_breakdown": {},
+                "evidence_quotes": [],
                 "matched_keywords": matched_keywords[:6],
                 "match_reasons": match_reasons,
                 "risks": _clean_list(risks),
@@ -844,12 +1212,25 @@ def _assemble_results(
                 match_reasons=list(item["match_reasons"]),
                 risks=list(item["risks"]),
                 match_score=score,
+                score_breakdown=dict(item.get("score_breakdown", {})),
+                evidence_quotes=list(item.get("evidence_quotes", [])),
                 recommended_action=_recommended_action(score),
                 analysis_mode=item["analysis_mode"],
                 confidence_label=item["confidence_label"],
             )
         )
     return results
+
+
+def _metadata_risks(candidate: object, confirmed_profile: ConfirmedProfile) -> list[str]:
+    risks: list[str] = []
+    if not getattr(candidate, "source_url", None):
+        risks.append("Source URL is missing.")
+    if getattr(candidate, "location", None) is None and confirmed_profile.preferred_locations:
+        risks.append("Location metadata is incomplete.")
+    for warning in getattr(candidate, "provider_warnings", []) or []:
+        risks.append(str(warning))
+    return risks
 
 
 def _find_running_or_pending_step(steps: list[JobSearchTraceStep]) -> JobSearchTraceStep | None:
@@ -878,6 +1259,37 @@ def _recommended_action(score: int) -> str:
     if score >= 58:
         return "Review the requirements carefully before investing more time."
     return "Keep as a lower-priority option unless the role is especially attractive."
+
+
+def _recall_queries_from_plan(search_plan: JobSearchPlan) -> list[str]:
+    if search_plan.search_intent is None:
+        return _clean_list(search_plan.queries[:MAX_PROVIDER_QUERIES_PER_RUN])
+    intent = search_plan.search_intent
+    return _clean_list(
+        intent.broad_queries
+        + intent.domain_queries
+        + search_plan.target_roles
+        + search_plan.queries
+    )[:MAX_PROVIDER_PREVIEW_TERMS]
+
+
+def _ranking_signals_from_plan(search_plan: JobSearchPlan) -> list[str]:
+    if search_plan.search_intent is None:
+        return _clean_list(search_plan.must_have_signals)
+    intent = search_plan.search_intent
+    return _clean_list(
+        intent.industry_domains
+        + intent.evidence_skills
+        + intent.generic_tools
+        + search_plan.must_have_signals
+    )[:16]
+
+
+def _source_provider_counts(results: list[JobSearchResult]) -> dict[str, int]:
+    counts: Counter[str] = Counter()
+    for result in results:
+        counts[result.source_provider or result.source] += 1
+    return dict(counts)
 
 
 def _clean_list(values: list[str]) -> list[str]:

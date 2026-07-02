@@ -348,7 +348,7 @@ export const useProfileSessionStore = defineStore("profileSession", {
       }
     },
     async loadJobSearchProviderStatus(
-      provider?: "mock" | "cuhksz_career"
+      provider?: "mock" | "cuhksz_career" | "linkedin" | "remoteok" | "serper_web" | "multi_source"
     ): Promise<JobSearchProviderStatus> {
       this.error = null;
       try {

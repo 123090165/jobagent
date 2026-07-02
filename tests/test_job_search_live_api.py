@@ -13,6 +13,7 @@ client = TestClient(app)
 
 class FakeProvider:
     provider_name = "mock"
+    provider_kind = "mock"
 
     def search_jobs(self, *, query: str, location: str | None, limit: int):
         base_location = location or "Remote"
@@ -25,6 +26,9 @@ class FakeProvider:
                 source_provider=self.provider_name,
                 snippet=f"Python FastAPI SQL platform APIs for query {query}",
                 raw_description="Python FastAPI SQL APIs and backend platform services.",
+                discovery_query=query,
+                discovery_rank=1,
+                detail_status="fake_inline",
             ),
             RawJobCandidate(
                 title="AI Product Engineer",
@@ -34,14 +38,57 @@ class FakeProvider:
                 source_provider=self.provider_name,
                 snippet=f"LLM product engineering and evaluations for query {query}",
                 raw_description="LLM product engineering, prompt tooling, and evaluation workflows.",
+                discovery_query=query,
+                discovery_rank=2,
+                detail_status="fake_inline",
             ),
         ][:limit]
 
 
 class FakeJSONLLM:
     def chat_completion_json(self, *, system_prompt: str, user_prompt: str) -> dict:
-        if "selected_indexes" in system_prompt:
-            return {"selected_indexes": [0, 1], "quality_warnings": []}
+        if "ranked_candidates" in system_prompt:
+            return {
+                "ranked_candidates": [
+                    {
+                        "index": 1,
+                        "match_score": 89,
+                        "confidence_label": "strong",
+                        "score_breakdown": {
+                            "role_alignment": 22,
+                            "domain_alignment": 24,
+                            "skill_evidence": 18,
+                            "seniority_and_work_type": 8,
+                            "location_fit": 10,
+                            "jd_evidence_quality": 10,
+                            "risk_penalty": 3,
+                        },
+                        "matched_keywords": ["LLM", "evaluation"],
+                        "match_reasons": ["LLM rubric preferred applied AI evidence."],
+                        "risks": ["Backend API evidence is lighter."],
+                        "evidence_quotes": ["LLM product engineering and evaluations"],
+                    },
+                    {
+                        "index": 0,
+                        "match_score": 73,
+                        "confidence_label": "medium",
+                        "score_breakdown": {
+                            "role_alignment": 24,
+                            "domain_alignment": 8,
+                            "skill_evidence": 19,
+                            "seniority_and_work_type": 8,
+                            "location_fit": 10,
+                            "jd_evidence_quality": 10,
+                            "risk_penalty": 6,
+                        },
+                        "matched_keywords": ["Python", "FastAPI", "SQL"],
+                        "match_reasons": ["Strong backend stack but weaker applied AI domain."],
+                        "risks": ["May drift toward backend-only work."],
+                        "evidence_quotes": ["Python FastAPI SQL APIs"],
+                    },
+                ],
+                "quality_warnings": [],
+            }
         return {
             "queries": ["Backend Engineer Python FastAPI", "AI Application Engineer LLM"],
             "locations": ["Remote", "Tokyo"],
@@ -136,7 +183,15 @@ def test_execute_live_run_with_fake_provider_completes(monkeypatch, tmp_path) ->
     assert completed.profile_session.current_step.value == "job_search_completed"
     assert completed.job_search_run.results
     assert all(item.source == "live_search" for item in completed.job_search_run.results)
+    assert completed.job_search_run.results[0].company == "Prompt Harbor"
+    assert completed.job_search_run.results[0].match_score == 89
+    assert completed.job_search_run.results[0].score_breakdown["domain_alignment"] == 24
+    assert completed.job_search_run.results[0].evidence_quotes
     assert completed.steps[-1].status == "completed"
+    provider_step = next(step for step in completed.steps if step.name == "Provider search")
+    assert provider_step.details["raw_candidate_count"] >= 2
+    assert provider_step.details["deduped_candidate_count"] >= 2
+    assert provider_step.details["query_stats"]
 
 
 def test_live_run_steps_endpoint_returns_trace(monkeypatch, tmp_path) -> None:
@@ -170,4 +225,6 @@ def test_live_run_steps_endpoint_returns_trace(monkeypatch, tmp_path) -> None:
         "Result assembly",
     ]
     assert items[0]["mode"] == "llm"
+    assert "details" in items[1]
+    assert items[1]["details"]["query_count"] >= 1
     assert run_response.job_search_run.llm_enabled is False

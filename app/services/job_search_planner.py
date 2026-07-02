@@ -1,33 +1,17 @@
 from __future__ import annotations
 
-import json
 from typing import Literal
 
 from pydantic import BaseModel, Field
 
 from app.schemas.confirmed_profile import ConfirmedProfile
+from app.schemas.job_search import JobSearchIntent
+from app.services.job_search_intent import (
+    build_queries_from_intent,
+    build_search_intent,
+    is_generic_tool_term,
+)
 from app.services.llm_provider import JSONChatLLM
-from app.services.llm_service import LLMServiceError
-from app.services.search_signal_normalizer import build_bilingual_search_signals
-
-GENERIC_SUPPORTING_SIGNAL_TERMS = {
-    "api",
-    "apis",
-    "c",
-    "c++",
-    "docker",
-    "excel",
-    "fastapi",
-    "git",
-    "matlab",
-    "numpy",
-    "pandas",
-    "python",
-    "pytorch",
-    "sql",
-    "sqlite",
-    "tensorflow",
-}
 
 
 class JobSearchPlan(BaseModel):
@@ -37,6 +21,7 @@ class JobSearchPlan(BaseModel):
     must_have_signals: list[str] = Field(default_factory=list)
     avoid_signals: list[str] = Field(default_factory=list)
     ranking_policy: str
+    search_intent: JobSearchIntent | None = None
     mode: Literal["deterministic", "llm", "fallback"]
     fallback_reason: str | None = None
     quality_warnings: list[str] = Field(default_factory=list)
@@ -48,103 +33,65 @@ def build_search_plan(
     use_llm: bool,
     llm_service: JSONChatLLM | None = None,
 ) -> JobSearchPlan:
-    deterministic = _build_deterministic_plan(confirmed_profile)
-    if not use_llm:
-        return deterministic
-
-    if llm_service is None:
-        return deterministic.model_copy(
-            update={
-                "mode": "fallback",
-                "fallback_reason": "llm_service_unavailable",
-                "quality_warnings": _dedupe(deterministic.quality_warnings + ["LLM planning unavailable. Used deterministic search plan."]),
-            }
-        )
-
-    try:
-        payload = llm_service.chat_completion_json(
-            system_prompt=(
-                "You are a job search planning assistant. "
-                "Only expand and refine search queries from the provided confirmed profile. "
-                "Do not invent user experience, employers, industries, or credentials. "
-                "Return JSON with queries, locations, target_roles, must_have_signals, avoid_signals, ranking_policy, and quality_warnings."
-            ),
-            user_prompt=(
-                "Confirmed profile JSON:\n"
-                f"{json.dumps(confirmed_profile.model_dump(mode='json'), ensure_ascii=False)}"
-            ),
-        )
-        plan = JobSearchPlan.model_validate(
-            {
-                "queries": payload.get("queries", []),
-                "locations": payload.get("locations", []),
-                "target_roles": payload.get("target_roles", []),
-                "must_have_signals": payload.get("must_have_signals", []),
-                "avoid_signals": payload.get("avoid_signals", []),
-                "ranking_policy": payload.get("ranking_policy") or deterministic.ranking_policy,
-                "mode": "llm",
-                "fallback_reason": None,
-                "quality_warnings": payload.get("quality_warnings", []),
-            }
-        )
-        return _normalize_plan(plan, fallback=deterministic)
-    except (LLMServiceError, ValueError, TypeError) as exc:
-        return deterministic.model_copy(
-            update={
-                "mode": "fallback",
-                "fallback_reason": type(exc).__name__,
-                "quality_warnings": _dedupe(
-                    deterministic.quality_warnings
-                    + [f"LLM planning fallback triggered: {type(exc).__name__}."]
-                ),
-            }
-        )
+    intent = build_search_intent(
+        confirmed_profile,
+        use_llm=use_llm,
+        llm_service=llm_service,
+    )
+    return _build_plan_from_intent(confirmed_profile, intent)
 
 
 def _build_deterministic_plan(confirmed_profile: ConfirmedProfile) -> JobSearchPlan:
-    target_roles = _dedupe(confirmed_profile.target_roles)
-    signals = build_bilingual_search_signals(
-        confirmed_profile.target_roles,
-        confirmed_profile.search_keywords,
-        confirmed_profile.core_skills,
+    return _build_plan_from_intent(
+        confirmed_profile,
+        build_search_intent(confirmed_profile, use_llm=False),
     )
-    keywords = _dedupe(
-        _query_signal_seed(signals, confirmed_profile.search_keywords, confirmed_profile.core_skills)
-    )
-    provider_terms = _provider_query_signal_seed(
-        signals,
-        target_roles=target_roles,
-        search_keywords=confirmed_profile.search_keywords,
-        core_skills=confirmed_profile.core_skills,
-    )
+
+
+def _build_plan_from_intent(
+    confirmed_profile: ConfirmedProfile,
+    intent: JobSearchIntent,
+) -> JobSearchPlan:
+    target_roles = _dedupe(intent.role_titles or confirmed_profile.target_roles)
     locations = _dedupe(confirmed_profile.preferred_locations)
-    queries = build_focused_provider_queries(target_roles, provider_terms)
+    queries = build_queries_from_intent(intent)
 
     if not queries:
-        queries.append("Software Engineer")
+        fallback_query = " ".join(
+            _dedupe(
+                target_roles[:1]
+                + intent.role_families[:1]
+                + intent.industry_domains[:2]
+                + intent.evidence_skills[:2]
+            )
+        ).strip()
+        queries.append(fallback_query or "Internship")
 
     warnings: list[str] = []
     if not confirmed_profile.preferred_locations:
         warnings.append("No preferred locations found; search will include remote-friendly defaults.")
-    if not confirmed_profile.search_keywords:
+    if not confirmed_profile.search_keywords and not intent.industry_domains and not intent.evidence_skills:
         warnings.append("Search keywords were sparse; core skills were used to build the plan.")
-    if signals["zh_terms"] and signals["en_terms"]:
-        warnings.append(
-            "Bilingual search signals were prepared for future English providers; CUHKSZ planning still prioritizes Chinese terms and common acronyms."
-        )
+    warnings = _dedupe(warnings + intent.quality_warnings)
 
     return JobSearchPlan(
         queries=_dedupe(queries),
         locations=locations,
         target_roles=target_roles,
-        must_have_signals=_dedupe(signals["normalized_signals"])[:10],
-        avoid_signals=_dedupe(confirmed_profile.risks)[:5],
+        must_have_signals=_dedupe(
+            intent.role_titles
+            + intent.industry_domains
+            + intent.evidence_skills
+            + intent.generic_tools
+        )[:14],
+        avoid_signals=_dedupe(intent.negative_signals or confirmed_profile.risks)[:8],
         ranking_policy=(
-            "Prefer target role overlap, skill overlap, and clear source metadata. "
-            "Future English providers should use expanded English aliases from normalized search signals."
+            "Prefer profile-derived role overlap, domain overlap, distinctive evidence skills, "
+            "constraint fit, and clear source metadata. Treat generic tools as weak supporting signals."
         ),
-        mode="deterministic",
-        fallback_reason=None,
+        search_intent=intent,
+        mode=intent.mode,
+        fallback_reason=intent.fallback_reason,
         quality_warnings=warnings,
     )
 
@@ -179,7 +126,7 @@ def build_focused_provider_queries(target_roles: list[str], search_signal_terms:
             term
             for term in keyword_seed
             if not _overlaps_target_role(term, [role])
-            and not _is_generic_supporting_signal(term)
+            and not is_generic_tool_term(term)
         ]
         base_query = role
         if role_terms:
@@ -238,7 +185,7 @@ def _provider_query_signal_seed(
         term
         for term in candidates
         if not _overlaps_target_role(term, target_roles)
-        and not _is_generic_supporting_signal(term)
+        and not is_generic_tool_term(term)
     ]
     if focused:
         return _dedupe(focused)
@@ -254,11 +201,6 @@ def _overlaps_target_role(term: str, target_roles: list[str]) -> bool:
         if role_key and (term_key == role_key or term_key in role_key or role_key in term_key):
             return True
     return False
-
-
-def _is_generic_supporting_signal(term: str) -> bool:
-    normalized = term.strip().lower()
-    return normalized in GENERIC_SUPPORTING_SIGNAL_TERMS
 
 
 def _looks_like_acronym(value: str) -> bool:

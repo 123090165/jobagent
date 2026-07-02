@@ -8,8 +8,54 @@ from app.services.llm_service import LLMServiceError
 
 
 class FakeFilterLLM:
+    def __init__(self) -> None:
+        self.system_prompt = ""
+        self.user_prompt = ""
+
     def chat_completion_json(self, *, system_prompt: str, user_prompt: str) -> dict:
-        return {"selected_indexes": [1, 0], "quality_warnings": []}
+        self.system_prompt = system_prompt
+        self.user_prompt = user_prompt
+        return {
+            "ranked_candidates": [
+                {
+                    "index": 1,
+                    "match_score": 91,
+                    "confidence_label": "strong",
+                    "score_breakdown": {
+                        "role_alignment": 25,
+                        "domain_alignment": 18,
+                        "skill_evidence": 18,
+                        "seniority_and_work_type": 10,
+                        "location_fit": 10,
+                        "jd_evidence_quality": 10,
+                        "risk_penalty": 0,
+                    },
+                    "matched_keywords": ["Python", "FastAPI", "SQL"],
+                    "match_reasons": ["Strong backend role and stack overlap."],
+                    "risks": [],
+                    "evidence_quotes": ["Python FastAPI SQL APIs."],
+                },
+                {
+                    "index": 0,
+                    "match_score": 62,
+                    "confidence_label": "limited",
+                    "score_breakdown": {
+                        "role_alignment": 12,
+                        "domain_alignment": 8,
+                        "skill_evidence": 8,
+                        "seniority_and_work_type": 10,
+                        "location_fit": 10,
+                        "jd_evidence_quality": 10,
+                        "risk_penalty": 0,
+                    },
+                    "matched_keywords": ["Docker"],
+                    "match_reasons": ["Adjacent platform tooling overlap."],
+                    "risks": ["Less direct backend API evidence."],
+                    "evidence_quotes": ["Docker CI platform tooling."],
+                },
+            ],
+            "quality_warnings": [],
+        }
 
 
 class FailingFilterLLM:
@@ -78,16 +124,23 @@ def _candidates() -> list[RawJobCandidate]:
 
 
 def test_candidate_filter_llm_success_path() -> None:
+    llm = FakeFilterLLM()
     result = filter_candidates(
         _confirmed_profile(),
         _plan(),
         _candidates(),
         use_llm=True,
-        llm_service=FakeFilterLLM(),
+        llm_service=llm,
     )
 
     assert result.mode == "llm"
     assert result.selected_candidates[0].company == "Example B"
+    assert result.scorecards[0].match_score == 91
+    assert result.scorecards[0].score_breakdown["role_alignment"] == 25
+    assert result.scorecards[0].evidence_quotes == ["Python FastAPI SQL APIs."]
+    assert "Scoring rubric" in llm.system_prompt
+    assert "break exact score ties by lower candidate index" in llm.system_prompt
+    assert "Requested result limit" in llm.user_prompt
 
 
 def test_candidate_filter_fallback_path() -> None:
@@ -102,3 +155,4 @@ def test_candidate_filter_fallback_path() -> None:
     assert result.mode == "fallback"
     assert result.fallback_reason == "LLMServiceError"
     assert result.selected_candidates
+    assert result.scorecards

@@ -89,6 +89,15 @@ def test_job_search_preview_returns_plan_without_creating_run(monkeypatch, tmp_p
     assert payload["locations"] == ["深圳"]
     assert "PPG" in payload["search_signal_terms"]
     assert "ECG" in payload["search_signal_terms"]
+    assert payload["provider_query_count"] == 0
+    assert payload["estimated_provider_requests"] == 0
+    assert payload["estimated_total_llm_requests"] == 0
+    assert payload["search_intent"]["role_titles"]
+    assert "generic_tools" in payload["search_intent"]
+    assert payload["search_source_kind"] == "mock"
+    assert payload["recall_queries"]
+    assert payload["ranking_signals"]
+    assert "Local mock search" in " ".join(payload["query_strategy_notes"])
 
     runs = client.get(f"/api/v1/profile-sessions/{session_id}/job-search-runs")
     assert runs.status_code == 200
@@ -116,6 +125,81 @@ def test_job_search_preview_returns_cuhksz_search_urls(monkeypatch, tmp_path) ->
     assert "健康算法实习生" not in payload["provider_search_terms"]
     assert any("title=%E7%AE%97%E6%B3%95" in url for url in payload["provider_search_urls"])
     assert any("title=%E5%81%A5%E5%BA%B7%E7%AE%97%E6%B3%95" in url for url in payload["provider_search_urls"])
+    assert 1 <= payload["provider_query_count"] <= 3
+    assert payload["estimated_provider_requests"] >= len(payload["provider_search_urls"])
+    assert payload["estimated_candidate_pool_size"] <= 20
+    assert payload["estimated_total_llm_requests"] == (
+        payload["estimated_llm_planning_requests"]
+        + payload["estimated_llm_filtering_requests"]
+        + payload["estimated_llm_analysis_requests"]
+    )
+    assert any("CUHKSZ" in note for note in payload["query_strategy_notes"])
+    assert payload["search_intent"]["mode"] in {"deterministic", "llm", "fallback"}
+    assert "industry_domains" in payload["search_intent"]
+    assert payload["search_source_kind"] == "native_job_board"
+    assert payload["recall_queries"]
+    assert payload["ranking_signals"]
+
+
+def test_job_search_preview_returns_web_search_source_strategy(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("JOBAGENT_WEB_SEARCH_SITES", "career.example.com")
+    confirmed = _create_session_with_confirmed_profile(tmp_path, monkeypatch, "job-search-preview-web.sqlite3")
+    session_id = confirmed["profile_session"]["session_id"]
+
+    response = client.post(
+        "/api/v1/job-search-runs/preview",
+        json={
+            "session_id": session_id,
+            "search_mode": "live_search",
+            "search_provider": "serper_web",
+            "target_roles": ["Brand Marketing Intern"],
+            "keywords": ["market research", "consumer insight", "Excel"],
+            "locations": ["Shanghai"],
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["search_provider"] == "serper_web"
+    assert payload["search_source_kind"] == "search_engine"
+    assert payload["provider_search_terms"]
+    assert any("site%3Acareer.example.com" in url for url in payload["provider_search_urls"])
+    assert any("Search engine" in note or "search-engine" in note for note in payload["query_strategy_notes"])
+
+
+def test_job_search_preview_returns_selected_multi_source_strategy(monkeypatch, tmp_path) -> None:
+    confirmed = _create_session_with_confirmed_profile(
+        tmp_path,
+        monkeypatch,
+        "job-search-preview-multi-source.sqlite3",
+    )
+    session_id = confirmed["profile_session"]["session_id"]
+
+    response = client.post(
+        "/api/v1/job-search-runs/preview",
+        json={
+            "session_id": session_id,
+            "search_mode": "live_search",
+            "search_provider": "multi_source",
+            "selected_sources": ["cuhksz_career", "linkedin", "remoteok"],
+            "target_roles": ["Brand Marketing Intern"],
+            "keywords": ["market research", "consumer insight"],
+            "locations": ["Shanghai"],
+            "max_results": 10,
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["search_provider"] == "multi_source:cuhksz_career,linkedin,remoteok"
+    assert payload["selected_sources"] == ["cuhksz_career", "linkedin", "remoteok"]
+    assert payload["search_source_kind"] == "hybrid"
+    assert any("Selected sources" in note for note in payload["search_source_notes"])
+    assert any("career.cuhk.edu.cn" in url for url in payload["provider_search_urls"])
+    assert any("site%3Alinkedin.com%2Fjobs" in url for url in payload["provider_search_urls"])
+    assert any("remoteok.com/api" in url for url in payload["provider_search_urls"])
+    assert any("Multi-source search" in note for note in payload["query_strategy_notes"])
+    assert payload["estimated_candidate_pool_size"] <= 20
 
 
 def test_job_search_creates_run_and_updates_session(monkeypatch, tmp_path) -> None:
