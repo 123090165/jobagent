@@ -3,6 +3,7 @@ import { AxiosError } from "axios";
 
 import {
   confirmProfileDraft,
+  createBrowserHelperJobSearchRun,
   createJobSearchRun,
   createProfileDraft,
   createProfileSession,
@@ -22,6 +23,7 @@ import {
   updateProfileDraft
 } from "../api/profileSessions";
 import type {
+  CreateBrowserHelperJobSearchPayload,
   CreateJobSearchRunPayload,
   ConfirmedProfile,
   JobSearchProviderStatus,
@@ -348,7 +350,7 @@ export const useProfileSessionStore = defineStore("profileSession", {
       }
     },
     async loadJobSearchProviderStatus(
-      provider?: "mock" | "cuhksz_career" | "linkedin" | "remoteok" | "serper_web" | "multi_source"
+      provider?: "mock" | "cuhksz_career" | "linkedin" | "remoteok" | "serper_web" | "browser_helper" | "multi_source"
     ): Promise<JobSearchProviderStatus> {
       this.error = null;
       try {
@@ -376,6 +378,27 @@ export const useProfileSessionStore = defineStore("profileSession", {
         return response.job_search_run;
       } catch (error) {
         this.error = toApiErrorMessage(error, "Failed to start job search.");
+        throw error;
+      } finally {
+        this.isJobSearchCreating = false;
+      }
+    },
+    async createBrowserHelperJobSearch(
+      payload: CreateBrowserHelperJobSearchPayload
+    ): Promise<JobSearchRun> {
+      this.isJobSearchCreating = true;
+      this.error = null;
+      try {
+        const response = await createBrowserHelperJobSearchRun(payload);
+        this.session = response.profile_session;
+        this.jobSearchRun = response.job_search_run;
+        this.jobSearchSteps = response.steps;
+        this.jobSearchRuns = [response.job_search_run, ...this.jobSearchRuns.filter(
+          (item) => item.job_search_run_id !== response.job_search_run.job_search_run_id
+        )];
+        return response.job_search_run;
+      } catch (error) {
+        this.error = toApiErrorMessage(error, "Failed to import browser helper candidates.");
         throw error;
       } finally {
         this.isJobSearchCreating = false;

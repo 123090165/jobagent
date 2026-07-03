@@ -4,6 +4,11 @@ import { useRoute, useRouter } from "vue-router";
 import { NButton, NCard, NCheckbox, NCheckboxGroup, NSwitch, NTag } from "naive-ui";
 
 import StepProgress from "../components/StepProgress.vue";
+import {
+  fetchBrowserHelperDemoCandidates,
+  pingBrowserHelper,
+  type BrowserHelperStatus
+} from "../services/browserHelper";
 import { useProfileSessionStore } from "../stores/profileSession";
 import type { CreateJobSearchRunPayload, JobSearchRun } from "../types/profileSession";
 
@@ -17,6 +22,9 @@ const selectedSearchSources = ref<SearchSource[]>(["cuhksz_career"]);
 const useLocalDemo = ref(false);
 const useLlm = ref(false);
 const maxResults = ref(10);
+const browserHelperStatus = ref<BrowserHelperStatus | null>(null);
+const isBrowserHelperChecking = ref(false);
+const browserHelperMessage = ref<string | null>(null);
 const selectedLlmProvider = computed(() => (useLlm.value ? "deepseek" : "ollama"));
 const canStartSearch = computed(() => useLocalDemo.value || selectedSearchSources.value.length > 0);
 
@@ -72,6 +80,17 @@ const providerStatusLabel = computed(() => {
     return `CUHKSZ Career ready${status.search_url ? ` • ${status.search_url}` : ""}`;
   }
   return `CUHKSZ Career unavailable${status.reason ? ` • ${status.reason}` : ""}`;
+});
+
+const browserHelperStatusTag = computed(() => {
+  if (!browserHelperStatus.value) {
+    return "Not checked";
+  }
+  return browserHelperStatus.value.installed ? "Detected" : "Not detected";
+});
+
+const canImportBrowserHelperDemo = computed(() => {
+  return Boolean(profileSessionStore.jobSearchPreview && browserHelperStatus.value?.installed);
 });
 
 function buildPayload(): CreateJobSearchRunPayload {
@@ -144,6 +163,42 @@ function goBackToConfirmed() {
 async function startJobSearch() {
   try {
     const run = await profileSessionStore.createJobSearch(buildPayload());
+    await router.push({ name: "job-search", params: { runId: run.job_search_run_id } });
+  } catch {
+    // Error state is rendered from the store.
+  }
+}
+
+async function checkBrowserHelper() {
+  isBrowserHelperChecking.value = true;
+  browserHelperMessage.value = null;
+  try {
+    browserHelperStatus.value = await pingBrowserHelper();
+    browserHelperMessage.value = browserHelperStatus.value.error;
+  } finally {
+    isBrowserHelperChecking.value = false;
+  }
+}
+
+async function importBrowserHelperDemo() {
+  if (!profileSessionStore.jobSearchPreview) {
+    return;
+  }
+  try {
+    const preview = profileSessionStore.jobSearchPreview;
+    const result = await fetchBrowserHelperDemoCandidates(preview.query);
+    const run = await profileSessionStore.createBrowserHelperJobSearch({
+      session_id: sessionId.value,
+      query: preview.query,
+      helper_version: result.version,
+      platforms: result.platforms,
+      use_llm: false,
+      locations: preview.locations,
+      target_roles: preview.target_roles,
+      keywords: preview.keywords,
+      max_results: maxResults.value,
+      candidates: result.candidates
+    });
     await router.push({ name: "job-search", params: { runId: run.job_search_run_id } });
   } catch {
     // Error state is rendered from the store.
@@ -231,6 +286,43 @@ function seeResult() {
               <span>{{ selectedLlmProvider }} / {{ llmStatusLabel }}</span>
             </div>
           </div>
+        </div>
+      </n-card>
+
+      <n-card title="Browser Helper" size="small" class="job-search-summary">
+        <div class="job-search-setup">
+          <div class="job-search-setup-row">
+            <span class="job-search-setup-label">Helper Status</span>
+            <div class="job-search-status-copy">
+              <n-tag
+                :type="browserHelperStatus?.installed ? 'success' : 'warning'"
+                round
+              >
+                {{ browserHelperStatusTag }}
+              </n-tag>
+              <span>
+                {{ browserHelperStatus?.version ? `v${browserHelperStatus.version}` : "Chrome/Edge only" }}
+              </span>
+            </div>
+          </div>
+          <div class="review-actions">
+            <n-button
+              secondary
+              :loading="isBrowserHelperChecking"
+              @click="checkBrowserHelper"
+            >
+              Check Helper
+            </n-button>
+            <n-button
+              secondary
+              :disabled="!canImportBrowserHelperDemo"
+              :loading="profileSessionStore.isJobSearchCreating"
+              @click="importBrowserHelperDemo"
+            >
+              Import Demo Candidate
+            </n-button>
+          </div>
+          <p v-if="browserHelperMessage" class="flow-meta">{{ browserHelperMessage }}</p>
         </div>
       </n-card>
 

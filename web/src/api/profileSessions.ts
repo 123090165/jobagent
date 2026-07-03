@@ -1,5 +1,6 @@
 import { client } from "./client";
 import type {
+  CreateBrowserHelperJobSearchPayload,
   CreateJobSearchRunPayload,
   ConfirmedProfileResponse,
   JobSearchProviderStatus,
@@ -139,6 +140,16 @@ export async function createJobSearchRun(
   return response.data;
 }
 
+export async function createBrowserHelperJobSearchRun(
+  payload: CreateBrowserHelperJobSearchPayload
+): Promise<JobSearchRunResponse> {
+  const response = await client.post<JobSearchRunResponse>(
+    "/api/v1/job-search-runs/browser-helper",
+    payload
+  );
+  return response.data;
+}
+
 export async function previewJobSearchRun(
   payload: CreateJobSearchRunPayload
 ): Promise<JobSearchPreview> {
@@ -154,7 +165,7 @@ export async function getLlmStatus(useDeepseek = false): Promise<LlmStatus> {
 }
 
 export async function getJobSearchProviderStatus(
-  provider?: "mock" | "cuhksz_career" | "linkedin" | "remoteok" | "serper_web" | "multi_source"
+  provider?: "mock" | "cuhksz_career" | "linkedin" | "remoteok" | "serper_web" | "browser_helper" | "multi_source"
 ): Promise<JobSearchProviderStatus> {
   const response = await client.get<JobSearchProviderStatus>("/api/v1/job-search-providers/status", {
     params: { provider }

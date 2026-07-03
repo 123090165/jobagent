@@ -1,0 +1,28 @@
+{
+  "manifest_version": 3,
+  "name": "JobAgent Browser Helper",
+  "version": "0.1.0",
+  "description": "Browser-assisted job candidate collection for JobAgent.",
+  "permissions": ["tabs", "cookies"],
+  "host_permissions": [
+    "*://*.zhipin.com/*",
+    "*://zhipin.com/*",
+    "*://*.liepin.com/*",
+    "*://liepin.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "http://localhost:5173/*",
+        "http://127.0.0.1:5173/*",
+        "http://localhost:4173/*",
+        "http://127.0.0.1:4173/*"
+      ],
+      "js": ["bridge.js"],
+      "run_at": "document_start"
+    }
+  ]
+}

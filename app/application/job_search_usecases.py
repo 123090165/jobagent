@@ -22,6 +22,8 @@ from app.repositories.profile_session_repository import (
 )
 from app.schemas.confirmed_profile import ConfirmedProfile
 from app.schemas.job_search import (
+    BrowserHelperJobCandidate,
+    BrowserHelperJobSearchRunCreateRequest,
     JobSearchResult,
     JobSearchPreviewResponse,
     JobSearchRun,
@@ -45,6 +47,7 @@ from app.services.job_search_recall_metrics import (
     candidate_recall_key,
 )
 from app.services.job_search_providers import (
+    BrowserHelperPayloadProvider,
     JobSearchProvider,
     RawJobCandidate,
     encode_selected_sources,
@@ -239,6 +242,58 @@ def create_job_search_run(
         job_search_run=run,
         profile_session=updated_session,
         steps=steps,
+    )
+
+
+def create_browser_helper_job_search_run(
+    payload: BrowserHelperJobSearchRunCreateRequest,
+    *,
+    session_repository: ProfileSessionRepository = profile_session_repository,
+    confirmed_repository: ConfirmedProfileRepository = confirmed_profile_repository,
+    search_repository: JobSearchRepository = job_search_repository,
+    llm_service: JSONChatLLM | None = None,
+) -> JobSearchRunResponse:
+    if not payload.candidates:
+        raise JobAgentError(
+            message="Browser helper returned no candidates.",
+            error_code="browser_helper_candidates_required",
+            status_code=400,
+        )
+
+    raw_candidates = [_browser_helper_candidate_to_raw(candidate) for candidate in payload.candidates]
+    provider = BrowserHelperPayloadProvider(
+        candidates=raw_candidates,
+        platforms=payload.platforms,
+        helper_version=payload.helper_version,
+    )
+    run_response = create_job_search_run(
+        JobSearchRunCreateRequest(
+            session_id=payload.session_id,
+            query=payload.query,
+            search_mode="browser_helper",
+            search_provider=provider.provider_name,
+            selected_sources=[],
+            use_llm=payload.use_llm,
+            locations=payload.locations,
+            target_roles=payload.target_roles,
+            keywords=payload.keywords,
+            max_results=payload.max_results,
+        ),
+        background_tasks=None,
+        session_repository=session_repository,
+        confirmed_repository=confirmed_repository,
+        search_repository=search_repository,
+        job_search_provider=provider,
+        llm_service=llm_service,
+    )
+    return execute_job_search_run(
+        run_response.job_search_run.job_search_run_id,
+        session_repository=session_repository,
+        confirmed_repository=confirmed_repository,
+        search_repository=search_repository,
+        job_search_provider=provider,
+        llm_service=llm_service,
+        max_results=payload.max_results,
     )
 
 
@@ -698,6 +753,8 @@ def _build_provider_preview_searches(
 def _provider_source_kind(provider_name: str | None, search_mode: str) -> str:
     if search_mode == "local_mock" or provider_name == "mock":
         return "mock"
+    if search_mode == "browser_helper" or (provider_name or "").startswith("browser_helper"):
+        return "browser_helper"
     if (provider_name or "").startswith("multi_source:") or provider_name == "multi_source":
         return "hybrid"
     if provider_name in {"serper_web", "linkedin"}:
@@ -1021,6 +1078,43 @@ def _run_provider_search(
     locations = _effective_provider_locations(provider_name, search_plan.locations)
     per_call_limit = max(1, min(max_results, 5))
     candidate_pool_cap = max_results * 2
+    if provider_kind == "browser_helper":
+        query = queries[0] if queries else ""
+        location = locations[0] if locations else None
+        returned = provider.search_jobs(query=query, location=location, limit=candidate_pool_cap)
+        deduped: dict[str, RawJobCandidate] = {}
+        duplicate_count = 0
+        truncated_candidate_count = 0
+        for candidate in returned:
+            key = candidate_recall_key(candidate)
+            if key in deduped:
+                duplicate_count += 1
+                continue
+            if len(deduped) >= candidate_pool_cap:
+                truncated_candidate_count += 1
+                continue
+            deduped[key] = candidate
+        return ProviderRecallResult(
+            candidates=list(deduped.values()),
+            provider_name=provider_name,
+            provider_kind=provider_kind,
+            query_stats=[
+                ProviderQueryStat(
+                    query=query,
+                    location=location,
+                    requested_limit=candidate_pool_cap,
+                    returned_count=len(returned),
+                    new_candidate_count=len(deduped),
+                    source_count=_provider_source_count(provider, provider_name),
+                    logical_request_count=1,
+                )
+            ],
+            raw_candidates=returned,
+            raw_candidate_count=len(returned),
+            duplicate_count=duplicate_count,
+            truncated_candidate_count=truncated_candidate_count,
+            candidate_pool_cap=candidate_pool_cap,
+        )
     deduped: dict[str, RawJobCandidate] = {}
     seen_keys: set[str] = set()
     stats: list[ProviderQueryStat] = []
@@ -1343,6 +1437,27 @@ def _source_provider_counts(results: list[JobSearchResult]) -> dict[str, int]:
     for result in results:
         counts[result.source_provider or result.source] += 1
     return dict(counts)
+
+
+def _browser_helper_candidate_to_raw(candidate: BrowserHelperJobCandidate) -> RawJobCandidate:
+    source_provider = candidate.source_provider.strip() or "browser_helper"
+    warnings = [
+        *candidate.provider_warnings,
+        "Candidate came from browser helper payload; platform cookies are not stored by backend.",
+    ]
+    return RawJobCandidate(
+        title=candidate.title.strip(),
+        company=(candidate.company or "").strip() or None,
+        location=(candidate.location or "").strip() or None,
+        source_url=(candidate.source_url or "").strip() or None,
+        source_provider=source_provider,
+        snippet=candidate.snippet.strip(),
+        raw_description=(candidate.raw_description or "").strip() or candidate.snippet.strip(),
+        discovery_query=(candidate.discovery_query or "").strip() or None,
+        discovery_rank=candidate.discovery_rank,
+        detail_status=(candidate.detail_status or "").strip() or "browser_helper_payload",
+        provider_warnings=_clean_list(warnings),
+    )
 
 
 def _clean_list(values: list[str]) -> list[str]:

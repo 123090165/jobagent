@@ -42,6 +42,7 @@ resume truthfulness, search recall, candidate preservation, and ranking quality.
 | `tests/` | active | Backend, service, API, parser, provider, and frontend-helper regression tests. |
 | `docs/` | active but partly drifted | Product, API, architecture, cleanup, and planning docs. |
 | `experiments/` | experiment-only | Local DeepSeek resume extraction comparison, multidomain flow checks, and provider recall calibration; not production runtime. |
+| `browser-helper/` | browser extension | Chrome/Edge helper bridge for browser-assisted job candidate payloads. Real BOSS/Liepin collectors are not implemented yet. |
 | `data/` | local runtime data | SQLite database and local generated state. Should not be treated as source. |
 | `.ai/` | local/supporting | Local assistant or project-support metadata. Not part of the app runtime. |
 | `.github/` | repo support | GitHub configuration if present. |
@@ -183,6 +184,7 @@ current Vue `/api/v1` flow and should be treated carefully before deletion.
 | `job_search_providers/remoteok_provider.py` | live | RemoteOK public JSON API provider. |
 | `job_search_providers/serper_web_provider.py` | optional live | Serper Google Search API provider for public job-link discovery. |
 | `job_search_providers/multi_source_provider.py` | live | Aggregates selected source providers into one candidate pool. |
+| `job_search_providers/browser_helper_provider.py` | browser-assisted payload path | Consumes candidates returned by the JobAgent Browser Helper extension. |
 | `jd_analysis_quality.py` | live | Quality gate for LLM JD extraction. |
 | `jd_quality_service.py` | live/tested | JD quality scoring helpers. |
 | `mock_pipeline.py` | live support | Deterministic legacy-style parser/profile support still used indirectly by profile review paths. |

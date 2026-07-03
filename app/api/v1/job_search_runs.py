@@ -3,12 +3,14 @@ from __future__ import annotations
 from fastapi import APIRouter, BackgroundTasks
 
 from app.application.job_search_usecases import (
+    create_browser_helper_job_search_run,
     create_job_search_run,
     get_job_search_run,
     list_job_search_trace_steps,
     preview_job_search_run,
 )
 from app.schemas.job_search import (
+    BrowserHelperJobSearchRunCreateRequest,
     JobSearchPreviewResponse,
     JobSearchRunCreateRequest,
     JobSearchRunResponse,
@@ -29,6 +31,13 @@ def create_job_search_run_endpoint(
 @router.post("/preview", response_model=JobSearchPreviewResponse)
 def preview_job_search_run_endpoint(payload: JobSearchRunCreateRequest) -> JobSearchPreviewResponse:
     return preview_job_search_run(payload)
+
+
+@router.post("/browser-helper", response_model=JobSearchRunResponse)
+def create_browser_helper_job_search_run_endpoint(
+    payload: BrowserHelperJobSearchRunCreateRequest,
+) -> JobSearchRunResponse:
+    return create_browser_helper_job_search_run(payload)
 
 
 @router.get("/{run_id}", response_model=JobSearchRunResponse)

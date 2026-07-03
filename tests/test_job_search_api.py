@@ -202,6 +202,62 @@ def test_job_search_preview_returns_selected_multi_source_strategy(monkeypatch, 
     assert payload["estimated_candidate_pool_size"] <= 20
 
 
+def test_browser_helper_job_search_requires_candidates(monkeypatch, tmp_path) -> None:
+    confirmed = _create_session_with_confirmed_profile(tmp_path, monkeypatch, "job-search-browser-empty.sqlite3")
+
+    response = client.post(
+        "/api/v1/job-search-runs/browser-helper",
+        json={
+            "session_id": confirmed["profile_session"]["session_id"],
+            "query": "browser helper demo",
+            "platforms": ["demo"],
+            "candidates": [],
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.json()["error_code"] == "browser_helper_candidates_required"
+
+
+def test_browser_helper_job_search_accepts_payload_candidates(monkeypatch, tmp_path) -> None:
+    confirmed = _create_session_with_confirmed_profile(tmp_path, monkeypatch, "job-search-browser.sqlite3")
+
+    response = client.post(
+        "/api/v1/job-search-runs/browser-helper",
+        json={
+            "session_id": confirmed["profile_session"]["session_id"],
+            "query": "Backend Engineer",
+            "helper_version": "0.1.0",
+            "platforms": ["demo"],
+            "max_results": 5,
+            "candidates": [
+                {
+                    "title": "Backend Engineer Intern",
+                    "company": "Browser Helper Demo",
+                    "location": "Remote",
+                    "source_url": "https://jobs.example.com/browser-helper/backend",
+                    "source_provider": "browser_helper_demo",
+                    "snippet": "Python FastAPI SQL APIs and backend platform work.",
+                    "raw_description": "Python FastAPI SQL APIs and backend platform work.",
+                    "detail_status": "browser_helper_payload",
+                }
+            ],
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    run = payload["job_search_run"]
+    assert run["status"] == "completed"
+    assert run["search_mode"] == "browser_helper"
+    assert run["search_provider"] == "browser_helper:demo"
+    assert run["results"]
+    assert run["results"][0]["source_provider"] == "browser_helper_demo"
+    assert run["results"][0]["source_url"] == "https://jobs.example.com/browser-helper/backend"
+    provider_step = next(step for step in payload["steps"] if step["name"] == "Provider search")
+    assert provider_step["details"]["source_candidate_counts"]["browser_helper_demo"] == 1
+
+
 def test_job_search_creates_run_and_updates_session(monkeypatch, tmp_path) -> None:
     confirmed = _create_session_with_confirmed_profile(tmp_path, monkeypatch, "job-search-create.sqlite3")
 

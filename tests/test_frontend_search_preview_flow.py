@@ -33,6 +33,10 @@ def test_frontend_calls_backend_search_preview_endpoint() -> None:
     assert "recall_queries" in types
     assert "ranking_signals" in types
     assert "search_source_kind" in types
+    assert "createBrowserHelperJobSearchRun" in api
+    assert '"/api/v1/job-search-runs/browser-helper"' in api
+    assert "createBrowserHelperJobSearch(" in store
+    assert "CreateBrowserHelperJobSearchPayload" in types
 
 
 def test_confirmed_page_routes_to_preview_instead_of_creating_search_run() -> None:
@@ -100,3 +104,16 @@ def test_search_preview_page_separates_recall_queries_from_ranking_signals() -> 
     assert "Recall And Ranking Plan" in search_preview
     assert "Recall Queries" in search_preview
     assert "Ranking Signals" in search_preview
+
+
+def test_search_preview_page_exposes_browser_helper_probe() -> None:
+    search_preview = _read("pages/SearchPreviewPage.vue")
+    helper_service = _read("services/browserHelper.ts")
+
+    assert "Browser Helper" in search_preview
+    assert "Check Helper" in search_preview
+    assert "Import Demo Candidate" in search_preview
+    assert "pingBrowserHelper" in search_preview
+    assert "fetchBrowserHelperDemoCandidates" in search_preview
+    assert "__jobagentHelper" in helper_service
+    assert "searchDemo" in helper_service

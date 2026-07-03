@@ -133,6 +133,8 @@ function formatTraceDetail(value: unknown) {
           {{
             profileSessionStore.jobSearchRun.search_mode === "local_mock"
               ? "Local demo"
+              : profileSessionStore.jobSearchRun.search_mode === "browser_helper"
+                ? "Browser helper"
               : profileSessionStore.jobSearchRun.llm_enabled
                 ? "DeepSeek API"
                 : "Local Ollama"

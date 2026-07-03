@@ -24,7 +24,7 @@ Job Brief is postponed until Job Search recall and ranking are reliable.
 - backend: `app/`
 - API: `app/api/v1`
 - frontend: `web/`
-- providers: `mock`, `cuhksz_career`, `linkedin`, `remoteok`, `serper_web`, `multi_source`
+- providers: `mock`, `cuhksz_career`, `linkedin`, `remoteok`, `serper_web`, `browser_helper`, `multi_source`
 
 ## Next development plan
 

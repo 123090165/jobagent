@@ -8,6 +8,10 @@ from app.services.job_search_providers.base import (
     JobSearchProviderError,
     RawJobCandidate,
 )
+from app.services.job_search_providers.browser_helper_provider import (
+    BROWSER_HELPER_PROVIDER_PREFIX,
+    BrowserHelperPayloadProvider,
+)
 from app.services.job_search_providers.cuhksz_career_provider import (
     CUHKSZ_CAREER_ALLOWED_DOMAINS,
     CUHKSZ_CAREER_BASE_URL,
@@ -35,6 +39,7 @@ AVAILABLE_JOB_SEARCH_PROVIDERS = [
     "linkedin",
     "remoteok",
     "serper_web",
+    "browser_helper",
     "multi_source",
 ]
 AVAILABLE_JOB_SEARCH_SOURCES = ["cuhksz_career", "linkedin", "remoteok"]
@@ -67,6 +72,8 @@ def normalize_job_search_provider_name(provider_name: str | None = None) -> str:
         return "linkedin"
     if normalized in {"remoteok", "remote_ok"}:
         return "remoteok"
+    if normalized == BROWSER_HELPER_PROVIDER_PREFIX or normalized.startswith(f"{BROWSER_HELPER_PROVIDER_PREFIX}:"):
+        return normalized
     if normalized == "multi_source" or normalized.startswith(MULTI_SOURCE_PREFIX):
         return normalized
     raise JobSearchProviderError(f"Unsupported job search provider: {provider_name}")
@@ -115,6 +122,8 @@ def resolve_job_search_provider(provider_name: str | None = None) -> JobSearchPr
         return LinkedInDiscoveryProvider()
     if normalized == "remoteok":
         return RemoteOKProvider()
+    if normalized == BROWSER_HELPER_PROVIDER_PREFIX or normalized.startswith(f"{BROWSER_HELPER_PROVIDER_PREFIX}:"):
+        raise JobSearchProviderError("browser_helper provider requires payload candidates.")
     return CUHKSZCareerProvider()
 
 
@@ -174,6 +183,19 @@ def get_job_search_provider_status(provider_name: str | None = None) -> dict[str
             detail_strategy="official_json_api",
         )
         return asdict(status)
+    if normalized == BROWSER_HELPER_PROVIDER_PREFIX or normalized.startswith(f"{BROWSER_HELPER_PROVIDER_PREFIX}:"):
+        status = JobSearchProviderStatus(
+            provider="browser_helper",
+            configured=True,
+            available_providers=AVAILABLE_JOB_SEARCH_PROVIDERS,
+            reason="Requires the JobAgent Browser Helper extension in Chrome or Edge.",
+            base_url=None,
+            search_url=None,
+            allowlisted_domains=["zhipin.com", "liepin.com"],
+            source_kind="browser_helper",
+            detail_strategy="browser_extension_payload",
+        )
+        return asdict(status)
     if normalized == "multi_source" or normalized.startswith(MULTI_SOURCE_PREFIX):
         status = JobSearchProviderStatus(
             provider="multi_source",
@@ -224,6 +246,7 @@ __all__ = [
     "LinkedInDiscoveryProvider",
     "MockJobSearchProvider",
     "MultiSourceJobSearchProvider",
+    "BrowserHelperPayloadProvider",
     "RawJobCandidate",
     "RemoteOKProvider",
     "SerperWebSearchProvider",

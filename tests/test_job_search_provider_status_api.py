@@ -56,6 +56,7 @@ def test_provider_status_endpoint_reports_cuhksz() -> None:
         "linkedin",
         "remoteok",
         "serper_web",
+        "browser_helper",
         "multi_source",
     ]
     assert payload["base_url"] == "https://career.cuhk.edu.cn"
@@ -104,6 +105,16 @@ def test_provider_status_helper_reports_remoteok() -> None:
     assert status["configured"] is True
     assert status["source_kind"] == "native_api"
     assert status["allowlisted_domains"] == ["remoteok.com"]
+
+
+def test_provider_status_helper_reports_browser_helper() -> None:
+    status = get_job_search_provider_status("browser_helper")
+
+    assert status["provider"] == "browser_helper"
+    assert status["configured"] is True
+    assert status["source_kind"] == "browser_helper"
+    assert status["detail_strategy"] == "browser_extension_payload"
+    assert "zhipin.com" in status["allowlisted_domains"]
 
 
 def test_provider_status_helper_reports_multi_source() -> None:

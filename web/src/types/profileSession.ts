@@ -170,7 +170,7 @@ export interface JobSearchRun {
   locations: string[];
   target_roles: string[];
   keywords: string[];
-  search_mode: "local_mock" | "live_search";
+  search_mode: "local_mock" | "live_search" | "browser_helper";
   llm_enabled: boolean;
   search_provider: string | null;
   selected_sources: string[];
@@ -218,7 +218,7 @@ export interface JobSearchPreview {
   provider_queries: string[];
   search_intent: JobSearchIntent | null;
   selected_sources: string[];
-  search_source_kind: "mock" | "native_job_board" | "native_api" | "search_engine" | "direct_crawler" | "hybrid";
+  search_source_kind: "mock" | "native_job_board" | "native_api" | "search_engine" | "direct_crawler" | "browser_helper" | "hybrid";
   search_source_notes: string[];
   recall_queries: string[];
   ranking_signals: string[];
@@ -264,7 +264,7 @@ export interface JobSearchProviderStatus {
   base_url: string | null;
   search_url: string | null;
   allowlisted_domains: string[];
-  source_kind: "mock" | "native_job_board" | "native_api" | "search_engine" | "direct_crawler" | "hybrid" | string;
+  source_kind: "mock" | "native_job_board" | "native_api" | "search_engine" | "direct_crawler" | "browser_helper" | "hybrid" | string;
   detail_strategy: string;
 }
 
@@ -272,13 +272,40 @@ export interface CreateJobSearchRunPayload {
   session_id: string;
   query?: string | null;
   search_mode?: "local_mock" | "live_search";
-  search_provider?: "mock" | "cuhksz_career" | "linkedin" | "remoteok" | "serper_web" | "multi_source";
+  search_provider?: "mock" | "cuhksz_career" | "linkedin" | "remoteok" | "serper_web" | "browser_helper" | "multi_source";
   selected_sources?: Array<"cuhksz_career" | "linkedin" | "remoteok">;
   use_llm?: boolean;
   locations?: string[];
   target_roles?: string[];
   keywords?: string[];
   max_results?: number;
+}
+
+export interface BrowserHelperJobCandidate {
+  title: string;
+  company?: string | null;
+  location?: string | null;
+  source_url?: string | null;
+  source_provider: string;
+  snippet: string;
+  raw_description?: string | null;
+  discovery_query?: string | null;
+  discovery_rank?: number | null;
+  detail_status?: string | null;
+  provider_warnings?: string[];
+}
+
+export interface CreateBrowserHelperJobSearchPayload {
+  session_id: string;
+  query?: string | null;
+  helper_version?: string | null;
+  platforms?: string[];
+  use_llm?: boolean;
+  locations?: string[];
+  target_roles?: string[];
+  keywords?: string[];
+  max_results?: number;
+  candidates: BrowserHelperJobCandidate[];
 }
 
 export interface UpdateProfileDraftPayload {

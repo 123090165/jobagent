@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 
 from app.schemas.profile_session import ProfileSession
 
-JobSearchMode: TypeAlias = Literal["local_mock", "live_search"]
+JobSearchMode: TypeAlias = Literal["local_mock", "live_search", "browser_helper"]
 JobSearchRunStatus: TypeAlias = Literal["pending", "running", "completed", "failed"]
 JobSearchStepStatus: TypeAlias = Literal["pending", "running", "completed", "failed"]
 JobSearchStepMode: TypeAlias = Literal["deterministic", "llm", "provider", "fallback", "mock"]
@@ -21,6 +21,7 @@ JobSearchSourceKind: TypeAlias = Literal[
     "native_api",
     "search_engine",
     "direct_crawler",
+    "browser_helper",
     "hybrid",
 ]
 JobSearchSelectedSource: TypeAlias = Literal["cuhksz_career", "linkedin", "remoteok"]
@@ -111,6 +112,33 @@ class JobSearchRunCreateRequest(BaseModel):
     target_roles: list[str] = Field(default_factory=list)
     keywords: list[str] = Field(default_factory=list)
     max_results: int = 10
+
+
+class BrowserHelperJobCandidate(BaseModel):
+    title: str
+    company: str | None = None
+    location: str | None = None
+    source_url: str | None = None
+    source_provider: str = "browser_helper"
+    snippet: str
+    raw_description: str | None = None
+    discovery_query: str | None = None
+    discovery_rank: int | None = None
+    detail_status: str | None = "browser_helper_payload"
+    provider_warnings: list[str] = Field(default_factory=list)
+
+
+class BrowserHelperJobSearchRunCreateRequest(BaseModel):
+    session_id: str
+    query: str | None = None
+    helper_version: str | None = None
+    platforms: list[str] = Field(default_factory=list)
+    use_llm: bool = False
+    locations: list[str] = Field(default_factory=list)
+    target_roles: list[str] = Field(default_factory=list)
+    keywords: list[str] = Field(default_factory=list)
+    max_results: int = 10
+    candidates: list[BrowserHelperJobCandidate] = Field(default_factory=list)
 
 
 class JobSearchRunResponse(BaseModel):

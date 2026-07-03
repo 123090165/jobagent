@@ -247,7 +247,8 @@ It also supports the frontend multi-source shape:
 ## Browser Helper Boundary
 
 The local `slate-helper/` extension shows a different strategy for platforms
-that are not stable public pages:
+that are not stable public pages. JobAgent now has its own extension skeleton
+under `browser-helper/` for the same browser-assisted provider family:
 
 - user opens the platform login page in their own browser;
 - the extension reads session cookies locally;
@@ -258,6 +259,15 @@ This is appropriate for sites such as BOSS, Liepin, or Tianyancha where plain
 backend HTTP requests can fail because of login, CORS, anti-bot checks, or SSR
 behavior. It should be treated as a future `browser_helper` provider family, not
 as a replacement for public direct providers such as CUHKSZ Career or RemoteOK.
+
+Current implementation status:
+
+- `browser-helper/` can be loaded as a Chrome/Edge unpacked extension;
+- Search Preview can detect the helper and import a demo candidate;
+- backend endpoint `POST /api/v1/job-search-runs/browser-helper` accepts
+  standardized helper candidates and runs them through the existing ranking
+  pipeline;
+- real BOSS/Liepin platform collectors are not implemented yet.
 
 ## Safety Rules
 
