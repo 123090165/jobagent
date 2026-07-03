@@ -101,6 +101,19 @@ job data right now?" It writes JSON and Markdown reports under
 `experiments/output/`. Unit tests for this script use fake providers and do not
 perform network calls.
 
+To smoke-test the same selected-source shape used by the frontend:
+
+```powershell
+.venv\Scripts\python.exe experiments\provider_live_smoke.py `
+  --provider multi_source `
+  --source cuhksz_career `
+  --source linkedin `
+  --source remoteok `
+  --query "brand marketing intern Shanghai" `
+  --limit 3 `
+  --min-candidates 1
+```
+
 ## Metrics
 
 Each report includes schema-valid rate, evidence-valid rate, unsupported field count, expected signal coverage, and output stability. The evaluator now also records wall-clock elapsed seconds for every run and the logical LLM request count for each mode, then reports per-mode averages in both JSON and Markdown summaries. This makes it easier to compare extraction quality against latency and request cost.

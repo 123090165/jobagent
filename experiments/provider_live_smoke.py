@@ -14,6 +14,8 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from app.config.env_loader import load_local_env
 from app.services.job_search_providers import (
+    AVAILABLE_JOB_SEARCH_SOURCES,
+    encode_selected_sources,
     JobSearchProvider,
     JobSearchProviderError,
     RawJobCandidate,
@@ -27,7 +29,7 @@ from app.services.job_search_recall_metrics import build_source_recall_stats
 def main() -> int:
     args = parse_args()
     load_local_env(args.env_file)
-    provider_name = normalize_job_search_provider_name(args.provider)
+    provider_name = resolve_provider_name(args.provider, args.source)
     query = resolve_smoke_query(args.query, args.url)
     provider = resolve_job_search_provider(provider_name)
     result = run_smoke_check(
@@ -43,6 +45,7 @@ def main() -> int:
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "input_url": args.url,
         "provider_status": get_job_search_provider_status(provider_name),
+        "selected_sources": args.source if normalize_job_search_provider_name(args.provider) == "multi_source" else [],
         **result,
     }
 
@@ -66,7 +69,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--provider",
         default="cuhksz_career",
-        choices=["cuhksz_career", "linkedin", "remoteok", "serper_web"],
+        choices=["cuhksz_career", "linkedin", "remoteok", "serper_web", "multi_source"],
+    )
+    parser.add_argument(
+        "--source",
+        action="append",
+        choices=AVAILABLE_JOB_SEARCH_SOURCES,
+        default=[],
+        help="Selected source for multi_source. Can be repeated. Defaults to all frontend sources.",
     )
     parser.add_argument("--query", default=None, help="Provider query. If omitted, --url must include q/title/query.")
     parser.add_argument("--url", default=None, help="Optional search URL to derive the query from.")
@@ -89,6 +99,13 @@ def parse_args() -> argparse.Namespace:
         help="Directory for JSON and Markdown reports.",
     )
     return parser.parse_args()
+
+
+def resolve_provider_name(provider: str, sources: list[str]) -> str:
+    normalized = normalize_job_search_provider_name(provider)
+    if normalized == "multi_source":
+        return encode_selected_sources(sources or list(AVAILABLE_JOB_SEARCH_SOURCES))
+    return normalized
 
 
 def resolve_smoke_query(query: str | None, url: str | None) -> str:
@@ -175,6 +192,7 @@ def render_markdown(payload: dict[str, Any]) -> str:
         "",
         f"Generated: {payload['generated_at']}",
         f"Provider: `{payload['provider']}`",
+        f"Selected sources: {', '.join(payload.get('selected_sources') or []) or 'None'}",
         f"Query: `{payload['query']}`",
         f"Location: {payload['location'] or 'None'}",
         f"Input URL: {payload['input_url'] or 'None'}",

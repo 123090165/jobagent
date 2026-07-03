@@ -5,6 +5,7 @@ import json
 from app.services.job_search_providers.base import RawJobCandidate
 from experiments.provider_live_smoke import (
     render_markdown,
+    resolve_provider_name,
     resolve_smoke_query,
     run_smoke_check,
 )
@@ -39,6 +40,12 @@ def test_resolve_smoke_query_extracts_cuhksz_title_param() -> None:
     url = "https://career.cuhk.edu.cn/job/search?title=%E7%AE%97%E6%B3%95&title_type=1"
 
     assert resolve_smoke_query(None, url) == "算法"
+
+
+def test_resolve_provider_name_encodes_multi_source_selection() -> None:
+    assert resolve_provider_name("multi_source", ["cuhksz_career", "remoteok"]) == (
+        "multi_source:cuhksz_career,remoteok"
+    )
 
 
 def test_run_smoke_check_uses_provider_interface_without_network() -> None:
@@ -85,6 +92,7 @@ def test_render_markdown_contains_candidate_links_and_counts() -> None:
         "generated_at": "2026-01-01T00:00:00+00:00",
         "input_url": "https://career.example.com/job/search?title=algorithm",
         "provider": "fake",
+        "selected_sources": [],
         "query": "algorithm",
         "location": None,
         "passed": True,
@@ -119,4 +127,5 @@ def test_render_markdown_contains_candidate_links_and_counts() -> None:
 
     assert "Provider Live Smoke Check" in markdown
     assert "Candidates: 1" in markdown
+    assert "Selected sources: None" in markdown
     assert "[open](https://career.example.com/job/view/id/1)" in markdown

@@ -231,6 +231,19 @@ This script calls only the selected provider through the unified
 with candidate counts, source URLs, detail status, raw-description length, and
 source-level recall stats.
 
+It also supports the frontend multi-source shape:
+
+```powershell
+.venv\Scripts\python.exe experiments\provider_live_smoke.py `
+  --provider multi_source `
+  --source cuhksz_career `
+  --source linkedin `
+  --source remoteok `
+  --query "brand marketing intern Shanghai" `
+  --limit 3 `
+  --min-candidates 1
+```
+
 ## Browser Helper Boundary
 
 The local `slate-helper/` extension shows a different strategy for platforms
