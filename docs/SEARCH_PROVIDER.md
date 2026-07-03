@@ -212,6 +212,40 @@ search intent during setup and does not call DeepSeek or build Job Brief.
 Runtime `Provider search` trace details use the same source-level recall metric
 shape so frontend/manual debugging and experiment reports share one vocabulary.
 
+## Live Smoke Checks
+
+Use the single-provider smoke check when the question is whether a provider can
+fetch a real public result page right now:
+
+```powershell
+.venv\Scripts\python.exe experiments\provider_live_smoke.py `
+  --provider cuhksz_career `
+  --url "https://career.cuhk.edu.cn/job/search?title=%E7%AE%97%E6%B3%95&title_type=1&city=&d_industry=&nature=&d_skill=&d_category=" `
+  --limit 3 `
+  --min-candidates 1 `
+  --require-detail
+```
+
+This script calls only the selected provider through the unified
+`JobSearchProvider.search_jobs()` interface. It writes JSON and Markdown reports
+with candidate counts, source URLs, detail status, raw-description length, and
+source-level recall stats.
+
+## Browser Helper Boundary
+
+The local `slate-helper/` extension shows a different strategy for platforms
+that are not stable public pages:
+
+- user opens the platform login page in their own browser;
+- the extension reads session cookies locally;
+- background fetches use browser credentials and platform-specific headers;
+- some SSR pages are loaded in a real tab and inspected from the DOM.
+
+This is appropriate for sites such as BOSS, Liepin, or Tianyancha where plain
+backend HTTP requests can fail because of login, CORS, anti-bot checks, or SSR
+behavior. It should be treated as a future `browser_helper` provider family, not
+as a replacement for public direct providers such as CUHKSZ Career or RemoteOK.
+
 ## Safety Rules
 
 - Only fetch allowlisted public pages.

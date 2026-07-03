@@ -298,6 +298,10 @@ or live providers.
 for `multi_source`, individual sources, or `serper_web`; setup uses
 deterministic search intent and does not call DeepSeek.
 
+`experiments/provider_live_smoke.py` runs one provider query through the shared
+`JobSearchProvider` interface and reports whether live public candidates, source
+URLs, and optional detail text are available.
+
 ## Tests
 
 The test suite is active and broad. Important clusters:
@@ -319,7 +323,8 @@ The test suite is active and broad. Important clusters:
 - Frontend helper/flow coverage: `test_frontend_profile_review_helpers.py`,
   `test_frontend_search_preview_flow.py`
 - Experiment: `test_resume_extraction_compare_experiment.py`,
-  `test_provider_recall_calibration_experiment.py`
+  `test_provider_recall_calibration_experiment.py`,
+  `test_provider_live_smoke_experiment.py`
 
 The latest local focused provider check before this document was:
 

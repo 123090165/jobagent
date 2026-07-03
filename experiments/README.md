@@ -82,6 +82,25 @@ The report includes per-source raw counts, deduped counts, unretained counts,
 missing URL/detail counts, detail coverage, provider warnings, provider query
 results, and top candidates with source links.
 
+## Provider Live Smoke Check
+
+Run a single-provider live crawler smoke check through the shared
+`JobSearchProvider` interface:
+
+```powershell
+.venv\Scripts\python.exe experiments\provider_live_smoke.py `
+  --provider cuhksz_career `
+  --url "https://career.cuhk.edu.cn/job/search?title=%E7%AE%97%E6%B3%95&title_type=1&city=&d_industry=&nature=&d_skill=&d_category=" `
+  --limit 3 `
+  --min-candidates 1 `
+  --require-detail
+```
+
+This is the fastest reusable check for "can this provider actually fetch public
+job data right now?" It writes JSON and Markdown reports under
+`experiments/output/`. Unit tests for this script use fake providers and do not
+perform network calls.
+
 ## Metrics
 
 Each report includes schema-valid rate, evidence-valid rate, unsupported field count, expected signal coverage, and output stability. The evaluator now also records wall-clock elapsed seconds for every run and the logical LLM request count for each mode, then reports per-mode averages in both JSON and Markdown summaries. This makes it easier to compare extraction quality against latency and request cost.
