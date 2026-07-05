@@ -41,6 +41,24 @@ GENERIC_CUHKSZ_QUERY_TOKENS = {
     "application",
     "software",
     "developer",
+    "data",
+    "analysis",
+    "analytics",
+    "analyst",
+    "product",
+    "manager",
+    "marketing",
+    "brand",
+    "growth",
+    "market",
+    "research",
+    "consumer",
+    "insight",
+    "finance",
+    "investment",
+    "quant",
+    "speech",
+    "recognition",
 }
 
 COMPANY_LABELS = ["公司名称", "企业名称"]
@@ -75,7 +93,7 @@ def build_cuhksz_title_terms(query: str, *, limit: int = MAX_CUHKSZ_TITLE_TERMS)
         return []
 
     terms: list[str] = []
-    terms.extend(_expand_english_health_query(raw_query))
+    terms.extend(_expand_english_query(raw_query))
 
     cjk_chunks = re.findall(r"[\u4e00-\u9fff]{2,}", raw_query)
     for chunk in cjk_chunks:
@@ -86,13 +104,13 @@ def build_cuhksz_title_terms(query: str, *, limit: int = MAX_CUHKSZ_TITLE_TERMS)
         normalized = token.strip()
         if normalized.lower() in GENERIC_CUHKSZ_QUERY_TOKENS:
             continue
-        if len(normalized) <= 8 or normalized.isupper():
+        if normalized.isupper() and len(normalized) <= 8:
             terms.append(normalized)
 
     return _dedupe(terms)[:limit]
 
 
-def _expand_english_health_query(query: str) -> list[str]:
+def _expand_english_query(query: str) -> list[str]:
     lowered = query.lower()
     terms: list[str] = []
     if "algorithm" in lowered or "algorithms" in lowered:
@@ -103,6 +121,28 @@ def _expand_english_health_query(query: str) -> list[str]:
         "algorithm" in lowered or "ai" in lowered
     ):
         terms.append("健康算法")
+    if "speech recognition" in lowered or "automatic speech recognition" in lowered or "asr" in lowered:
+        terms.append("语音识别")
+    if "data science" in lowered or "data analysis" in lowered or "data analyst" in lowered:
+        terms.append("数据分析")
+    if "backend" in lowered or "back-end" in lowered or "server-side" in lowered:
+        terms.append("后端开发")
+    if "frontend" in lowered or "front-end" in lowered or "web developer" in lowered:
+        terms.append("前端开发")
+    if "product manager" in lowered or "product" in lowered:
+        terms.append("产品")
+    if (
+        "marketing" in lowered
+        or "brand" in lowered
+        or "growth" in lowered
+        or "market research" in lowered
+        or "consumer insight" in lowered
+    ):
+        terms.append("市场")
+    if "finance" in lowered or "investment" in lowered:
+        terms.append("金融")
+    if "quant" in lowered:
+        terms.append("量化")
     return terms
 
 

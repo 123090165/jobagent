@@ -300,6 +300,7 @@ export interface CreateBrowserHelperJobSearchPayload {
   query?: string | null;
   helper_version?: string | null;
   platforms?: string[];
+  selected_sources?: Array<"cuhksz_career" | "linkedin" | "remoteok">;
   use_llm?: boolean;
   locations?: string[];
   target_roles?: string[];

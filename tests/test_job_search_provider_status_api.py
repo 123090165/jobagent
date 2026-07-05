@@ -41,6 +41,10 @@ def test_provider_resolver_supports_selected_source_aliases() -> None:
         "linkedin",
         "remoteok",
     ]
+    assert selected_sources_from_provider_name("browser_helper:boss,cuhksz_career,remoteok") == [
+        "cuhksz_career",
+        "remoteok",
+    ]
 
 
 def test_provider_status_endpoint_reports_cuhksz() -> None:
@@ -114,7 +118,7 @@ def test_provider_status_helper_reports_browser_helper() -> None:
     assert status["configured"] is True
     assert status["source_kind"] == "browser_helper"
     assert status["detail_strategy"] == "browser_extension_payload"
-    assert "zhipin.com" in status["allowlisted_domains"]
+    assert status["allowlisted_domains"] == ["zhipin.com"]
 
 
 def test_provider_status_helper_reports_multi_source() -> None:

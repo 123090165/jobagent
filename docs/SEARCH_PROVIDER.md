@@ -255,19 +255,21 @@ under `browser-helper/` for the same browser-assisted provider family:
 - background fetches use browser credentials and platform-specific headers;
 - some SSR pages are loaded in a real tab and inspected from the DOM.
 
-This is appropriate for sites such as BOSS, Liepin, or Tianyancha where plain
-backend HTTP requests can fail because of login, CORS, anti-bot checks, or SSR
-behavior. It should be treated as a future `browser_helper` provider family, not
-as a replacement for public direct providers such as CUHKSZ Career or RemoteOK.
+This is appropriate for sites such as BOSS where plain backend HTTP requests can
+fail because of login, CORS, anti-bot checks, or SSR behavior. It should be
+treated as a `browser_helper` provider family, not as a replacement for public
+direct providers such as CUHKSZ Career or RemoteOK.
 
 Current implementation status:
 
 - `browser-helper/` can be loaded as a Chrome/Edge unpacked extension;
-- Search Preview can detect the helper and import a demo candidate;
+- Search Preview can detect the helper, check BOSS login state, open the BOSS
+  login page, and ask the helper to collect BOSS search results;
 - backend endpoint `POST /api/v1/job-search-runs/browser-helper` accepts
   standardized helper candidates and runs them through the existing ranking
   pipeline;
-- real BOSS/Liepin platform collectors are not implemented yet.
+- the first real collector target is BOSS (`zhipin.com`); other platforms are
+  intentionally hidden until this path is stable.
 
 ## Safety Rules
 

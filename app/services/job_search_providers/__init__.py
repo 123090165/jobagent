@@ -102,6 +102,11 @@ def selected_sources_from_provider_name(provider_name: str | None) -> list[str]:
     if normalized.startswith(MULTI_SOURCE_PREFIX):
         raw_sources = normalized[len(MULTI_SOURCE_PREFIX) :].split(",")
         return _dedupe_sources([normalize_job_search_source_name(source) for source in raw_sources if source])
+    if normalized.startswith(f"{BROWSER_HELPER_PROVIDER_PREFIX}:"):
+        raw_sources = normalized[len(BROWSER_HELPER_PROVIDER_PREFIX) + 1 :].split(",")
+        return _dedupe_sources(
+            [source for source in raw_sources if source in AVAILABLE_JOB_SEARCH_SOURCES]
+        )
     if normalized in AVAILABLE_JOB_SEARCH_SOURCES:
         return [normalized]
     return []
@@ -188,10 +193,10 @@ def get_job_search_provider_status(provider_name: str | None = None) -> dict[str
             provider="browser_helper",
             configured=True,
             available_providers=AVAILABLE_JOB_SEARCH_PROVIDERS,
-            reason="Requires the JobAgent Browser Helper extension in Chrome or Edge.",
+            reason="Requires the JobAgent Browser Helper extension in Chrome or Edge for BOSS login-assisted search.",
             base_url=None,
             search_url=None,
-            allowlisted_domains=["zhipin.com", "liepin.com"],
+            allowlisted_domains=["zhipin.com"],
             source_kind="browser_helper",
             detail_strategy="browser_extension_payload",
         )

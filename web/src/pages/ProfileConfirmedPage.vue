@@ -3,7 +3,7 @@ import { computed, onMounted } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { NButton, NCard } from "naive-ui";
 
-import StepProgress from "../components/StepProgress.vue";
+import FlowPageHeader from "../components/FlowPageHeader.vue";
 import { useProfileSessionStore } from "../stores/profileSession";
 
 const route = useRoute();
@@ -13,6 +13,15 @@ const sessionId = computed(() => String(route.params.sessionId ?? ""));
 const sessionUnavailable = computed(
   () => profileSessionStore.hasLoadedSession && !profileSessionStore.session
 );
+const confirmedStats = computed(() => {
+  const profile = profileSessionStore.confirmedProfile;
+  return {
+    roles: profile?.target_roles.length ?? 0,
+    coreSkills: profile?.core_skills.length ?? 0,
+    supportingSkills: profile?.supporting_skills.length ?? 0,
+    keywords: profile?.search_keywords.length ?? 0
+  };
+});
 
 onMounted(async () => {
   try {
@@ -39,12 +48,12 @@ async function startJobSearch() {
 
 <template>
   <section class="flow-page">
-    <h1>Profile Confirmed</h1>
-    <p class="flow-message">
-      Review the final confirmed profile, choose between the CUHKSZ live board and the local demo path, and launch the next job search run.
-    </p>
-    <p class="flow-meta">Session {{ sessionId }}</p>
-    <StepProgress :active-index="2" />
+    <FlowPageHeader
+      title="Profile Confirmed"
+      description="Review the locked profile before preparing a provider-specific search plan."
+      :meta="`Session ${sessionId}`"
+      :active-step="3"
+    />
 
     <div v-if="profileSessionStore.error" class="error-banner">
       {{ profileSessionStore.error }}
@@ -65,15 +74,27 @@ async function startJobSearch() {
     </div>
 
     <div v-else class="confirmed-layout">
-      <div class="review-actions">
-        <n-button secondary @click="goBackToDraft">Back to Draft</n-button>
-        <n-button
-          type="primary"
-          :disabled="!profileSessionStore.confirmedProfile"
-          @click="startJobSearch"
-        >
-          Preview Job Search
-        </n-button>
+      <div class="workspace-panel">
+        <div class="panel-heading">
+          <div>
+            <h2>Confirmed profile</h2>
+            <p>Job search preview will use this profile as the backend source of truth.</p>
+          </div>
+          <span class="flow-meta">
+            {{ profileSessionStore.confirmedProfile ? "Ready for search" : "Loading profile" }}
+          </span>
+        </div>
+
+        <div class="flow-toolbar">
+          <n-button secondary @click="goBackToDraft">Back to Draft</n-button>
+          <n-button
+            type="primary"
+            :disabled="!profileSessionStore.confirmedProfile"
+            @click="startJobSearch"
+          >
+            Preview Job Search
+          </n-button>
+        </div>
       </div>
 
       <div
@@ -84,6 +105,25 @@ async function startJobSearch() {
       </div>
 
       <template v-else-if="profileSessionStore.confirmedProfile">
+        <div class="metric-grid">
+          <div class="metric-card">
+            <span>Target roles</span>
+            <strong>{{ confirmedStats.roles }}</strong>
+          </div>
+          <div class="metric-card">
+            <span>Core skills</span>
+            <strong>{{ confirmedStats.coreSkills }}</strong>
+          </div>
+          <div class="metric-card">
+            <span>Supporting skills</span>
+            <strong>{{ confirmedStats.supportingSkills }}</strong>
+          </div>
+          <div class="metric-card">
+            <span>Keywords</span>
+            <strong>{{ confirmedStats.keywords }}</strong>
+          </div>
+        </div>
+
         <div class="confirmed-grid">
           <n-card title="Summary" size="small">
             <p class="confirmed-summary">{{ profileSessionStore.confirmedProfile.summary }}</p>

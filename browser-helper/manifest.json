@@ -1,14 +1,12 @@
 {
   "manifest_version": 3,
   "name": "JobAgent Browser Helper",
-  "version": "0.1.0",
-  "description": "Browser-assisted job candidate collection for JobAgent.",
-  "permissions": ["tabs", "cookies"],
+  "version": "0.2.2",
+  "description": "Browser-assisted BOSS job candidate collection for JobAgent.",
+  "permissions": ["tabs", "cookies", "scripting"],
   "host_permissions": [
     "*://*.zhipin.com/*",
-    "*://zhipin.com/*",
-    "*://*.liepin.com/*",
-    "*://liepin.com/*"
+    "*://zhipin.com/*"
   ],
   "background": {
     "service_worker": "background.js"
@@ -18,6 +16,8 @@
       "matches": [
         "http://localhost:5173/*",
         "http://127.0.0.1:5173/*",
+        "http://localhost:5174/*",
+        "http://127.0.0.1:5174/*",
         "http://localhost:4173/*",
         "http://127.0.0.1:4173/*"
       ],

@@ -1,0 +1,32 @@
+[
+  {
+    "id": 1, "priority": 1,
+    "comment": "Liepin's API rejects requests not Origin'd from www.liepin.com",
+    "action": {
+      "type": "modifyHeaders",
+      "requestHeaders": [
+        { "header": "origin",  "operation": "set", "value": "https://www.liepin.com" },
+        { "header": "referer", "operation": "set", "value": "https://www.liepin.com/zhaopin/" }
+      ]
+    },
+    "condition": {
+      "urlFilter": "||api-c.liepin.com",
+      "resourceTypes": ["xmlhttprequest"]
+    }
+  },
+  {
+    "id": 2, "priority": 1,
+    "comment": "天眼查 nsearch may reject a cross-origin Origin/Referer from the Slate page",
+    "action": {
+      "type": "modifyHeaders",
+      "requestHeaders": [
+        { "header": "origin",  "operation": "set", "value": "https://www.tianyancha.com" },
+        { "header": "referer", "operation": "set", "value": "https://www.tianyancha.com/" }
+      ]
+    },
+    "condition": {
+      "urlFilter": "||tianyancha.com",
+      "resourceTypes": ["xmlhttprequest"]
+    }
+  }
+]

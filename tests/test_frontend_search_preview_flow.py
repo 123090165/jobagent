@@ -27,6 +27,8 @@ def test_frontend_calls_backend_search_preview_endpoint() -> None:
     assert '"/api/v1/job-search-runs/preview"' in api
     assert "previewJobSearch(" in store
     assert "jobSearchPreview" in store
+    assert "jobSearchPreviewRequestId" in store
+    assert "requestId === this.jobSearchPreviewRequestId" in store
     assert "provider_search_terms" in types
     assert "provider_search_urls" in types
     assert "selected_sources" in types
@@ -49,13 +51,28 @@ def test_confirmed_page_routes_to_preview_instead_of_creating_search_run() -> No
 
 def test_job_search_result_page_can_return_to_preview() -> None:
     job_search_page = _read("pages/JobSearchPage.vue")
+    search_preview = _read("pages/SearchPreviewPage.vue")
+    store = _read("stores/profileSession.ts")
     types = _read("types/profileSession.ts")
 
     assert "Back to Search Preview" in job_search_page
     assert 'name: "search-preview"' in job_search_page
+    assert "jobSearchPreviewControls" in store
+    assert "saveJobSearchPreviewControls" in store
+    assert "restorePreviewControls" in search_preview
+    assert "canReuseStoredPreview" in search_preview
+    assert "expectedStoredPreviewProvider" in search_preview
+    assert "saveCurrentPreviewControls" in search_preview
     assert "Score Breakdown" in job_search_page
     assert "Evidence" in job_search_page
     assert "Trace Details" in job_search_page
+    assert "Provider Key" in job_search_page
+    assert "Selected Sources" in job_search_page
+    assert "Result Sources" in job_search_page
+    assert "runProviderLabel" in job_search_page
+    assert "resultSourceSummary" in job_search_page
+    assert "formatProviderName" in job_search_page
+    assert "formatSourceName" in job_search_page
     assert "score_breakdown" in types
     assert "evidence_quotes" in types
 
@@ -71,6 +88,9 @@ def test_search_preview_page_shows_provider_specific_search_urls() -> None:
     assert "CUHKSZ Career" in search_preview
     assert "LinkedIn" in search_preview
     assert "RemoteOK" in search_preview
+    assert "BOSS" in search_preview
+    assert "selectedProviderSearchSources" in search_preview
+    assert "isBossSourceSelected" in search_preview
     assert "selected_sources" in search_preview
 
 
@@ -112,8 +132,68 @@ def test_search_preview_page_exposes_browser_helper_probe() -> None:
 
     assert "Browser Helper" in search_preview
     assert "Check Helper" in search_preview
-    assert "Import Demo Candidate" in search_preview
+    assert "Check BOSS Login" in search_preview
+    assert "Open BOSS Login" in search_preview
+    assert "Start Job Search" in search_preview
     assert "pingBrowserHelper" in search_preview
-    assert "fetchBrowserHelperDemoCandidates" in search_preview
+    assert "checkBossLoginStatus" in search_preview
+    assert "startBossLoginAutoRefresh" in search_preview
+    assert "stopBossLoginAutoRefresh" in search_preview
+    assert "BOSS login verified by a live page probe" in search_preview
+    assert "fetchBossCandidates" in search_preview
+    assert "startBrowserHelperJobSearch" in search_preview
+    assert "buildBossSearchQueries" in search_preview
+    assert "BOSS_ENGLISH_QUERY_REWRITES" in search_preview
+    assert "BOSS_MAX_SEARCH_QUERY_ATTEMPTS = 6" in search_preview
+    assert "BOSS Queries" in search_preview
+    assert "formatBossEmptyResultMessage" in search_preview
+    assert "tabKeptOpen" in search_preview
+    assert "DOM signals" in search_preview
+    assert "Tried BOSS queries" in search_preview
+    assert "API diagnostics" in search_preview
+    assert "providerSourcesForRun(profileSessionStore.jobSearchPreview)" in search_preview
+    assert "backendProviderSourceLabel" in search_preview
+    assert "Backend Sources" in search_preview
+    assert "legacySelectedSearchSources" in search_preview
+    assert "profileSessionStore.jobSearchPreviewControls?.selectedProviderSearchSources" in search_preview
+    assert "if (!selectedProviderSources.length)" in search_preview
+    assert "preview?.selected_sources" in search_preview
+    assert "!profileSessionStore.isJobSearchPreviewLoading" in search_preview
     assert "__jobagentHelper" in helper_service
-    assert "searchDemo" in helper_service
+    assert "BOSS_SEARCH_RESPONSE_TIMEOUT_MS = 90000" in helper_service
+    assert "const helperQuery = queries[0] ?? query" in helper_service
+    assert "BOSS helper search timed out" in helper_service
+    assert "BossSearchDiagnostics" in helper_service
+    assert "attemptedQueries" in helper_service
+    assert "searchAttempts" in helper_service
+    assert "checkBossLogin" in helper_service
+    assert "searchBoss" in helper_service
+    assert "cookieLoggedIn" in helper_service
+    assert "sessionVerified" in helper_service
+
+
+def test_browser_helper_boss_search_waits_for_real_page_signals() -> None:
+    helper_background = Path("browser-helper/background.js").read_text(encoding="utf-8")
+
+    assert '"https://www.zhipin.com/web/geek/jobs"' in helper_background
+    assert 'new URL(BOSS_SEARCH_API_PATH, BOSS_HOME_URL)' in helper_background
+    assert '"/wapi/zpgeek/search/joblist.json"' in helper_background
+    assert "normalizeBossSearchQueries" in helper_background
+    assert "BOSS_MAX_QUERY_ATTEMPTS = 6" in helper_background
+    assert "BOSS_ENGLISH_QUERY_REWRITES" in helper_background
+    assert "fetchBossJobsFromWorkerApi" in helper_background
+    assert 'world: "MAIN"' in helper_background
+    assert "fetchBossJobListFromPage" in helper_background
+    assert "searchBossJobsInTab" in helper_background
+    assert "waitForBossPageSignals" in helper_background
+    assert "probeBossLoginSession" in helper_background
+    assert "interpretBossLoginProbe" in helper_background
+    assert "BOSS_LOGIN_PROBE_QUERY" in helper_background
+    assert "cookieLoggedIn" in helper_background
+    assert "sessionVerified" in helper_background
+    assert "active: false" in helper_background
+    assert "let shouldCloseTab = true" in helper_background
+    assert "if (shouldCloseTab)" in helper_background
+    assert "BOSS fallback tab was closed because no valid job candidates were parsed." in helper_background
+    assert "validJobDetailLinkCount" in helper_background
+    assert "!/\\/job_detail\\/[^/?#]+/.test" in helper_background

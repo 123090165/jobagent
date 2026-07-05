@@ -3,6 +3,7 @@ from __future__ import annotations
 from app.services.job_search_providers.base import RawJobCandidate
 from app.services.job_search_recall_metrics import (
     build_source_recall_stats,
+    candidate_recall_key,
     dedupe_recall_candidates,
     has_missing_detail,
 )
@@ -54,6 +55,72 @@ def test_dedupe_recall_candidates_prefers_source_url_and_counts_duplicates() -> 
     deduped, duplicate_count, truncated_count = dedupe_recall_candidates(candidates, limit=10)
 
     assert len(deduped) == 2
+    assert duplicate_count == 1
+    assert truncated_count == 0
+
+
+def test_candidate_recall_key_canonicalizes_boss_detail_query_params() -> None:
+    first = _candidate(
+        title="Algorithm Intern",
+        source_provider="boss_zhipin",
+        source_url="https://www.zhipin.com/job_detail/ABC123.html?lid=one&securityId=first",
+        detail_status="browser_helper_payload",
+    )
+    second = _candidate(
+        title="Algorithm Intern",
+        source_provider="boss_zhipin",
+        source_url="https://www.zhipin.com/job_detail/ABC123.html?lid=two&securityId=second",
+        detail_status="browser_helper_payload",
+    )
+
+    deduped, duplicate_count, truncated_count = dedupe_recall_candidates([first, second], limit=10)
+
+    assert candidate_recall_key(first) == candidate_recall_key(second)
+    assert len(deduped) == 1
+    assert duplicate_count == 1
+    assert truncated_count == 0
+
+
+def test_candidate_recall_key_canonicalizes_cuhksz_detail_query_params() -> None:
+    first = _candidate(
+        title="AI Algorithm Intern",
+        source_provider="cuhksz_career",
+        source_url="https://career.cuhk.edu.cn/job/view/id/468293?from=search",
+        detail_status="native_detail_page",
+    )
+    second = _candidate(
+        title="AI Algorithm Intern",
+        source_provider="cuhksz_career",
+        source_url="https://career.cuhk.edu.cn/job/view/id/468293?keyword=AI",
+        detail_status="native_detail_page",
+    )
+
+    deduped, duplicate_count, truncated_count = dedupe_recall_candidates([first, second], limit=10)
+
+    assert candidate_recall_key(first) == candidate_recall_key(second)
+    assert len(deduped) == 1
+    assert duplicate_count == 1
+    assert truncated_count == 0
+
+
+def test_candidate_recall_key_canonicalizes_linkedin_job_urls() -> None:
+    first = _candidate(
+        title="Machine Learning Intern",
+        source_provider="linkedin",
+        source_url="https://www.linkedin.com/jobs/view/1234567890/?trk=public_jobs_topcard-title",
+        detail_status="linkedin_external_link",
+    )
+    second = _candidate(
+        title="Machine Learning Intern",
+        source_provider="linkedin",
+        source_url="https://www.linkedin.com/jobs/search/?currentJobId=1234567890&keywords=machine%20learning",
+        detail_status="linkedin_external_link",
+    )
+
+    deduped, duplicate_count, truncated_count = dedupe_recall_candidates([first, second], limit=10)
+
+    assert candidate_recall_key(first) == candidate_recall_key(second)
+    assert len(deduped) == 1
     assert duplicate_count == 1
     assert truncated_count == 0
 

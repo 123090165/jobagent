@@ -3,7 +3,7 @@ import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { NButton, NCard, NCode, NCollapse, NCollapseItem, NSwitch, NTag, NThing } from "naive-ui";
 
-import StepProgress from "../components/StepProgress.vue";
+import FlowPageHeader from "../components/FlowPageHeader.vue";
 import { useProfileSessionStore } from "../stores/profileSession";
 
 const route = useRoute();
@@ -51,13 +51,39 @@ const analysisModeTagType = computed(() => {
   }
   return "default";
 });
+const detectedSectionCount = computed(() => {
+  if (!parsedReview.value) {
+    return 0;
+  }
+  return [
+    parsedReview.value.education.length,
+    parsedReview.value.work_experience.length,
+    parsedReview.value.projects.length,
+    parsedReview.value.skills.items.length
+  ].filter((count) => count > 0).length;
+});
+const reviewReadinessLabel = computed(() => {
+  if (!parsedReview.value) {
+    return "Waiting for analysis";
+  }
+  if (parsedReview.value.quality_warnings.length) {
+    return "Needs review";
+  }
+  return "Ready for draft";
+});
+const reviewReadinessTagType = computed(() => {
+  if (!parsedReview.value) {
+    return "default";
+  }
+  return parsedReview.value.quality_warnings.length ? "warning" : "success";
+});
 
 function formatEducationItem(item: Record<string, unknown>): string {
   const parts = [item.school, item.degree, item.major].filter(
     (value): value is string => typeof value === "string" && value.length > 0
   );
   const rawText = typeof item.raw_text === "string" ? item.raw_text : "";
-  return parts.join(" · ") || rawText || "Education entry";
+  return parts.join(" - ") || rawText || "Education entry";
 }
 
 function formatWorkExperience(item: Record<string, unknown>): string {
@@ -122,12 +148,12 @@ async function continueToDraft() {
 
 <template>
   <section class="flow-page">
-    <h1>Profile Review</h1>
-    <p class="flow-message">
-      Review how JobAgent understands your resume before we move on to profile drafting.
-    </p>
-    <p class="flow-meta">Session {{ sessionId }}</p>
-    <StepProgress :active-index="1" />
+    <FlowPageHeader
+      title="Profile Review"
+      description="Review the parsed resume signal before creating an editable search profile."
+      :meta="`Session ${sessionId}`"
+      :active-step="1"
+    />
 
     <div v-if="profileSessionStore.error" class="error-banner">
       {{ profileSessionStore.error }}
@@ -149,34 +175,61 @@ async function continueToDraft() {
     </div>
 
     <div v-else class="review-layout">
-      <div class="review-actions">
-        <div class="job-search-setup-row">
-          <span class="job-search-setup-label">Use DeepSeek API for resume analysis</span>
-          <n-switch v-model:value="useLlmResumeAnalysis" />
+      <div class="workspace-panel">
+        <div class="panel-heading">
+          <div>
+            <h2>Analysis setup</h2>
+            <p>Parser mode and downstream draft handoff.</p>
+          </div>
+          <n-tag :type="reviewReadinessTagType" round>{{ reviewReadinessLabel }}</n-tag>
         </div>
-        <n-button
-          type="primary"
-          :loading="profileSessionStore.isReviewLoading"
-          @click="analyzeResume(false)"
-        >
-          Analyze Resume
-        </n-button>
-        <n-button
-          secondary
-          :disabled="!parsedReview"
-          :loading="profileSessionStore.isReviewLoading"
-          @click="analyzeResume(true)"
-        >
-          Regenerate Review
-        </n-button>
-        <n-button
-          tertiary
-          :disabled="!parsedReview"
-          :loading="profileSessionStore.isDraftLoading"
-          @click="continueToDraft"
-        >
-          Continue to Profile Draft
-        </n-button>
+
+        <div class="setup-grid">
+          <div class="setting-row">
+            <span class="setting-label">DeepSeek resume analysis</span>
+            <div class="setting-control">
+              <n-switch v-model:value="useLlmResumeAnalysis" />
+              <span>{{ llmToggleLabel }}</span>
+            </div>
+          </div>
+          <div class="setting-row">
+            <span class="setting-label">Provider status</span>
+            <div class="job-search-status-copy">
+              <n-tag :type="llmStatus?.configured ? 'success' : 'warning'" round>
+                {{ llmStatus?.configured ? "Configured" : "Fallback Ready" }}
+              </n-tag>
+              <span>{{ selectedLlmProvider }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="flow-toolbar">
+          <div class="flow-toolbar-secondary">
+            <n-button
+              :type="parsedReview ? 'default' : 'primary'"
+              :loading="profileSessionStore.isReviewLoading"
+              @click="analyzeResume(false)"
+            >
+              Analyze Resume
+            </n-button>
+            <n-button
+              secondary
+              :disabled="!parsedReview"
+              :loading="profileSessionStore.isReviewLoading"
+              @click="analyzeResume(true)"
+            >
+              Regenerate Review
+            </n-button>
+          </div>
+          <n-button
+            type="primary"
+            :disabled="!parsedReview"
+            :loading="profileSessionStore.isDraftLoading"
+            @click="continueToDraft"
+          >
+            Continue to Profile Draft
+          </n-button>
+        </div>
       </div>
 
       <div v-if="!parsedReview" class="review-empty-state">
@@ -185,8 +238,28 @@ async function continueToDraft() {
         </p>
       </div>
 
-      <div v-else class="review-grid">
-        <n-card title="Analysis Mode" size="small">
+      <template v-else>
+        <div class="metric-grid">
+          <div class="metric-card">
+            <span>Detected sections</span>
+            <strong>{{ detectedSectionCount }}/4</strong>
+          </div>
+          <div class="metric-card">
+            <span>Skills</span>
+            <strong>{{ parsedReview.skills.count }}</strong>
+          </div>
+          <div class="metric-card">
+            <span>Warnings</span>
+            <strong>{{ parsedReview.quality_warnings.length }}</strong>
+          </div>
+          <div class="metric-card">
+            <span>Questions</span>
+            <strong>{{ parsedReview.missing_info_questions.length }}</strong>
+          </div>
+        </div>
+
+        <div class="review-grid">
+          <n-card title="Analysis Mode" size="small">
           <div class="job-search-status-copy">
             <n-tag :type="analysisModeTagType" round>{{ analysisModeLabel }}</n-tag>
           </div>
@@ -290,8 +363,9 @@ async function continueToDraft() {
               No follow-up questions right now.
             </li>
           </ul>
-        </n-card>
-      </div>
+          </n-card>
+        </div>
+      </template>
 
       <n-collapse v-if="parsedReview?.raw_parser_output" class="review-debug">
         <n-collapse-item title="Raw parser output" name="raw-parser-output">

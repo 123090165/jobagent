@@ -16,12 +16,35 @@ class MultiSourceJobSearchProvider:
         self.providers = providers
         self.source_names = [getattr(provider, "provider_name", "unknown") for provider in providers]
         self.provider_name = "multi_source:" + ",".join(self.source_names) if self.source_names else "multi_source"
+        self.source_attempts: list[dict[str, object]] = []
 
     def search_jobs(self, *, query: str, location: str | None, limit: int) -> list[RawJobCandidate]:
         candidates: list[RawJobCandidate] = []
         for provider in self.providers:
+            source_name = getattr(provider, "provider_name", "unknown")
             try:
-                candidates.extend(provider.search_jobs(query=query, location=location, limit=limit))
-            except JobSearchProviderError:
+                returned = provider.search_jobs(query=query, location=location, limit=limit)
+                candidates.extend(returned)
+                self.source_attempts.append(
+                    {
+                        "source": source_name,
+                        "query": query,
+                        "location": location,
+                        "requested_limit": limit,
+                        "returned_count": len(returned),
+                        "error": None,
+                    }
+                )
+            except JobSearchProviderError as exc:
+                self.source_attempts.append(
+                    {
+                        "source": source_name,
+                        "query": query,
+                        "location": location,
+                        "requested_limit": limit,
+                        "returned_count": 0,
+                        "error": f"{type(exc).__name__}: {exc}",
+                    }
+                )
                 continue
         return candidates

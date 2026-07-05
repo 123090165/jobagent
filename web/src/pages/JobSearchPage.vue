@@ -3,7 +3,7 @@ import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { NButton, NCard, NTag } from "naive-ui";
 
-import StepProgress from "../components/StepProgress.vue";
+import FlowPageHeader from "../components/FlowPageHeader.vue";
 import { useProfileSessionStore } from "../stores/profileSession";
 
 const route = useRoute();
@@ -12,9 +12,83 @@ const profileSessionStore = useProfileSessionStore();
 const runId = computed(() => String(route.params.runId ?? ""));
 const jobBriefHint = ref<string | null>(null);
 
+const SOURCE_LABELS: Record<string, string> = {
+  boss: "BOSS",
+  boss_zhipin: "BOSS",
+  zhipin: "BOSS",
+  cuhksz_career: "CUHKSZ Career",
+  linkedin: "LinkedIn",
+  remoteok: "RemoteOK",
+  serper_web: "Web Search",
+  browser_helper: "Browser Helper",
+  browser_helper_demo: "Browser Helper Demo",
+  live_search: "Live Search",
+  local_mock: "Local Demo",
+  mock: "Local Demo"
+};
+
 const isRunning = computed(() =>
   ["pending", "running"].includes(profileSessionStore.jobSearchRun?.status ?? "")
 );
+const completedTraceCount = computed(
+  () => profileSessionStore.jobSearchSteps.filter((step) => step.status === "completed").length
+);
+const resultCount = computed(() => profileSessionStore.jobSearchRun?.results.length ?? 0);
+const runStatusLabel = computed(() => {
+  const status = profileSessionStore.jobSearchRun?.status;
+  if (!status) {
+    return "Loading run";
+  }
+  if (status === "completed") {
+    return "Results ready";
+  }
+  if (status === "failed") {
+    return "Run failed";
+  }
+  return "Search running";
+});
+const runSelectedSources = computed(() => {
+  const run = profileSessionStore.jobSearchRun;
+  if (!run) {
+    return [];
+  }
+  const selected = [
+    ...sourcesFromProviderName(run.search_provider),
+    ...(run.selected_sources ?? [])
+  ];
+  if (run.search_mode === "local_mock" && selected.length === 0) {
+    selected.push("mock");
+  }
+  return uniqueSourceKeys(selected);
+});
+const runProviderLabel = computed(() => {
+  const run = profileSessionStore.jobSearchRun;
+  if (!run) {
+    return "Not set";
+  }
+  if (runSelectedSources.value.length) {
+    return runSelectedSources.value.map(formatSourceName).join(" + ");
+  }
+  return formatProviderName(run.search_provider);
+});
+const selectedSourceSummary = computed(() => {
+  return runSelectedSources.value.map(formatSourceName).join(", ") || "Not set";
+});
+const resultSourceCounts = computed(() => {
+  const counts = new Map<string, number>();
+  for (const result of profileSessionStore.jobSearchRun?.results ?? []) {
+    const key = normalizeSourceKey(result.source_provider || result.source);
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  return [...counts.entries()].map(([source, count]) => ({
+    source,
+    label: formatSourceName(source),
+    count
+  }));
+});
+const resultSourceSummary = computed(() => {
+  return resultSourceCounts.value.map((item) => `${item.label} ${item.count}`).join(", ") || "No results yet";
+});
 
 onMounted(async () => {
   jobBriefHint.value = null;
@@ -70,16 +144,72 @@ function formatTraceDetail(value: unknown) {
   }
   return String(value ?? "");
 }
+
+function normalizeSourceKey(source: string | null | undefined): string {
+  const normalized = (source ?? "").trim().toLowerCase();
+  if (normalized === "boss_zhipin" || normalized === "zhipin") {
+    return "boss";
+  }
+  return normalized;
+}
+
+function uniqueSourceKeys(sources: Array<string | null | undefined>): string[] {
+  const seen = new Set<string>();
+  const items: string[] = [];
+  for (const source of sources) {
+    const normalized = normalizeSourceKey(source);
+    if (!normalized || seen.has(normalized)) {
+      continue;
+    }
+    seen.add(normalized);
+    items.push(normalized);
+  }
+  return items;
+}
+
+function sourcesFromProviderName(providerName: string | null | undefined): string[] {
+  const normalized = (providerName ?? "").trim().toLowerCase();
+  if (!normalized) {
+    return [];
+  }
+  if (normalized.startsWith("browser_helper:")) {
+    const suffix = normalized.slice("browser_helper:".length);
+    return uniqueSourceKeys(suffix.split(",").map((source) => (source === "manual" ? "browser_helper" : source)));
+  }
+  if (normalized === "browser_helper") {
+    return ["boss"];
+  }
+  if (normalized.startsWith("multi_source:")) {
+    return uniqueSourceKeys(normalized.slice("multi_source:".length).split(","));
+  }
+  return uniqueSourceKeys([normalized]);
+}
+
+function formatSourceName(source: string | null | undefined): string {
+  const normalized = normalizeSourceKey(source);
+  if (!normalized) {
+    return "Unknown";
+  }
+  return SOURCE_LABELS[normalized] ?? normalized;
+}
+
+function formatProviderName(providerName: string | null | undefined): string {
+  const sources = sourcesFromProviderName(providerName);
+  if (sources.length) {
+    return sources.map(formatSourceName).join(" + ");
+  }
+  return providerName || "not set";
+}
 </script>
 
 <template>
   <section class="flow-page">
-    <h1>Job Search Run</h1>
-    <p class="flow-message">
-      Follow the live search timeline, wait for analysis to finish, and then review the provider-backed job cards.
-    </p>
-    <p class="flow-meta">Run {{ runId }}</p>
-    <StepProgress :active-index="2" />
+    <FlowPageHeader
+      title="Job Search Run"
+      description="Follow retrieval and analysis steps, then review ranked job cards."
+      :meta="`Run ${runId}`"
+      :active-step="4"
+    />
 
     <div v-if="profileSessionStore.error" class="error-banner">
       {{ profileSessionStore.error }}
@@ -100,9 +230,23 @@ function formatTraceDetail(value: unknown) {
     </div>
 
     <div v-else class="job-search-layout">
-      <div class="review-actions">
-        <n-button secondary @click="goBackToConfirmed">Back to Confirmed Profile</n-button>
-        <n-button secondary @click="goBackToSearchPreview">Back to Search Preview</n-button>
+      <div class="workspace-panel">
+        <div class="panel-heading">
+          <div>
+            <h2>{{ runStatusLabel }}</h2>
+            <p>
+              {{ resultCount }} results, {{ completedTraceCount }}/{{ profileSessionStore.jobSearchSteps.length }} trace steps complete.
+            </p>
+          </div>
+          <n-tag :type="statusTagType(profileSessionStore.jobSearchRun.status)" round>
+            {{ profileSessionStore.jobSearchRun.status }}
+          </n-tag>
+        </div>
+
+        <div class="flow-toolbar">
+          <n-button secondary @click="goBackToConfirmed">Back to Confirmed Profile</n-button>
+          <n-button secondary @click="goBackToSearchPreview">Back to Search Preview</n-button>
+        </div>
       </div>
 
       <n-card title="Run Status" size="small" class="job-search-summary">
@@ -111,10 +255,16 @@ function formatTraceDetail(value: unknown) {
             {{ profileSessionStore.jobSearchRun.status }}
           </n-tag>
           <span>
-            Mode: {{ profileSessionStore.jobSearchRun.search_mode }} • Provider:
-            {{ profileSessionStore.jobSearchRun.search_provider || "not set" }}
+            Mode: {{ profileSessionStore.jobSearchRun.search_mode }} - Provider:
+            {{ runProviderLabel }}
           </span>
         </div>
+        <p>
+          <strong>Provider Key:</strong>
+          {{ profileSessionStore.jobSearchRun.search_provider || "not set" }}
+        </p>
+        <p><strong>Selected Sources:</strong> {{ selectedSourceSummary }}</p>
+        <p><strong>Result Sources:</strong> {{ resultSourceSummary }}</p>
         <p><strong>Query:</strong> {{ profileSessionStore.jobSearchRun.query }}</p>
         <p>
           <strong>Target Roles:</strong>
@@ -171,13 +321,22 @@ function formatTraceDetail(value: unknown) {
               </ul>
             </div>
             <p v-if="step.quality_warnings.length">
-              <strong>Warnings:</strong> {{ step.quality_warnings.join(" • ") }}
+              <strong>Warnings:</strong> {{ step.quality_warnings.join(" - ") }}
             </p>
           </div>
         </div>
       </n-card>
 
       <p v-if="jobBriefHint" class="flow-meta">{{ jobBriefHint }}</p>
+
+      <div
+        v-if="profileSessionStore.jobSearchRun.status === 'failed'"
+        class="review-empty-state"
+      >
+        <p class="flow-message">
+          {{ profileSessionStore.jobSearchRun.error_message || "The provider run failed." }}
+        </p>
+      </div>
 
       <div v-if="profileSessionStore.jobSearchRun.status === 'completed'" class="job-card-grid">
         <n-card
@@ -189,7 +348,7 @@ function formatTraceDetail(value: unknown) {
           <div class="job-card-header">
             <div>
               <h2 class="job-card-title">{{ result.title }}</h2>
-              <p class="job-card-company">{{ result.company }} · {{ result.location }}</p>
+              <p class="job-card-company">{{ result.company }} - {{ result.location }}</p>
             </div>
             <div class="trace-step-tags">
               <n-tag type="success" round>{{ result.match_score }}</n-tag>
@@ -202,9 +361,9 @@ function formatTraceDetail(value: unknown) {
           <div class="job-card-section">
             <strong>Source</strong>
             <p>
-              {{ result.source_provider || result.source }}
+              {{ formatSourceName(result.source_provider || result.source) }}
               <template v-if="result.source_url">
-                ·
+                -
                 <a :href="result.source_url" target="_blank" rel="noreferrer">Open listing</a>
               </template>
             </p>
@@ -212,7 +371,7 @@ function formatTraceDetail(value: unknown) {
 
           <div class="job-card-section">
             <strong>Analysis</strong>
-            <p>{{ result.analysis_mode }} · {{ result.confidence_label }}</p>
+            <p>{{ result.analysis_mode }} - {{ result.confidence_label }}</p>
           </div>
 
           <div class="job-card-section">

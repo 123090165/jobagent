@@ -77,6 +77,16 @@ def test_cuhksz_title_terms_translate_english_health_queries_to_chinese_broad_te
     ]
 
 
+def test_cuhksz_title_terms_use_chinese_for_common_english_role_queries() -> None:
+    assert build_cuhksz_title_terms("Brand Marketing Intern market research Excel") == [
+        "市场",
+    ]
+    assert build_cuhksz_title_terms("Speech Recognition Intern ASR Python") == [
+        "语音识别",
+        "ASR",
+    ]
+
+
 def test_cuhksz_provider_fetches_search_url_with_title_params() -> None:
     fetched_urls: list[str] = []
 

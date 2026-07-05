@@ -60,6 +60,7 @@ from app.services.job_search_providers.cuhksz_career_provider import (
     build_cuhksz_search_url,
     build_cuhksz_title_terms,
 )
+from app.services.job_search_providers.multi_source_provider import MultiSourceJobSearchProvider
 from app.services.job_search_providers.serper_web_provider import (
     build_serper_preview_search_url,
     configured_serper_search_sites,
@@ -91,6 +92,10 @@ ASSEMBLY_GUARDRAILS = [
 MAX_PROVIDER_QUERIES_PER_RUN = 3
 MAX_PROVIDER_LOCATIONS_PER_RUN = 3
 MAX_PROVIDER_PREVIEW_TERMS = 8
+
+
+def _uses_job_search_analysis(search_mode: str) -> bool:
+    return search_mode in {"live_search", "browser_helper"}
 
 
 @dataclass
@@ -126,6 +131,7 @@ class ProviderRecallResult:
     duplicate_count: int = 0
     truncated_candidate_count: int = 0
     candidate_pool_cap: int = 0
+    source_attempts: list[dict[str, object]] = field(default_factory=list)
 
     def details(self) -> dict[str, object]:
         source_stats = build_source_recall_stats(self.raw_candidates, self.candidates)
@@ -145,6 +151,7 @@ class ProviderRecallResult:
             "missing_detail_count": sum(item.missing_detail_count for item in source_stats),
             "candidate_pool_cap": self.candidate_pool_cap,
             "query_stats": [item.to_dict() for item in self.query_stats],
+            "source_attempts": self.source_attempts,
         }
 
 
@@ -253,7 +260,10 @@ def create_browser_helper_job_search_run(
     search_repository: JobSearchRepository = job_search_repository,
     llm_service: JSONChatLLM | None = None,
 ) -> JobSearchRunResponse:
-    if not payload.candidates:
+    selected_sources = _clean_list(
+        [normalize_job_search_source_name(source) for source in payload.selected_sources]
+    )
+    if not payload.candidates and not selected_sources:
         raise JobAgentError(
             message="Browser helper returned no candidates.",
             error_code="browser_helper_candidates_required",
@@ -266,13 +276,15 @@ def create_browser_helper_job_search_run(
         platforms=payload.platforms,
         helper_version=payload.helper_version,
     )
+    if selected_sources:
+        provider = _compose_browser_helper_provider(provider, selected_sources)
     run_response = create_job_search_run(
         JobSearchRunCreateRequest(
             session_id=payload.session_id,
             query=payload.query,
             search_mode="browser_helper",
             search_provider=provider.provider_name,
-            selected_sources=[],
+            selected_sources=payload.selected_sources,
             use_llm=payload.use_llm,
             locations=payload.locations,
             target_roles=payload.target_roles,
@@ -295,6 +307,23 @@ def create_browser_helper_job_search_run(
         llm_service=llm_service,
         max_results=payload.max_results,
     )
+
+
+def _compose_browser_helper_provider(
+    helper_provider: BrowserHelperPayloadProvider,
+    selected_sources: list[str],
+) -> JobSearchProvider:
+    providers: list[JobSearchProvider] = [
+        helper_provider,
+        *[resolve_job_search_provider(source) for source in selected_sources],
+    ]
+    provider = MultiSourceJobSearchProvider(providers)
+    source_names = _clean_list(helper_provider.source_names + selected_sources)
+    provider.provider_kind = "hybrid"
+    provider.detail_strategy = "browser_extension_payload_plus_selected_sources"
+    provider.provider_name = f"browser_helper:{','.join(source_names)}"
+    provider.source_names = source_names
+    return provider
 
 
 def execute_job_search_run(
@@ -326,7 +355,7 @@ def execute_job_search_run(
 
     llm_resolution = resolve_llm_provider_for_switch(use_deepseek=run.llm_enabled)
     effective_llm_service = llm_service if llm_service is not None else llm_resolution.service
-    use_llm_analysis = run.search_mode == "live_search"
+    use_llm_analysis = _uses_job_search_analysis(run.search_mode)
     provider = job_search_provider or resolve_job_search_provider(run.search_provider)
     steps = _ensure_trace_steps(run_id, search_repository)
     session_repository.mark_job_search_running(session_id=run.session_id)
@@ -584,7 +613,7 @@ def preview_job_search_run(
         )
 
     query, locations, target_roles, keywords = _resolve_search_inputs(payload, confirmed_profile)
-    use_llm_analysis = payload.search_mode == "live_search"
+    use_llm_analysis = _uses_job_search_analysis(payload.search_mode)
     llm_provider: str | None = None
     effective_llm_service = llm_service
     if use_llm_analysis:
@@ -1114,6 +1143,7 @@ def _run_provider_search(
             duplicate_count=duplicate_count,
             truncated_candidate_count=truncated_candidate_count,
             candidate_pool_cap=candidate_pool_cap,
+            source_attempts=_provider_source_attempts(provider),
         )
     deduped: dict[str, RawJobCandidate] = {}
     seen_keys: set[str] = set()
@@ -1164,7 +1194,15 @@ def _run_provider_search(
         duplicate_count=duplicate_count,
         truncated_candidate_count=truncated_candidate_count,
         candidate_pool_cap=candidate_pool_cap,
+        source_attempts=_provider_source_attempts(provider),
     )
+
+
+def _provider_source_attempts(provider: JobSearchProvider) -> list[dict[str, object]]:
+    attempts = getattr(provider, "source_attempts", None)
+    if not isinstance(attempts, list):
+        return []
+    return [dict(item) for item in attempts if isinstance(item, dict)]
 
 
 def _provider_source_count(provider: JobSearchProvider, provider_name: str) -> int:
@@ -1334,8 +1372,13 @@ def _assemble_results(
     source: str,
 ) -> list[JobSearchResult]:
     results: list[JobSearchResult] = []
+    seen_result_keys: set[str] = set()
     for item in matched_items:
         candidate = item["candidate"]
+        result_key = candidate_recall_key(candidate)
+        if result_key in seen_result_keys:
+            continue
+        seen_result_keys.add(result_key)
         analysis = item["analysis"]
         description = getattr(candidate, "snippet", None) or getattr(analysis, "raw_jd", "")
         source_url = getattr(candidate, "source_url", None)
@@ -1376,8 +1419,25 @@ def _metadata_risks(candidate: object, confirmed_profile: ConfirmedProfile) -> l
     if getattr(candidate, "location", None) is None and confirmed_profile.preferred_locations:
         risks.append("Location metadata is incomplete.")
     for warning in getattr(candidate, "provider_warnings", []) or []:
-        risks.append(str(warning))
+        warning_text = str(warning)
+        if _is_boilerplate_browser_helper_warning(warning_text):
+            continue
+        risks.append(warning_text)
     return risks
+
+
+def _is_boilerplate_browser_helper_warning(warning: str) -> bool:
+    normalized = warning.lower()
+    return any(
+        fragment in normalized
+        for fragment in (
+            "browser helper",
+            "platform cookies",
+            "local boss browser session",
+            "cookies were not sent",
+            "cookies are not stored",
+        )
+    )
 
 
 def _find_running_or_pending_step(steps: list[JobSearchTraceStep]) -> JobSearchTraceStep | None:

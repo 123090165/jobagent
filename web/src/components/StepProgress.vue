@@ -8,22 +8,34 @@ const props = withDefaults(
   }
 );
 
-const steps = ["Resume", "Profile", "Search", "Brief"];
+const steps = [
+  { label: "Intake", detail: "Resume" },
+  { label: "Review", detail: "Parse" },
+  { label: "Draft", detail: "Profile" },
+  { label: "Confirm", detail: "Ready" },
+  { label: "Search", detail: "Results" },
+  { label: "Brief", detail: "Planned" }
+];
 </script>
 
 <template>
   <div class="step-progress" aria-label="Profile setup progress">
     <div
       v-for="(step, index) in steps"
-      :key="step"
+      :key="step.label"
       class="step-item"
       :class="{
         'is-active': index === props.activeIndex,
         'is-complete': index < props.activeIndex
       }"
+      :aria-current="index === props.activeIndex ? 'step' : undefined"
     >
       <span class="step-line" aria-hidden="true" />
-      <span class="step-label">{{ step }}</span>
+      <span class="step-marker" aria-hidden="true">{{ index + 1 }}</span>
+      <span class="step-copy">
+        <span class="step-label">{{ step.label }}</span>
+        <span class="step-detail">{{ step.detail }}</span>
+      </span>
     </div>
   </div>
 </template>

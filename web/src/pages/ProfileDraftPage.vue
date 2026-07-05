@@ -3,7 +3,7 @@ import { computed, onMounted, reactive, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { NButton, NCard, NInput } from "naive-ui";
 
-import StepProgress from "../components/StepProgress.vue";
+import FlowPageHeader from "../components/FlowPageHeader.vue";
 import { useProfileSessionStore } from "../stores/profileSession";
 import type { ProfileDraft } from "../types/profileSession";
 
@@ -16,6 +16,15 @@ const confirmMessage = ref<string | null>(null);
 const sessionUnavailable = computed(
   () => profileSessionStore.hasLoadedSession && !profileSessionStore.session
 );
+const draftSummaryStats = computed(() => {
+  const draft = profileSessionStore.profileDraft;
+  return {
+    roles: draft?.target_roles.length ?? 0,
+    skills: (draft?.core_skills.length ?? 0) + (draft?.supporting_skills.length ?? 0),
+    keywords: draft?.search_keywords.length ?? 0,
+    risks: draft?.risks.length ?? 0
+  };
+});
 
 const form = reactive({
   summary: "",
@@ -137,13 +146,12 @@ function goBackToReview() {
 
 <template>
   <section class="flow-page">
-    <h1>Profile Draft</h1>
-    <p class="flow-message">
-      Convert the parsed resume review into an editable candidate profile before downstream
-      confirmation and job search.
-    </p>
-    <p class="flow-meta">Session {{ sessionId }}</p>
-    <StepProgress :active-index="1" />
+    <FlowPageHeader
+      title="Profile Draft"
+      description="Edit the search-ready profile that will be confirmed and used by job search."
+      :meta="`Session ${sessionId}`"
+      :active-step="2"
+    />
 
     <div v-if="profileSessionStore.error" class="error-banner">
       {{ profileSessionStore.error }}
@@ -157,24 +165,38 @@ function goBackToReview() {
     </div>
 
     <div v-else class="draft-layout">
-      <div class="review-actions">
-        <n-button secondary @click="goBackToReview">Back to Review</n-button>
-        <n-button
-          type="primary"
-          :loading="profileSessionStore.isDraftSaving"
-          :disabled="profileSessionStore.isDraftLoading || !profileSessionStore.profileDraft"
-          @click="saveDraft"
-        >
-          Save Draft
-        </n-button>
-        <n-button
-          tertiary
-          :loading="profileSessionStore.isConfirming"
-          :disabled="profileSessionStore.isDraftLoading || !profileSessionStore.profileDraft"
-          @click="confirmProfile"
-        >
-          Confirm Profile
-        </n-button>
+      <div class="workspace-panel">
+        <div class="panel-heading">
+          <div>
+            <h2>Draft controls</h2>
+            <p>Save edits independently, then confirm when the profile is ready.</p>
+          </div>
+          <span class="flow-meta">
+            {{ profileSessionStore.profileDraft ? "Draft loaded" : "Preparing draft" }}
+          </span>
+        </div>
+
+        <div class="flow-toolbar">
+          <n-button secondary @click="goBackToReview">Back to Review</n-button>
+          <div class="flow-toolbar-secondary">
+            <n-button
+              secondary
+              :loading="profileSessionStore.isDraftSaving"
+              :disabled="profileSessionStore.isDraftLoading || !profileSessionStore.profileDraft"
+              @click="saveDraft"
+            >
+              Save Draft
+            </n-button>
+            <n-button
+              type="primary"
+              :loading="profileSessionStore.isConfirming"
+              :disabled="profileSessionStore.isDraftLoading || !profileSessionStore.profileDraft"
+              @click="confirmProfile"
+            >
+              Confirm Profile
+            </n-button>
+          </div>
+        </div>
       </div>
 
       <p v-if="saveMessage" class="flow-meta">{{ saveMessage }}</p>
@@ -188,6 +210,25 @@ function goBackToReview() {
       </div>
 
       <div v-else-if="profileSessionStore.profileDraft" class="draft-grid">
+        <div class="metric-grid draft-metrics">
+          <div class="metric-card">
+            <span>Target roles</span>
+            <strong>{{ draftSummaryStats.roles }}</strong>
+          </div>
+          <div class="metric-card">
+            <span>Skills</span>
+            <strong>{{ draftSummaryStats.skills }}</strong>
+          </div>
+          <div class="metric-card">
+            <span>Keywords</span>
+            <strong>{{ draftSummaryStats.keywords }}</strong>
+          </div>
+          <div class="metric-card">
+            <span>Risks</span>
+            <strong>{{ draftSummaryStats.risks }}</strong>
+          </div>
+        </div>
+
         <n-card title="Narrative" size="small">
           <label class="draft-field">
             <span>Summary</span>

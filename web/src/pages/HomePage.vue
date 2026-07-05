@@ -1,24 +1,36 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { useRouter } from "vue-router";
-import { NButton, NInput } from "naive-ui";
+import { NButton, NInput, NRadioButton, NRadioGroup } from "naive-ui";
 
-import StepProgress from "../components/StepProgress.vue";
+import FlowPageHeader from "../components/FlowPageHeader.vue";
 import { useProfileSessionStore } from "../stores/profileSession";
 
 const profileSessionStore = useProfileSessionStore();
 const router = useRouter();
+const intakeMode = ref<"file" | "text">("file");
 const resumeText = ref("");
 const selectedFile = ref<File | null>(null);
+const isSubmitting = computed(
+  () => profileSessionStore.isCreating || profileSessionStore.isSubmitting
+);
 const selectedFileName = computed(() => selectedFile.value?.name ?? "No file selected");
+const canSubmit = computed(() => {
+  if (intakeMode.value === "file") {
+    return Boolean(selectedFile.value);
+  }
+  return Boolean(resumeText.value.trim());
+});
 const resumePreview = computed(() => {
-  if (selectedFile.value) {
+  if (intakeMode.value === "file" && selectedFile.value) {
     return `Selected file: ${selectedFile.value.name}`;
   }
-  if (resumeText.value.trim()) {
+  if (intakeMode.value === "text" && resumeText.value.trim()) {
     return `${resumeText.value.trim().length} characters ready to submit`;
   }
-  return "Choose a txt/md file or paste your resume text.";
+  return intakeMode.value === "file"
+    ? "Choose a txt or md resume file."
+    : "Paste plain resume text.";
 });
 
 function onFileSelected(event: Event) {
@@ -28,7 +40,7 @@ function onFileSelected(event: Event) {
 
 async function submitResume() {
   try {
-    const session = selectedFile.value
+    const session = intakeMode.value === "file" && selectedFile.value
       ? await profileSessionStore.submitFileResume(selectedFile.value)
       : await profileSessionStore.submitTextResume(resumeText.value);
     await router.push({
@@ -42,61 +54,73 @@ async function submitResume() {
 </script>
 
 <template>
-  <section class="home-page">
-    <div class="home-content">
-      <p class="eyebrow">Search-ready profile</p>
-      <h1>JobAgent</h1>
-      <p class="subtitle">
-        Upload or paste your resume to build a search-ready profile
-      </p>
+  <section class="flow-page flow-page-wide home-page">
+    <FlowPageHeader
+      eyebrow="Profile workflow"
+      title="JobAgent"
+      description="Build a confirmed profile from a resume, preview the retrieval plan, then run provider-backed job search."
+      meta="Resume intake"
+      :active-step="0"
+    />
 
-      <StepProgress :active-index="0" />
-
-      <div class="intake-actions" aria-label="Resume intake options">
-        <div class="intake-choice">
-          <div>
-            <strong>Upload resume</strong>
-            <p class="intake-helper">Supports .txt and .md files in v4.1.</p>
-          </div>
-          <label class="file-picker">
-            <input
-              accept=".txt,.md,text/plain,text/markdown"
-              type="file"
-              @change="onFileSelected"
-            />
-            <span>{{ selectedFile ? "Replace file" : "Choose file" }}</span>
-          </label>
+    <div class="workspace-panel intake-panel">
+      <div class="panel-heading">
+        <div>
+          <h2>Resume input</h2>
+          <p>Choose one source for this session.</p>
         </div>
-        <div class="intake-choice">
-          <div>
-            <strong>Paste resume</strong>
-            <p class="intake-helper">Paste plain text if you do not want to upload a file.</p>
-          </div>
-          <n-input
-            v-model:value="resumeText"
-            type="textarea"
-            :autosize="{ minRows: 6, maxRows: 10 }"
-            placeholder="Paste your resume text here"
+        <n-radio-group v-model:value="intakeMode" size="small">
+          <n-radio-button value="file">Upload</n-radio-button>
+          <n-radio-button value="text">Paste</n-radio-button>
+        </n-radio-group>
+      </div>
+
+      <div v-if="intakeMode === 'file'" class="intake-choice">
+        <div>
+          <strong>Resume file</strong>
+          <p class="intake-helper">Supported formats: .txt, .md.</p>
+        </div>
+        <label class="file-picker">
+          <input
+            accept=".txt,.md,text/plain,text/markdown"
+            type="file"
+            @change="onFileSelected"
           />
+          <span>{{ selectedFile ? "Replace file" : "Choose file" }}</span>
+        </label>
+      </div>
+
+      <div v-else class="intake-choice">
+        <div>
+          <strong>Resume text</strong>
+          <p class="intake-helper">Plain text is sent through the same intake API.</p>
         </div>
+        <n-input
+          v-model:value="resumeText"
+          type="textarea"
+          :autosize="{ minRows: 8, maxRows: 14 }"
+          placeholder="Paste resume text"
+        />
       </div>
 
-      <div class="resume-preview">
-        <span class="preview-label">Current input</span>
-        <strong>{{ selectedFileName }}</strong>
-        <p>{{ resumePreview }}</p>
-      </div>
-
-      <div class="start-row">
+      <div class="intake-summary">
+        <div>
+          <span class="preview-label">Current input</span>
+          <strong>{{ intakeMode === "file" ? selectedFileName : "Pasted resume text" }}</strong>
+          <p>{{ resumePreview }}</p>
+        </div>
         <n-button
           type="primary"
           size="large"
-          :loading="profileSessionStore.isCreating || profileSessionStore.isSubmitting"
-          :disabled="!selectedFile && !resumeText.trim()"
+          :loading="isSubmitting"
+          :disabled="!canSubmit"
           @click="submitResume"
         >
           Start Profile Setup
         </n-button>
+      </div>
+
+      <div class="status-row">
         <span v-if="profileSessionStore.session" class="session-note">
           Session {{ profileSessionStore.session.session_id }}
         </span>

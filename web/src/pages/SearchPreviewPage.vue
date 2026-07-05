@@ -1,32 +1,157 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { NButton, NCard, NCheckbox, NCheckboxGroup, NSwitch, NTag } from "naive-ui";
-
-import StepProgress from "../components/StepProgress.vue";
 import {
-  fetchBrowserHelperDemoCandidates,
+  NButton,
+  NCard,
+  NCheckbox,
+  NCheckboxGroup,
+  NInputNumber,
+  NSwitch,
+  NTag
+} from "naive-ui";
+
+import FlowPageHeader from "../components/FlowPageHeader.vue";
+import {
+  checkBossLoginStatus,
+  fetchBossCandidates,
+  openBossLoginPage,
   pingBrowserHelper,
+  type BossLoginStatus,
   type BrowserHelperStatus
 } from "../services/browserHelper";
-import { useProfileSessionStore } from "../stores/profileSession";
-import type { CreateJobSearchRunPayload, JobSearchRun } from "../types/profileSession";
+import {
+  useProfileSessionStore,
+  type JobSearchPreviewControls,
+  type JobSearchPreviewProviderSource
+} from "../stores/profileSession";
+import type { CreateJobSearchRunPayload, JobSearchPreview, JobSearchRun } from "../types/profileSession";
 
-type SearchSource = "cuhksz_career" | "linkedin" | "remoteok";
+type ProviderSearchSource = JobSearchPreviewProviderSource;
+type SearchSource = ProviderSearchSource | "boss";
+
+const SOURCE_LABELS: Record<SearchSource, string> = {
+  cuhksz_career: "CUHKSZ Career",
+  linkedin: "LinkedIn",
+  remoteok: "RemoteOK",
+  boss: "BOSS"
+};
+
+const BOSS_MAX_SEARCH_QUERY_ATTEMPTS = 6;
+const BOSS_DEFAULT_JOB_TYPE = "intern";
+const BOSS_BROAD_QUERY_FALLBACKS = [
+  "\u7b97\u6cd5\u5b9e\u4e60",
+  "AI\u7b97\u6cd5\u5b9e\u4e60",
+  "\u4eba\u5de5\u667a\u80fd\u5b9e\u4e60"
+];
+const BOSS_ENGLISH_QUERY_REWRITES: Array<{ pattern: RegExp; queries: string[] }> = [
+  {
+    pattern: /physiological signal|signal processing|ppg|ecg|biosignal|bio[- ]?signal/i,
+    queries: ["\u751f\u7406\u4fe1\u53f7\u5904\u7406\u5b9e\u4e60", "\u4fe1\u53f7\u5904\u7406\u5b9e\u4e60"]
+  },
+  {
+    pattern: /biomedical|medical|health|healthcare/i,
+    queries: ["\u5065\u5eb7\u7b97\u6cd5\u5b9e\u4e60", "\u533b\u7597AI\u5b9e\u4e60"]
+  },
+  {
+    pattern: /algorithm|machine learning|deep learning|artificial intelligence|\bai\b/i,
+    queries: ["AI\u7b97\u6cd5\u5b9e\u4e60", "\u7b97\u6cd5\u5b9e\u4e60", "\u4eba\u5de5\u667a\u80fd\u5b9e\u4e60"]
+  },
+  {
+    pattern: /data science|data analysis|data analyst|analytics/i,
+    queries: ["\u6570\u636e\u5206\u6790\u5b9e\u4e60", "\u6570\u636e\u7b97\u6cd5\u5b9e\u4e60"]
+  },
+  {
+    pattern: /backend|back[- ]?end|server[- ]?side/i,
+    queries: ["\u540e\u7aef\u5f00\u53d1\u5b9e\u4e60", "\u8f6f\u4ef6\u5f00\u53d1\u5b9e\u4e60"]
+  },
+  {
+    pattern: /frontend|front[- ]?end|web developer/i,
+    queries: ["\u524d\u7aef\u5f00\u53d1\u5b9e\u4e60", "\u8f6f\u4ef6\u5f00\u53d1\u5b9e\u4e60"]
+  },
+  {
+    pattern: /product manager|product/i,
+    queries: ["\u4ea7\u54c1\u5b9e\u4e60", "\u4ea7\u54c1\u7ecf\u7406\u5b9e\u4e60"]
+  },
+  {
+    pattern: /marketing|brand|growth|consumer insight|market research/i,
+    queries: ["\u5e02\u573a\u8425\u9500\u5b9e\u4e60", "\u54c1\u724c\u8425\u9500\u5b9e\u4e60"]
+  },
+  {
+    pattern: /finance|investment|quant/i,
+    queries: ["\u91d1\u878d\u5b9e\u4e60", "\u91cf\u5316\u5b9e\u4e60"]
+  }
+];
+const PROVIDER_SEARCH_SOURCE_VALUES = new Set<ProviderSearchSource>([
+  "cuhksz_career",
+  "linkedin",
+  "remoteok"
+]);
 
 const route = useRoute();
 const router = useRouter();
 const profileSessionStore = useProfileSessionStore();
 const sessionId = computed(() => String(route.params.sessionId ?? ""));
-const selectedSearchSources = ref<SearchSource[]>(["cuhksz_career"]);
+const selectedProviderSearchSources = ref<ProviderSearchSource[]>(["cuhksz_career"]);
+const isBossSourceSelected = ref(false);
 const useLocalDemo = ref(false);
 const useLlm = ref(false);
-const maxResults = ref(10);
+const maxResults = ref<number | null>(10);
 const browserHelperStatus = ref<BrowserHelperStatus | null>(null);
+const bossLoginStatus = ref<BossLoginStatus | null>(null);
 const isBrowserHelperChecking = ref(false);
+const isBossLoginChecking = ref(false);
+const isBossSearching = ref(false);
+const isRestoringPreviewControls = ref(false);
 const browserHelperMessage = ref<string | null>(null);
+let bossLoginRefreshTimer: number | null = null;
 const selectedLlmProvider = computed(() => (useLlm.value ? "deepseek" : "ollama"));
 const canStartSearch = computed(() => useLocalDemo.value || selectedSearchSources.value.length > 0);
+const effectiveMaxResults = computed(() => maxResults.value ?? 10);
+const selectedSearchSources = computed<SearchSource[]>(() => [
+  ...selectedProviderSearchSources.value,
+  ...(isBossSourceSelected.value ? (["boss"] as const) : [])
+]);
+const providerSearchSources = computed<ProviderSearchSource[]>(() => {
+  return [...selectedProviderSearchSources.value];
+});
+const isBossSelected = computed(() => isBossSourceSelected.value);
+const bossSearchQueriesForPreview = computed(() => {
+  return profileSessionStore.jobSearchPreview
+    ? buildBossSearchQueries(profileSessionStore.jobSearchPreview)
+    : [];
+});
+const usesBrowserHelper = computed(() => isBossSelected.value && !useLocalDemo.value);
+const selectedSourceLabel = computed(() => {
+  if (useLocalDemo.value) {
+    return "Local demo";
+  }
+  return selectedSearchSources.value.map((source) => SOURCE_LABELS[source]).join(", ") || "No source selected";
+});
+const backendProviderSourcesForRun = computed(() => {
+  return providerSourcesForRun(profileSessionStore.jobSearchPreview);
+});
+const backendProviderSourceLabel = computed(() => {
+  return backendProviderSourcesForRun.value.map((source) => SOURCE_LABELS[source]).join(", ") || "BOSS only";
+});
+const previewStatusLabel = computed(() => {
+  if (profileSessionStore.isJobSearchPreviewLoading) {
+    return "Refreshing preview";
+  }
+  if (!profileSessionStore.jobSearchPreview) {
+    return "Preview unavailable";
+  }
+  return "Preview ready";
+});
+const previewStatusTagType = computed(() => {
+  if (profileSessionStore.isJobSearchPreviewLoading) {
+    return "warning";
+  }
+  if (profileSessionStore.jobSearchPreview) {
+    return "success";
+  }
+  return "default";
+});
 
 const latestResultRun = computed<JobSearchRun | null>(() => {
   return (
@@ -47,19 +172,22 @@ const llmStatusLabel = computed(() => {
   }
   const { provider, configured, model, reason } = profileSessionStore.llmStatus;
   if (configured) {
-    return `${provider}${model ? ` • ${model}` : ""}`;
+    return `${provider}${model ? ` - ${model}` : ""}`;
   }
-  return `${provider} unavailable${reason ? ` • ${reason}` : ""}`;
+  return `${provider} unavailable${reason ? ` - ${reason}` : ""}`;
 });
 
 const providerStatusLabel = computed(() => {
   if (useLocalDemo.value) {
     return "Local demo provider ready";
   }
-  const selected = selectedSearchSources.value.join(", ") || "none";
+  const selected = selectedSearchSources.value.map((source) => SOURCE_LABELS[source]).join(", ") || "none";
   const status = profileSessionStore.jobSearchProviderStatus;
   if (!status) {
     return `Selected sources: ${selected}`;
+  }
+  if (status.provider === "browser_helper") {
+    return `Selected sources: ${selected}${status.reason ? ` - ${status.reason}` : ""}`;
   }
   if (status.provider === "multi_source") {
     if (status.configured) {
@@ -77,9 +205,9 @@ const providerStatusLabel = computed(() => {
     return `Web search unavailable${status.reason ? ` - ${status.reason}` : ""}`;
   }
   if (status.configured) {
-    return `CUHKSZ Career ready${status.search_url ? ` • ${status.search_url}` : ""}`;
+    return `CUHKSZ Career ready${status.search_url ? ` - ${status.search_url}` : ""}`;
   }
-  return `CUHKSZ Career unavailable${status.reason ? ` • ${status.reason}` : ""}`;
+  return `CUHKSZ Career unavailable${status.reason ? ` - ${status.reason}` : ""}`;
 });
 
 const browserHelperStatusTag = computed(() => {
@@ -89,46 +217,215 @@ const browserHelperStatusTag = computed(() => {
   return browserHelperStatus.value.installed ? "Detected" : "Not detected";
 });
 
-const canImportBrowserHelperDemo = computed(() => {
-  return Boolean(profileSessionStore.jobSearchPreview && browserHelperStatus.value?.installed);
+const bossLoginStatusTag = computed(() => {
+  if (!bossLoginStatus.value) {
+    return "Not checked";
+  }
+  return bossLoginStatus.value.loggedIn ? "Logged in" : "Login required";
+});
+
+const bossLoginStatusSummary = computed(() => {
+  if (!bossLoginStatus.value) {
+    return "Check after detecting helper";
+  }
+  return formatBossLoginStatusSummary(bossLoginStatus.value);
+});
+
+const canCheckBossLogin = computed(() => Boolean(browserHelperStatus.value?.installed));
+
+const providerStatusTarget = computed<"mock" | "browser_helper" | "multi_source">(() => {
+  if (useLocalDemo.value) {
+    return "mock";
+  }
+  if (usesBrowserHelper.value && providerSearchSources.value.length === 0) {
+    return "browser_helper";
+  }
+  return "multi_source";
+});
+
+const canStartUnifiedSearch = computed(() => {
+  return Boolean(
+    profileSessionStore.jobSearchPreview &&
+      canStartSearch.value &&
+      !profileSessionStore.isJobSearchPreviewLoading
+  );
 });
 
 function buildPayload(): CreateJobSearchRunPayload {
+  const selectedProviderSources = providerSearchSources.value;
   return {
     session_id: sessionId.value,
     search_mode: useLocalDemo.value ? "local_mock" : "live_search",
-    search_provider: useLocalDemo.value ? "mock" : "multi_source",
-    selected_sources: useLocalDemo.value ? [] : selectedSearchSources.value,
+    search_provider: useLocalDemo.value
+      ? "mock"
+      : usesBrowserHelper.value && selectedProviderSources.length === 0
+        ? "browser_helper"
+        : "multi_source",
+    selected_sources: useLocalDemo.value ? [] : selectedProviderSources,
     use_llm: useLocalDemo.value ? false : useLlm.value,
-    max_results: maxResults.value
+    max_results: effectiveMaxResults.value
   };
+}
+
+function saveCurrentPreviewControls(): void {
+  const controls: JobSearchPreviewControls = {
+    sessionId: sessionId.value,
+    selectedProviderSearchSources: normalizeProviderSearchSources(selectedProviderSearchSources.value),
+    isBossSourceSelected: isBossSourceSelected.value,
+    useLocalDemo: useLocalDemo.value,
+    useLlm: useLocalDemo.value ? false : useLlm.value,
+    maxResults: maxResults.value
+  };
+  profileSessionStore.saveJobSearchPreviewControls(controls);
+}
+
+async function restorePreviewControls(): Promise<boolean> {
+  const controls = profileSessionStore.jobSearchPreviewControls;
+  if (!controls || controls.sessionId !== sessionId.value) {
+    return false;
+  }
+  isRestoringPreviewControls.value = true;
+  try {
+    const legacySources = legacySelectedSearchSources(controls);
+    selectedProviderSearchSources.value = normalizeProviderSearchSources(
+      controls.selectedProviderSearchSources ?? legacySources
+    );
+    isBossSourceSelected.value = Boolean(
+      controls.isBossSourceSelected || legacySources.includes("boss")
+    );
+    useLocalDemo.value = controls.useLocalDemo;
+    useLlm.value = controls.useLocalDemo ? false : controls.useLlm;
+    maxResults.value = controls.maxResults;
+    await nextTick();
+    return true;
+  } finally {
+    isRestoringPreviewControls.value = false;
+  }
+}
+
+function canReuseStoredPreview(): boolean {
+  const preview = profileSessionStore.jobSearchPreview;
+  if (!preview || preview.session_id !== sessionId.value) {
+    return false;
+  }
+  const payload = buildPayload();
+  return (
+    preview.search_mode === payload.search_mode &&
+    preview.search_provider === expectedStoredPreviewProvider(payload) &&
+    preview.llm_enabled === Boolean(payload.use_llm) &&
+    sameProviderSearchSources(
+      normalizeProviderSearchSources(preview.selected_sources ?? []),
+      payload.selected_sources ?? []
+    )
+  );
+}
+
+function expectedStoredPreviewProvider(payload: CreateJobSearchRunPayload): string | null {
+  if (payload.search_mode === "local_mock") {
+    return "mock";
+  }
+  const selectedSources = normalizeProviderSearchSources(payload.selected_sources ?? []);
+  if (selectedSources.length === 1) {
+    return selectedSources[0];
+  }
+  if (selectedSources.length > 1) {
+    return `multi_source:${selectedSources.join(",")}`;
+  }
+  return payload.search_provider ?? null;
+}
+
+function providerSourcesForRun(preview: JobSearchPreview | null): ProviderSearchSource[] {
+  const previewSources = normalizeProviderSearchSources(preview?.selected_sources ?? []);
+  const savedSources = normalizeProviderSearchSources(
+    profileSessionStore.jobSearchPreviewControls?.selectedProviderSearchSources ??
+      legacySelectedSearchSources(profileSessionStore.jobSearchPreviewControls)
+  );
+  return uniqueProviderSearchSources([
+    ...providerSearchSources.value,
+    ...previewSources,
+    ...savedSources
+  ]);
+}
+
+function normalizeProviderSearchSources(values: unknown): ProviderSearchSource[] {
+  if (!Array.isArray(values)) {
+    return [];
+  }
+  return values.filter((value): value is ProviderSearchSource =>
+    PROVIDER_SEARCH_SOURCE_VALUES.has(value as ProviderSearchSource)
+  );
+}
+
+function legacySelectedSearchSources(controls: unknown): string[] {
+  if (!controls || typeof controls !== "object") {
+    return [];
+  }
+  const values = (controls as { selectedSearchSources?: unknown }).selectedSearchSources;
+  return Array.isArray(values) ? values.map((value) => String(value)) : [];
+}
+
+function uniqueProviderSearchSources(values: ProviderSearchSource[]): ProviderSearchSource[] {
+  const result: ProviderSearchSource[] = [];
+  const seen = new Set<ProviderSearchSource>();
+  for (const value of values) {
+    if (seen.has(value)) {
+      continue;
+    }
+    seen.add(value);
+    result.push(value);
+  }
+  return result;
+}
+
+function sameProviderSearchSources(left: ProviderSearchSource[], right: ProviderSearchSource[]): boolean {
+  const normalizedLeft = uniqueProviderSearchSources(left);
+  const normalizedRight = uniqueProviderSearchSources(right);
+  return (
+    normalizedLeft.length === normalizedRight.length &&
+    normalizedLeft.every((value, index) => value === normalizedRight[index])
+  );
 }
 
 async function refreshPreview() {
   if (!profileSessionStore.session?.confirmed_profile_id) {
     return;
   }
+  saveCurrentPreviewControls();
   await profileSessionStore.previewJobSearch(buildPayload());
 }
 
 onMounted(async () => {
   try {
+    const restoredPreviewControls = await restorePreviewControls();
     const session = await profileSessionStore.loadSession(sessionId.value);
     if (session.confirmed_profile_id) {
       await profileSessionStore.loadConfirmedProfile(session.confirmed_profile_id);
     }
     await profileSessionStore.loadJobSearchRuns(sessionId.value);
     await profileSessionStore.loadLlmStatus(useLlm.value);
-    await profileSessionStore.loadJobSearchProviderStatus(useLocalDemo.value ? "mock" : "multi_source");
-    await refreshPreview();
+    await profileSessionStore.loadJobSearchProviderStatus(providerStatusTarget.value);
+    if (!restoredPreviewControls || !canReuseStoredPreview()) {
+      await refreshPreview();
+    }
   } catch {
     // Error state is rendered from the store.
   }
 });
 
+onUnmounted(() => {
+  stopBossLoginAutoRefresh();
+});
+
 watch(selectedSearchSources, async () => {
+  if (isRestoringPreviewControls.value) {
+    return;
+  }
+  saveCurrentPreviewControls();
+  if (!usesBrowserHelper.value) {
+    browserHelperMessage.value = null;
+  }
   try {
-    await profileSessionStore.loadJobSearchProviderStatus(useLocalDemo.value ? "mock" : "multi_source");
+    await profileSessionStore.loadJobSearchProviderStatus(providerStatusTarget.value);
     await refreshPreview();
   } catch {
     // Error state is rendered from the store.
@@ -136,11 +433,15 @@ watch(selectedSearchSources, async () => {
 }, { deep: true });
 
 watch(useLocalDemo, async (value) => {
+  if (isRestoringPreviewControls.value) {
+    return;
+  }
   if (value) {
     useLlm.value = false;
   }
+  saveCurrentPreviewControls();
   try {
-    await profileSessionStore.loadJobSearchProviderStatus(value ? "mock" : "multi_source");
+    await profileSessionStore.loadJobSearchProviderStatus(providerStatusTarget.value);
     await refreshPreview();
   } catch {
     // Error state is rendered from the store.
@@ -148,8 +449,24 @@ watch(useLocalDemo, async (value) => {
 });
 
 watch(useLlm, async (value) => {
+  if (isRestoringPreviewControls.value) {
+    return;
+  }
+  saveCurrentPreviewControls();
   try {
     await profileSessionStore.loadLlmStatus(value);
+    await refreshPreview();
+  } catch {
+    // Error state is rendered from the store.
+  }
+});
+
+watch(maxResults, async () => {
+  if (isRestoringPreviewControls.value) {
+    return;
+  }
+  saveCurrentPreviewControls();
+  try {
     await refreshPreview();
   } catch {
     // Error state is rendered from the store.
@@ -161,6 +478,12 @@ function goBackToConfirmed() {
 }
 
 async function startJobSearch() {
+  saveCurrentPreviewControls();
+  profileSessionStore.prepareNewJobSearch();
+  if (usesBrowserHelper.value) {
+    await startBrowserHelperJobSearch();
+    return;
+  }
   try {
     const run = await profileSessionStore.createJobSearch(buildPayload());
     await router.push({ name: "job-search", params: { runId: run.job_search_run_id } });
@@ -175,34 +498,270 @@ async function checkBrowserHelper() {
   try {
     browserHelperStatus.value = await pingBrowserHelper();
     browserHelperMessage.value = browserHelperStatus.value.error;
+    if (browserHelperStatus.value.installed) {
+      await checkBossLogin();
+    } else {
+      bossLoginStatus.value = null;
+    }
   } finally {
     isBrowserHelperChecking.value = false;
   }
 }
 
-async function importBrowserHelperDemo() {
-  if (!profileSessionStore.jobSearchPreview) {
+async function checkBossLogin() {
+  if (!browserHelperStatus.value?.installed) {
+    browserHelperMessage.value = "Install and detect the Browser Helper first.";
+    return;
+  }
+  isBossLoginChecking.value = true;
+  browserHelperMessage.value = null;
+  try {
+    bossLoginStatus.value = await checkBossLoginStatus();
+    browserHelperMessage.value = formatBossLoginStatusMessage(bossLoginStatus.value);
+    if (bossLoginStatus.value.loggedIn) {
+      stopBossLoginAutoRefresh();
+    }
+  } catch (error) {
+    browserHelperMessage.value = error instanceof Error ? error.message : "BOSS login status check failed.";
+  } finally {
+    isBossLoginChecking.value = false;
+  }
+}
+
+async function openBossLogin() {
+  if (!browserHelperStatus.value?.installed) {
+    browserHelperMessage.value = "Install and detect the Browser Helper first.";
     return;
   }
   try {
+    await openBossLoginPage();
+    bossLoginStatus.value = null;
+    browserHelperMessage.value = "BOSS login page opened. Login status will refresh automatically.";
+    startBossLoginAutoRefresh();
+  } catch (error) {
+    browserHelperMessage.value = error instanceof Error ? error.message : "Failed to open BOSS login page.";
+  }
+}
+
+async function startBrowserHelperJobSearch() {
+  if (!profileSessionStore.jobSearchPreview) {
+    return;
+  }
+  const selectedProviderSources = providerSourcesForRun(profileSessionStore.jobSearchPreview);
+  isBossSearching.value = true;
+  browserHelperMessage.value = null;
+  try {
+    if (!browserHelperStatus.value?.installed) {
+      await checkBrowserHelper();
+    }
+    if (!browserHelperStatus.value?.installed) {
+      browserHelperMessage.value = "Install and detect the Browser Helper before starting BOSS search.";
+      return;
+    }
+    await checkBossLogin();
+    if (!bossLoginStatus.value?.loggedIn) {
+      browserHelperMessage.value = "BOSS login is required before starting this search.";
+      return;
+    }
+
     const preview = profileSessionStore.jobSearchPreview;
-    const result = await fetchBrowserHelperDemoCandidates(preview.query);
+    const bossQueries = buildBossSearchQueries(preview);
+    const result = await fetchBossCandidates(
+      preview.query,
+      preview.locations[0] ?? null,
+      effectiveMaxResults.value,
+      bossQueries,
+      BOSS_DEFAULT_JOB_TYPE
+    );
+    if (!result.candidates.length) {
+      browserHelperMessage.value = formatBossEmptyResultMessage(result);
+      if (!selectedProviderSources.length) {
+        return;
+      }
+    }
     const run = await profileSessionStore.createBrowserHelperJobSearch({
       session_id: sessionId.value,
       query: preview.query,
       helper_version: result.version,
-      platforms: result.platforms,
-      use_llm: false,
+      platforms: ["boss"],
+      selected_sources: selectedProviderSources,
+      use_llm: useLlm.value,
       locations: preview.locations,
       target_roles: preview.target_roles,
       keywords: preview.keywords,
-      max_results: maxResults.value,
+      max_results: effectiveMaxResults.value,
       candidates: result.candidates
     });
     await router.push({ name: "job-search", params: { runId: run.job_search_run_id } });
-  } catch {
-    // Error state is rendered from the store.
+  } catch (error) {
+    browserHelperMessage.value = error instanceof Error ? error.message : "BOSS helper search failed.";
+  } finally {
+    isBossSearching.value = false;
   }
+}
+
+function startBossLoginAutoRefresh(): void {
+  stopBossLoginAutoRefresh();
+  let attempts = 0;
+  const poll = async () => {
+    attempts += 1;
+    if (!usesBrowserHelper.value || !browserHelperStatus.value?.installed) {
+      stopBossLoginAutoRefresh();
+      return;
+    }
+    await checkBossLogin();
+    if (bossLoginStatus.value?.loggedIn || attempts >= 24) {
+      if (!bossLoginStatus.value?.loggedIn && attempts >= 24) {
+        browserHelperMessage.value = "BOSS login was not verified after automatic refresh. Use Check BOSS Login after completing login or verification.";
+      }
+      stopBossLoginAutoRefresh();
+      return;
+    }
+    bossLoginRefreshTimer = window.setTimeout(() => {
+      void poll();
+    }, 5000);
+  };
+  bossLoginRefreshTimer = window.setTimeout(() => {
+    void poll();
+  }, 3000);
+}
+
+function stopBossLoginAutoRefresh(): void {
+  if (bossLoginRefreshTimer !== null) {
+    window.clearTimeout(bossLoginRefreshTimer);
+    bossLoginRefreshTimer = null;
+  }
+}
+
+function formatBossLoginStatusMessage(status: BossLoginStatus): string {
+  if (status.loggedIn) {
+    return "BOSS login verified by a live page probe.";
+  }
+  if (status.cookieLoggedIn) {
+    return `BOSS cookies exist but the live session is not usable: ${status.verificationReason ?? status.verificationStatus}.`;
+  }
+  return status.verificationReason ?? "BOSS login is required before helper search.";
+}
+
+function formatBossLoginStatusSummary(status: BossLoginStatus): string {
+  const cookieSummary = `${status.cookieCount} cookies, ${status.matchedAuthCookies.length} auth-like`;
+  const probeSummary = `${status.probeJobCardCount} cards, ${status.probeValidJobDetailLinkCount} valid links`;
+  if (status.loggedIn) {
+    return `Verified session - ${cookieSummary}; probe ${probeSummary}`;
+  }
+  if (status.cookieLoggedIn) {
+    return `Cookies present but not verified - ${status.verificationStatus}; probe ${probeSummary}`;
+  }
+  return `Not logged in - ${cookieSummary}; ${status.verificationStatus}`;
+}
+
+function buildBossSearchQueries(preview: JobSearchPreview): string[] {
+  const seedTerms = [
+    ...preview.target_roles,
+    preview.query,
+    ...preview.recall_queries,
+    ...preview.provider_queries.slice(0, 4),
+    ...preview.keywords.slice(0, 12)
+  ];
+  const localizedQueries = seedTerms.flatMap(toBossSearchQueries);
+  const queries = uniqueBossQueries(localizedQueries);
+  return (queries.length ? queries : BOSS_BROAD_QUERY_FALLBACKS).slice(
+    0,
+    BOSS_MAX_SEARCH_QUERY_ATTEMPTS
+  );
+}
+
+function toBossSearchQueries(value: string): string[] {
+  const query = cleanBossQuery(value);
+  if (!query) {
+    return [];
+  }
+  if (containsCjk(query)) {
+    return [query];
+  }
+  const rewritten = BOSS_ENGLISH_QUERY_REWRITES.flatMap((rule) =>
+    rule.pattern.test(query) ? rule.queries : []
+  );
+  if (rewritten.length) {
+    return rewritten;
+  }
+  return [];
+}
+
+function uniqueBossQueries(values: string[]): string[] {
+  const result: string[] = [];
+  const seen = new Set<string>();
+  for (const value of values) {
+    const query = cleanBossQuery(value);
+    if (!query) {
+      continue;
+    }
+    const key = query.toLowerCase();
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    result.push(query);
+  }
+  return result;
+}
+
+function cleanBossQuery(value: string): string {
+  return String(value || "").replace(/\s+/g, " ").trim().slice(0, 80);
+}
+
+function containsCjk(value: string): boolean {
+  return /[\u3400-\u9fff]/.test(value);
+}
+
+function formatBossEmptyResultMessage(result: Awaited<ReturnType<typeof fetchBossCandidates>>): string {
+  const diagnostics = result.diagnostics;
+  const parts = result.warnings.length ? [...result.warnings] : ["BOSS helper returned no candidates."];
+  if (result.attemptedQueries.length) {
+    parts.push(`Tried BOSS queries: ${result.attemptedQueries.join(", ")}.`);
+  }
+  if (result.searchAttempts.length) {
+    const attempts = result.searchAttempts
+      .map((attempt) => `${attempt.query}: ${attempt.candidateCount}`)
+      .join(", ");
+    parts.push(`Attempt results: ${attempts}.`);
+  }
+  const loadedPage = result.pageTitle || result.pageUrl;
+  if (loadedPage) {
+    parts.push(`Loaded page: ${result.pageTitle ?? "untitled"}${result.pageUrl ? ` (${result.pageUrl})` : ""}.`);
+  }
+  if (diagnostics) {
+    const cardCount = diagnostics.jobCardCount ?? 0;
+    const validLinkCount = diagnostics.validJobDetailLinkCount ?? 0;
+    const bodyLength = diagnostics.bodyTextLength ?? 0;
+    parts.push(
+      `DOM signals: ${cardCount} card candidates, ${validLinkCount} valid job links, ${bodyLength} text chars.`
+    );
+    if (diagnostics.loginLikelyRequired) {
+      parts.push("The loaded BOSS page still looks like a login page.");
+    }
+    if (diagnostics.verificationLikelyRequired) {
+      parts.push("The loaded BOSS page looks like it requires verification.");
+    }
+    if (diagnostics.noResultLikely) {
+      parts.push("The loaded BOSS page looks like an empty-result page.");
+    }
+    if (diagnostics.readError) {
+      parts.push(`Diagnostic read failed: ${diagnostics.readError}.`);
+    }
+    if (diagnostics.apiTransport || diagnostics.apiStatus || diagnostics.apiDetectedJobLikeCount !== undefined) {
+      parts.push(
+        `API diagnostics: ${diagnostics.apiTransport ?? "unknown"} status ${diagnostics.apiStatus ?? "unknown"}, job-like rows ${diagnostics.apiDetectedJobLikeCount ?? "unknown"}.`
+      );
+    }
+    if (diagnostics.apiShape) {
+      parts.push(`API shape: ${JSON.stringify(diagnostics.apiShape)}.`);
+    }
+  }
+  if (result.tabKeptOpen) {
+    parts.push("The BOSS tab was kept open for inspection.");
+  }
+  return parts.join(" ");
 }
 
 function seeResult() {
@@ -215,40 +774,69 @@ function seeResult() {
 
 <template>
   <section class="flow-page">
-    <h1>Search Preview</h1>
-    <p class="flow-message">
-      Confirm the search plan before running provider retrieval.
-    </p>
-    <p class="flow-meta">Session {{ sessionId }}</p>
-    <StepProgress :active-index="2" />
+    <FlowPageHeader
+      title="Search Preview"
+      description="Confirm retrieval sources, query scope, and analysis mode before creating a job search run."
+      :meta="`Session ${sessionId}`"
+      :active-step="4"
+    />
 
     <div v-if="profileSessionStore.error" class="error-banner">
       {{ profileSessionStore.error }}
     </div>
 
     <div class="confirmed-layout">
-      <div class="review-actions">
-        <n-button secondary @click="goBackToConfirmed">Back to Confirmed Profile</n-button>
-        <n-button
-          type="primary"
-          :disabled="!profileSessionStore.jobSearchPreview || !canStartSearch"
-          :loading="profileSessionStore.isJobSearchCreating"
-          @click="startJobSearch"
-        >
-          Start Job Search
-        </n-button>
-        <n-button secondary :disabled="!canSeeResult" @click="seeResult">See Result</n-button>
+      <div class="workspace-panel">
+        <div class="panel-heading">
+          <div>
+            <h2>Search controls</h2>
+            <p>{{ selectedSourceLabel }}</p>
+          </div>
+          <n-tag :type="previewStatusTagType" round>{{ previewStatusLabel }}</n-tag>
+        </div>
+
+        <div class="flow-toolbar">
+          <n-button secondary @click="goBackToConfirmed">Back to Confirmed Profile</n-button>
+          <div class="flow-toolbar-secondary">
+            <n-button
+              secondary
+              :loading="profileSessionStore.isJobSearchPreviewLoading"
+              :disabled="!canStartSearch"
+              @click="refreshPreview"
+            >
+              Refresh Preview
+            </n-button>
+            <n-button
+              secondary
+              :disabled="!canSeeResult || profileSessionStore.isJobSearchCreating || isBossSearching"
+              @click="seeResult"
+            >
+              See Result
+            </n-button>
+            <n-button
+              type="primary"
+              :disabled="!canStartUnifiedSearch"
+              :loading="profileSessionStore.isJobSearchCreating || isBossSearching"
+              @click="startJobSearch"
+            >
+              Start Job Search
+            </n-button>
+          </div>
+        </div>
       </div>
 
       <n-card title="Search Setup" size="small" class="job-search-setup-card">
         <div class="job-search-setup">
           <div class="job-search-setup-row">
             <span class="job-search-setup-label">Recruiting Websites</span>
-            <n-checkbox-group v-model:value="selectedSearchSources" :disabled="useLocalDemo">
+            <n-checkbox-group v-model:value="selectedProviderSearchSources" :disabled="useLocalDemo">
               <n-checkbox value="cuhksz_career">CUHKSZ Career</n-checkbox>
               <n-checkbox value="linkedin">LinkedIn</n-checkbox>
               <n-checkbox value="remoteok">RemoteOK</n-checkbox>
             </n-checkbox-group>
+            <n-checkbox v-model:checked="isBossSourceSelected" :disabled="useLocalDemo">
+              BOSS
+            </n-checkbox>
           </div>
 
           <div class="job-search-setup-row">
@@ -259,6 +847,17 @@ function seeResult() {
           <div class="job-search-setup-row">
             <span class="job-search-setup-label">Use DeepSeek API for analysis</span>
             <n-switch v-model:value="useLlm" :disabled="useLocalDemo" />
+          </div>
+
+          <div class="job-search-setup-row">
+            <span class="job-search-setup-label">Result Limit</span>
+            <n-input-number
+              v-model:value="maxResults"
+              :min="1"
+              :max="50"
+              :step="1"
+              size="small"
+            />
           </div>
 
           <div class="job-search-setup-row">
@@ -286,12 +885,8 @@ function seeResult() {
               <span>{{ selectedLlmProvider }} / {{ llmStatusLabel }}</span>
             </div>
           </div>
-        </div>
-      </n-card>
 
-      <n-card title="Browser Helper" size="small" class="job-search-summary">
-        <div class="job-search-setup">
-          <div class="job-search-setup-row">
+          <div v-if="usesBrowserHelper" class="job-search-setup-row">
             <span class="job-search-setup-label">Helper Status</span>
             <div class="job-search-status-copy">
               <n-tag
@@ -305,7 +900,21 @@ function seeResult() {
               </span>
             </div>
           </div>
-          <div class="review-actions">
+          <div v-if="usesBrowserHelper" class="job-search-setup-row">
+            <span class="job-search-setup-label">BOSS Login</span>
+            <div class="job-search-status-copy">
+              <n-tag
+                :type="bossLoginStatus?.loggedIn ? 'success' : 'warning'"
+                round
+              >
+                {{ bossLoginStatusTag }}
+              </n-tag>
+              <span>
+                {{ bossLoginStatusSummary }}
+              </span>
+            </div>
+          </div>
+          <div v-if="usesBrowserHelper" class="flow-toolbar compact">
             <n-button
               secondary
               :loading="isBrowserHelperChecking"
@@ -315,14 +924,21 @@ function seeResult() {
             </n-button>
             <n-button
               secondary
-              :disabled="!canImportBrowserHelperDemo"
-              :loading="profileSessionStore.isJobSearchCreating"
-              @click="importBrowserHelperDemo"
+              :disabled="!canCheckBossLogin"
+              :loading="isBossLoginChecking"
+              @click="checkBossLogin"
             >
-              Import Demo Candidate
+              Check BOSS Login
+            </n-button>
+            <n-button
+              secondary
+              :disabled="!canCheckBossLogin"
+              @click="openBossLogin"
+            >
+              Open BOSS Login
             </n-button>
           </div>
-          <p v-if="browserHelperMessage" class="flow-meta">{{ browserHelperMessage }}</p>
+          <p v-if="usesBrowserHelper && browserHelperMessage" class="flow-meta">{{ browserHelperMessage }}</p>
         </div>
       </n-card>
 
@@ -334,6 +950,25 @@ function seeResult() {
       </div>
 
       <template v-else-if="profileSessionStore.jobSearchPreview">
+        <div class="metric-grid">
+          <div class="metric-card">
+            <span>Provider requests</span>
+            <strong>{{ profileSessionStore.jobSearchPreview.estimated_provider_requests }}</strong>
+          </div>
+          <div class="metric-card">
+            <span>Candidate cap</span>
+            <strong>{{ profileSessionStore.jobSearchPreview.estimated_candidate_pool_size }}</strong>
+          </div>
+          <div class="metric-card">
+            <span>LLM requests</span>
+            <strong>{{ profileSessionStore.jobSearchPreview.estimated_total_llm_requests }}</strong>
+          </div>
+          <div class="metric-card">
+            <span>Sources</span>
+            <strong>{{ useLocalDemo ? 1 : selectedSearchSources.length }}</strong>
+          </div>
+        </div>
+
         <n-card title="Provider Queries" size="small" class="job-search-summary">
           <div class="job-status-row">
             <n-tag round>{{ profileSessionStore.jobSearchPreview.planning_mode }}</n-tag>
@@ -344,7 +979,15 @@ function seeResult() {
           </div>
           <p>
             <strong>Selected Sources:</strong>
-            {{ profileSessionStore.jobSearchPreview.selected_sources.join(", ") || "None" }}
+            {{ selectedSourceLabel }}
+          </p>
+          <p v-if="isBossSelected">
+            <strong>Backend Sources:</strong>
+            {{ backendProviderSourceLabel }}
+          </p>
+          <p v-if="isBossSelected && bossSearchQueriesForPreview.length">
+            <strong>BOSS Queries:</strong>
+            {{ bossSearchQueriesForPreview.join(", ") }}
           </p>
           <ul class="review-list">
             <li
@@ -359,7 +1002,7 @@ function seeResult() {
           </p>
           <p v-if="profileSessionStore.jobSearchPreview.quality_warnings.length">
             <strong>Warnings:</strong>
-            {{ profileSessionStore.jobSearchPreview.quality_warnings.join(" • ") }}
+            {{ profileSessionStore.jobSearchPreview.quality_warnings.join(" - ") }}
           </p>
         </n-card>
 

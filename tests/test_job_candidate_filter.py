@@ -206,3 +206,73 @@ def test_candidate_filter_deterministic_scorecard_prefers_role_and_domain_eviden
     assert top.score_breakdown["domain_alignment"] > 0
     assert top.match_reasons
     assert top.evidence_quotes
+
+
+def test_candidate_filter_matches_boss_chinese_terms_and_location_aliases() -> None:
+    profile = ConfirmedProfile.model_validate(
+        {
+            "confirmed_profile_id": "confirmed-health",
+            "session_id": "session-health",
+            "resume_document_id": "resume-health",
+            "parsed_review_id": "review-health",
+            "profile_draft_id": "draft-health",
+            "summary": "AI health algorithm intern focused on physiological signals.",
+            "target_roles": ["AI Health Algorithm Intern", "Physiological Signal Processing Intern"],
+            "target_directions": ["AI health algorithms", "physiological signal processing"],
+            "core_skills": ["PPG", "ECG", "PyTorch"],
+            "supporting_skills": ["deep learning"],
+            "search_keywords": ["AI health algorithm", "physiological signal processing", "PPG", "ECG"],
+            "preferred_locations": ["Shenzhen", "China"],
+            "work_arrangements": ["onsite"],
+            "strengths": [],
+            "risks": [],
+            "missing_info_questions": [],
+            "created_at": "2026-01-01T00:00:00+00:00",
+            "updated_at": "2026-01-01T00:00:00+00:00",
+        }
+    )
+    plan = JobSearchPlan(
+        queries=["AI Health Algorithm Intern PPG ECG"],
+        locations=["Shenzhen"],
+        target_roles=["AI Health Algorithm Intern", "Physiological Signal Processing Intern"],
+        must_have_signals=["AI health algorithm", "physiological signal processing", "PPG", "ECG"],
+        avoid_signals=[],
+        ranking_policy="Prefer health algorithm and signal processing overlap.",
+        mode="deterministic",
+    )
+    candidates = [
+        RawJobCandidate(
+            title="嵌入式开发实习生",
+            company="Hardware Co",
+            location="深圳 福田区",
+            source_url="https://www.zhipin.com/job_detail/embedded.html",
+            source_provider="boss_zhipin",
+            snippet="C++ C 单片机 智能硬件 实习",
+            raw_description="C++ C 单片机 智能硬件 实习",
+            provider_warnings=[
+                "Fetched via JobAgent Browser Helper; platform cookies were not sent to backend.",
+            ],
+        ),
+        RawJobCandidate(
+            title="AI算法实习生",
+            company="Health AI Co",
+            location="深圳 南山区",
+            source_url="https://www.zhipin.com/job_detail/health-ai.html",
+            source_provider="boss_zhipin",
+            snippet="医疗健康 AI算法 生理信号 PPG ECG PyTorch 深度学习 实习",
+            raw_description="医疗健康 AI算法 生理信号 PPG ECG PyTorch 深度学习 实习",
+            provider_warnings=[
+                "Fetched via JobAgent Browser Helper; platform cookies were not sent to backend.",
+            ],
+        ),
+    ]
+
+    result = filter_candidates(profile, plan, candidates, use_llm=False)
+
+    assert result.selected_indexes[0] == 1
+    top = result.scorecards[0]
+    assert top.match_score >= 70
+    assert top.score_breakdown["role_alignment"] >= 18
+    assert top.score_breakdown["domain_alignment"] >= 18
+    assert top.score_breakdown["location_fit"] == 10
+    assert top.score_breakdown["risk_penalty"] == 0

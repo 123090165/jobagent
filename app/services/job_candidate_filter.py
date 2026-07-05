@@ -24,6 +24,39 @@ SCORE_BREAKDOWN_KEYS = [
     "risk_penalty",
 ]
 
+LOCATION_ALIASES = {
+    "shenzhen": ["shenzhen", "深圳", "深圳市"],
+    "china": ["china", "中国"],
+    "beijing": ["beijing", "北京", "北京市"],
+    "shanghai": ["shanghai", "上海", "上海市"],
+    "guangzhou": ["guangzhou", "广州", "广州市"],
+    "hangzhou": ["hangzhou", "杭州", "杭州市"],
+}
+
+SIGNAL_VARIANTS = [
+    (("physiological signal", "biosignal", "bio-signal"), ["生理信号", "信号处理"]),
+    (("signal processing",), ["信号处理"]),
+    (("health", "healthcare"), ["健康", "医疗"]),
+    (("biomedical", "medical"), ["生物医学", "医疗"]),
+    (("algorithm", "algorithms"), ["算法"]),
+    (("artificial intelligence", "machine learning", "deep learning"), ["人工智能", "机器学习", "深度学习"]),
+    (("data analysis", "data analyst", "data science"), ["数据分析"]),
+    (("intern", "internship"), ["实习", "实习生"]),
+    (("backend", "back-end"), ["后端"]),
+    (("frontend", "front-end"), ["前端"]),
+    (("marketing", "market research", "consumer insight"), ["市场", "市场调研", "用户研究"]),
+    (("finance", "investment"), ["金融", "投资"]),
+    (("quant",), ["量化"]),
+]
+
+HELPER_WARNING_FRAGMENTS = [
+    "browser helper",
+    "platform cookies",
+    "local boss browser session",
+    "cookies were not sent",
+    "cookies are not stored",
+]
+
 LLM_CANDIDATE_RANKING_SYSTEM_PROMPT = """
 You are ranking existing job candidates for one confirmed user profile.
 
@@ -296,7 +329,21 @@ def _candidate_text(candidate: RawJobCandidate) -> str:
 
 
 def _contains_signal(text: str, signal: str) -> bool:
-    return bool(signal and signal.lower() in text)
+    return any(variant and variant.lower() in text for variant in _signal_variants(signal))
+
+
+def _signal_variants(signal: str) -> list[str]:
+    normalized = signal.strip()
+    if not normalized:
+        return []
+    lowered = normalized.lower()
+    variants = [normalized]
+    for needles, additions in SIGNAL_VARIANTS:
+        if any(needle in lowered for needle in needles):
+            variants.extend(additions)
+    if "ai" in lowered.split() or lowered.startswith("ai "):
+        variants.extend(["AI", "人工智能"])
+    return _dedupe_list(variants)
 
 
 def _domain_terms(confirmed_profile: ConfirmedProfile, search_plan: JobSearchPlan) -> list[str]:
@@ -331,10 +378,12 @@ def _role_alignment_score(
     if any(role.lower() in text for role in roles):
         return 20
     role_tokens = {
-        token
+        variant.lower()
         for role in roles
         for token in role.lower().replace("/", " ").split()
-        if len(token) >= 4 and token not in {"intern", "assistant"}
+        if token not in {"intern", "internship", "assistant"}
+        for variant in _signal_variants(token)
+        if len(variant) >= 2
     }
     title_hits = sum(1 for token in role_tokens if token in title_text)
     text_hits = sum(1 for token in role_tokens if token in text)
@@ -388,11 +437,25 @@ def _location_score_and_risks(
         return 5, ["Candidate location is missing."]
     if "remote" in location and "remote" in arrangements:
         return 10, []
-    if any(pref and (pref in location or location in pref) for pref in preferred):
+    if any(_location_matches(location, pref) for pref in preferred):
         return 10, []
     if "remote" in location:
         return 7, []
     return 4, ["Candidate location may not match preferred locations."]
+
+
+def _location_matches(candidate_location: str, preferred_location: str) -> bool:
+    if not candidate_location or not preferred_location:
+        return False
+    if preferred_location in candidate_location or candidate_location in preferred_location:
+        return True
+    for aliases in LOCATION_ALIASES.values():
+        alias_values = [alias.lower() for alias in aliases]
+        if any(alias in candidate_location for alias in alias_values) and any(
+            alias in preferred_location for alias in alias_values
+        ):
+            return True
+    return False
 
 
 def _jd_evidence_score_and_risks(candidate: RawJobCandidate) -> tuple[int, list[str]]:
@@ -400,14 +463,24 @@ def _jd_evidence_score_and_risks(candidate: RawJobCandidate) -> tuple[int, list[
     risks: list[str] = []
     if not candidate.source_url:
         risks.append("Candidate source URL is missing.")
-    if candidate.provider_warnings:
-        risks.extend(candidate.provider_warnings[:2])
+    provider_warnings = [
+        warning
+        for warning in candidate.provider_warnings
+        if not _is_boilerplate_provider_warning(warning)
+    ]
+    if provider_warnings:
+        risks.extend(provider_warnings[:2])
     if len(evidence_text) >= 180 and candidate.source_url:
-        return (8 if candidate.provider_warnings else 10), risks
+        return (8 if provider_warnings else 10), risks
     if len(evidence_text) >= 60:
         return 6, risks
     risks.append("Candidate JD evidence is sparse.")
     return 3, risks
+
+
+def _is_boilerplate_provider_warning(warning: str) -> bool:
+    normalized = warning.lower()
+    return any(fragment in normalized for fragment in HELPER_WARNING_FRAGMENTS)
 
 
 def _deterministic_reasons(

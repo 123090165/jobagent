@@ -133,6 +133,7 @@ class BrowserHelperJobSearchRunCreateRequest(BaseModel):
     query: str | None = None
     helper_version: str | None = None
     platforms: list[str] = Field(default_factory=list)
+    selected_sources: list[JobSearchSelectedSource] = Field(default_factory=list)
     use_llm: bool = False
     locations: list[str] = Field(default_factory=list)
     target_roles: list[str] = Field(default_factory=list)

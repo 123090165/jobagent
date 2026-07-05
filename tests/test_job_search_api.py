@@ -258,6 +258,157 @@ def test_browser_helper_job_search_accepts_payload_candidates(monkeypatch, tmp_p
     assert provider_step["details"]["source_candidate_counts"]["browser_helper_demo"] == 1
 
 
+def test_browser_helper_job_search_combines_selected_sources(monkeypatch, tmp_path) -> None:
+    from app.application import job_search_usecases
+    from app.services.job_search_providers.base import RawJobCandidate
+
+    class FakeSelectedProvider:
+        provider_kind = "native_api"
+        detail_strategy = "fake_test_provider"
+
+        def __init__(self, source_name: str) -> None:
+            self.provider_name = source_name
+            self.source_names = [source_name]
+
+        def search_jobs(self, *, query: str, location: str | None, limit: int) -> list[RawJobCandidate]:
+            return [
+                RawJobCandidate(
+                    title=f"{self.provider_name} Backend Engineer",
+                    company=f"{self.provider_name} Test Company",
+                    location=location or "Remote",
+                    source_url=f"https://jobs.example.com/{self.provider_name}/{query.replace(' ', '-').lower()}",
+                    source_provider=self.provider_name,
+                    snippet="Python FastAPI SQL backend APIs and platform work.",
+                    raw_description="Python FastAPI SQL backend APIs and platform work.",
+                    detail_status="test_provider_payload",
+                )
+            ][:limit]
+
+    monkeypatch.setattr(
+        job_search_usecases,
+        "resolve_job_search_provider",
+        lambda source_name: FakeSelectedProvider(source_name),
+    )
+    confirmed = _create_session_with_confirmed_profile(
+        tmp_path,
+        monkeypatch,
+        "job-search-browser-selected-sources.sqlite3",
+    )
+
+    response = client.post(
+        "/api/v1/job-search-runs/browser-helper",
+        json={
+            "session_id": confirmed["profile_session"]["session_id"],
+            "query": "Backend Engineer",
+            "helper_version": "0.2.0",
+            "platforms": ["boss"],
+            "selected_sources": ["cuhksz_career", "remoteok"],
+            "max_results": 10,
+            "candidates": [
+                {
+                    "title": "BOSS Backend Engineer",
+                    "company": "BOSS Test Company",
+                    "location": "Shenzhen",
+                    "source_url": "https://www.zhipin.com/job_detail/test.html",
+                    "source_provider": "boss_zhipin",
+                    "snippet": "Python FastAPI SQL APIs and backend platform work.",
+                    "raw_description": "Python FastAPI SQL APIs and backend platform work.",
+                    "detail_status": "boss_search_list_dom",
+                }
+            ],
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    run = payload["job_search_run"]
+    assert run["search_provider"] == "browser_helper:boss,cuhksz_career,remoteok"
+    assert run["selected_sources"] == ["cuhksz_career", "remoteok"]
+    source_providers = {item["source_provider"] for item in run["results"]}
+    assert "boss_zhipin" in source_providers
+    assert "cuhksz_career" in source_providers
+    assert "remoteok" in source_providers
+    provider_step = next(step for step in payload["steps"] if step["name"] == "Provider search")
+    details = provider_step["details"]
+    assert details["provider"] == "browser_helper:boss,cuhksz_career,remoteok"
+    assert details["source_kind"] == "hybrid"
+    assert details["selected_sources"] == ["cuhksz_career", "remoteok"]
+    assert details["source_candidate_counts"]["boss_zhipin"] == 1
+    assert details["source_candidate_counts"]["cuhksz_career"] >= 1
+    assert details["source_candidate_counts"]["remoteok"] >= 1
+    assert details["logical_provider_call_count"] >= 3
+    source_attempts = details["source_attempts"]
+    assert any(item["source"] == "browser_helper:boss" and item["returned_count"] >= 1 for item in source_attempts)
+    assert any(item["source"] == "cuhksz_career" and item["returned_count"] >= 1 for item in source_attempts)
+    assert any(item["source"] == "remoteok" and item["returned_count"] >= 1 for item in source_attempts)
+
+
+def test_browser_helper_empty_candidates_still_runs_selected_sources(monkeypatch, tmp_path) -> None:
+    from app.application import job_search_usecases
+    from app.services.job_search_providers.base import RawJobCandidate
+
+    class FakeSelectedProvider:
+        provider_kind = "native_job_board"
+        detail_strategy = "fake_selected_provider"
+
+        def __init__(self, source_name: str) -> None:
+            self.provider_name = source_name
+            self.source_names = [source_name]
+
+        def search_jobs(self, *, query: str, location: str | None, limit: int) -> list[RawJobCandidate]:
+            return [
+                RawJobCandidate(
+                    title=f"{self.provider_name} Algorithm Intern",
+                    company=f"{self.provider_name} Test Company",
+                    location=location or "Shenzhen",
+                    source_url=f"https://jobs.example.com/{self.provider_name}/algorithm-intern",
+                    source_provider=self.provider_name,
+                    snippet="Python machine learning algorithm internship with signal processing work.",
+                    raw_description="Python machine learning algorithm internship with signal processing work.",
+                    detail_status="test_provider_payload",
+                )
+            ][:limit]
+
+    monkeypatch.setattr(
+        job_search_usecases,
+        "resolve_job_search_provider",
+        lambda source_name: FakeSelectedProvider(source_name),
+    )
+    confirmed = _create_session_with_confirmed_profile(
+        tmp_path,
+        monkeypatch,
+        "job-search-browser-empty-selected-sources.sqlite3",
+    )
+
+    response = client.post(
+        "/api/v1/job-search-runs/browser-helper",
+        json={
+            "session_id": confirmed["profile_session"]["session_id"],
+            "query": "Algorithm Intern",
+            "helper_version": "0.2.0",
+            "platforms": ["boss"],
+            "selected_sources": ["cuhksz_career"],
+            "max_results": 10,
+            "candidates": [],
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    run = payload["job_search_run"]
+    assert run["search_provider"] == "browser_helper:boss,cuhksz_career"
+    assert run["selected_sources"] == ["cuhksz_career"]
+    source_providers = {item["source_provider"] for item in run["results"]}
+    assert "cuhksz_career" in source_providers
+    assert "boss_zhipin" not in source_providers
+    provider_step = next(step for step in payload["steps"] if step["name"] == "Provider search")
+    details = provider_step["details"]
+    assert details["source_candidate_counts"]["cuhksz_career"] >= 1
+    source_attempts = details["source_attempts"]
+    assert any(item["source"] == "browser_helper:boss" and item["returned_count"] == 0 for item in source_attempts)
+    assert any(item["source"] == "cuhksz_career" and item["returned_count"] >= 1 for item in source_attempts)
+
+
 def test_job_search_creates_run_and_updates_session(monkeypatch, tmp_path) -> None:
     confirmed = _create_session_with_confirmed_profile(tmp_path, monkeypatch, "job-search-create.sqlite3")
 

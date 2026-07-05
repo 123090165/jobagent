@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import re
 from collections import Counter
 from collections.abc import Iterable
 from dataclasses import asdict, dataclass
+from urllib.parse import parse_qs, urlparse
 
 from app.services.job_search_providers.base import RawJobCandidate
 
@@ -33,8 +35,9 @@ class ProviderSourceRecallStat:
 
 
 def candidate_recall_key(candidate: RawJobCandidate) -> str:
-    if candidate.source_url:
-        return candidate.source_url.strip().lower().rstrip("/")
+    canonical_url = canonical_source_url_key(candidate.source_url)
+    if canonical_url:
+        return canonical_url
     return ":".join(
         [
             (candidate.title or "").strip().lower(),
@@ -42,6 +45,58 @@ def candidate_recall_key(candidate: RawJobCandidate) -> str:
             (candidate.location or "").strip().lower(),
         ]
     )
+
+
+def canonical_source_url_key(source_url: str | None) -> str | None:
+    if not source_url:
+        return None
+    raw_url = source_url.strip()
+    if not raw_url:
+        return None
+    try:
+        parsed = urlparse(raw_url)
+    except ValueError:
+        return raw_url.lower().rstrip("/")
+
+    if not parsed.netloc and re.match(r"^[a-z0-9.-]+\.[a-z]{2,}/", raw_url, re.IGNORECASE):
+        parsed = urlparse(f"https://{raw_url}")
+
+    netloc = _canonical_host(parsed.netloc)
+    path = re.sub(r"/+", "/", parsed.path or "").rstrip("/")
+    if not path:
+        path = "/"
+
+    zhipin_match = re.search(r"/job_detail/([^/?#]+)", path, re.IGNORECASE)
+    if ("zhipin.com" in netloc or not netloc) and zhipin_match:
+        host = netloc or "zhipin.com"
+        return f"{host}/job_detail/{zhipin_match.group(1).lower()}"
+
+    cuhksz_match = re.search(r"/job/view/id/([^/?#]+)", path, re.IGNORECASE)
+    if ("career.cuhk.edu.cn" in netloc or not netloc) and cuhksz_match:
+        host = netloc or "career.cuhk.edu.cn"
+        return f"{host}/job/view/id/{cuhksz_match.group(1).lower()}"
+
+    linkedin_match = re.search(r"/jobs/view/([^/?#]+)", path, re.IGNORECASE)
+    if ("linkedin.com" in netloc or not netloc) and linkedin_match:
+        return f"linkedin.com/jobs/view/{linkedin_match.group(1).lower()}"
+
+    if "linkedin.com" in netloc:
+        current_job_id = (parse_qs(parsed.query).get("currentJobId") or [""])[0].strip()
+        if current_job_id:
+            return f"linkedin.com/jobs/view/{current_job_id.lower()}"
+
+    if netloc:
+        return f"{netloc}{path.lower()}"
+    return path.lower()
+
+
+def _canonical_host(netloc: str) -> str:
+    host = netloc.lower().removeprefix("www.")
+    if host.endswith(".zhipin.com"):
+        return "zhipin.com"
+    if host.endswith(".linkedin.com"):
+        return "linkedin.com"
+    return host
 
 
 def dedupe_recall_candidates(

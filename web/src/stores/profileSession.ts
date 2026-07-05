@@ -65,6 +65,19 @@ interface ProfileSessionState {
   hasLoadedSession: boolean;
   error: string | null;
   jobSearchPollTimer: number | null;
+  jobSearchPreviewRequestId: number;
+  jobSearchPreviewControls: JobSearchPreviewControls | null;
+}
+
+export type JobSearchPreviewProviderSource = "cuhksz_career" | "linkedin" | "remoteok";
+
+export interface JobSearchPreviewControls {
+  sessionId: string;
+  selectedProviderSearchSources: JobSearchPreviewProviderSource[];
+  isBossSourceSelected: boolean;
+  useLocalDemo: boolean;
+  useLlm: boolean;
+  maxResults: number | null;
 }
 
 interface ApiErrorPayload {
@@ -98,7 +111,9 @@ export const useProfileSessionStore = defineStore("profileSession", {
     isLlmStatusLoading: false,
     hasLoadedSession: false,
     error: null,
-    jobSearchPollTimer: null
+    jobSearchPollTimer: null,
+    jobSearchPreviewRequestId: 0,
+    jobSearchPreviewControls: null
   }),
   actions: {
     async createSession(): Promise<ProfileSession> {
@@ -143,6 +158,7 @@ export const useProfileSessionStore = defineStore("profileSession", {
         this.profileDraft = null;
         this.confirmedProfile = null;
         this.jobSearchPreview = null;
+        this.jobSearchPreviewControls = null;
         this.jobSearchRun = null;
         this.jobSearchRuns = [];
         this.jobSearchSteps = [];
@@ -162,6 +178,7 @@ export const useProfileSessionStore = defineStore("profileSession", {
         this.profileDraft = null;
         this.confirmedProfile = null;
         this.jobSearchPreview = null;
+        this.jobSearchPreviewControls = null;
         this.jobSearchRun = null;
         this.jobSearchRuns = [];
         this.jobSearchSteps = [];
@@ -185,6 +202,7 @@ export const useProfileSessionStore = defineStore("profileSession", {
         this.profileDraft = null;
         this.confirmedProfile = null;
         this.jobSearchPreview = null;
+        this.jobSearchPreviewControls = null;
         this.jobSearchRun = null;
         this.jobSearchRuns = [];
         this.jobSearchSteps = [];
@@ -252,6 +270,7 @@ export const useProfileSessionStore = defineStore("profileSession", {
         this.profileDraft = response.profile_draft;
         this.confirmedProfile = null;
         this.jobSearchPreview = null;
+        this.jobSearchPreviewControls = null;
         this.jobSearchRun = null;
         this.jobSearchRuns = [];
         this.jobSearchSteps = [];
@@ -292,6 +311,7 @@ export const useProfileSessionStore = defineStore("profileSession", {
         this.profileDraft = response.profile_draft;
         this.confirmedProfile = null;
         this.jobSearchPreview = null;
+        this.jobSearchPreviewControls = null;
         this.jobSearchRun = null;
         this.jobSearchRuns = [];
         this.jobSearchSteps = [];
@@ -311,6 +331,7 @@ export const useProfileSessionStore = defineStore("profileSession", {
         this.session = response.profile_session;
         this.confirmedProfile = response.confirmed_profile;
         this.jobSearchPreview = null;
+        this.jobSearchPreviewControls = null;
         return response.confirmed_profile;
       } catch (error) {
         this.error = toApiErrorMessage(error, "Failed to confirm profile.");
@@ -362,10 +383,23 @@ export const useProfileSessionStore = defineStore("profileSession", {
         throw error;
       }
     },
+    prepareNewJobSearch(): void {
+      this.stopPollingJobSearchRun();
+      this.jobSearchRun = null;
+      this.jobSearchSteps = [];
+      this.error = null;
+    },
+    saveJobSearchPreviewControls(controls: JobSearchPreviewControls): void {
+      this.jobSearchPreviewControls = {
+        ...controls,
+        selectedProviderSearchSources: [...controls.selectedProviderSearchSources]
+      };
+    },
     async createJobSearch(
       payload: CreateJobSearchRunPayload
     ): Promise<JobSearchRun> {
       this.isJobSearchCreating = true;
+      this.prepareNewJobSearch();
       this.error = null;
       try {
         const response = await createJobSearchRun(payload);
@@ -387,6 +421,7 @@ export const useProfileSessionStore = defineStore("profileSession", {
       payload: CreateBrowserHelperJobSearchPayload
     ): Promise<JobSearchRun> {
       this.isJobSearchCreating = true;
+      this.prepareNewJobSearch();
       this.error = null;
       try {
         const response = await createBrowserHelperJobSearchRun(payload);
@@ -407,17 +442,26 @@ export const useProfileSessionStore = defineStore("profileSession", {
     async previewJobSearch(
       payload: CreateJobSearchRunPayload
     ): Promise<JobSearchPreview> {
+      const requestId = this.jobSearchPreviewRequestId + 1;
+      this.jobSearchPreviewRequestId = requestId;
       this.isJobSearchPreviewLoading = true;
       this.error = null;
       try {
-        this.jobSearchPreview = await previewJobSearchRun(payload);
-        return this.jobSearchPreview;
+        const preview = await previewJobSearchRun(payload);
+        if (requestId === this.jobSearchPreviewRequestId) {
+          this.jobSearchPreview = preview;
+        }
+        return preview;
       } catch (error) {
-        this.jobSearchPreview = null;
-        this.error = toApiErrorMessage(error, "Failed to preview job search.");
+        if (requestId === this.jobSearchPreviewRequestId) {
+          this.jobSearchPreview = null;
+          this.error = toApiErrorMessage(error, "Failed to preview job search.");
+        }
         throw error;
       } finally {
-        this.isJobSearchPreviewLoading = false;
+        if (requestId === this.jobSearchPreviewRequestId) {
+          this.isJobSearchPreviewLoading = false;
+        }
       }
     },
     async loadJobSearchRun(runId: string): Promise<JobSearchRun> {
