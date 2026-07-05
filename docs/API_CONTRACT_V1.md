@@ -71,6 +71,12 @@ The current search pipeline records trace steps for:
 - Profile matching
 - Result assembly
 
+### BrowserJobCapture
+
+User-triggered browser job-detail input. It captures visible page text and page
+metadata from a Chrome/Edge extension, then maps that input into the existing
+JobSearchRun analysis pipeline.
+
 ### JobBrief
 
 Next planned v4.6 resource. It is not implemented in the current API yet.
@@ -144,6 +150,69 @@ Supported providers:
 
 - `mock`
 - `cuhksz_career`
+
+### Browser Job Capture
+
+```text
+POST /api/v1/browser/job-captures/analyze
+```
+
+Request:
+
+```json
+{
+  "session_id": "uuid",
+  "source": "company_site",
+  "source_url": "https://jobs.example.com/backend-intern",
+  "page_title": "Backend Engineer Intern - Example",
+  "title": "Backend Engineer Intern",
+  "company": "Example",
+  "location": "Remote",
+  "salary": null,
+  "jd_text": "visible job description text...",
+  "visible_text": "optional visible page text...",
+  "captured_at": "2026-07-05T00:00:00Z",
+  "extractor_version": "browser-helper-current-page-v1",
+  "warnings": [],
+  "use_llm": false
+}
+```
+
+Response:
+
+```json
+{
+  "capture": {
+    "source": "company_site",
+    "source_url": "https://jobs.example.com/backend-intern",
+    "page_title": "Backend Engineer Intern - Example",
+    "title": "Backend Engineer Intern",
+    "company": "Example",
+    "location": "Remote",
+    "salary": null,
+    "jd_text_preview": "visible job description text...",
+    "captured_at": "2026-07-05T00:00:00Z",
+    "extractor_version": "browser-helper-current-page-v1"
+  },
+  "report": {
+    "overall_score": 80,
+    "recommendation": "Worth reviewing closely and tailoring before applying.",
+    "matched_strengths": [],
+    "critical_gaps": [],
+    "resume_actions": [],
+    "interview_questions": [],
+    "confidence_label": "medium",
+    "analysis_mode": "mock"
+  },
+  "warnings": [],
+  "job_search_run_id": "uuid",
+  "job_result_id": "uuid"
+}
+```
+
+This endpoint requires an existing ProfileSession with a confirmed profile. It
+does not create an application record. It persists the underlying JobSearchRun
+because that is the existing analysis record for the v4 flow.
 
 ### Provider And LLM Status
 

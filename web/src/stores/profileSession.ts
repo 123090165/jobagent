@@ -37,6 +37,7 @@ import type {
   ResumeDocument,
   UpdateProfileDraftPayload
 } from "../types/profileSession";
+import type { ProviderSearchSource } from "../services/jobSearchSources";
 
 interface ProfileSessionState {
   session: ProfileSession | null;
@@ -69,11 +70,9 @@ interface ProfileSessionState {
   jobSearchPreviewControls: JobSearchPreviewControls | null;
 }
 
-export type JobSearchPreviewProviderSource = "cuhksz_career" | "linkedin" | "remoteok";
-
 export interface JobSearchPreviewControls {
   sessionId: string;
-  selectedProviderSearchSources: JobSearchPreviewProviderSource[];
+  selectedProviderSearchSources: ProviderSearchSource[];
   isBossSourceSelected: boolean;
   useLocalDemo: boolean;
   useLlm: boolean;

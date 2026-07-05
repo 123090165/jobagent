@@ -48,6 +48,7 @@ def candidate_recall_key(candidate: RawJobCandidate) -> str:
 
 
 def canonical_source_url_key(source_url: str | None) -> str | None:
+    """Return the stable provider-agnostic URL identity used for recall/result dedupe."""
     if not source_url:
         return None
     raw_url = source_url.strip()

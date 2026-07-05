@@ -129,6 +129,8 @@ def test_search_preview_page_separates_recall_queries_from_ranking_signals() -> 
 def test_search_preview_page_exposes_browser_helper_probe() -> None:
     search_preview = _read("pages/SearchPreviewPage.vue")
     helper_service = _read("services/browserHelper.ts")
+    boss_planning = _read("services/bossSearchPlanning.ts")
+    source_service = _read("services/jobSearchSources.ts")
 
     assert "Browser Helper" in search_preview
     assert "Check Helper" in search_preview
@@ -143,18 +145,25 @@ def test_search_preview_page_exposes_browser_helper_probe() -> None:
     assert "fetchBossCandidates" in search_preview
     assert "startBrowserHelperJobSearch" in search_preview
     assert "buildBossSearchQueries" in search_preview
-    assert "BOSS_ENGLISH_QUERY_REWRITES" in search_preview
-    assert "BOSS_MAX_SEARCH_QUERY_ATTEMPTS = 6" in search_preview
-    assert "BOSS Queries" in search_preview
     assert "formatBossEmptyResultMessage" in search_preview
-    assert "tabKeptOpen" in search_preview
-    assert "DOM signals" in search_preview
-    assert "Tried BOSS queries" in search_preview
-    assert "API diagnostics" in search_preview
+    assert "legacySelectedSearchSources" in search_preview
+    assert "normalizeProviderSearchSources" in search_preview
+    assert "formatSearchSources" in search_preview
+    assert "ProviderSearchSource" in source_service
+    assert "formatProviderName" in source_service
+    assert "formatSourceName" in source_service
+    assert "normalizeProviderSearchSources" in source_service
+    assert "BOSS_ENGLISH_QUERY_REWRITES" in boss_planning
+    assert "BOSS_MAX_SEARCH_QUERY_ATTEMPTS = 6" in boss_planning
+    assert "BOSS Queries" in search_preview
+    assert "formatBossEmptyResultMessage" in boss_planning
+    assert "tabKeptOpen" in boss_planning
+    assert "DOM signals" in boss_planning
+    assert "Tried BOSS queries" in boss_planning
+    assert "API diagnostics" in boss_planning
     assert "providerSourcesForRun(profileSessionStore.jobSearchPreview)" in search_preview
     assert "backendProviderSourceLabel" in search_preview
     assert "Backend Sources" in search_preview
-    assert "legacySelectedSearchSources" in search_preview
     assert "profileSessionStore.jobSearchPreviewControls?.selectedProviderSearchSources" in search_preview
     assert "if (!selectedProviderSources.length)" in search_preview
     assert "preview?.selected_sources" in search_preview
@@ -186,6 +195,7 @@ def test_browser_helper_boss_search_waits_for_real_page_signals() -> None:
     assert "fetchBossJobListFromPage" in helper_background
     assert "searchBossJobsInTab" in helper_background
     assert "waitForBossPageSignals" in helper_background
+    assert "BOSS_PAGE_TEXT_MARKERS" in helper_background
     assert "probeBossLoginSession" in helper_background
     assert "interpretBossLoginProbe" in helper_background
     assert "BOSS_LOGIN_PROBE_QUERY" in helper_background

@@ -22,6 +22,11 @@ from app.repositories.profile_session_repository import (
 )
 from app.schemas.confirmed_profile import ConfirmedProfile
 from app.schemas.job_search import (
+    BROWSER_CAPTURE_PREVIEW_LENGTH,
+    BrowserJobCaptureAnalyzeResponse,
+    BrowserJobCaptureReport,
+    BrowserJobCaptureRequest,
+    BrowserJobCaptureSummary,
     BrowserHelperJobCandidate,
     BrowserHelperJobSearchRunCreateRequest,
     JobSearchResult,
@@ -306,6 +311,78 @@ def create_browser_helper_job_search_run(
         job_search_provider=provider,
         llm_service=llm_service,
         max_results=payload.max_results,
+    )
+
+
+def analyze_browser_job_capture(
+    payload: BrowserJobCaptureRequest,
+    *,
+    session_repository: ProfileSessionRepository = profile_session_repository,
+    confirmed_repository: ConfirmedProfileRepository = confirmed_profile_repository,
+    search_repository: JobSearchRepository = job_search_repository,
+    llm_service: JSONChatLLM | None = None,
+) -> BrowserJobCaptureAnalyzeResponse:
+    candidate = browser_job_capture_to_candidate(payload)
+    run_response = create_browser_helper_job_search_run(
+        BrowserHelperJobSearchRunCreateRequest(
+            session_id=payload.session_id,
+            query=payload.title or payload.page_title,
+            helper_version=payload.extractor_version,
+            platforms=[payload.source],
+            use_llm=payload.use_llm,
+            max_results=1,
+            candidates=[candidate],
+        ),
+        session_repository=session_repository,
+        confirmed_repository=confirmed_repository,
+        search_repository=search_repository,
+        llm_service=llm_service,
+    )
+    run = run_response.job_search_run
+    if run.status == "failed":
+        raise JobAgentError(
+            message=run.error_message or "Browser job capture analysis failed.",
+            error_code="browser_job_capture_analysis_failed",
+            status_code=500,
+        )
+    if not run.results:
+        raise JobAgentError(
+            message="Browser job capture did not produce an analysis result.",
+            error_code="browser_job_capture_no_result",
+            status_code=422,
+        )
+
+    result = run.results[0]
+    return BrowserJobCaptureAnalyzeResponse(
+        capture=_capture_summary(payload),
+        report=_browser_capture_report(result),
+        warnings=_clean_list(
+            payload.warnings
+            + candidate.provider_warnings
+            + _trace_quality_warnings(run_response.steps)
+        ),
+        job_search_run_id=run.job_search_run_id,
+        job_result_id=result.job_result_id,
+    )
+
+
+def browser_job_capture_to_candidate(payload: BrowserJobCaptureRequest) -> BrowserHelperJobCandidate:
+    warnings = _browser_capture_warnings(payload)
+    title = payload.title or payload.page_title or "Untitled captured role"
+    snippet = payload.jd_text[:BROWSER_CAPTURE_PREVIEW_LENGTH]
+    source_provider = f"browser_capture_{payload.source}"
+    return BrowserHelperJobCandidate(
+        title=title,
+        company=payload.company,
+        location=payload.location,
+        source_url=payload.source_url,
+        source_provider=source_provider,
+        snippet=snippet,
+        raw_description=payload.jd_text,
+        discovery_query=title,
+        discovery_rank=1,
+        detail_status="browser_job_capture_payload",
+        provider_warnings=warnings,
     )
 
 
@@ -1518,6 +1595,57 @@ def _browser_helper_candidate_to_raw(candidate: BrowserHelperJobCandidate) -> Ra
         detail_status=(candidate.detail_status or "").strip() or "browser_helper_payload",
         provider_warnings=_clean_list(warnings),
     )
+
+
+def _capture_summary(payload: BrowserJobCaptureRequest) -> BrowserJobCaptureSummary:
+    return BrowserJobCaptureSummary(
+        source=payload.source,
+        source_url=payload.source_url,
+        page_title=payload.page_title,
+        title=payload.title,
+        company=payload.company,
+        location=payload.location,
+        salary=payload.salary,
+        jd_text_preview=payload.jd_text[:BROWSER_CAPTURE_PREVIEW_LENGTH],
+        captured_at=payload.captured_at,
+        extractor_version=payload.extractor_version,
+    )
+
+
+def _browser_capture_report(result: JobSearchResult) -> BrowserJobCaptureReport:
+    return BrowserJobCaptureReport(
+        overall_score=result.match_score,
+        recommendation=result.recommended_action,
+        matched_strengths=_clean_list(result.match_reasons + result.matched_keywords),
+        critical_gaps=result.risks,
+        resume_actions=[result.recommended_action] if result.recommended_action else [],
+        interview_questions=[],
+        confidence_label=result.confidence_label,
+        analysis_mode=result.analysis_mode,
+    )
+
+
+def _browser_capture_warnings(payload: BrowserJobCaptureRequest) -> list[str]:
+    warnings = list(payload.warnings)
+    if payload.title is None:
+        warnings.append("Job title was not confidently extracted from the browser page.")
+    if payload.company is None:
+        warnings.append("Company was not confidently extracted from the browser page.")
+    if payload.location is None:
+        warnings.append("Location was not confidently extracted from the browser page.")
+    warnings.append(f"Browser capture page title: {payload.page_title}")
+    warnings.append(f"Browser capture extractor version: {payload.extractor_version}")
+    warnings.append(f"Browser capture captured_at: {payload.captured_at.isoformat()}")
+    return _clean_list(warnings)
+
+
+def _trace_quality_warnings(steps: list[JobSearchTraceStep]) -> list[str]:
+    warnings: list[str] = []
+    for step in steps:
+        warnings.extend(step.quality_warnings)
+        if step.status == "failed" and step.summary:
+            warnings.append(step.summary)
+    return _clean_list(warnings)
 
 
 def _clean_list(values: list[str]) -> list[str]:

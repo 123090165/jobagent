@@ -261,6 +261,14 @@ Live Pinia store and the main frontend state coordinator. It owns:
 - search run creation/loading/polling
 - provider status
 
+### `web/src/services/`
+
+| File | Status | Purpose |
+| --- | --- | --- |
+| `browserHelper.ts` | live | Frontend bridge to the Chrome/Edge Browser Helper extension. |
+| `bossSearchPlanning.ts` | live | BOSS query localization and empty-result diagnostic message formatting. |
+| `jobSearchSources.ts` | live | Shared source labels, provider-key parsing, and source-selection normalization. |
+
 ### `web/src/pages/`
 
 | File | Status | Purpose |
@@ -421,10 +429,15 @@ Before starting v4.7, the files most likely to matter are:
 - `app/services/job_search_providers/remoteok_provider.py`
 - `app/services/job_search_providers/serper_web_provider.py`
 - `app/services/job_search_providers/multi_source_provider.py`
+- `app/services/job_search_providers/browser_helper_provider.py`
 - `app/repositories/job_search_repository.py`
 - `app/schemas/job_search.py`
+- `browser-helper/background.js`
 - `web/src/pages/SearchPreviewPage.vue`
 - `web/src/pages/JobSearchPage.vue`
+- `web/src/services/browserHelper.ts`
+- `web/src/services/bossSearchPlanning.ts`
+- `web/src/services/jobSearchSources.ts`
 - `web/src/stores/profileSession.ts`
 - `web/src/types/profileSession.ts`
 - `tests/test_job_search_planner.py`

@@ -21,72 +21,24 @@ import {
   type BrowserHelperStatus
 } from "../services/browserHelper";
 import {
+  BOSS_DEFAULT_JOB_TYPE,
+  buildBossSearchQueries,
+  formatBossEmptyResultMessage
+} from "../services/bossSearchPlanning";
+import {
+  formatSearchSources,
+  legacySelectedSearchSources,
+  normalizeProviderSearchSources,
+  sameProviderSearchSources,
+  uniqueProviderSearchSources,
+  type ProviderSearchSource,
+  type SearchSource
+} from "../services/jobSearchSources";
+import {
   useProfileSessionStore,
-  type JobSearchPreviewControls,
-  type JobSearchPreviewProviderSource
+  type JobSearchPreviewControls
 } from "../stores/profileSession";
 import type { CreateJobSearchRunPayload, JobSearchPreview, JobSearchRun } from "../types/profileSession";
-
-type ProviderSearchSource = JobSearchPreviewProviderSource;
-type SearchSource = ProviderSearchSource | "boss";
-
-const SOURCE_LABELS: Record<SearchSource, string> = {
-  cuhksz_career: "CUHKSZ Career",
-  linkedin: "LinkedIn",
-  remoteok: "RemoteOK",
-  boss: "BOSS"
-};
-
-const BOSS_MAX_SEARCH_QUERY_ATTEMPTS = 6;
-const BOSS_DEFAULT_JOB_TYPE = "intern";
-const BOSS_BROAD_QUERY_FALLBACKS = [
-  "\u7b97\u6cd5\u5b9e\u4e60",
-  "AI\u7b97\u6cd5\u5b9e\u4e60",
-  "\u4eba\u5de5\u667a\u80fd\u5b9e\u4e60"
-];
-const BOSS_ENGLISH_QUERY_REWRITES: Array<{ pattern: RegExp; queries: string[] }> = [
-  {
-    pattern: /physiological signal|signal processing|ppg|ecg|biosignal|bio[- ]?signal/i,
-    queries: ["\u751f\u7406\u4fe1\u53f7\u5904\u7406\u5b9e\u4e60", "\u4fe1\u53f7\u5904\u7406\u5b9e\u4e60"]
-  },
-  {
-    pattern: /biomedical|medical|health|healthcare/i,
-    queries: ["\u5065\u5eb7\u7b97\u6cd5\u5b9e\u4e60", "\u533b\u7597AI\u5b9e\u4e60"]
-  },
-  {
-    pattern: /algorithm|machine learning|deep learning|artificial intelligence|\bai\b/i,
-    queries: ["AI\u7b97\u6cd5\u5b9e\u4e60", "\u7b97\u6cd5\u5b9e\u4e60", "\u4eba\u5de5\u667a\u80fd\u5b9e\u4e60"]
-  },
-  {
-    pattern: /data science|data analysis|data analyst|analytics/i,
-    queries: ["\u6570\u636e\u5206\u6790\u5b9e\u4e60", "\u6570\u636e\u7b97\u6cd5\u5b9e\u4e60"]
-  },
-  {
-    pattern: /backend|back[- ]?end|server[- ]?side/i,
-    queries: ["\u540e\u7aef\u5f00\u53d1\u5b9e\u4e60", "\u8f6f\u4ef6\u5f00\u53d1\u5b9e\u4e60"]
-  },
-  {
-    pattern: /frontend|front[- ]?end|web developer/i,
-    queries: ["\u524d\u7aef\u5f00\u53d1\u5b9e\u4e60", "\u8f6f\u4ef6\u5f00\u53d1\u5b9e\u4e60"]
-  },
-  {
-    pattern: /product manager|product/i,
-    queries: ["\u4ea7\u54c1\u5b9e\u4e60", "\u4ea7\u54c1\u7ecf\u7406\u5b9e\u4e60"]
-  },
-  {
-    pattern: /marketing|brand|growth|consumer insight|market research/i,
-    queries: ["\u5e02\u573a\u8425\u9500\u5b9e\u4e60", "\u54c1\u724c\u8425\u9500\u5b9e\u4e60"]
-  },
-  {
-    pattern: /finance|investment|quant/i,
-    queries: ["\u91d1\u878d\u5b9e\u4e60", "\u91cf\u5316\u5b9e\u4e60"]
-  }
-];
-const PROVIDER_SEARCH_SOURCE_VALUES = new Set<ProviderSearchSource>([
-  "cuhksz_career",
-  "linkedin",
-  "remoteok"
-]);
 
 const route = useRoute();
 const router = useRouter();
@@ -126,13 +78,13 @@ const selectedSourceLabel = computed(() => {
   if (useLocalDemo.value) {
     return "Local demo";
   }
-  return selectedSearchSources.value.map((source) => SOURCE_LABELS[source]).join(", ") || "No source selected";
+  return formatSearchSources(selectedSearchSources.value, "No source selected");
 });
 const backendProviderSourcesForRun = computed(() => {
   return providerSourcesForRun(profileSessionStore.jobSearchPreview);
 });
 const backendProviderSourceLabel = computed(() => {
-  return backendProviderSourcesForRun.value.map((source) => SOURCE_LABELS[source]).join(", ") || "BOSS only";
+  return formatSearchSources(backendProviderSourcesForRun.value, "BOSS only");
 });
 const previewStatusLabel = computed(() => {
   if (profileSessionStore.isJobSearchPreviewLoading) {
@@ -181,7 +133,7 @@ const providerStatusLabel = computed(() => {
   if (useLocalDemo.value) {
     return "Local demo provider ready";
   }
-  const selected = selectedSearchSources.value.map((source) => SOURCE_LABELS[source]).join(", ") || "none";
+  const selected = formatSearchSources(selectedSearchSources.value, "none");
   const status = profileSessionStore.jobSearchProviderStatus;
   if (!status) {
     return `Selected sources: ${selected}`;
@@ -345,45 +297,6 @@ function providerSourcesForRun(preview: JobSearchPreview | null): ProviderSearch
     ...previewSources,
     ...savedSources
   ]);
-}
-
-function normalizeProviderSearchSources(values: unknown): ProviderSearchSource[] {
-  if (!Array.isArray(values)) {
-    return [];
-  }
-  return values.filter((value): value is ProviderSearchSource =>
-    PROVIDER_SEARCH_SOURCE_VALUES.has(value as ProviderSearchSource)
-  );
-}
-
-function legacySelectedSearchSources(controls: unknown): string[] {
-  if (!controls || typeof controls !== "object") {
-    return [];
-  }
-  const values = (controls as { selectedSearchSources?: unknown }).selectedSearchSources;
-  return Array.isArray(values) ? values.map((value) => String(value)) : [];
-}
-
-function uniqueProviderSearchSources(values: ProviderSearchSource[]): ProviderSearchSource[] {
-  const result: ProviderSearchSource[] = [];
-  const seen = new Set<ProviderSearchSource>();
-  for (const value of values) {
-    if (seen.has(value)) {
-      continue;
-    }
-    seen.add(value);
-    result.push(value);
-  }
-  return result;
-}
-
-function sameProviderSearchSources(left: ProviderSearchSource[], right: ProviderSearchSource[]): boolean {
-  const normalizedLeft = uniqueProviderSearchSources(left);
-  const normalizedRight = uniqueProviderSearchSources(right);
-  return (
-    normalizedLeft.length === normalizedRight.length &&
-    normalizedLeft.every((value, index) => value === normalizedRight[index])
-  );
 }
 
 async function refreshPreview() {
@@ -653,115 +566,6 @@ function formatBossLoginStatusSummary(status: BossLoginStatus): string {
     return `Cookies present but not verified - ${status.verificationStatus}; probe ${probeSummary}`;
   }
   return `Not logged in - ${cookieSummary}; ${status.verificationStatus}`;
-}
-
-function buildBossSearchQueries(preview: JobSearchPreview): string[] {
-  const seedTerms = [
-    ...preview.target_roles,
-    preview.query,
-    ...preview.recall_queries,
-    ...preview.provider_queries.slice(0, 4),
-    ...preview.keywords.slice(0, 12)
-  ];
-  const localizedQueries = seedTerms.flatMap(toBossSearchQueries);
-  const queries = uniqueBossQueries(localizedQueries);
-  return (queries.length ? queries : BOSS_BROAD_QUERY_FALLBACKS).slice(
-    0,
-    BOSS_MAX_SEARCH_QUERY_ATTEMPTS
-  );
-}
-
-function toBossSearchQueries(value: string): string[] {
-  const query = cleanBossQuery(value);
-  if (!query) {
-    return [];
-  }
-  if (containsCjk(query)) {
-    return [query];
-  }
-  const rewritten = BOSS_ENGLISH_QUERY_REWRITES.flatMap((rule) =>
-    rule.pattern.test(query) ? rule.queries : []
-  );
-  if (rewritten.length) {
-    return rewritten;
-  }
-  return [];
-}
-
-function uniqueBossQueries(values: string[]): string[] {
-  const result: string[] = [];
-  const seen = new Set<string>();
-  for (const value of values) {
-    const query = cleanBossQuery(value);
-    if (!query) {
-      continue;
-    }
-    const key = query.toLowerCase();
-    if (seen.has(key)) {
-      continue;
-    }
-    seen.add(key);
-    result.push(query);
-  }
-  return result;
-}
-
-function cleanBossQuery(value: string): string {
-  return String(value || "").replace(/\s+/g, " ").trim().slice(0, 80);
-}
-
-function containsCjk(value: string): boolean {
-  return /[\u3400-\u9fff]/.test(value);
-}
-
-function formatBossEmptyResultMessage(result: Awaited<ReturnType<typeof fetchBossCandidates>>): string {
-  const diagnostics = result.diagnostics;
-  const parts = result.warnings.length ? [...result.warnings] : ["BOSS helper returned no candidates."];
-  if (result.attemptedQueries.length) {
-    parts.push(`Tried BOSS queries: ${result.attemptedQueries.join(", ")}.`);
-  }
-  if (result.searchAttempts.length) {
-    const attempts = result.searchAttempts
-      .map((attempt) => `${attempt.query}: ${attempt.candidateCount}`)
-      .join(", ");
-    parts.push(`Attempt results: ${attempts}.`);
-  }
-  const loadedPage = result.pageTitle || result.pageUrl;
-  if (loadedPage) {
-    parts.push(`Loaded page: ${result.pageTitle ?? "untitled"}${result.pageUrl ? ` (${result.pageUrl})` : ""}.`);
-  }
-  if (diagnostics) {
-    const cardCount = diagnostics.jobCardCount ?? 0;
-    const validLinkCount = diagnostics.validJobDetailLinkCount ?? 0;
-    const bodyLength = diagnostics.bodyTextLength ?? 0;
-    parts.push(
-      `DOM signals: ${cardCount} card candidates, ${validLinkCount} valid job links, ${bodyLength} text chars.`
-    );
-    if (diagnostics.loginLikelyRequired) {
-      parts.push("The loaded BOSS page still looks like a login page.");
-    }
-    if (diagnostics.verificationLikelyRequired) {
-      parts.push("The loaded BOSS page looks like it requires verification.");
-    }
-    if (diagnostics.noResultLikely) {
-      parts.push("The loaded BOSS page looks like an empty-result page.");
-    }
-    if (diagnostics.readError) {
-      parts.push(`Diagnostic read failed: ${diagnostics.readError}.`);
-    }
-    if (diagnostics.apiTransport || diagnostics.apiStatus || diagnostics.apiDetectedJobLikeCount !== undefined) {
-      parts.push(
-        `API diagnostics: ${diagnostics.apiTransport ?? "unknown"} status ${diagnostics.apiStatus ?? "unknown"}, job-like rows ${diagnostics.apiDetectedJobLikeCount ?? "unknown"}.`
-      );
-    }
-    if (diagnostics.apiShape) {
-      parts.push(`API shape: ${JSON.stringify(diagnostics.apiShape)}.`);
-    }
-  }
-  if (result.tabKeptOpen) {
-    parts.push("The BOSS tab was kept open for inspection.");
-  }
-  return parts.join(" ");
 }
 
 function seeResult() {

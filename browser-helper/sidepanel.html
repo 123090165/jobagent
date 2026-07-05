@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>JobAgent</title>
+    <link rel="stylesheet" href="sidepanel.css" />
+  </head>
+  <body>
+    <main class="panel">
+      <section class="section">
+        <label class="field">
+          <span>Backend URL</span>
+          <input id="backendUrl" type="url" spellcheck="false" />
+        </label>
+        <label class="field">
+          <span>Profile session ID</span>
+          <input id="sessionId" type="text" spellcheck="false" />
+        </label>
+        <label class="checkbox">
+          <input id="useLlm" type="checkbox" />
+          <span>Use LLM analysis</span>
+        </label>
+        <button id="analyzeButton" type="button">Analyze current job</button>
+      </section>
+
+      <section id="status" class="status" aria-live="polite"></section>
+      <section id="capture" class="section hidden"></section>
+      <section id="report" class="section hidden"></section>
+      <section id="warnings" class="section hidden"></section>
+    </main>
+    <script src="sidepanel.js"></script>
+  </body>
+</html>

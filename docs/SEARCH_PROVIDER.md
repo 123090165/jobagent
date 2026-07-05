@@ -10,6 +10,7 @@ The current v4 job search architecture is part of the `JobSearchRun` flow under
 - `linkedin` (Serper-backed discovery of public job view links)
 - `remoteok` (public JSON API)
 - `serper_web` (optional, API-key backed)
+- `browser_helper` (payload candidates collected by the local browser helper)
 - `multi_source` (aggregates selected recruiting websites)
 
 Removed legacy providers and surfaces:
@@ -88,7 +89,7 @@ Allowed values:
 - `serper_web`
 - `multi_source`
 
-For the Search Preview UI, the preferred live-search shape is:
+For the Search Preview UI, the preferred non-BOSS live-search shape is:
 
 ```json
 {
@@ -101,9 +102,34 @@ The backend encodes the selected sources into the stored run provider name, for
 example `multi_source:cuhksz_career,linkedin,remoteok`, and each returned
 candidate keeps its own `source_provider`.
 
+When BOSS is selected, the frontend first asks the Browser Helper to collect
+BOSS candidates in the user's local browser session. It then calls
+`POST /api/v1/job-search-runs/browser-helper` with:
+
+```json
+{
+  "platforms": ["boss"],
+  "selected_sources": ["cuhksz_career"],
+  "candidates": ["...standardized BOSS candidates..."]
+}
+```
+
+The backend composes a hybrid provider from the BOSS payload plus any selected
+backend-native sources. A stored provider key such as
+`browser_helper:boss,cuhksz_career` means BOSS came from the extension while
+CUHKSZ was still searched by the backend. The result page displays both selected
+sources and actual result source counts so this is visible after the run.
+
 `GET /api/v1/job-search-providers/status` reports provider availability,
 configured provider name, search URL, allowlisted domains, source kind, and
 detail strategy.
+
+## Frontend Source Rules
+
+Source labels and provider-key parsing live in
+`web/src/services/jobSearchSources.ts`. BOSS query localization and empty-result
+diagnostics live in `web/src/services/bossSearchPlanning.ts`. Keep these rules
+out of page components so Search Preview and Job Search results stay consistent.
 
 ## Mock Provider
 
@@ -183,6 +209,24 @@ before the shared filtering/ranking stage. It is currently the main frontend
 path for live search because it lets the user choose CUHKSZ Career, LinkedIn,
 and RemoteOK independently.
 
+## Candidate Identity And Deduping
+
+All provider candidates pass through `candidate_recall_key()` in
+`app/services/job_search_recall_metrics.py`. The dedupe key first canonicalizes
+source URLs, then falls back to title/company/location when no URL exists.
+
+The canonical URL rule is deliberately provider-wide:
+
+- common URLs drop query strings and fragments;
+- BOSS/Zhipin keeps only stable `/job_detail/<id>.html`;
+- CUHKSZ keeps only `/job/view/id/<id>`;
+- LinkedIn keeps `/jobs/view/<id>` and also maps search URLs with
+  `currentJobId=<id>` to the same key.
+
+Provider search dedupes candidates before filtering, and result assembly applies
+the same key again so one job cannot appear twice with different scores after
+ranking.
+
 ## Recall Calibration
 
 Use the provider recall calibration experiment before changing query limits or
@@ -246,14 +290,17 @@ It also supports the frontend multi-source shape:
 
 ## Browser Helper Boundary
 
-The local `slate-helper/` extension shows a different strategy for platforms
-that are not stable public pages. JobAgent now has its own extension skeleton
-under `browser-helper/` for the same browser-assisted provider family:
+The local `slate-helper/` extension is kept as a reference implementation for
+browser-assisted providers. JobAgent's active extension is `browser-helper/`.
+It is currently scoped to BOSS:
 
 - user opens the platform login page in their own browser;
-- the extension reads session cookies locally;
-- background fetches use browser credentials and platform-specific headers;
-- some SSR pages are loaded in a real tab and inspected from the DOM.
+- the extension checks BOSS cookies and verifies the live session with a hidden
+  probe page;
+- search tries the BOSS job-list JSON endpoint with browser credentials first;
+- if the worker fetch cannot parse candidates, the helper opens one temporary
+  background BOSS tab for page-context API fetch and DOM fallback;
+- the backend receives standardized job candidates only, never platform cookies.
 
 This is appropriate for sites such as BOSS where plain backend HTTP requests can
 fail because of login, CORS, anti-bot checks, or SSR behavior. It should be
@@ -268,14 +315,36 @@ Current implementation status:
 - backend endpoint `POST /api/v1/job-search-runs/browser-helper` accepts
   standardized helper candidates and runs them through the existing ranking
   pipeline;
+- Side Panel current-page capture can read the active tab's visible text after
+  a user click and call `POST /api/v1/browser/job-captures/analyze`;
+- browser job capture is normalized into the same `browser_helper` candidate
+  path before JD analysis and profile matching;
+- BOSS can be combined with backend-native sources in the same run;
 - the first real collector target is BOSS (`zhipin.com`); other platforms are
   intentionally hidden until this path is stable.
+
+Current-page capture data flow:
+
+```text
+Chrome Side Panel
+-> activeTab visible-text extractor
+-> extension service worker
+-> FastAPI Browser Job Capture API
+-> BrowserHelperJobCandidate normalization
+-> existing JobAgent job-search analysis pipeline
+-> Side Panel compact report
+```
+
+This path is intentionally generic. It reads visible text and page metadata; it
+does not claim stable structured extraction for every recruiting site.
 
 ## Safety Rules
 
 - Only fetch allowlisted public pages.
 - Preserve source URLs.
 - Treat parsed text as provider evidence, not invented content.
+- Capture current pages only after explicit user action.
+- Do not send browser cookies, API keys, or database secrets to the backend.
 - Keep tests network-free by using fixtures or injected fetchers.
 - Add future providers behind the same provider interface and status endpoint.
 - Preserve candidate-pool and per-query trace details so poor recall can be

@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from datetime import datetime
+from urllib.parse import urlparse
 from typing import Literal, TypeAlias
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.schemas.profile_session import ProfileSession
 
@@ -25,6 +26,12 @@ JobSearchSourceKind: TypeAlias = Literal[
     "hybrid",
 ]
 JobSearchSelectedSource: TypeAlias = Literal["cuhksz_career", "linkedin", "remoteok"]
+BrowserJobCaptureSource: TypeAlias = Literal["boss", "linkedin", "company_site", "unknown"]
+
+BROWSER_CAPTURE_MIN_JD_TEXT_LENGTH = 80
+BROWSER_CAPTURE_MAX_JD_TEXT_LENGTH = 20000
+BROWSER_CAPTURE_MAX_VISIBLE_TEXT_LENGTH = 30000
+BROWSER_CAPTURE_PREVIEW_LENGTH = 500
 
 
 class JobSearchIntent(BaseModel):
@@ -142,6 +149,117 @@ class BrowserHelperJobSearchRunCreateRequest(BaseModel):
     candidates: list[BrowserHelperJobCandidate] = Field(default_factory=list)
 
 
+class BrowserJobCaptureRequest(BaseModel):
+    session_id: str
+    source: BrowserJobCaptureSource = "unknown"
+    source_url: str
+    page_title: str
+    title: str | None = None
+    company: str | None = None
+    location: str | None = None
+    salary: str | None = None
+    jd_text: str
+    visible_text: str | None = None
+    captured_at: datetime
+    extractor_version: str
+    warnings: list[str] = Field(default_factory=list)
+    use_llm: bool = False
+
+    @field_validator("session_id", "source_url", "page_title", "extractor_version")
+    @classmethod
+    def _required_string(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("field cannot be empty")
+        return cleaned
+
+    @field_validator("title", "company", "location", "salary", mode="before")
+    @classmethod
+    def _optional_string(cls, value: object) -> str | None:
+        if value is None:
+            return None
+        cleaned = str(value).strip()
+        return cleaned or None
+
+    @field_validator("source_url")
+    @classmethod
+    def _validate_source_url(cls, value: str) -> str:
+        parsed = urlparse(value)
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+            raise ValueError("source_url must be an http or https URL")
+        return value
+
+    @field_validator("jd_text")
+    @classmethod
+    def _validate_jd_text(cls, value: str) -> str:
+        cleaned = _compact_text(value)
+        if len(cleaned) < BROWSER_CAPTURE_MIN_JD_TEXT_LENGTH:
+            raise ValueError(
+                f"jd_text must be at least {BROWSER_CAPTURE_MIN_JD_TEXT_LENGTH} characters"
+            )
+        return cleaned[:BROWSER_CAPTURE_MAX_JD_TEXT_LENGTH]
+
+    @field_validator("visible_text")
+    @classmethod
+    def _validate_visible_text(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        cleaned = _compact_text(value)
+        return cleaned[:BROWSER_CAPTURE_MAX_VISIBLE_TEXT_LENGTH] if cleaned else None
+
+    @field_validator("warnings", mode="before")
+    @classmethod
+    def _clean_warnings(cls, value: object) -> list[str]:
+        if value is None:
+            return []
+        if not isinstance(value, list):
+            return [str(value).strip()] if str(value).strip() else []
+        cleaned: list[str] = []
+        seen: set[str] = set()
+        for item in value:
+            warning = str(item).strip()
+            if not warning:
+                continue
+            key = warning.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            cleaned.append(warning)
+        return cleaned
+
+
+class BrowserJobCaptureSummary(BaseModel):
+    source: BrowserJobCaptureSource
+    source_url: str
+    page_title: str
+    title: str | None = None
+    company: str | None = None
+    location: str | None = None
+    salary: str | None = None
+    jd_text_preview: str
+    captured_at: datetime
+    extractor_version: str
+
+
+class BrowserJobCaptureReport(BaseModel):
+    overall_score: int
+    recommendation: str
+    matched_strengths: list[str] = Field(default_factory=list)
+    critical_gaps: list[str] = Field(default_factory=list)
+    resume_actions: list[str] = Field(default_factory=list)
+    interview_questions: list[str] = Field(default_factory=list)
+    confidence_label: JobSearchConfidenceLabel = "limited"
+    analysis_mode: JobSearchAnalysisMode = "mock"
+
+
+class BrowserJobCaptureAnalyzeResponse(BaseModel):
+    capture: BrowserJobCaptureSummary
+    report: BrowserJobCaptureReport
+    warnings: list[str] = Field(default_factory=list)
+    job_search_run_id: str
+    job_result_id: str | None = None
+
+
 class JobSearchRunResponse(BaseModel):
     job_search_run: JobSearchRun
     profile_session: ProfileSession
@@ -190,3 +308,21 @@ class JobSearchRunListResponse(BaseModel):
 
 class JobSearchTraceStepListResponse(BaseModel):
     items: list[JobSearchTraceStep] = Field(default_factory=list)
+
+
+def _compact_text(value: str) -> str:
+    lines = [
+        line.strip()
+        for line in str(value).replace("\r\n", "\n").replace("\r", "\n").split("\n")
+    ]
+    compacted: list[str] = []
+    blank_seen = False
+    for line in lines:
+        if not line:
+            if not blank_seen:
+                compacted.append("")
+            blank_seen = True
+            continue
+        blank_seen = False
+        compacted.append(line)
+    return "\n".join(compacted).strip()

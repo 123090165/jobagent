@@ -1,4 +1,9 @@
-const HELPER_VERSION = "0.2.2";
+const HELPER_VERSION = "0.3.0";
+const DEFAULT_JOBAGENT_BACKEND_URL = "http://127.0.0.1:8000";
+const CURRENT_PAGE_CAPTURE_VERSION = "browser-helper-current-page-v1";
+const CURRENT_PAGE_MIN_TEXT_LENGTH = 80;
+const CURRENT_PAGE_MAX_TEXT_LENGTH = 20000;
+const CURRENT_PAGE_PREVIEW_LENGTH = 500;
 const BOSS_PLATFORM = "boss";
 const BOSS_HOME_URL = "https://www.zhipin.com/";
 const BOSS_SEARCH_URL = "https://www.zhipin.com/web/geek/jobs";
@@ -61,6 +66,27 @@ const BOSS_AUTH_COOKIE_NAMES = [
   "zp_token",
   "boss_login_mode"
 ];
+const BOSS_PAGE_TEXT_MARKERS = {
+  login: [
+    "\u767b\u5f55",
+    "\u8bf7\u767b\u5f55",
+    "\u626b\u7801\u767b\u5f55"
+  ],
+  verification: [
+    "\u9a8c\u8bc1\u7801",
+    "\u5b89\u5168\u9a8c\u8bc1",
+    "\u8eab\u4efd\u9a8c\u8bc1",
+    "\u8bf7\u5b8c\u6210\u9a8c\u8bc1"
+  ],
+  noResult: [
+    "\u6682\u65e0",
+    "\u6ca1\u6709\u627e\u5230",
+    "\u672a\u627e\u5230",
+    "\u65e0\u76f8\u5173\u804c\u4f4d",
+    "\u6362\u4e2a\u5173\u952e\u8bcd",
+    "\u6362\u4e00\u4e2a\u5173\u952e\u8bcd"
+  ]
+};
 const BOSS_DEFAULT_JOB_TYPE_CODE = "1902";
 const BOSS_JOB_TYPE_CODES = new Map([
   ["1901", "1901"],
@@ -81,31 +107,37 @@ const BOSS_JOB_TYPE_CODES = new Map([
 
 const BOSS_CITY_CODES = new Map([
   ["beijing", "101010100"],
-  ["北京", "101010100"],
+  ["\u5317\u4eac", "101010100"],
   ["shanghai", "101020100"],
-  ["上海", "101020100"],
+  ["\u4e0a\u6d77", "101020100"],
   ["guangzhou", "101280100"],
-  ["广州", "101280100"],
+  ["\u5e7f\u5dde", "101280100"],
   ["shenzhen", "101280600"],
-  ["深圳", "101280600"],
+  ["\u6df1\u5733", "101280600"],
   ["hangzhou", "101210100"],
-  ["杭州", "101210100"],
+  ["\u676d\u5dde", "101210100"],
   ["nanjing", "101190100"],
-  ["南京", "101190100"],
+  ["\u5357\u4eac", "101190100"],
   ["suzhou", "101190400"],
-  ["苏州", "101190400"],
+  ["\u82cf\u5dde", "101190400"],
   ["chengdu", "101270100"],
-  ["成都", "101270100"],
+  ["\u6210\u90fd", "101270100"],
   ["wuhan", "101200100"],
-  ["武汉", "101200100"],
+  ["\u6b66\u6c49", "101200100"],
   ["xian", "101110100"],
   ["xi'an", "101110100"],
-  ["西安", "101110100"],
+  ["\u897f\u5b89", "101110100"],
   ["tianjin", "101030100"],
-  ["天津", "101030100"],
+  ["\u5929\u6d25", "101030100"],
   ["chongqing", "101040100"],
-  ["重庆", "101040100"]
+  ["\u91cd\u5e86", "101040100"]
 ]);
+
+if (chrome.sidePanel?.setPanelBehavior) {
+  chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {
+    // Older Chromium builds may expose sidePanel without panel behavior support.
+  });
+}
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   (async () => {
@@ -119,7 +151,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         sendResponse({
           ok: true,
           version: HELPER_VERSION,
-          capabilities: ["ping", "checkBossLogin", "openBossLogin", "searchBoss"]
+          capabilities: ["ping", "checkBossLogin", "openBossLogin", "searchBoss", "analyzeCurrentJob"]
         });
         return;
       }
@@ -189,6 +221,20 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         return;
       }
 
+      if (message.action === "analyzeCurrentJob") {
+        const result = await analyzeCurrentJobPage({
+          backendUrl: message.backendUrl,
+          sessionId: message.sessionId,
+          useLlm: message.useLlm
+        });
+        sendResponse({
+          ok: true,
+          version: HELPER_VERSION,
+          ...result
+        });
+        return;
+      }
+
       sendResponse({ ok: false, error: `unknown action: ${message.action}` });
     } catch (error) {
       sendResponse({ ok: false, error: String(error) });
@@ -196,6 +242,202 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   })();
   return true;
 });
+
+async function analyzeCurrentJobPage({ backendUrl, sessionId, useLlm }) {
+  const normalizedSessionId = String(sessionId || "").trim();
+  if (!normalizedSessionId) {
+    return {
+      ok: false,
+      errorType: "configuration",
+      error: "Profile session ID is required before analyzing the current job page."
+    };
+  }
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab?.id) {
+    return {
+      ok: false,
+      errorType: "capture",
+      error: "No active tab is available for current-page capture."
+    };
+  }
+
+  const [captureResult] = await chrome.scripting.executeScript({
+    target: { tabId: tab.id },
+    func: captureCurrentJobPage,
+    args: [{ minTextLength: CURRENT_PAGE_MIN_TEXT_LENGTH, maxTextLength: CURRENT_PAGE_MAX_TEXT_LENGTH }]
+  });
+  const capture = captureResult?.result;
+  if (!capture) {
+    return {
+      ok: false,
+      errorType: "capture",
+      error: "Current-page capture returned no result."
+    };
+  }
+  capture.session_id = normalizedSessionId;
+  capture.use_llm = Boolean(useLlm);
+  if (capture.jd_text.length < CURRENT_PAGE_MIN_TEXT_LENGTH) {
+    return {
+      ok: false,
+      errorType: "capture",
+      error: "The extension did not read enough visible page text to analyze this job.",
+      capture
+    };
+  }
+
+  const apiUrl = `${normalizeBackendUrl(backendUrl)}/api/v1/browser/job-captures/analyze`;
+  try {
+    const response = await fetch(apiUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(capture)
+    });
+    const payload = await readJsonResponse(response);
+    if (!response.ok) {
+      return {
+        ok: false,
+        errorType: "backend",
+        status: response.status,
+        errorCode: payload?.error_code || null,
+        error: payload?.detail || `JobAgent backend returned ${response.status}.`,
+        capture,
+        backendResponse: payload
+      };
+    }
+    return {
+      ok: true,
+      capture,
+      analysis: payload
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      errorType: "network",
+      error: `Failed to call JobAgent backend: ${String(error)}`,
+      capture
+    };
+  }
+}
+
+function normalizeBackendUrl(value) {
+  return String(value || DEFAULT_JOBAGENT_BACKEND_URL).trim().replace(/\/+$/, "") || DEFAULT_JOBAGENT_BACKEND_URL;
+}
+
+async function readJsonResponse(response) {
+  const text = await response.text();
+  if (!text) {
+    return null;
+  }
+  try {
+    return JSON.parse(text);
+  } catch (_error) {
+    return { detail: text };
+  }
+}
+
+function captureCurrentJobPage({ minTextLength, maxTextLength }) {
+  const rawText = document.body?.innerText || "";
+  const visibleText = compactVisibleText(rawText).slice(0, maxTextLength);
+  const sourceUrl = window.location.href;
+  const pageTitle = document.title || "";
+  const source = inferCaptureSource(window.location.hostname);
+  const warnings = [];
+  if (visibleText.length < minTextLength) {
+    warnings.push("Visible page text is too short for reliable JD analysis.");
+  }
+  if (!looksLikeJobPage(visibleText, pageTitle, sourceUrl)) {
+    warnings.push("The current page may not be a job detail page.");
+  }
+  warnings.push("Generic visible-text extractor was used; structured fields may be incomplete.");
+  return {
+    source,
+    source_url: sourceUrl,
+    page_title: pageTitle,
+    title: null,
+    company: null,
+    location: null,
+    salary: null,
+    jd_text: visibleText,
+    visible_text: visibleText,
+    captured_at: new Date().toISOString(),
+    extractor_version: CURRENT_PAGE_CAPTURE_VERSION,
+    warnings: uniqueCaptureWarnings(warnings),
+    debug: {
+      visibleTextLength: visibleText.length,
+      preview: visibleText.slice(0, CURRENT_PAGE_PREVIEW_LENGTH),
+      readyState: document.readyState
+    }
+  };
+}
+
+function inferCaptureSource(hostname) {
+  const host = String(hostname || "").toLowerCase();
+  if (host.includes("zhipin.com")) {
+    return "boss";
+  }
+  if (host.includes("linkedin.com")) {
+    return "linkedin";
+  }
+  return host ? "company_site" : "unknown";
+}
+
+function looksLikeJobPage(text, title, url) {
+  const combined = `${title}\n${url}\n${text}`.toLowerCase();
+  return [
+    "job",
+    "role",
+    "position",
+    "responsibilities",
+    "requirements",
+    "qualifications",
+    "职位",
+    "岗位",
+    "职责",
+    "要求"
+  ].some((marker) => combined.includes(marker));
+}
+
+function compactVisibleText(value) {
+  const lines = String(value || "")
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .split("\n")
+    .map((line) => line.trim());
+  const compacted = [];
+  let blankSeen = false;
+  for (const line of lines) {
+    if (!line) {
+      if (!blankSeen) {
+        compacted.push("");
+      }
+      blankSeen = true;
+      continue;
+    }
+    blankSeen = false;
+    compacted.push(line);
+  }
+  return compacted.join("\n").trim();
+}
+
+function uniqueCaptureWarnings(values) {
+  const seen = new Set();
+  const result = [];
+  for (const value of values) {
+    const item = String(value || "").trim();
+    if (!item) {
+      continue;
+    }
+    const key = item.toLowerCase();
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    result.push(item);
+  }
+  return result;
+}
 
 async function buildBossLoginStatus() {
   const cookies = await getBossCookies();
@@ -472,7 +714,7 @@ async function searchBossJobsInTab(tabId, { query, requestedLocation, limit, cit
   const [extraction] = await chrome.scripting.executeScript({
     target: { tabId },
     func: extractBossJobsFromPage,
-    args: [{ query, requestedLocation, limit, searchUrl }]
+    args: [{ query, requestedLocation, limit, searchUrl, textMarkers: BOSS_PAGE_TEXT_MARKERS }]
   });
   const result = extraction?.result || {
     searchUrl,
@@ -791,7 +1033,8 @@ async function readBossPageSignals(tabId) {
   try {
     const [signals] = await chrome.scripting.executeScript({
       target: { tabId },
-      func: collectBossPageSignals
+      func: collectBossPageSignals,
+      args: [BOSS_PAGE_TEXT_MARKERS]
     });
     return signals?.result || null;
   } catch (error) {
@@ -1019,8 +1262,9 @@ function validBossJobDetailUrl(href) {
   }
 }
 
-function collectBossPageSignals() {
+function collectBossPageSignals(textMarkers) {
   const bodyText = document.body ? document.body.innerText || "" : "";
+  const markers = normalizeBossTextMarkers(textMarkers);
   const jobCardSelectors = [
     ".job-card-wrapper",
     ".job-card-box",
@@ -1053,18 +1297,31 @@ function collectBossPageSignals() {
     ),
     jobDetailLinkCount: jobDetailLinks.length,
     validJobDetailLinkCount: validJobDetailLinks.length,
-    loginLikelyRequired: /登录后|请登录|扫码登录/.test(bodyText),
-    verificationLikelyRequired: /验证码|安全验证|身份验证|请完成验证/.test(bodyText),
-    noResultLikely: /暂无|没有找到|未找到|无相关职位|换个关键词|换一个关键词/.test(bodyText),
+    loginLikelyRequired: containsAnyMarker(bodyText, markers.login),
+    verificationLikelyRequired: containsAnyMarker(bodyText, markers.verification),
+    noResultLikely: containsAnyMarker(bodyText, markers.noResult),
     bodyPreview: bodyText.replace(/\s+/g, " ").trim().slice(0, 300)
   };
+
+  function normalizeBossTextMarkers(value) {
+    return {
+      login: Array.isArray(value?.login) ? value.login : [],
+      verification: Array.isArray(value?.verification) ? value.verification : [],
+      noResult: Array.isArray(value?.noResult) ? value.noResult : []
+    };
+  }
+
+  function containsAnyMarker(value, markers) {
+    return markers.some((marker) => marker && value.includes(marker));
+  }
 }
 
-function extractBossJobsFromPage({ query, requestedLocation, limit, searchUrl }) {
+function extractBossJobsFromPage({ query, requestedLocation, limit, searchUrl, textMarkers }) {
   const warnings = [];
   const bodyText = document.body ? document.body.innerText || "" : "";
+  const markers = normalizeBossTextMarkers(textMarkers);
   const loginLikelyRequired =
-    /登录后|请登录|扫码登录|验证码|安全验证|身份验证|请完成验证/.test(bodyText);
+    containsAnyMarker(bodyText, markers.login) || containsAnyMarker(bodyText, markers.verification);
   if (loginLikelyRequired) {
     warnings.push("BOSS page appears to require login or verification.");
   }
@@ -1245,10 +1502,22 @@ function extractBossJobsFromPage({ query, requestedLocation, limit, searchUrl })
       jobDetailLinkCount: jobDetailLinks.length,
       validJobDetailLinkCount: validJobDetailLinks.length,
       loginLikelyRequired,
-      verificationLikelyRequired: /验证码|安全验证|身份验证|请完成验证/.test(bodyText),
-      noResultLikely: /暂无|没有找到|未找到|无相关职位|换个关键词|换一个关键词/.test(bodyText),
+      verificationLikelyRequired: containsAnyMarker(bodyText, markers.verification),
+      noResultLikely: containsAnyMarker(bodyText, markers.noResult),
       bodyPreview: bodyText.replace(/\s+/g, " ").trim().slice(0, 300)
     };
+  }
+
+  function normalizeBossTextMarkers(value) {
+    return {
+      login: Array.isArray(value?.login) ? value.login : [],
+      verification: Array.isArray(value?.verification) ? value.verification : [],
+      noResult: Array.isArray(value?.noResult) ? value.noResult : []
+    };
+  }
+
+  function containsAnyMarker(value, markers) {
+    return markers.some((marker) => marker && value.includes(marker));
   }
 
   function uniqueElements(elements) {

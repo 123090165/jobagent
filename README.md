@@ -68,6 +68,53 @@ npm install
 npm run build
 ```
 
+## Browser Job Capture Extension
+
+The development Chrome/Edge extension lives in `browser-helper/`. It supports
+two browser-assisted flows:
+
+- BOSS search-list candidate collection from the JobAgent web Search Preview.
+- Current-page job capture from the extension Side Panel.
+
+To test current-page capture:
+
+1. Start FastAPI:
+
+```powershell
+.venv\Scripts\python.exe -m uvicorn app.main:app --reload
+```
+
+2. Complete the normal resume flow until the session has a confirmed profile.
+3. Copy the `session_id` from the JobAgent URL or API response.
+4. Open `chrome://extensions`, enable Developer mode, and load unpacked from:
+
+```text
+D:\projects\jobagent\browser-helper
+```
+
+5. Open a visible job detail page and click the JobAgent extension icon.
+6. In the Side Panel, set:
+
+```text
+Backend URL: http://127.0.0.1:8000
+Profile session ID: <confirmed ProfileSession session_id>
+```
+
+7. Click `Analyze current job`.
+
+The extension reads only visible page text after the user clicks. It sends
+structured text, URL, page title, extractor version, and warnings to
+`POST /api/v1/browser/job-captures/analyze`. The backend reuses the existing
+Job Search pipeline for JD analysis and profile matching.
+
+Current limitations:
+
+- no automatic application submission;
+- no batch crawling, automatic search, or automatic pagination;
+- no CAPTCHA handling or anti-bot bypass;
+- no browser cookies or LLM/API keys are sent to the backend;
+- generic extraction may miss structured title/company/location fields.
+
 ## Main Directories
 
 - `app/api/v1`: current v4 FastAPI resource API

@@ -4,6 +4,13 @@ import { useRoute, useRouter } from "vue-router";
 import { NButton, NCard, NTag } from "naive-ui";
 
 import FlowPageHeader from "../components/FlowPageHeader.vue";
+import {
+  formatProviderName,
+  formatSourceName,
+  normalizeSourceKey,
+  sourcesFromProviderName,
+  uniqueSourceKeys
+} from "../services/jobSearchSources";
 import { useProfileSessionStore } from "../stores/profileSession";
 
 const route = useRoute();
@@ -11,21 +18,6 @@ const router = useRouter();
 const profileSessionStore = useProfileSessionStore();
 const runId = computed(() => String(route.params.runId ?? ""));
 const jobBriefHint = ref<string | null>(null);
-
-const SOURCE_LABELS: Record<string, string> = {
-  boss: "BOSS",
-  boss_zhipin: "BOSS",
-  zhipin: "BOSS",
-  cuhksz_career: "CUHKSZ Career",
-  linkedin: "LinkedIn",
-  remoteok: "RemoteOK",
-  serper_web: "Web Search",
-  browser_helper: "Browser Helper",
-  browser_helper_demo: "Browser Helper Demo",
-  live_search: "Live Search",
-  local_mock: "Local Demo",
-  mock: "Local Demo"
-};
 
 const isRunning = computed(() =>
   ["pending", "running"].includes(profileSessionStore.jobSearchRun?.status ?? "")
@@ -143,62 +135,6 @@ function formatTraceDetail(value: unknown) {
     return JSON.stringify(value);
   }
   return String(value ?? "");
-}
-
-function normalizeSourceKey(source: string | null | undefined): string {
-  const normalized = (source ?? "").trim().toLowerCase();
-  if (normalized === "boss_zhipin" || normalized === "zhipin") {
-    return "boss";
-  }
-  return normalized;
-}
-
-function uniqueSourceKeys(sources: Array<string | null | undefined>): string[] {
-  const seen = new Set<string>();
-  const items: string[] = [];
-  for (const source of sources) {
-    const normalized = normalizeSourceKey(source);
-    if (!normalized || seen.has(normalized)) {
-      continue;
-    }
-    seen.add(normalized);
-    items.push(normalized);
-  }
-  return items;
-}
-
-function sourcesFromProviderName(providerName: string | null | undefined): string[] {
-  const normalized = (providerName ?? "").trim().toLowerCase();
-  if (!normalized) {
-    return [];
-  }
-  if (normalized.startsWith("browser_helper:")) {
-    const suffix = normalized.slice("browser_helper:".length);
-    return uniqueSourceKeys(suffix.split(",").map((source) => (source === "manual" ? "browser_helper" : source)));
-  }
-  if (normalized === "browser_helper") {
-    return ["boss"];
-  }
-  if (normalized.startsWith("multi_source:")) {
-    return uniqueSourceKeys(normalized.slice("multi_source:".length).split(","));
-  }
-  return uniqueSourceKeys([normalized]);
-}
-
-function formatSourceName(source: string | null | undefined): string {
-  const normalized = normalizeSourceKey(source);
-  if (!normalized) {
-    return "Unknown";
-  }
-  return SOURCE_LABELS[normalized] ?? normalized;
-}
-
-function formatProviderName(providerName: string | null | undefined): string {
-  const sources = sourcesFromProviderName(providerName);
-  if (sources.length) {
-    return sources.map(formatSourceName).join(" + ");
-  }
-  return providerName || "not set";
 }
 </script>
 
