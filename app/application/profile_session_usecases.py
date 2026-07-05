@@ -10,15 +10,19 @@ from app.services.errors import JobAgentError
 
 def create_profile_session(
     repository: ProfileSessionRepository = profile_session_repository,
+    *,
+    user_id: str | None = None,
 ) -> ProfileSession:
-    return repository.create()
+    return repository.create(user_id=user_id) if user_id is not None else repository.create()
 
 
 def get_profile_session(
     session_id: str,
     repository: ProfileSessionRepository = profile_session_repository,
+    *,
+    user_id: str | None = None,
 ) -> ProfileSession:
-    session = repository.get(session_id)
+    session = repository.get(session_id, user_id=user_id)
     if session is None:
         raise JobAgentError(
             message="Profile session not found.",

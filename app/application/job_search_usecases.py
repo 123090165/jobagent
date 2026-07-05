@@ -72,6 +72,7 @@ from app.services.job_search_providers.serper_web_provider import (
 )
 from app.services.job_search_providers.remoteok_provider import REMOTEOK_API_URL
 from app.services.llm_provider import JSONChatLLM, resolve_llm_provider_for_switch
+from app.storage.database import LOCAL_USER_ID
 
 TRACE_STEP_NAMES = [
     "Search planning",
@@ -163,6 +164,7 @@ class ProviderRecallResult:
 def create_job_search_run(
     payload: JobSearchRunCreateRequest,
     *,
+    user_id: str | None = None,
     background_tasks: BackgroundTasks | None = None,
     session_repository: ProfileSessionRepository = profile_session_repository,
     confirmed_repository: ConfirmedProfileRepository = confirmed_profile_repository,
@@ -170,7 +172,7 @@ def create_job_search_run(
     job_search_provider: JobSearchProvider | None = None,
     llm_service: JSONChatLLM | None = None,
 ) -> JobSearchRunResponse:
-    session = get_profile_session(payload.session_id, repository=session_repository)
+    session = get_profile_session(payload.session_id, repository=session_repository, user_id=user_id)
     if session.confirmed_profile_id is None:
         raise JobAgentError(
             message="Confirmed profile is required before starting job search.",
@@ -184,7 +186,7 @@ def create_job_search_run(
             status_code=409,
         )
 
-    confirmed_profile = confirmed_repository.get(session.confirmed_profile_id)
+    confirmed_profile = confirmed_repository.get(session.confirmed_profile_id, user_id=user_id)
     if confirmed_profile is None:
         raise JobAgentError(
             message="Confirmed profile not found.",
@@ -209,6 +211,7 @@ def create_job_search_run(
             target_roles=target_roles,
             keywords=keywords,
             results=results,
+            user_id=user_id or LOCAL_USER_ID,
         )
         updated_session = session_repository.mark_job_search_completed(session_id=session.session_id)
         return JobSearchRunResponse(
@@ -233,6 +236,7 @@ def create_job_search_run(
         search_mode=payload.search_mode,
         llm_enabled=payload.use_llm,
         search_provider=provider_name,
+        user_id=user_id or LOCAL_USER_ID,
     )
     steps = _create_initial_trace_steps(run.job_search_run_id, search_repository)
     run = search_repository.mark_running(run.job_search_run_id) or run
@@ -260,6 +264,7 @@ def create_job_search_run(
 def create_browser_helper_job_search_run(
     payload: BrowserHelperJobSearchRunCreateRequest,
     *,
+    user_id: str | None = None,
     session_repository: ProfileSessionRepository = profile_session_repository,
     confirmed_repository: ConfirmedProfileRepository = confirmed_profile_repository,
     search_repository: JobSearchRepository = job_search_repository,
@@ -302,6 +307,7 @@ def create_browser_helper_job_search_run(
         search_repository=search_repository,
         job_search_provider=provider,
         llm_service=llm_service,
+        user_id=user_id,
     )
     return execute_job_search_run(
         run_response.job_search_run.job_search_run_id,
@@ -317,6 +323,7 @@ def create_browser_helper_job_search_run(
 def analyze_browser_job_capture(
     payload: BrowserJobCaptureRequest,
     *,
+    user_id: str | None = None,
     session_repository: ProfileSessionRepository = profile_session_repository,
     confirmed_repository: ConfirmedProfileRepository = confirmed_profile_repository,
     search_repository: JobSearchRepository = job_search_repository,
@@ -337,6 +344,7 @@ def analyze_browser_job_capture(
         confirmed_repository=confirmed_repository,
         search_repository=search_repository,
         llm_service=llm_service,
+        user_id=user_id,
     )
     run = run_response.job_search_run
     if run.status == "failed":
@@ -623,17 +631,18 @@ def execute_job_search_run(
 def get_job_search_run(
     run_id: str,
     *,
+    user_id: str | None = None,
     session_repository: ProfileSessionRepository = profile_session_repository,
     search_repository: JobSearchRepository = job_search_repository,
 ) -> JobSearchRunResponse:
-    run = search_repository.get(run_id)
+    run = search_repository.get(run_id, user_id=user_id)
     if run is None:
         raise JobAgentError(
             message="Job search run not found.",
             error_code="job_search_run_not_found",
             status_code=404,
         )
-    session = get_profile_session(run.session_id, repository=session_repository)
+    session = get_profile_session(run.session_id, repository=session_repository, user_id=user_id)
     return JobSearchRunResponse(
         job_search_run=run,
         profile_session=session,
@@ -644,9 +653,10 @@ def get_job_search_run(
 def list_job_search_trace_steps(
     run_id: str,
     *,
+    user_id: str | None = None,
     search_repository: JobSearchRepository = job_search_repository,
 ) -> list[JobSearchTraceStep]:
-    run = search_repository.get(run_id)
+    run = search_repository.get(run_id, user_id=user_id)
     if run is None:
         raise JobAgentError(
             message="Job search run not found.",
@@ -659,21 +669,23 @@ def list_job_search_trace_steps(
 def list_job_search_runs(
     session_id: str,
     *,
+    user_id: str | None = None,
     session_repository: ProfileSessionRepository = profile_session_repository,
     search_repository: JobSearchRepository = job_search_repository,
 ) -> list[JobSearchRun]:
-    get_profile_session(session_id, repository=session_repository)
-    return search_repository.list_recent_by_session(session_id)
+    get_profile_session(session_id, repository=session_repository, user_id=user_id)
+    return search_repository.list_recent_by_session(session_id, user_id=user_id)
 
 
 def preview_job_search_run(
     payload: JobSearchRunCreateRequest,
     *,
+    user_id: str | None = None,
     session_repository: ProfileSessionRepository = profile_session_repository,
     confirmed_repository: ConfirmedProfileRepository = confirmed_profile_repository,
     llm_service: JSONChatLLM | None = None,
 ) -> JobSearchPreviewResponse:
-    session = get_profile_session(payload.session_id, repository=session_repository)
+    session = get_profile_session(payload.session_id, repository=session_repository, user_id=user_id)
     if session.confirmed_profile_id is None:
         raise JobAgentError(
             message="Confirmed profile is required before previewing job search.",
@@ -681,7 +693,7 @@ def preview_job_search_run(
             status_code=409,
         )
 
-    confirmed_profile = confirmed_repository.get(session.confirmed_profile_id)
+    confirmed_profile = confirmed_repository.get(session.confirmed_profile_id, user_id=user_id)
     if confirmed_profile is None:
         raise JobAgentError(
             message="Confirmed profile not found.",

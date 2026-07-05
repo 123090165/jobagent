@@ -23,11 +23,13 @@ from app.schemas.parsed_resume_review import (
 from app.services.errors import JobAgentError
 from app.services.llm_provider import JSONChatLLM, resolve_llm_provider_for_switch
 from app.services.resume_profile_review_service import build_resume_profile_review
+from app.storage.database import LOCAL_USER_ID
 
 
 def parse_resume_for_review(
     session_id: str,
     *,
+    user_id: str | None = None,
     regenerate: bool = False,
     use_llm: bool = False,
     llm_service: JSONChatLLM | None = None,
@@ -35,7 +37,7 @@ def parse_resume_for_review(
     resume_repository: ResumeDocumentRepository = resume_document_repository,
     parsed_review_repository: ParsedResumeReviewRepository = parsed_resume_review_repository,
 ) -> ParsedResumeReviewResponse:
-    session = get_profile_session(session_id, repository=session_repository)
+    session = get_profile_session(session_id, repository=session_repository, user_id=user_id)
     if session.resume_document_id is None:
         raise JobAgentError(
             message="Resume review requires an existing resume document.",
@@ -47,13 +49,14 @@ def parse_resume_for_review(
         session_id,
         session_repository=session_repository,
         resume_repository=resume_repository,
+        user_id=user_id,
     )
 
     requested_llm_provider = "deepseek" if use_llm else "ollama"
 
     if not regenerate:
         if session.parsed_review_id:
-            existing = parsed_review_repository.get(session.parsed_review_id)
+            existing = parsed_review_repository.get(session.parsed_review_id, user_id=user_id)
             if (
                 existing is not None
                 and existing.resume_document_id == resume_document.resume_document_id
@@ -70,6 +73,7 @@ def parse_resume_for_review(
         existing_for_resume = parsed_review_repository.get_current_for_session(
             session_id=session.session_id,
             resume_document_id=resume_document.resume_document_id,
+            user_id=user_id,
         )
         if existing_for_resume is not None and _can_reuse_parsed_review(
             existing_for_resume.analysis_mode,
@@ -105,6 +109,7 @@ def parse_resume_for_review(
     parsed_review = parsed_review_repository.create(
         session_id=session.session_id,
         resume_document_id=resume_document.resume_document_id,
+        user_id=user_id or LOCAL_USER_ID,
         basic_info={
             "name": review_result.parsed_profile.name,
             "highlights": review_result.parsed_profile.highlights,
@@ -145,17 +150,18 @@ def parse_resume_for_review(
 def get_parsed_resume_review(
     session_id: str,
     *,
+    user_id: str | None = None,
     session_repository: ProfileSessionRepository = profile_session_repository,
     parsed_review_repository: ParsedResumeReviewRepository = parsed_resume_review_repository,
 ) -> ParsedResumeReviewResponse:
-    session = get_profile_session(session_id, repository=session_repository)
+    session = get_profile_session(session_id, repository=session_repository, user_id=user_id)
     if session.parsed_review_id is None:
         raise JobAgentError(
             message="Parsed resume review not found for this session.",
             error_code="parsed_review_not_found",
             status_code=404,
         )
-    parsed_review = parsed_review_repository.get(session.parsed_review_id)
+    parsed_review = parsed_review_repository.get(session.parsed_review_id, user_id=user_id)
     if parsed_review is None:
         raise JobAgentError(
             message="Parsed resume review not found for this session.",

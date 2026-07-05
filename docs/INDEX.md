@@ -11,6 +11,7 @@ Job Brief is postponed until Job Search recall and ranking are reliable.
 - [README.md](../README.md)
 - [docs/API_CONTRACT_V1.md](API_CONTRACT_V1.md)
 - [docs/PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md)
+- [docs/DATABASE_AUTH_AND_LIBRARY_PLAN.md](DATABASE_AUTH_AND_LIBRARY_PLAN.md)
 - [docs/V4_PRODUCT_REFACTOR_PLAN.md](V4_PRODUCT_REFACTOR_PLAN.md)
 - [docs/SEARCH_PROVIDER.md](SEARCH_PROVIDER.md)
 - [docs/NEXT_DEV_PLAN.md](NEXT_DEV_PLAN.md)

@@ -1,14 +1,14 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, File, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, Query, UploadFile, status
 
+from app.api.dependencies import get_current_user
 from app.application.profile_session_usecases import (
     create_profile_session,
     get_profile_session,
 )
 from app.application.job_search_usecases import list_job_search_runs
 from app.application.profile_draft_usecases import create_profile_draft
-from app.schemas.job_search import JobSearchRunListResponse
 from app.application.resume_intake_usecases import (
     get_resume_document,
     submit_resume_file,
@@ -18,6 +18,8 @@ from app.application.resume_review_usecases import (
     get_parsed_resume_review,
     parse_resume_for_review,
 )
+from app.schemas.auth import UserAccount
+from app.schemas.job_search import JobSearchRunListResponse
 from app.schemas.parsed_resume_review import ParsedResumeReviewResponse
 from app.schemas.profile_draft import ProfileDraftResponse
 from app.schemas.profile_session import ProfileSession
@@ -28,13 +30,18 @@ router = APIRouter(prefix="/api/v1/profile-sessions", tags=["v4-profile-sessions
 
 
 @router.post("", response_model=ProfileSession, status_code=status.HTTP_201_CREATED)
-def create_profile_session_endpoint() -> ProfileSession:
-    return create_profile_session()
+def create_profile_session_endpoint(
+    current_user: UserAccount = Depends(get_current_user),
+) -> ProfileSession:
+    return create_profile_session(user_id=current_user.user_id)
 
 
 @router.get("/{session_id}", response_model=ProfileSession)
-def get_profile_session_endpoint(session_id: str) -> ProfileSession:
-    return get_profile_session(session_id)
+def get_profile_session_endpoint(
+    session_id: str,
+    current_user: UserAccount = Depends(get_current_user),
+) -> ProfileSession:
+    return get_profile_session(session_id, user_id=current_user.user_id)
 
 
 @router.post(
@@ -44,8 +51,9 @@ def get_profile_session_endpoint(session_id: str) -> ProfileSession:
 def submit_resume_text_endpoint(
     session_id: str,
     payload: ResumeTextRequest,
+    current_user: UserAccount = Depends(get_current_user),
 ) -> ResumeIntakeResponse:
-    return submit_resume_text(session_id, payload.text)
+    return submit_resume_text(session_id, payload.text, user_id=current_user.user_id)
 
 
 @router.post(
@@ -55,13 +63,17 @@ def submit_resume_text_endpoint(
 async def submit_resume_file_endpoint(
     session_id: str,
     file: UploadFile = File(...),
+    current_user: UserAccount = Depends(get_current_user),
 ) -> ResumeIntakeResponse:
-    return await submit_resume_file(session_id, file)
+    return await submit_resume_file(session_id, file, user_id=current_user.user_id)
 
 
 @router.get("/{session_id}/resume", response_model=ResumeDocument)
-def get_resume_document_endpoint(session_id: str) -> ResumeDocument:
-    return get_resume_document(session_id)
+def get_resume_document_endpoint(
+    session_id: str,
+    current_user: UserAccount = Depends(get_current_user),
+) -> ResumeDocument:
+    return get_resume_document(session_id, user_id=current_user.user_id)
 
 
 @router.post(
@@ -72,16 +84,25 @@ def parse_resume_for_review_endpoint(
     session_id: str,
     regenerate: bool = Query(default=False),
     use_llm: bool = Query(default=False),
+    current_user: UserAccount = Depends(get_current_user),
 ) -> ParsedResumeReviewResponse:
-    return parse_resume_for_review(session_id, regenerate=regenerate, use_llm=use_llm)
+    return parse_resume_for_review(
+        session_id,
+        regenerate=regenerate,
+        use_llm=use_llm,
+        user_id=current_user.user_id,
+    )
 
 
 @router.get(
     "/{session_id}/parsed-review",
     response_model=ParsedResumeReviewResponse,
 )
-def get_parsed_resume_review_endpoint(session_id: str) -> ParsedResumeReviewResponse:
-    return get_parsed_resume_review(session_id)
+def get_parsed_resume_review_endpoint(
+    session_id: str,
+    current_user: UserAccount = Depends(get_current_user),
+) -> ParsedResumeReviewResponse:
+    return get_parsed_resume_review(session_id, user_id=current_user.user_id)
 
 
 @router.post(
@@ -91,13 +112,23 @@ def get_parsed_resume_review_endpoint(session_id: str) -> ParsedResumeReviewResp
 def create_profile_draft_endpoint(
     session_id: str,
     regenerate: bool = Query(default=False),
+    current_user: UserAccount = Depends(get_current_user),
 ) -> ProfileDraftResponse:
-    return create_profile_draft(session_id, regenerate=regenerate)
+    return create_profile_draft(
+        session_id,
+        regenerate=regenerate,
+        user_id=current_user.user_id,
+    )
 
 
 @router.get(
     "/{session_id}/job-search-runs",
     response_model=JobSearchRunListResponse,
 )
-def list_job_search_runs_endpoint(session_id: str) -> JobSearchRunListResponse:
-    return JobSearchRunListResponse(items=list_job_search_runs(session_id))
+def list_job_search_runs_endpoint(
+    session_id: str,
+    current_user: UserAccount = Depends(get_current_user),
+) -> JobSearchRunListResponse:
+    return JobSearchRunListResponse(
+        items=list_job_search_runs(session_id, user_id=current_user.user_id)
+    )

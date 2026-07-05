@@ -71,10 +71,9 @@ npm run build
 ## Browser Job Capture Extension
 
 The development Chrome/Edge extension lives in `browser-helper/`. It supports
-two browser-assisted flows:
-
-- BOSS search-list candidate collection from the JobAgent web Search Preview.
-- Current-page job capture from the extension Side Panel.
+user-triggered current-page job capture from the extension Side Panel.
+Automated BOSS search, login probing, hidden tabs, polling, and BOSS API
+fetches are disabled.
 
 To test current-page capture:
 

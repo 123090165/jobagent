@@ -55,9 +55,10 @@ Search planning
   It accepts `BrowserHelperJobSearchRunCreateRequest`, converts helper payload
   candidates into `RawJobCandidate`, then reuses the normal job-search workflow.
 - `browser-helper/` is the active unpacked Chrome/Edge helper. It is currently
-  scoped to BOSS search-list candidate collection, uses `tabs`, `cookies`, and
-  `scripting`, and communicates with the Vue app through `bridge.js` +
-  `window.postMessage`.
+  the active unpacked extension and communicates with the Vue app through
+  `bridge.js` + `window.postMessage`. Earlier BOSS search-list automation was
+  superseded by the safer current-page capture path: no cookies permission, no
+  hidden BOSS tabs, no BOSS API fetches, and no login probing.
 - `web/` is Vue 3 + Vite + Naive UI. API calls are centralized in
   `web/src/api/profileSessions.ts`; shared frontend types live in
   `web/src/types/profileSession.ts`.
@@ -192,9 +193,9 @@ configure it by env after loading the extension.
 
 ## Proposed Extension Scope
 
-The current `browser-helper/` is active and already integrated with the web app,
-but it is BOSS search-list oriented and asks for broader BOSS/cookie
-permissions.
+At the time this plan was drafted, `browser-helper/` was integrated with the
+web app through a broader BOSS search-list path. That path has since been
+disabled in favor of current-page capture with lower permissions.
 
 For the new current-page job-detail flow, prefer either:
 

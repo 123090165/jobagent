@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from uuid import uuid4
 
 from app.schemas.resume_document import ResumeDocument, ResumeDocumentSourceType
-from app.storage.database import get_connection, init_database
+from app.storage.database import LOCAL_USER_ID, get_connection, init_database
 
 
 def _utc_now() -> datetime:
@@ -18,6 +18,7 @@ class ResumeDocumentRepository:
         session_id: str,
         source_type: ResumeDocumentSourceType,
         text: str,
+        user_id: str = LOCAL_USER_ID,
         filename: str | None = None,
         file_type: str | None = None,
     ) -> ResumeDocument:
@@ -40,6 +41,7 @@ class ResumeDocumentRepository:
                 INSERT INTO resume_documents (
                     resume_document_id,
                     session_id,
+                    user_id,
                     source_type,
                     filename,
                     file_type,
@@ -48,11 +50,12 @@ class ResumeDocumentRepository:
                     created_at,
                     updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     document.resume_document_id,
                     document.session_id,
+                    user_id,
                     document.source_type,
                     document.filename,
                     document.file_type,
@@ -65,11 +68,16 @@ class ResumeDocumentRepository:
             connection.commit()
         return document
 
-    def get(self, resume_document_id: str) -> ResumeDocument | None:
+    def get(self, resume_document_id: str, *, user_id: str | None = None) -> ResumeDocument | None:
         with get_connection() as connection:
             init_database(connection)
+            where_clause = "WHERE resume_document_id = ?"
+            parameters: tuple[str, ...] = (resume_document_id,)
+            if user_id is not None:
+                where_clause += " AND user_id = ?"
+                parameters = (resume_document_id, user_id)
             row = connection.execute(
-                """
+                f"""
                 SELECT
                     resume_document_id,
                     session_id,
@@ -81,9 +89,9 @@ class ResumeDocumentRepository:
                     created_at,
                     updated_at
                 FROM resume_documents
-                WHERE resume_document_id = ?
+                {where_clause}
                 """,
-                (resume_document_id,),
+                parameters,
             ).fetchone()
         if row is None:
             return None

@@ -8,7 +8,7 @@ from app.schemas.profile_session import (
     ProfileSessionStatus,
     ProfileSessionStep,
 )
-from app.storage.database import get_connection, init_database
+from app.storage.database import LOCAL_USER_ID, get_connection, init_database
 
 
 def _utc_now() -> datetime:
@@ -16,7 +16,7 @@ def _utc_now() -> datetime:
 
 
 class ProfileSessionRepository:
-    def create(self) -> ProfileSession:
+    def create(self, *, user_id: str = LOCAL_USER_ID) -> ProfileSession:
         now = _utc_now()
         session = ProfileSession(
             session_id=str(uuid4()),
@@ -31,6 +31,7 @@ class ProfileSessionRepository:
                 """
                 INSERT INTO profile_sessions (
                     session_id,
+                    user_id,
                     status,
                     created_at,
                     updated_at,
@@ -40,10 +41,11 @@ class ProfileSessionRepository:
                     confirmed_profile_id,
                     current_step
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     session.session_id,
+                    user_id,
                     session.status.value,
                     session.created_at.isoformat(),
                     session.updated_at.isoformat(),
@@ -57,11 +59,16 @@ class ProfileSessionRepository:
             connection.commit()
         return session
 
-    def get(self, session_id: str) -> ProfileSession | None:
+    def get(self, session_id: str, *, user_id: str | None = None) -> ProfileSession | None:
         with get_connection() as connection:
             init_database(connection)
+            where_clause = "WHERE session_id = ?"
+            parameters: tuple[str, ...] = (session_id,)
+            if user_id is not None:
+                where_clause += " AND user_id = ?"
+                parameters = (session_id, user_id)
             row = connection.execute(
-                """
+                f"""
                 SELECT
                     session_id,
                     status,
@@ -73,9 +80,9 @@ class ProfileSessionRepository:
                     confirmed_profile_id,
                     current_step
                 FROM profile_sessions
-                WHERE session_id = ?
+                {where_clause}
                 """,
-                (session_id,),
+                parameters,
             ).fetchone()
         if row is None:
             return None

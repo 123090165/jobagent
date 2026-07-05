@@ -6,7 +6,7 @@ from uuid import uuid4
 
 from app.schemas.confirmed_profile import ConfirmedProfile
 from app.schemas.profile_draft import ProfileDraft
-from app.storage.database import get_connection, init_database
+from app.storage.database import LOCAL_USER_ID, get_connection, init_database
 
 
 def _utc_now() -> datetime:
@@ -21,6 +21,7 @@ class ConfirmedProfileRepository:
         resume_document_id: str,
         parsed_review_id: str,
         profile_draft: ProfileDraft,
+        user_id: str = LOCAL_USER_ID,
     ) -> ConfirmedProfile:
         now = _utc_now()
         confirmed = ConfirmedProfile(
@@ -53,6 +54,7 @@ class ConfirmedProfileRepository:
                     resume_document_id,
                     parsed_review_id,
                     profile_draft_id,
+                    user_id,
                     summary,
                     target_roles_json,
                     target_directions_json,
@@ -67,7 +69,7 @@ class ConfirmedProfileRepository:
                     created_at,
                     updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     confirmed.confirmed_profile_id,
@@ -75,6 +77,7 @@ class ConfirmedProfileRepository:
                     confirmed.resume_document_id,
                     confirmed.parsed_review_id,
                     confirmed.profile_draft_id,
+                    user_id,
                     confirmed.summary,
                     json.dumps(confirmed.target_roles),
                     json.dumps(confirmed.target_directions),
@@ -93,11 +96,16 @@ class ConfirmedProfileRepository:
             connection.commit()
         return confirmed
 
-    def get(self, confirmed_profile_id: str) -> ConfirmedProfile | None:
+    def get(self, confirmed_profile_id: str, *, user_id: str | None = None) -> ConfirmedProfile | None:
         with get_connection() as connection:
             init_database(connection)
+            where_clause = "WHERE confirmed_profile_id = ?"
+            parameters: tuple[str, ...] = (confirmed_profile_id,)
+            if user_id is not None:
+                where_clause += " AND user_id = ?"
+                parameters = (confirmed_profile_id, user_id)
             row = connection.execute(
-                """
+                f"""
                 SELECT
                     confirmed_profile_id,
                     session_id,
@@ -118,9 +126,9 @@ class ConfirmedProfileRepository:
                     created_at,
                     updated_at
                 FROM confirmed_profiles
-                WHERE confirmed_profile_id = ?
+                {where_clause}
                 """,
-                (confirmed_profile_id,),
+                parameters,
             ).fetchone()
         if row is None:
             return None
@@ -131,11 +139,17 @@ class ConfirmedProfileRepository:
         *,
         session_id: str,
         profile_draft_id: str,
+        user_id: str | None = None,
     ) -> ConfirmedProfile | None:
         with get_connection() as connection:
             init_database(connection)
+            where_clause = "WHERE session_id = ? AND profile_draft_id = ?"
+            parameters: tuple[str, ...] = (session_id, profile_draft_id)
+            if user_id is not None:
+                where_clause += " AND user_id = ?"
+                parameters = (session_id, profile_draft_id, user_id)
             row = connection.execute(
-                """
+                f"""
                 SELECT
                     confirmed_profile_id,
                     session_id,
@@ -156,11 +170,11 @@ class ConfirmedProfileRepository:
                     created_at,
                     updated_at
                 FROM confirmed_profiles
-                WHERE session_id = ? AND profile_draft_id = ?
+                {where_clause}
                 ORDER BY updated_at DESC, created_at DESC
                 LIMIT 1
                 """,
-                (session_id, profile_draft_id),
+                parameters,
             ).fetchone()
         if row is None:
             return None

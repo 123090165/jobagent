@@ -21,6 +21,7 @@ from app.schemas.profile_draft import (
     UpdateProfileDraftRequest,
 )
 from app.services.errors import JobAgentError
+from app.storage.database import LOCAL_USER_ID
 
 HEALTH_TARGET_ROLES = [
     "AI Health Algorithm Intern",
@@ -64,12 +65,13 @@ HEALTH_SKILL_PRIORITY_TERMS = [
 def create_profile_draft(
     session_id: str,
     *,
+    user_id: str | None = None,
     regenerate: bool = False,
     session_repository: ProfileSessionRepository = profile_session_repository,
     parsed_review_repository: ParsedResumeReviewRepository = parsed_resume_review_repository,
     draft_repository: ProfileDraftRepository = profile_draft_repository,
 ) -> ProfileDraftResponse:
-    session = get_profile_session(session_id, repository=session_repository)
+    session = get_profile_session(session_id, repository=session_repository, user_id=user_id)
     if session.parsed_review_id is None:
         raise JobAgentError(
             message="Profile draft requires an existing parsed resume review.",
@@ -81,12 +83,13 @@ def create_profile_draft(
         session_id,
         session_repository=session_repository,
         parsed_review_repository=parsed_review_repository,
+        user_id=user_id,
     )
     parsed_review = parsed_review_response.parsed_review
 
     if not regenerate:
         if session.profile_draft_id:
-            existing = draft_repository.get(session.profile_draft_id)
+            existing = draft_repository.get(session.profile_draft_id, user_id=user_id)
             if existing is not None and existing.parsed_review_id == parsed_review.parsed_review_id:
                 return ProfileDraftResponse(
                     profile_draft=existing,
@@ -95,6 +98,7 @@ def create_profile_draft(
         existing_for_review = draft_repository.get_current_for_session(
             session_id=session.session_id,
             parsed_review_id=parsed_review.parsed_review_id,
+            user_id=user_id,
         )
         if existing_for_review is not None:
             updated_session = session_repository.attach_profile_draft(
@@ -121,6 +125,7 @@ def create_profile_draft(
         strengths=draft_seed["strengths"],
         risks=draft_seed["risks"],
         missing_info_questions=draft_seed["missing_info_questions"],
+        user_id=user_id or LOCAL_USER_ID,
     )
     updated_session = session_repository.attach_profile_draft(
         session_id=session.session_id,
@@ -135,17 +140,18 @@ def create_profile_draft(
 def get_profile_draft(
     draft_id: str,
     *,
+    user_id: str | None = None,
     session_repository: ProfileSessionRepository = profile_session_repository,
     draft_repository: ProfileDraftRepository = profile_draft_repository,
 ) -> ProfileDraftResponse:
-    profile_draft = draft_repository.get(draft_id)
+    profile_draft = draft_repository.get(draft_id, user_id=user_id)
     if profile_draft is None:
         raise JobAgentError(
             message="Profile draft not found.",
             error_code="profile_draft_not_found",
             status_code=404,
         )
-    session = get_profile_session(profile_draft.session_id, repository=session_repository)
+    session = get_profile_session(profile_draft.session_id, repository=session_repository, user_id=user_id)
     return ProfileDraftResponse(profile_draft=profile_draft, profile_session=session)
 
 
@@ -153,10 +159,15 @@ def update_profile_draft(
     draft_id: str,
     payload: UpdateProfileDraftRequest,
     *,
+    user_id: str | None = None,
     session_repository: ProfileSessionRepository = profile_session_repository,
     draft_repository: ProfileDraftRepository = profile_draft_repository,
 ) -> ProfileDraftResponse:
-    profile_draft = draft_repository.update(draft_id, _normalize_update_payload(payload))
+    profile_draft = draft_repository.update(
+        draft_id,
+        _normalize_update_payload(payload),
+        user_id=user_id,
+    )
     if profile_draft is None:
         raise JobAgentError(
             message="Profile draft not found.",
@@ -169,7 +180,10 @@ def update_profile_draft(
     )
     return ProfileDraftResponse(
         profile_draft=profile_draft,
-        profile_session=updated_session or get_profile_session(profile_draft.session_id),
+        profile_session=updated_session or get_profile_session(
+            profile_draft.session_id,
+            user_id=user_id,
+        ),
     )
 
 

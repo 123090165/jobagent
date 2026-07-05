@@ -1,9 +1,12 @@
-const HELPER_VERSION = "0.3.0";
+const HELPER_VERSION = "0.3.1";
 const DEFAULT_JOBAGENT_BACKEND_URL = "http://127.0.0.1:8000";
 const CURRENT_PAGE_CAPTURE_VERSION = "browser-helper-current-page-v1";
 const CURRENT_PAGE_MIN_TEXT_LENGTH = 80;
 const CURRENT_PAGE_MAX_TEXT_LENGTH = 20000;
 const CURRENT_PAGE_PREVIEW_LENGTH = 500;
+const CURRENT_PAGE_CAPTURE_COOLDOWN_MS = 1500;
+const BOSS_AUTOMATION_DISABLED_MESSAGE =
+  "BOSS automated search and live probes are disabled. Open a BOSS job detail page yourself, then use the JobAgent Side Panel to analyze the current page.";
 const BOSS_PLATFORM = "boss";
 const BOSS_HOME_URL = "https://www.zhipin.com/";
 const BOSS_SEARCH_URL = "https://www.zhipin.com/web/geek/jobs";
@@ -105,6 +108,8 @@ const BOSS_JOB_TYPE_CODES = new Map([
   ["\u5b9e\u4e60\u751f", "1902"]
 ]);
 
+let lastCurrentPageCaptureStartedAt = 0;
+
 const BOSS_CITY_CODES = new Map([
   ["beijing", "101010100"],
   ["\u5317\u4eac", "101010100"],
@@ -151,13 +156,18 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         sendResponse({
           ok: true,
           version: HELPER_VERSION,
-          capabilities: ["ping", "checkBossLogin", "openBossLogin", "searchBoss", "analyzeCurrentJob"]
+          capabilities: ["ping", "openBossLogin", "analyzeCurrentJob", "bossCurrentPageCapture"]
         });
         return;
       }
 
       if (message.action === "checkBossLogin") {
-        sendResponse({ ok: true, ...(await buildBossLoginStatus()) });
+        sendResponse({
+          ok: false,
+          platform: BOSS_PLATFORM,
+          disabled: true,
+          error: "BOSS login probing is disabled to avoid automated BOSS access. Open BOSS manually in the browser when needed."
+        });
         return;
       }
 
@@ -189,34 +199,15 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       }
 
       if (message.action === "searchBoss") {
-        const loginStatus = await buildBossLoginStatus();
-        if (!loginStatus.loggedIn) {
-          sendResponse({
-            ok: false,
-            platform: BOSS_PLATFORM,
-            loginRequired: true,
-            loginUrl: BOSS_HOME_URL,
-            error: "BOSS login is required before searching."
-          });
-          return;
-        }
-
-        const queries = normalizeBossSearchQueries(message.queries, message.query);
-        if (!queries.length) {
-          sendResponse({ ok: false, error: "missing BOSS search query" });
-          return;
-        }
-
-        const limit = clampInteger(message.limit, 1, 30, 10);
-        const location = String(message.location || "").trim();
-        const jobType = String(message.jobType || "").trim();
-        const result = await searchBossJobs({ queries, location, jobType, limit });
         sendResponse({
-          ok: true,
+          ok: false,
           version: HELPER_VERSION,
           platform: BOSS_PLATFORM,
           platforms: [BOSS_PLATFORM],
-          ...result
+          disabled: true,
+          candidates: [],
+          warnings: [BOSS_AUTOMATION_DISABLED_MESSAGE],
+          error: BOSS_AUTOMATION_DISABLED_MESSAGE
         });
         return;
       }
@@ -252,6 +243,16 @@ async function analyzeCurrentJobPage({ backendUrl, sessionId, useLlm }) {
       error: "Profile session ID is required before analyzing the current job page."
     };
   }
+  const now = Date.now();
+  if (now - lastCurrentPageCaptureStartedAt < CURRENT_PAGE_CAPTURE_COOLDOWN_MS) {
+    return {
+      ok: false,
+      errorType: "capture_safety",
+      error: "Please wait a moment before capturing another page."
+    };
+  }
+  lastCurrentPageCaptureStartedAt = now;
+
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!tab?.id) {
     return {
@@ -260,18 +261,61 @@ async function analyzeCurrentJobPage({ backendUrl, sessionId, useLlm }) {
       error: "No active tab is available for current-page capture."
     };
   }
+  const tabGuard = validateCurrentPageCaptureTab(tab);
+  if (!tabGuard.ok) {
+    return {
+      ok: false,
+      errorType: "capture_safety",
+      error: tabGuard.error,
+      diagnostics: {
+        tabUrl: tab.url || null,
+        tabTitle: tab.title || null
+      }
+    };
+  }
 
-  const [captureResult] = await chrome.scripting.executeScript({
-    target: { tabId: tab.id },
-    func: captureCurrentJobPage,
-    args: [{ minTextLength: CURRENT_PAGE_MIN_TEXT_LENGTH, maxTextLength: CURRENT_PAGE_MAX_TEXT_LENGTH }]
-  });
+  let captureResult = null;
+  try {
+    [captureResult] = await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: captureCurrentJobPage,
+      args: [{
+        minTextLength: CURRENT_PAGE_MIN_TEXT_LENGTH,
+        maxTextLength: CURRENT_PAGE_MAX_TEXT_LENGTH,
+        captureVersion: CURRENT_PAGE_CAPTURE_VERSION,
+        previewLength: CURRENT_PAGE_PREVIEW_LENGTH
+      }]
+    });
+  } catch (error) {
+    return {
+      ok: false,
+      errorType: "capture",
+      error: `The extension could not read the current page: ${String(error)}`,
+      diagnostics: {
+        tabUrl: tab.url || null,
+        tabTitle: tab.title || null
+      }
+    };
+  }
   const capture = captureResult?.result;
   if (!capture) {
     return {
       ok: false,
       errorType: "capture",
-      error: "Current-page capture returned no result."
+      error: "Current-page capture returned no result.",
+      diagnostics: {
+        tabUrl: tab.url || null,
+        tabTitle: tab.title || null,
+        injectionFrameId: captureResult?.frameId ?? null
+      }
+    };
+  }
+  if (capture.blocked) {
+    return {
+      ok: false,
+      errorType: "capture_safety",
+      error: capture.blocked_reason || "The current page is not safe to analyze.",
+      capture
     };
   }
   capture.session_id = normalizedSessionId;
@@ -321,6 +365,47 @@ async function analyzeCurrentJobPage({ backendUrl, sessionId, useLlm }) {
   }
 }
 
+function validateCurrentPageCaptureTab(tab) {
+  const rawUrl = String(tab?.url || "").trim();
+  if (!rawUrl) {
+    return {
+      ok: false,
+      error: "The active tab URL is unavailable. Click the extension icon from the job detail tab and try again."
+    };
+  }
+  let parsed = null;
+  try {
+    parsed = new URL(rawUrl);
+  } catch (_error) {
+    return {
+      ok: false,
+      error: "The active tab URL is invalid. Open a normal job detail page and try again."
+    };
+  }
+  if (!["http:", "https:"].includes(parsed.protocol)) {
+    return {
+      ok: false,
+      error: "Only normal http/https job detail pages can be captured."
+    };
+  }
+  if (isBossHost(parsed.hostname) && !isBossJobDetailUrl(parsed)) {
+    return {
+      ok: false,
+      error: "For BOSS, open a specific job detail page before capturing. Search pages, login pages, verification pages, and home pages are not captured."
+    };
+  }
+  return { ok: true };
+}
+
+function isBossHost(hostname) {
+  const host = String(hostname || "").toLowerCase();
+  return host === "zhipin.com" || host.endsWith(".zhipin.com");
+}
+
+function isBossJobDetailUrl(url) {
+  return isBossHost(url.hostname) && /^\/job_detail\/[^/?#]+(?:\.html)?\/?$/i.test(url.pathname);
+}
+
 function normalizeBackendUrl(value) {
   return String(value || DEFAULT_JOBAGENT_BACKEND_URL).trim().replace(/\/+$/, "") || DEFAULT_JOBAGENT_BACKEND_URL;
 }
@@ -337,36 +422,267 @@ async function readJsonResponse(response) {
   }
 }
 
-function captureCurrentJobPage({ minTextLength, maxTextLength }) {
+function captureCurrentJobPage({ minTextLength, maxTextLength, captureVersion, previewLength }) {
+  function compactText(value) {
+    const lines = String(value || "")
+      .replace(/\r\n/g, "\n")
+      .replace(/\r/g, "\n")
+      .split("\n")
+      .map((line) => line.trim());
+    const compacted = [];
+    let blankSeen = false;
+    for (const line of lines) {
+      if (!line) {
+        if (!blankSeen) {
+          compacted.push("");
+        }
+        blankSeen = true;
+        continue;
+      }
+      blankSeen = false;
+      compacted.push(line);
+    }
+    return compacted.join("\n").trim();
+  }
+
+  function firstText(selectors) {
+    for (const selector of selectors) {
+      const node = document.querySelector(selector);
+      const text = compactText(node?.innerText || node?.textContent || "");
+      if (text) {
+        return text;
+      }
+    }
+    return null;
+  }
+
+  function inferSource(hostname) {
+    const host = String(hostname || "").toLowerCase();
+    if (host === "zhipin.com" || host.endsWith(".zhipin.com")) {
+      return "boss";
+    }
+    if (host.includes("linkedin.com")) {
+      return "linkedin";
+    }
+    return host ? "company_site" : "unknown";
+  }
+
+  function isBossDetailUrl(value) {
+    try {
+      const parsed = new URL(value);
+      const host = parsed.hostname.toLowerCase();
+      return (host === "zhipin.com" || host.endsWith(".zhipin.com")) &&
+        /^\/job_detail\/[^/?#]+(?:\.html)?\/?$/i.test(parsed.pathname);
+    } catch (_error) {
+      return false;
+    }
+  }
+
+  function includesAny(text, markers) {
+    return markers.some((marker) => text.includes(marker));
+  }
+
+  function looksLikeJobPageText(text, title, url) {
+    const combined = `${title}\n${url}\n${text}`.toLowerCase();
+    return [
+      "job",
+      "role",
+      "position",
+      "responsibilities",
+      "requirements",
+      "qualifications",
+      "\u804c\u4f4d",
+      "\u5c97\u4f4d",
+      "\u804c\u8d23",
+      "\u8981\u6c42",
+      "\u4efb\u804c",
+      "\u62db\u8058",
+      "职位",
+      "岗位",
+      "职责",
+      "要求"
+    ].some((marker) => combined.includes(marker));
+  }
+
+  function uniqueWarnings(values) {
+    const seen = new Set();
+    const result = [];
+    for (const value of values) {
+      const item = String(value || "").trim();
+      if (!item) {
+        continue;
+      }
+      const key = item.toLowerCase();
+      if (seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      result.push(item);
+    }
+    return result;
+  }
+
+  function extractBossDetailFields(visibleText) {
+    const title = firstText([
+      ".job-name",
+      ".job-title",
+      ".job-banner .name",
+      ".info-primary .name",
+      "[class*='job-name']"
+    ]);
+    const company = firstText([
+      ".company-name",
+      ".sider-company .company-info a",
+      ".company-info .name",
+      ".job-company",
+      "[class*='company-name']"
+    ]);
+    const location = firstText([
+      ".job-area",
+      ".location-address",
+      ".job-location",
+      ".job-primary .job-area",
+      "[class*='job-area']"
+    ]);
+    const salary = firstText([
+      ".salary",
+      ".job-salary",
+      ".job-banner .salary",
+      ".info-primary .salary",
+      "[class*='salary']"
+    ]);
+    const description = firstText([
+      ".job-sec-text",
+      ".job-sec .text",
+      ".job-sec",
+      ".job-detail-section",
+      ".job-detail",
+      ".job-desc",
+      "[class*='job-sec']"
+    ]);
+    const jdText = compactText([
+      title ? `Title: ${title}` : "",
+      company ? `Company: ${company}` : "",
+      location ? `Location: ${location}` : "",
+      salary ? `Salary: ${salary}` : "",
+      description || ""
+    ].filter(Boolean).join("\n\n"));
+    return {
+      title,
+      company,
+      location,
+      salary,
+      jd_text: jdText || visibleText,
+      usedStructuredDescription: Boolean(description)
+    };
+  }
+
+  function detectBossBlockedPage({ sourceUrl, visibleText, pageTitle, fields }) {
+    const combined = `${pageTitle}\n${visibleText}`;
+    const hasStructuredJobContent = Boolean(
+      fields.title || fields.salary || fields.usedStructuredDescription || fields.jd_text.length >= minTextLength
+    );
+    if (!isBossDetailUrl(sourceUrl)) {
+      return "This BOSS page is not a job detail page. The helper will not capture BOSS search, login, verification, or home pages.";
+    }
+    if (visibleText.length < minTextLength && !hasStructuredJobContent) {
+      return "The BOSS page is blank or did not expose enough visible job text. Stop and restore normal BOSS access before trying again.";
+    }
+    if (includesAny(combined, [
+      "\u5b89\u5168\u9a8c\u8bc1",
+      "\u9a8c\u8bc1\u7801",
+      "\u8eab\u4efd\u9a8c\u8bc1",
+      "\u4eba\u673a\u9a8c\u8bc1",
+      "\u8bf7\u5b8c\u6210\u9a8c\u8bc1",
+      "\u8bbf\u95ee\u5f02\u5e38"
+    ])) {
+      return "BOSS appears to require security verification. The helper stopped without sending this page to JobAgent.";
+    }
+    if (!hasStructuredJobContent && includesAny(combined, [
+      "\u767b\u5f55",
+      "\u626b\u7801\u767b\u5f55",
+      "\u8bf7\u767b\u5f55"
+    ])) {
+      return "BOSS appears to be showing a login page instead of a job detail page. The helper stopped without analysis.";
+    }
+    return null;
+  }
+
   const rawText = document.body?.innerText || "";
-  const visibleText = compactVisibleText(rawText).slice(0, maxTextLength);
+  const visibleText = compactText(rawText).slice(0, maxTextLength);
   const sourceUrl = window.location.href;
   const pageTitle = document.title || "";
-  const source = inferCaptureSource(window.location.hostname);
+  const source = inferSource(window.location.hostname);
   const warnings = [];
-  if (visibleText.length < minTextLength) {
-    warnings.push("Visible page text is too short for reliable JD analysis.");
+  let title = null;
+  let company = null;
+  let location = null;
+  let salary = null;
+  let jdText = visibleText;
+  let extractorVersion = captureVersion;
+
+  if (source === "boss") {
+    const fields = extractBossDetailFields(visibleText);
+    const blockedReason = detectBossBlockedPage({ sourceUrl, visibleText, pageTitle, fields });
+    title = fields.title;
+    company = fields.company;
+    location = fields.location;
+    salary = fields.salary;
+    jdText = fields.jd_text.slice(0, maxTextLength);
+    extractorVersion = `${captureVersion}:boss-detail-v1`;
+    warnings.push("BOSS current-page capture used DOM text only; no BOSS API calls, hidden tabs, polling, or automatic search were used.");
+    if (!fields.usedStructuredDescription) {
+      warnings.push("BOSS structured JD selector was not found; visible text fallback was used.");
+    }
+    if (blockedReason) {
+      return {
+        blocked: true,
+        blocked_reason: blockedReason,
+        source,
+        source_url: sourceUrl,
+        page_title: pageTitle,
+        title,
+        company,
+        location,
+        salary,
+        jd_text: jdText,
+        visible_text: visibleText,
+        captured_at: new Date().toISOString(),
+        extractor_version: extractorVersion,
+        warnings: uniqueWarnings(warnings),
+        debug: {
+          visibleTextLength: visibleText.length,
+          preview: visibleText.slice(0, previewLength),
+          readyState: document.readyState
+        }
+      };
+    }
+  } else {
+    if (visibleText.length < minTextLength) {
+      warnings.push("Visible page text is too short for reliable JD analysis.");
+    }
+    if (!looksLikeJobPageText(visibleText, pageTitle, sourceUrl)) {
+      warnings.push("The current page may not be a job detail page.");
+    }
+    warnings.push("Generic visible-text extractor was used; structured fields may be incomplete.");
   }
-  if (!looksLikeJobPage(visibleText, pageTitle, sourceUrl)) {
-    warnings.push("The current page may not be a job detail page.");
-  }
-  warnings.push("Generic visible-text extractor was used; structured fields may be incomplete.");
+
   return {
     source,
     source_url: sourceUrl,
     page_title: pageTitle,
-    title: null,
-    company: null,
-    location: null,
-    salary: null,
-    jd_text: visibleText,
+    title,
+    company,
+    location,
+    salary,
+    jd_text: jdText,
     visible_text: visibleText,
     captured_at: new Date().toISOString(),
-    extractor_version: CURRENT_PAGE_CAPTURE_VERSION,
-    warnings: uniqueCaptureWarnings(warnings),
+    extractor_version: extractorVersion,
+    warnings: uniqueWarnings(warnings),
     debug: {
       visibleTextLength: visibleText.length,
-      preview: visibleText.slice(0, CURRENT_PAGE_PREVIEW_LENGTH),
+      preview: visibleText.slice(0, previewLength),
       readyState: document.readyState
     }
   };
@@ -440,6 +756,25 @@ function uniqueCaptureWarnings(values) {
 }
 
 async function buildBossLoginStatus() {
+  return {
+    platform: BOSS_PLATFORM,
+    loggedIn: false,
+    loginUrl: BOSS_HOME_URL,
+    cookieCount: 0,
+    cookieLoggedIn: false,
+    matchedAuthCookies: [],
+    missingAuthCookies: BOSS_AUTH_COOKIE_NAMES.slice(),
+    sessionVerified: false,
+    verificationStatus: "disabled",
+    verificationReason: "BOSS login probing is disabled; current-page capture does not need cookie inspection.",
+    probeUrl: null,
+    probePageTitle: null,
+    probeBodyTextLength: 0,
+    probeJobCardCount: 0,
+    probeValidJobDetailLinkCount: 0,
+    loginLikelyRequired: false,
+    verificationLikelyRequired: false
+  };
   const cookies = await getBossCookies();
   const cookieNames = new Set(cookies.filter((cookie) => cookie.value).map((cookie) => cookie.name));
   const matchedAuthCookies = BOSS_AUTH_COOKIE_NAMES.filter((name) => cookieNames.has(name));
@@ -475,35 +810,13 @@ async function buildBossLoginStatus() {
 }
 
 async function probeBossLoginSession() {
-  const probeUrl = buildBossSearchUrl(
-    BOSS_LOGIN_PROBE_QUERY,
-    BOSS_LOGIN_PROBE_LOCATION,
-    BOSS_DEFAULT_JOB_TYPE_CODE
-  );
-  let tab = null;
-  try {
-    tab = await chrome.tabs.create({ url: probeUrl, active: false });
-    await waitTabComplete(tab.id, 15000);
-    await sleep(1000);
-    const signals = await waitForBossPageSignals(tab.id, BOSS_LOGIN_PROBE_TIMEOUT_MS);
-    return interpretBossLoginProbe(signals, probeUrl);
-  } catch (error) {
-    return {
-      verified: false,
-      loggedIn: false,
-      status: "probe_error",
-      reason: `BOSS login probe failed: ${String(error)}`,
-      probeUrl
-    };
-  } finally {
-    if (tab?.id) {
-      try {
-        await chrome.tabs.remove(tab.id);
-      } catch (_error) {
-        // The user may close the probe tab before the helper does.
-      }
-    }
-  }
+  return {
+    verified: false,
+    loggedIn: false,
+    status: "disabled",
+    reason: "BOSS live login probes are disabled.",
+    probeUrl: null
+  };
 }
 
 function interpretBossLoginProbe(signals, probeUrl) {
@@ -567,21 +880,7 @@ function interpretBossLoginProbe(signals, probeUrl) {
 }
 
 async function getBossCookies() {
-  const cookieGroups = await Promise.all([
-    chrome.cookies.getAll({ url: BOSS_COOKIE_URL }),
-    chrome.cookies.getAll({ domain: "zhipin.com" })
-  ]);
-  const seen = new Set();
-  const result = [];
-  for (const cookie of cookieGroups.flat()) {
-    const key = `${cookie.storeId}:${cookie.domain}:${cookie.path}:${cookie.name}`;
-    if (seen.has(key)) {
-      continue;
-    }
-    seen.add(key);
-    result.push(cookie);
-  }
-  return result;
+  return [];
 }
 
 function normalizeBossSearchQueries(rawQueries, rawQuery) {
@@ -613,120 +912,41 @@ function containsCjk(value) {
 }
 
 async function searchBossJobs({ queries, location, jobType, limit }) {
-  const cityCode = resolveBossCityCode(location);
-  const jobTypeCode = resolveBossJobTypeCode(jobType);
-  const directAttempts = [];
-  const directWarnings = [];
-  for (const query of queries) {
-    const searchUrl = buildBossSearchUrl(query, location, jobTypeCode);
-    const apiUrl = buildBossSearchApiUrl(query, cityCode, jobTypeCode, limit);
-    const apiResult = await fetchBossJobsFromWorkerApi({
-      query,
-      requestedLocation: location,
-      limit,
-      searchUrl,
-      apiUrl
-    });
-    directAttempts.push(buildBossSearchAttempt(query, apiResult));
-    directWarnings.push(...(apiResult.warnings || []));
-    if (apiResult.candidates.length) {
-      return {
-        ...apiResult,
-        attemptedQueries: queries,
-        searchAttempts: directAttempts,
-        successfulQuery: query
-      };
+  void queries;
+  void location;
+  void jobType;
+  void limit;
+  return {
+    searchUrl: null,
+    pageUrl: null,
+    pageTitle: null,
+    candidates: [],
+    warnings: [BOSS_AUTOMATION_DISABLED_MESSAGE],
+    diagnostics: {
+      disabled: true,
+      reason: BOSS_AUTOMATION_DISABLED_MESSAGE
     }
-  }
-
-  const firstSearchUrl = buildBossSearchUrl(queries[0], location, jobTypeCode);
-  const tab = await chrome.tabs.create({ url: firstSearchUrl, active: false });
-  let shouldCloseTab = true;
-  const tabAttempts = [];
-  let lastResult = null;
-  try {
-    for (const query of queries) {
-      const result = await searchBossJobsInTab(tab.id, {
-        query,
-        requestedLocation: location,
-        limit,
-        cityCode,
-        jobTypeCode
-      });
-      lastResult = result;
-      tabAttempts.push(buildBossSearchAttempt(query, result));
-      if (result.candidates.length) {
-        return {
-          ...result,
-          warnings: uniqueStrings([...directWarnings, ...(result.warnings || [])]),
-          attemptedQueries: queries,
-          searchAttempts: [...directAttempts, ...tabAttempts],
-          successfulQuery: query
-        };
-      }
-    }
-
-    const result = lastResult || {
-      searchUrl: firstSearchUrl,
-      candidates: [],
-      warnings: ["BOSS search returned no result."]
-    };
-    result.tabId = tab.id;
-    result.tabKeptOpen = false;
-    result.attemptedQueries = queries;
-    result.searchAttempts = [...directAttempts, ...tabAttempts];
-    result.warnings = uniqueStrings([
-      ...directWarnings,
-      ...(result.warnings || []),
-      "BOSS fallback tab was closed because no valid job candidates were parsed."
-    ]);
-    return result;
-  } finally {
-    if (shouldCloseTab) {
-      try {
-        await chrome.tabs.remove(tab.id);
-      } catch (_error) {
-        // The user may close the tab before extraction completes.
-      }
-    }
-  }
+  };
 }
 
 async function searchBossJobsInTab(tabId, { query, requestedLocation, limit, cityCode, jobTypeCode }) {
-  const searchUrl = buildBossSearchUrl(query, requestedLocation, jobTypeCode);
-  const apiUrl = buildBossSearchApiUrl(query, cityCode, jobTypeCode, limit);
-  await chrome.tabs.update(tabId, { url: searchUrl, active: false });
-  await waitTabComplete(tabId, 15000);
-  await sleep(1000);
-
-  const apiResult = await fetchBossJobsFromPageApi(tabId, {
-    query,
-    requestedLocation,
-    limit,
-    searchUrl,
-    apiUrl
-  });
-  if (apiResult.candidates.length) {
-    return apiResult;
-  }
-
-  const readinessSignals = await waitForBossPageSignals(tabId, BOSS_PAGE_READY_TIMEOUT_MS);
-  const [extraction] = await chrome.scripting.executeScript({
-    target: { tabId },
-    func: extractBossJobsFromPage,
-    args: [{ query, requestedLocation, limit, searchUrl, textMarkers: BOSS_PAGE_TEXT_MARKERS }]
-  });
-  const result = extraction?.result || {
-    searchUrl,
+  void tabId;
+  void query;
+  void requestedLocation;
+  void limit;
+  void cityCode;
+  void jobTypeCode;
+  return {
+    searchUrl: null,
+    pageUrl: null,
+    pageTitle: null,
     candidates: [],
-    warnings: ["BOSS page extraction returned no result."]
+    warnings: [BOSS_AUTOMATION_DISABLED_MESSAGE],
+    diagnostics: {
+      disabled: true,
+      reason: BOSS_AUTOMATION_DISABLED_MESSAGE
+    }
   };
-  result.warnings = uniqueStrings([
-    ...(apiResult.warnings || []),
-    ...(result.warnings || [])
-  ]);
-  result.diagnostics = result.diagnostics || readinessSignals || null;
-  return result;
 }
 
 function buildBossSearchAttempt(query, result) {
@@ -848,129 +1068,36 @@ function clampInteger(value, min, max, fallback) {
 }
 
 async function fetchBossJobsFromWorkerApi({ query, requestedLocation, limit, searchUrl, apiUrl }) {
-  try {
-    const response = await fetch(apiUrl, {
-      method: "GET",
-      credentials: "include",
-      headers: {
-        accept: "application/json, text/plain, */*",
-        "x-requested-with": "XMLHttpRequest"
-      }
-    });
-    const text = await response.text();
-    const data = parseJsonOrNull(text);
-    if (!response.ok || !data) {
-      return {
-        searchUrl,
-        candidates: [],
-        warnings: [
-          `BOSS worker joblist API did not return usable JSON for "${query}" (status ${response.status || "unknown"}).`
-        ],
-        diagnostics: {
-          apiTransport: "extension_worker",
-          apiStatus: response.status || null,
-          apiContentType: response.headers.get("content-type"),
-          apiPreview: text.slice(0, 500)
-        }
-      };
+  void query;
+  void requestedLocation;
+  void limit;
+  void apiUrl;
+  return {
+    searchUrl,
+    candidates: [],
+    warnings: [BOSS_AUTOMATION_DISABLED_MESSAGE],
+    diagnostics: {
+      disabled: true,
+      reason: BOSS_AUTOMATION_DISABLED_MESSAGE
     }
-    const candidates = parseBossApiCandidates(data, {
-      query,
-      requestedLocation,
-      limit,
-      searchUrl
-    });
-    return {
-      searchUrl,
-      pageUrl: null,
-      pageTitle: null,
-      warnings: candidates.length
-        ? []
-        : [`BOSS worker joblist API returned JSON but no valid job candidates were parsed for "${query}".`],
-      diagnostics: candidates.length
-        ? null
-        : buildBossApiDiagnostics(data, {
-            transport: "extension_worker",
-            status: response.status,
-            contentType: response.headers.get("content-type"),
-            textPreview: text
-          }),
-      candidates
-    };
-  } catch (error) {
-    return {
-      searchUrl,
-      candidates: [],
-      warnings: [`BOSS worker joblist API fetch failed for "${query}": ${String(error)}`],
-      diagnostics: {
-        apiTransport: "extension_worker",
-        readError: String(error)
-      }
-    };
-  }
+  };
 }
 
 async function fetchBossJobsFromPageApi(tabId, { query, requestedLocation, limit, searchUrl, apiUrl }) {
-  try {
-    const [apiFetch] = await chrome.scripting.executeScript({
-      target: { tabId },
-      world: "MAIN",
-      func: fetchBossJobListFromPage,
-      args: [{ apiUrl }]
-    });
-    const response = apiFetch?.result;
-    if (!response) {
-      return {
-        searchUrl,
-        candidates: [],
-        warnings: ["BOSS joblist API returned no response."]
-      };
+  void tabId;
+  void query;
+  void requestedLocation;
+  void limit;
+  void apiUrl;
+  return {
+    searchUrl,
+    candidates: [],
+    warnings: [BOSS_AUTOMATION_DISABLED_MESSAGE],
+    diagnostics: {
+      disabled: true,
+      reason: BOSS_AUTOMATION_DISABLED_MESSAGE
     }
-    if (!response.ok || !response.data) {
-      return {
-        searchUrl,
-        candidates: [],
-        warnings: [
-          `BOSS joblist API did not return usable JSON (status ${response.status || "unknown"}).`
-        ],
-        diagnostics: {
-          apiTransport: "page_context",
-          apiStatus: response.status || null,
-          apiContentType: response.contentType || null,
-          apiPreview: response.textPreview || null
-        }
-      };
-    }
-    const candidates = parseBossApiCandidates(response.data, {
-      query,
-      requestedLocation,
-      limit,
-      searchUrl
-    });
-    return {
-      searchUrl,
-      pageUrl: response.pageUrl || null,
-      pageTitle: response.pageTitle || null,
-      warnings: candidates.length
-        ? []
-        : [`BOSS joblist API returned JSON but no valid job candidates were parsed for "${query}".`],
-      diagnostics: candidates.length
-        ? null
-        : buildBossApiDiagnostics(response.data, {
-            transport: "page_context",
-            status: response.status,
-            contentType: response.contentType,
-            textPreview: response.textPreview
-          }),
-      candidates
-    };
-  } catch (error) {
-    return {
-      searchUrl,
-      candidates: [],
-      warnings: [`BOSS joblist API fetch failed: ${String(error)}`]
-    };
-  }
+  };
 }
 
 function parseJsonOrNull(text) {
@@ -1055,32 +1182,19 @@ async function readBossPageSignals(tabId) {
 }
 
 function fetchBossJobListFromPage({ apiUrl }) {
-  return fetch(apiUrl, {
-    method: "GET",
-    credentials: "include",
-    headers: {
-      accept: "application/json, text/plain, */*",
-      "x-requested-with": "XMLHttpRequest"
-    }
-  }).then(async (response) => {
-    const text = await response.text();
-    let data = null;
-    try {
-      data = text ? JSON.parse(text) : null;
-    } catch (_error) {
-      data = null;
-    }
-    return {
-      ok: response.ok,
-      status: response.status,
-      url: response.url,
-      contentType: response.headers.get("content-type"),
-      data,
-      textPreview: text.slice(0, 500),
-      pageUrl: window.location.href,
-      pageTitle: document.title
-    };
-  });
+  void apiUrl;
+  return {
+    ok: false,
+    status: 0,
+    url: null,
+    contentType: null,
+    data: null,
+    textPreview: "",
+    pageUrl: window.location.href,
+    pageTitle: document.title,
+    disabled: true,
+    reason: "BOSS page-context API fetch is disabled."
+  };
 }
 
 function parseBossApiCandidates(data, { query, requestedLocation, limit, searchUrl }) {

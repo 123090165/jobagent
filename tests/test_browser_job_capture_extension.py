@@ -16,9 +16,13 @@ def test_browser_helper_manifest_exposes_current_page_capture_side_panel() -> No
     assert "activeTab" in manifest["permissions"]
     assert "scripting" in manifest["permissions"]
     assert "storage" in manifest["permissions"]
+    assert "cookies" not in manifest["permissions"]
     assert manifest["side_panel"]["default_path"] == "sidepanel.html"
     assert "http://127.0.0.1:8000/*" in manifest["host_permissions"]
     assert "http://localhost:8000/*" in manifest["host_permissions"]
+    assert "*://*.zhipin.com/*" not in manifest.get("host_permissions", [])
+    assert "*://zhipin.com/*" not in manifest.get("host_permissions", [])
+    assert "https://www.zhipin.com/*" in manifest.get("optional_host_permissions", [])
     assert "<all_urls>" not in manifest.get("host_permissions", [])
 
 
@@ -36,6 +40,38 @@ def test_browser_helper_background_supports_user_triggered_current_page_capture(
     assert "chrome.sidePanel.setPanelBehavior" in background
 
 
+def test_boss_capture_is_manual_dom_only_and_blocks_automation() -> None:
+    background = _read("browser-helper/background.js")
+
+    assert "BOSS automated search and live probes are disabled" in background
+    assert 'capabilities: ["ping", "openBossLogin", "analyzeCurrentJob", "bossCurrentPageCapture"]' in background
+    assert "BOSS current-page capture used DOM text only" in background
+    assert "isBossJobDetailUrl" in background
+    assert "\\/job_detail\\/" in background
+    assert "(?:\\.html)?" in background
+    assert "capture_safety" in background
+    assert "BOSS appears to require security verification" in background
+    assert "searchBossJobs({ queries, location, jobType, limit })" in background
+    assert "BOSS_AUTOMATION_DISABLED_MESSAGE" in background
+
+
+def test_current_page_capture_injected_function_is_self_contained() -> None:
+    background = _read("browser-helper/background.js")
+    function_body = background.split("function captureCurrentJobPage", 1)[1].split(
+        "\nfunction inferCaptureSource",
+        1,
+    )[0]
+
+    assert "compactVisibleText(" not in function_body
+    assert "inferCaptureSource(" not in function_body
+    assert "looksLikeJobPage(" not in function_body
+    assert "uniqueCaptureWarnings(" not in function_body
+    assert "CURRENT_PAGE_CAPTURE_VERSION" not in function_body
+    assert "CURRENT_PAGE_PREVIEW_LENGTH" not in function_body
+    assert "captureVersion" in function_body
+    assert "previewLength" in function_body
+
+
 def test_browser_helper_side_panel_exposes_required_states_and_settings() -> None:
     html = _read("browser-helper/sidepanel.html")
     script = _read("browser-helper/sidepanel.js")
@@ -45,6 +81,9 @@ def test_browser_helper_side_panel_exposes_required_states_and_settings() -> Non
     assert "Analyze current job" in html
     assert "chrome.storage.local" in script
     assert "chrome.runtime.sendMessage" in script
+    assert "chrome.permissions.request" in script
+    assert "chrome.permissions.remove" in script
+    assert "https://www.zhipin.com/*" in script
     assert "Capturing the current page" in script
     assert "Analysis complete" in script
     assert "errorType" in script

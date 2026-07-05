@@ -16,6 +16,7 @@ from app.repositories.resume_document_repository import (
 from app.schemas.resume_document import ResumeDocument
 from app.schemas.resume_intake import ResumeIntakeResponse
 from app.services.errors import JobAgentError
+from app.storage.database import LOCAL_USER_ID
 
 MAX_RESUME_TEXT_LENGTH = 100_000
 MAX_RESUME_FILE_SIZE_BYTES = 1_000_000
@@ -26,15 +27,17 @@ def submit_resume_text(
     session_id: str,
     text: str,
     *,
+    user_id: str | None = None,
     session_repository: ProfileSessionRepository = profile_session_repository,
     resume_repository: ResumeDocumentRepository = resume_document_repository,
 ) -> ResumeIntakeResponse:
-    session = get_profile_session(session_id, repository=session_repository)
+    session = get_profile_session(session_id, repository=session_repository, user_id=user_id)
     _validate_resume_text(text)
     document = resume_repository.create(
         session_id=session.session_id,
         source_type="text",
         text=text,
+        user_id=user_id or LOCAL_USER_ID,
     )
     updated_session = session_repository.attach_resume_document(
         session_id=session.session_id,
@@ -50,10 +53,11 @@ async def submit_resume_file(
     session_id: str,
     upload_file: UploadFile,
     *,
+    user_id: str | None = None,
     session_repository: ProfileSessionRepository = profile_session_repository,
     resume_repository: ResumeDocumentRepository = resume_document_repository,
 ) -> ResumeIntakeResponse:
-    session = get_profile_session(session_id, repository=session_repository)
+    session = get_profile_session(session_id, repository=session_repository, user_id=user_id)
     filename = upload_file.filename or ""
     file_extension = Path(filename).suffix.lower()
     if file_extension not in SUPPORTED_RESUME_FILE_TYPES:
@@ -93,6 +97,7 @@ async def submit_resume_file(
         filename=filename,
         file_type=SUPPORTED_RESUME_FILE_TYPES[file_extension],
         text=text,
+        user_id=user_id or LOCAL_USER_ID,
     )
     updated_session = session_repository.attach_resume_document(
         session_id=session.session_id,
@@ -107,17 +112,18 @@ async def submit_resume_file(
 def get_resume_document(
     session_id: str,
     *,
+    user_id: str | None = None,
     session_repository: ProfileSessionRepository = profile_session_repository,
     resume_repository: ResumeDocumentRepository = resume_document_repository,
 ) -> ResumeDocument:
-    session = get_profile_session(session_id, repository=session_repository)
+    session = get_profile_session(session_id, repository=session_repository, user_id=user_id)
     if session.resume_document_id is None:
         raise JobAgentError(
             message="Resume document not found for this session.",
             error_code="resume_document_not_found",
             status_code=404,
         )
-    document = resume_repository.get(session.resume_document_id)
+    document = resume_repository.get(session.resume_document_id, user_id=user_id)
     if document is None:
         raise JobAgentError(
             message="Resume document not found for this session.",

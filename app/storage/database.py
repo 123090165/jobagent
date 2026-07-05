@@ -5,6 +5,8 @@ import sqlite3
 from pathlib import Path
 
 DEFAULT_DATABASE_PATH = Path("data/jobagent.sqlite3")
+LOCAL_USER_ID = "local-user"
+LOCAL_USERNAME = "local"
 
 
 def get_database_path() -> Path:
@@ -23,6 +25,35 @@ def get_connection(database_path: str | Path | None = None) -> sqlite3.Connectio
 def init_database(connection: sqlite3.Connection) -> None:
     connection.executescript(
         """
+        CREATE TABLE IF NOT EXISTS schema_migrations (
+            version INTEGER PRIMARY KEY,
+            name TEXT NOT NULL,
+            applied_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE TABLE IF NOT EXISTS users (
+            user_id TEXT PRIMARY KEY,
+            username TEXT NOT NULL UNIQUE,
+            password_hash TEXT NOT NULL,
+            password_salt TEXT NOT NULL,
+            password_algorithm TEXT NOT NULL,
+            display_name TEXT,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            disabled_at TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS auth_sessions (
+            auth_session_id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            token_hash TEXT NOT NULL UNIQUE,
+            created_at TEXT NOT NULL,
+            expires_at TEXT NOT NULL,
+            revoked_at TEXT,
+            user_agent TEXT,
+            FOREIGN KEY (user_id) REFERENCES users(user_id)
+        );
+
         CREATE TABLE IF NOT EXISTS resume_records (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             raw_text TEXT NOT NULL,
@@ -140,6 +171,7 @@ def init_database(connection: sqlite3.Connection) -> None:
 
         CREATE TABLE IF NOT EXISTS profile_sessions (
             session_id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL DEFAULT 'local-user',
             status TEXT NOT NULL,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL,
@@ -147,12 +179,14 @@ def init_database(connection: sqlite3.Connection) -> None:
             parsed_review_id TEXT,
             profile_draft_id TEXT,
             confirmed_profile_id TEXT,
-            current_step TEXT NOT NULL
+            current_step TEXT NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users(user_id)
         );
 
         CREATE TABLE IF NOT EXISTS resume_documents (
             resume_document_id TEXT PRIMARY KEY,
             session_id TEXT NOT NULL,
+            user_id TEXT NOT NULL DEFAULT 'local-user',
             source_type TEXT NOT NULL,
             filename TEXT,
             file_type TEXT,
@@ -160,6 +194,7 @@ def init_database(connection: sqlite3.Connection) -> None:
             text_length INTEGER NOT NULL,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users(user_id),
             FOREIGN KEY (session_id) REFERENCES profile_sessions(session_id)
         );
 
@@ -167,6 +202,7 @@ def init_database(connection: sqlite3.Connection) -> None:
             parsed_review_id TEXT PRIMARY KEY,
             session_id TEXT NOT NULL,
             resume_document_id TEXT NOT NULL,
+            user_id TEXT NOT NULL DEFAULT 'local-user',
             basic_info_json TEXT NOT NULL,
             education_json TEXT NOT NULL,
             work_experience_json TEXT NOT NULL,
@@ -181,6 +217,7 @@ def init_database(connection: sqlite3.Connection) -> None:
             analysis_warnings_json TEXT NOT NULL DEFAULT '[]',
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users(user_id),
             FOREIGN KEY (session_id) REFERENCES profile_sessions(session_id),
             FOREIGN KEY (resume_document_id) REFERENCES resume_documents(resume_document_id)
         );
@@ -189,6 +226,7 @@ def init_database(connection: sqlite3.Connection) -> None:
             profile_draft_id TEXT PRIMARY KEY,
             session_id TEXT NOT NULL,
             parsed_review_id TEXT NOT NULL,
+            user_id TEXT NOT NULL DEFAULT 'local-user',
             summary TEXT NOT NULL,
             target_roles_json TEXT NOT NULL,
             target_directions_json TEXT NOT NULL,
@@ -202,6 +240,7 @@ def init_database(connection: sqlite3.Connection) -> None:
             missing_info_questions_json TEXT NOT NULL,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users(user_id),
             FOREIGN KEY (session_id) REFERENCES profile_sessions(session_id),
             FOREIGN KEY (parsed_review_id) REFERENCES parsed_resume_reviews(parsed_review_id)
         );
@@ -212,6 +251,7 @@ def init_database(connection: sqlite3.Connection) -> None:
             resume_document_id TEXT NOT NULL,
             parsed_review_id TEXT NOT NULL,
             profile_draft_id TEXT NOT NULL,
+            user_id TEXT NOT NULL DEFAULT 'local-user',
             summary TEXT NOT NULL,
             target_roles_json TEXT NOT NULL,
             target_directions_json TEXT NOT NULL,
@@ -225,16 +265,46 @@ def init_database(connection: sqlite3.Connection) -> None:
             missing_info_questions_json TEXT NOT NULL,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users(user_id),
             FOREIGN KEY (session_id) REFERENCES profile_sessions(session_id),
             FOREIGN KEY (resume_document_id) REFERENCES resume_documents(resume_document_id),
             FOREIGN KEY (parsed_review_id) REFERENCES parsed_resume_reviews(parsed_review_id),
             FOREIGN KEY (profile_draft_id) REFERENCES profile_drafts(profile_draft_id)
         );
 
+        CREATE TABLE IF NOT EXISTS resume_profiles (
+            resume_profile_id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            source_session_id TEXT,
+            source_confirmed_profile_id TEXT,
+            name TEXT NOT NULL,
+            summary TEXT NOT NULL,
+            target_roles_json TEXT NOT NULL,
+            target_directions_json TEXT NOT NULL,
+            core_skills_json TEXT NOT NULL,
+            supporting_skills_json TEXT NOT NULL,
+            search_keywords_json TEXT NOT NULL,
+            preferred_locations_json TEXT NOT NULL,
+            work_arrangements_json TEXT NOT NULL,
+            strengths_json TEXT NOT NULL,
+            risks_json TEXT NOT NULL,
+            profile_json TEXT NOT NULL,
+            raw_resume_text TEXT,
+            is_default INTEGER NOT NULL DEFAULT 0,
+            archived_at TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users(user_id),
+            FOREIGN KEY (source_session_id) REFERENCES profile_sessions(session_id),
+            FOREIGN KEY (source_confirmed_profile_id)
+                REFERENCES confirmed_profiles(confirmed_profile_id)
+        );
+
         CREATE TABLE IF NOT EXISTS job_search_runs (
             job_search_run_id TEXT PRIMARY KEY,
             session_id TEXT NOT NULL,
             confirmed_profile_id TEXT NOT NULL,
+            user_id TEXT NOT NULL DEFAULT 'local-user',
             query TEXT NOT NULL,
             locations_json TEXT NOT NULL,
             target_roles_json TEXT NOT NULL,
@@ -247,6 +317,7 @@ def init_database(connection: sqlite3.Connection) -> None:
             results_json TEXT NOT NULL,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users(user_id),
             FOREIGN KEY (session_id) REFERENCES profile_sessions(session_id),
             FOREIGN KEY (confirmed_profile_id) REFERENCES confirmed_profiles(confirmed_profile_id)
         );
@@ -270,8 +341,56 @@ def init_database(connection: sqlite3.Connection) -> None:
             updated_at TEXT NOT NULL,
             FOREIGN KEY (job_search_run_id) REFERENCES job_search_runs(job_search_run_id)
         );
+
+        CREATE TABLE IF NOT EXISTS saved_jobs (
+            saved_job_id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            source_provider TEXT,
+            source_url TEXT,
+            normalized_source_key TEXT,
+            title TEXT NOT NULL,
+            company TEXT,
+            location TEXT,
+            salary TEXT,
+            employment_type TEXT,
+            raw_jd_text TEXT NOT NULL,
+            structured_jd_json TEXT NOT NULL,
+            tags_json TEXT NOT NULL DEFAULT '[]',
+            status TEXT NOT NULL DEFAULT 'saved',
+            notes TEXT,
+            first_seen_at TEXT NOT NULL,
+            saved_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            archived_at TEXT,
+            FOREIGN KEY (user_id) REFERENCES users(user_id)
+        );
+
+        CREATE TABLE IF NOT EXISTS saved_job_analyses (
+            saved_job_analysis_id TEXT PRIMARY KEY,
+            saved_job_id TEXT NOT NULL,
+            user_id TEXT NOT NULL,
+            resume_profile_id TEXT,
+            source_job_search_run_id TEXT,
+            source_job_result_id TEXT,
+            match_score INTEGER,
+            confidence_label TEXT,
+            recommendation TEXT,
+            matched_strengths_json TEXT NOT NULL DEFAULT '[]',
+            critical_gaps_json TEXT NOT NULL DEFAULT '[]',
+            resume_actions_json TEXT NOT NULL DEFAULT '[]',
+            interview_questions_json TEXT NOT NULL DEFAULT '[]',
+            analysis_json TEXT NOT NULL,
+            analysis_mode TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY (saved_job_id) REFERENCES saved_jobs(saved_job_id),
+            FOREIGN KEY (user_id) REFERENCES users(user_id),
+            FOREIGN KEY (resume_profile_id) REFERENCES resume_profiles(resume_profile_id),
+            FOREIGN KEY (source_job_search_run_id)
+                REFERENCES job_search_runs(job_search_run_id)
+        );
         """
     )
+    _ensure_local_user(connection)
     _ensure_column(connection, "analysis_records", "application_id", "INTEGER")
     _ensure_column(connection, "application_records", "resume_version_id", "INTEGER")
     _ensure_column(connection, "workflow_step_traces", "workflow_run_id", "TEXT")
@@ -284,6 +403,15 @@ def init_database(connection: sqlite3.Connection) -> None:
     _ensure_column(connection, "parsed_resume_reviews", "analysis_mode", "TEXT DEFAULT 'deterministic'")
     _ensure_column(connection, "parsed_resume_reviews", "analysis_provider", "TEXT")
     _ensure_column(connection, "parsed_resume_reviews", "analysis_warnings_json", "TEXT DEFAULT '[]'")
+    _ensure_user_columns(connection)
+    _backfill_user_ownership(connection)
+    _ensure_indexes(connection)
+    connection.execute(
+        """
+        INSERT OR IGNORE INTO schema_migrations (version, name)
+        VALUES (1, 'auth_and_user_libraries')
+        """
+    )
     connection.commit()
 
 
@@ -299,3 +427,97 @@ def _ensure_column(
     }
     if column_name not in columns:
         connection.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_definition}")
+
+
+def _ensure_local_user(connection: sqlite3.Connection) -> None:
+    connection.execute(
+        """
+        INSERT OR IGNORE INTO users (
+            user_id,
+            username,
+            password_hash,
+            password_salt,
+            password_algorithm,
+            display_name,
+            created_at,
+            updated_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """,
+        (
+            LOCAL_USER_ID,
+            LOCAL_USERNAME,
+            "local-placeholder",
+            "local-placeholder",
+            "local-placeholder",
+            "Local User",
+        ),
+    )
+
+
+def _ensure_user_columns(connection: sqlite3.Connection) -> None:
+    for table_name in [
+        "profile_sessions",
+        "resume_documents",
+        "parsed_resume_reviews",
+        "profile_drafts",
+        "confirmed_profiles",
+        "job_search_runs",
+    ]:
+        _ensure_column(
+            connection,
+            table_name,
+            "user_id",
+            f"TEXT DEFAULT '{LOCAL_USER_ID}'",
+        )
+
+
+def _backfill_user_ownership(connection: sqlite3.Connection) -> None:
+    for table_name in [
+        "profile_sessions",
+        "resume_documents",
+        "parsed_resume_reviews",
+        "profile_drafts",
+        "confirmed_profiles",
+        "job_search_runs",
+    ]:
+        connection.execute(
+            f"""
+            UPDATE {table_name}
+            SET user_id = ?
+            WHERE user_id IS NULL OR TRIM(user_id) = ''
+            """,
+            (LOCAL_USER_ID,),
+        )
+
+
+def _ensure_indexes(connection: sqlite3.Connection) -> None:
+    connection.executescript(
+        """
+        CREATE INDEX IF NOT EXISTS idx_auth_sessions_user_id
+            ON auth_sessions(user_id);
+        CREATE INDEX IF NOT EXISTS idx_auth_sessions_token_hash
+            ON auth_sessions(token_hash);
+        CREATE INDEX IF NOT EXISTS idx_profile_sessions_user_id
+            ON profile_sessions(user_id);
+        CREATE INDEX IF NOT EXISTS idx_confirmed_profiles_user_id
+            ON confirmed_profiles(user_id);
+        CREATE INDEX IF NOT EXISTS idx_job_search_runs_user_id
+            ON job_search_runs(user_id);
+        CREATE INDEX IF NOT EXISTS idx_resume_profiles_user_id
+            ON resume_profiles(user_id, archived_at, updated_at);
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_resume_profiles_one_default
+            ON resume_profiles(user_id)
+            WHERE is_default = 1 AND archived_at IS NULL;
+        CREATE INDEX IF NOT EXISTS idx_saved_jobs_user_id
+            ON saved_jobs(user_id, archived_at, updated_at);
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_saved_jobs_user_source_url
+            ON saved_jobs(user_id, source_url)
+            WHERE source_url IS NOT NULL;
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_saved_jobs_user_source_key
+            ON saved_jobs(user_id, normalized_source_key)
+            WHERE normalized_source_key IS NOT NULL;
+        CREATE INDEX IF NOT EXISTS idx_saved_job_analyses_saved_job_id
+            ON saved_job_analyses(saved_job_id, created_at);
+        """
+    )

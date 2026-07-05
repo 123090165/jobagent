@@ -7,13 +7,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.config.env_loader import load_local_env
+from app.api.v1.auth import router as auth_v1_router
 from app.api.v1.browser_job_captures import router as browser_job_captures_v1_router
 from app.api.v1.confirmed_profiles import router as confirmed_profiles_v1_router
 from app.api.v1.job_search_providers import router as job_search_providers_v1_router
 from app.api.v1.job_search_runs import router as job_search_runs_v1_router
 from app.api.v1.llm import router as llm_v1_router
 from app.api.v1.profile_drafts import router as profile_drafts_v1_router
+from app.api.v1.resume_profiles import router as resume_profiles_v1_router
 from app.api.v1.profile_sessions import router as profile_sessions_v1_router
+from app.api.v1.saved_jobs import router as saved_jobs_v1_router
 from app.schemas.api import HealthResponse
 from app.services.errors import JobAgentError
 
@@ -71,6 +74,9 @@ def create_app() -> FastAPI:
         )
 
     api.include_router(profile_sessions_v1_router)
+    api.include_router(auth_v1_router)
+    api.include_router(resume_profiles_v1_router)
+    api.include_router(saved_jobs_v1_router)
     api.include_router(profile_drafts_v1_router)
     api.include_router(confirmed_profiles_v1_router)
     api.include_router(job_search_runs_v1_router)

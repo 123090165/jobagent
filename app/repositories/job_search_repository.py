@@ -10,7 +10,7 @@ from app.schemas.job_search import (
     JobSearchTraceStep,
 )
 from app.services.job_search_providers import selected_sources_from_provider_name
-from app.storage.database import get_connection, init_database
+from app.storage.database import LOCAL_USER_ID, get_connection, init_database
 
 
 def _utc_now() -> datetime:
@@ -28,10 +28,12 @@ class JobSearchRepository:
         target_roles: list[str],
         keywords: list[str],
         results: list[JobSearchResult],
+        user_id: str = LOCAL_USER_ID,
     ) -> JobSearchRun:
         return self._create_run(
             session_id=session_id,
             confirmed_profile_id=confirmed_profile_id,
+            user_id=user_id,
             query=query,
             locations=locations,
             target_roles=target_roles,
@@ -56,10 +58,12 @@ class JobSearchRepository:
         search_mode: str,
         llm_enabled: bool,
         search_provider: str | None,
+        user_id: str = LOCAL_USER_ID,
     ) -> JobSearchRun:
         return self._create_run(
             session_id=session_id,
             confirmed_profile_id=confirmed_profile_id,
+            user_id=user_id,
             query=query,
             locations=locations,
             target_roles=target_roles,
@@ -104,11 +108,16 @@ class JobSearchRepository:
     def fail_run(self, run_id: str, error_message: str) -> JobSearchRun | None:
         return self._update_run_state(run_id, status="failed", error_message=error_message)
 
-    def get(self, job_search_run_id: str) -> JobSearchRun | None:
+    def get(self, job_search_run_id: str, *, user_id: str | None = None) -> JobSearchRun | None:
         with get_connection() as connection:
             init_database(connection)
+            where_clause = "WHERE job_search_run_id = ?"
+            parameters: tuple[str, ...] = (job_search_run_id,)
+            if user_id is not None:
+                where_clause += " AND user_id = ?"
+                parameters = (job_search_run_id, user_id)
             row = connection.execute(
-                """
+                f"""
                 SELECT
                     job_search_run_id,
                     session_id,
@@ -126,19 +135,29 @@ class JobSearchRepository:
                     created_at,
                     updated_at
                 FROM job_search_runs
-                WHERE job_search_run_id = ?
+                {where_clause}
                 """,
-                (job_search_run_id,),
+                parameters,
             ).fetchone()
         if row is None:
             return None
         return self._row_to_job_search_run(row)
 
-    def list_recent_by_session(self, session_id: str) -> list[JobSearchRun]:
+    def list_recent_by_session(
+        self,
+        session_id: str,
+        *,
+        user_id: str | None = None,
+    ) -> list[JobSearchRun]:
         with get_connection() as connection:
             init_database(connection)
+            where_clause = "WHERE session_id = ?"
+            parameters: tuple[str, ...] = (session_id,)
+            if user_id is not None:
+                where_clause += " AND user_id = ?"
+                parameters = (session_id, user_id)
             rows = connection.execute(
-                """
+                f"""
                 SELECT
                     job_search_run_id,
                     session_id,
@@ -156,10 +175,10 @@ class JobSearchRepository:
                     created_at,
                     updated_at
                 FROM job_search_runs
-                WHERE session_id = ?
+                {where_clause}
                 ORDER BY updated_at DESC, created_at DESC
                 """,
-                (session_id,),
+                parameters,
             ).fetchall()
         return [self._row_to_job_search_run(row) for row in rows]
 
@@ -391,6 +410,7 @@ class JobSearchRepository:
         *,
         session_id: str,
         confirmed_profile_id: str,
+        user_id: str,
         query: str,
         locations: list[str],
         target_roles: list[str],
@@ -429,6 +449,7 @@ class JobSearchRepository:
                     job_search_run_id,
                     session_id,
                     confirmed_profile_id,
+                    user_id,
                     query,
                     locations_json,
                     target_roles_json,
@@ -442,12 +463,13 @@ class JobSearchRepository:
                     created_at,
                     updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     run.job_search_run_id,
                     run.session_id,
                     run.confirmed_profile_id,
+                    user_id,
                     run.query,
                     json.dumps(run.locations),
                     json.dumps(run.target_roles),

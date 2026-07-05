@@ -1,14 +1,15 @@
 {
   "manifest_version": 3,
   "name": "JobAgent Browser Helper",
-  "version": "0.3.0",
-  "description": "Browser-assisted BOSS job candidate collection and current-page job capture for JobAgent.",
-  "permissions": ["tabs", "activeTab", "cookies", "scripting", "storage", "sidePanel"],
+  "version": "0.3.1",
+  "description": "User-triggered current-page job capture for JobAgent.",
+  "permissions": ["tabs", "activeTab", "scripting", "storage", "sidePanel"],
   "host_permissions": [
-    "*://*.zhipin.com/*",
-    "*://zhipin.com/*",
     "http://127.0.0.1:8000/*",
     "http://localhost:8000/*"
+  ],
+  "optional_host_permissions": [
+    "https://www.zhipin.com/*"
   ],
   "action": {
     "default_title": "JobAgent"

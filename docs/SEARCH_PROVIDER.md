@@ -102,23 +102,12 @@ The backend encodes the selected sources into the stored run provider name, for
 example `multi_source:cuhksz_career,linkedin,remoteok`, and each returned
 candidate keeps its own `source_provider`.
 
-When BOSS is selected, the frontend first asks the Browser Helper to collect
-BOSS candidates in the user's local browser session. It then calls
-`POST /api/v1/job-search-runs/browser-helper` with:
-
-```json
-{
-  "platforms": ["boss"],
-  "selected_sources": ["cuhksz_career"],
-  "candidates": ["...standardized BOSS candidates..."]
-}
-```
-
-The backend composes a hybrid provider from the BOSS payload plus any selected
-backend-native sources. A stored provider key such as
-`browser_helper:boss,cuhksz_career` means BOSS came from the extension while
-CUHKSZ was still searched by the backend. The result page displays both selected
-sources and actual result source counts so this is visible after the run.
+BOSS is no longer collected from Search Preview by automated browser search.
+When BOSS is selected there, the UI only guides the user to the manual Side
+Panel capture flow. If backend-native sources such as CUHKSZ are also selected,
+Search Preview runs those sources only. BOSS detail pages are analyzed through
+`POST /api/v1/browser/job-captures/analyze` after the user opens a detail page
+and clicks `Analyze current job` in the extension.
 
 `GET /api/v1/job-search-providers/status` reports provider availability,
 configured provider name, search URL, allowlisted domains, source kind, and
@@ -127,9 +116,8 @@ detail strategy.
 ## Frontend Source Rules
 
 Source labels and provider-key parsing live in
-`web/src/services/jobSearchSources.ts`. BOSS query localization and empty-result
-diagnostics live in `web/src/services/bossSearchPlanning.ts`. Keep these rules
-out of page components so Search Preview and Job Search results stay consistent.
+`web/src/services/jobSearchSources.ts`. Keep these rules out of page components
+so Search Preview and Job Search results stay consistent.
 
 ## Mock Provider
 
@@ -218,7 +206,7 @@ source URLs, then falls back to title/company/location when no URL exists.
 The canonical URL rule is deliberately provider-wide:
 
 - common URLs drop query strings and fragments;
-- BOSS/Zhipin keeps only stable `/job_detail/<id>.html`;
+- BOSS/Zhipin keeps only stable `/job_detail/<id>` with an optional `.html`;
 - CUHKSZ keeps only `/job/view/id/<id>`;
 - LinkedIn keeps `/jobs/view/<id>` and also maps search URLs with
   `currentJobId=<id>` to the same key.
@@ -292,26 +280,26 @@ It also supports the frontend multi-source shape:
 
 The local `slate-helper/` extension is kept as a reference implementation for
 browser-assisted providers. JobAgent's active extension is `browser-helper/`.
-It is currently scoped to BOSS:
+Its BOSS path is currently manual current-page capture only:
 
-- user opens the platform login page in their own browser;
-- the extension checks BOSS cookies and verifies the live session with a hidden
-  probe page;
-- search tries the BOSS job-list JSON endpoint with browser credentials first;
-- if the worker fetch cannot parse candidates, the helper opens one temporary
-  background BOSS tab for page-context API fetch and DOM fallback;
+- the user opens BOSS and navigates to a specific job detail page manually;
+- the extension captures only after the user clicks `Analyze current job`;
+- BOSS pages must match `/job_detail/...`, with or without a `.html` suffix;
+- the helper stops on BOSS login, verification, blank, search, or home pages;
+- the extension does not read BOSS cookies, does not open hidden BOSS tabs,
+  does not poll BOSS pages, and does not fetch BOSS APIs;
+- `https://www.zhipin.com/*` is an optional host permission requested only when
+  the user clicks `Analyze current job`, then removed after the attempt;
 - the backend receives standardized job candidates only, never platform cookies.
 
-This is appropriate for sites such as BOSS where plain backend HTTP requests can
-fail because of login, CORS, anti-bot checks, or SSR behavior. It should be
-treated as a `browser_helper` provider family, not as a replacement for public
-direct providers such as CUHKSZ Career or RemoteOK.
+This should be treated as a `browser_helper` current-page capture path, not as
+a replacement for public direct providers such as CUHKSZ Career or RemoteOK.
 
 Current implementation status:
 
 - `browser-helper/` can be loaded as a Chrome/Edge unpacked extension;
-- Search Preview can detect the helper, check BOSS login state, open the BOSS
-  login page, and ask the helper to collect BOSS search results;
+- Search Preview can detect the helper and optionally open BOSS in a foreground
+  tab, but automated BOSS search and login probing are disabled;
 - backend endpoint `POST /api/v1/job-search-runs/browser-helper` accepts
   standardized helper candidates and runs them through the existing ranking
   pipeline;
@@ -319,9 +307,8 @@ Current implementation status:
   a user click and call `POST /api/v1/browser/job-captures/analyze`;
 - browser job capture is normalized into the same `browser_helper` candidate
   path before JD analysis and profile matching;
-- BOSS can be combined with backend-native sources in the same run;
-- the first real collector target is BOSS (`zhipin.com`); other platforms are
-  intentionally hidden until this path is stable.
+- BOSS current-page capture is handled separately from backend-native source
+  runs.
 
 Current-page capture data flow:
 

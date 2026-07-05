@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 WEB_SRC = Path("web/src")
@@ -129,23 +130,22 @@ def test_search_preview_page_separates_recall_queries_from_ranking_signals() -> 
 def test_search_preview_page_exposes_browser_helper_probe() -> None:
     search_preview = _read("pages/SearchPreviewPage.vue")
     helper_service = _read("services/browserHelper.ts")
-    boss_planning = _read("services/bossSearchPlanning.ts")
     source_service = _read("services/jobSearchSources.ts")
 
     assert "Browser Helper" in search_preview
     assert "Check Helper" in search_preview
-    assert "Check BOSS Login" in search_preview
-    assert "Open BOSS Login" in search_preview
+    assert "Check BOSS Login" not in search_preview
+    assert "Open BOSS" in search_preview
     assert "Start Job Search" in search_preview
     assert "pingBrowserHelper" in search_preview
-    assert "checkBossLoginStatus" in search_preview
-    assert "startBossLoginAutoRefresh" in search_preview
-    assert "stopBossLoginAutoRefresh" in search_preview
-    assert "BOSS login verified by a live page probe" in search_preview
-    assert "fetchBossCandidates" in search_preview
+    assert "checkBossLoginStatus" not in search_preview
+    assert "startBossLoginAutoRefresh" not in search_preview
+    assert "stopBossLoginAutoRefresh" not in search_preview
+    assert "BOSS login verified by a live page probe" not in search_preview
+    assert "fetchBossCandidates" not in search_preview
     assert "startBrowserHelperJobSearch" in search_preview
-    assert "buildBossSearchQueries" in search_preview
-    assert "formatBossEmptyResultMessage" in search_preview
+    assert "Manual current-page capture only" in search_preview
+    assert "automatic BOSS search is disabled" in search_preview
     assert "legacySelectedSearchSources" in search_preview
     assert "normalizeProviderSearchSources" in search_preview
     assert "formatSearchSources" in search_preview
@@ -153,14 +153,7 @@ def test_search_preview_page_exposes_browser_helper_probe() -> None:
     assert "formatProviderName" in source_service
     assert "formatSourceName" in source_service
     assert "normalizeProviderSearchSources" in source_service
-    assert "BOSS_ENGLISH_QUERY_REWRITES" in boss_planning
-    assert "BOSS_MAX_SEARCH_QUERY_ATTEMPTS = 6" in boss_planning
-    assert "BOSS Queries" in search_preview
-    assert "formatBossEmptyResultMessage" in boss_planning
-    assert "tabKeptOpen" in boss_planning
-    assert "DOM signals" in boss_planning
-    assert "Tried BOSS queries" in boss_planning
-    assert "API diagnostics" in boss_planning
+    assert "BOSS Queries" not in search_preview
     assert "providerSourcesForRun(profileSessionStore.jobSearchPreview)" in search_preview
     assert "backendProviderSourceLabel" in search_preview
     assert "Backend Sources" in search_preview
@@ -169,41 +162,24 @@ def test_search_preview_page_exposes_browser_helper_probe() -> None:
     assert "preview?.selected_sources" in search_preview
     assert "!profileSessionStore.isJobSearchPreviewLoading" in search_preview
     assert "__jobagentHelper" in helper_service
-    assert "BOSS_SEARCH_RESPONSE_TIMEOUT_MS = 90000" in helper_service
-    assert "const helperQuery = queries[0] ?? query" in helper_service
-    assert "BOSS helper search timed out" in helper_service
+    assert "BOSS automated search and login probing are disabled" in helper_service
     assert "BossSearchDiagnostics" in helper_service
     assert "attemptedQueries" in helper_service
     assert "searchAttempts" in helper_service
-    assert "checkBossLogin" in helper_service
-    assert "searchBoss" in helper_service
     assert "cookieLoggedIn" in helper_service
     assert "sessionVerified" in helper_service
 
 
-def test_browser_helper_boss_search_waits_for_real_page_signals() -> None:
+def test_browser_helper_boss_automation_is_disabled() -> None:
     helper_background = Path("browser-helper/background.js").read_text(encoding="utf-8")
+    manifest = json.loads(Path("browser-helper/manifest.json").read_text(encoding="utf-8"))
 
-    assert '"https://www.zhipin.com/web/geek/jobs"' in helper_background
-    assert 'new URL(BOSS_SEARCH_API_PATH, BOSS_HOME_URL)' in helper_background
-    assert '"/wapi/zpgeek/search/joblist.json"' in helper_background
-    assert "normalizeBossSearchQueries" in helper_background
-    assert "BOSS_MAX_QUERY_ATTEMPTS = 6" in helper_background
-    assert "BOSS_ENGLISH_QUERY_REWRITES" in helper_background
-    assert "fetchBossJobsFromWorkerApi" in helper_background
-    assert 'world: "MAIN"' in helper_background
-    assert "fetchBossJobListFromPage" in helper_background
-    assert "searchBossJobsInTab" in helper_background
-    assert "waitForBossPageSignals" in helper_background
-    assert "BOSS_PAGE_TEXT_MARKERS" in helper_background
-    assert "probeBossLoginSession" in helper_background
-    assert "interpretBossLoginProbe" in helper_background
-    assert "BOSS_LOGIN_PROBE_QUERY" in helper_background
-    assert "cookieLoggedIn" in helper_background
-    assert "sessionVerified" in helper_background
-    assert "active: false" in helper_background
-    assert "let shouldCloseTab = true" in helper_background
-    assert "if (shouldCloseTab)" in helper_background
-    assert "BOSS fallback tab was closed because no valid job candidates were parsed." in helper_background
-    assert "validJobDetailLinkCount" in helper_background
-    assert "!/\\/job_detail\\/[^/?#]+/.test" in helper_background
+    assert "BOSS_AUTOMATION_DISABLED_MESSAGE" in helper_background
+    assert "BOSS automated search and live probes are disabled" in helper_background
+    assert 'capabilities: ["ping", "openBossLogin", "analyzeCurrentJob", "bossCurrentPageCapture"]' in helper_background
+    assert "BOSS current-page capture used DOM text only" in helper_background
+    assert "isBossJobDetailUrl" in helper_background
+    assert "capture_safety" in helper_background
+    assert "cookies" not in manifest["permissions"]
+    assert "*://*.zhipin.com/*" not in manifest.get("host_permissions", [])
+    assert "*://zhipin.com/*" not in manifest.get("host_permissions", [])

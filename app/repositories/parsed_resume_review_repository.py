@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from uuid import uuid4
 
 from app.schemas.parsed_resume_review import ParsedResumeReview
-from app.storage.database import get_connection, init_database
+from app.storage.database import LOCAL_USER_ID, get_connection, init_database
 
 
 def _utc_now() -> datetime:
@@ -27,6 +27,7 @@ class ParsedResumeReviewRepository:
         quality_warnings: list[str],
         missing_info_questions: list[str],
         raw_parser_output: dict | None,
+        user_id: str = LOCAL_USER_ID,
         analysis_mode: str = "deterministic",
         analysis_provider: str | None = None,
         analysis_warnings: list[str] | None = None,
@@ -59,6 +60,7 @@ class ParsedResumeReviewRepository:
                     parsed_review_id,
                     session_id,
                     resume_document_id,
+                    user_id,
                     basic_info_json,
                     education_json,
                     work_experience_json,
@@ -74,12 +76,13 @@ class ParsedResumeReviewRepository:
                     created_at,
                     updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     review.parsed_review_id,
                     review.session_id,
                     review.resume_document_id,
+                    user_id,
                     json.dumps(review.basic_info),
                     json.dumps(review.education),
                     json.dumps(review.work_experience),
@@ -99,11 +102,16 @@ class ParsedResumeReviewRepository:
             connection.commit()
         return review
 
-    def get(self, parsed_review_id: str) -> ParsedResumeReview | None:
+    def get(self, parsed_review_id: str, *, user_id: str | None = None) -> ParsedResumeReview | None:
         with get_connection() as connection:
             init_database(connection)
+            where_clause = "WHERE parsed_review_id = ?"
+            parameters: tuple[str, ...] = (parsed_review_id,)
+            if user_id is not None:
+                where_clause += " AND user_id = ?"
+                parameters = (parsed_review_id, user_id)
             row = connection.execute(
-                """
+                f"""
                 SELECT
                     parsed_review_id,
                     session_id,
@@ -123,9 +131,9 @@ class ParsedResumeReviewRepository:
                     created_at,
                     updated_at
                 FROM parsed_resume_reviews
-                WHERE parsed_review_id = ?
+                {where_clause}
                 """,
-                (parsed_review_id,),
+                parameters,
             ).fetchone()
         if row is None:
             return None
@@ -136,11 +144,17 @@ class ParsedResumeReviewRepository:
         *,
         session_id: str,
         resume_document_id: str,
+        user_id: str | None = None,
     ) -> ParsedResumeReview | None:
         with get_connection() as connection:
             init_database(connection)
+            where_clause = "WHERE session_id = ? AND resume_document_id = ?"
+            parameters: tuple[str, ...] = (session_id, resume_document_id)
+            if user_id is not None:
+                where_clause += " AND user_id = ?"
+                parameters = (session_id, resume_document_id, user_id)
             row = connection.execute(
-                """
+                f"""
                 SELECT
                     parsed_review_id,
                     session_id,
@@ -160,11 +174,11 @@ class ParsedResumeReviewRepository:
                     created_at,
                     updated_at
                 FROM parsed_resume_reviews
-                WHERE session_id = ? AND resume_document_id = ?
+                {where_clause}
                 ORDER BY updated_at DESC, created_at DESC
                 LIMIT 1
                 """,
-                (session_id, resume_document_id),
+                parameters,
             ).fetchone()
         if row is None:
             return None

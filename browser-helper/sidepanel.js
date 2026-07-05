@@ -37,7 +37,9 @@ async function analyzeCurrentJob() {
   clearResults();
   setBusy(true);
   setStatus("Capturing the current page...");
+  let temporaryOrigin = null;
   try {
+    temporaryOrigin = await ensureCurrentPagePermission();
     const response = await chrome.runtime.sendMessage({
       action: "analyzeCurrentJob",
       backendUrl: backendUrlInput.value.trim() || DEFAULT_BACKEND_URL,
@@ -52,8 +54,56 @@ async function analyzeCurrentJob() {
   } catch (error) {
     setStatus(`Extension request failed: ${String(error)}`, true);
   } finally {
+    if (temporaryOrigin) {
+      await revokeTemporaryPermission(temporaryOrigin);
+    }
     setBusy(false);
   }
+}
+
+async function ensureCurrentPagePermission() {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  const tabUrl = String(tab?.url || "");
+  const origin = optionalOriginForTabUrl(tabUrl);
+  if (!origin) {
+    return null;
+  }
+  const hasPermission = await chrome.permissions.contains({ origins: [origin] });
+  if (hasPermission) {
+    return origin;
+  }
+  const granted = await chrome.permissions.request({ origins: [origin] });
+  if (!granted) {
+    throw new Error("Permission to read the current BOSS job detail page was not granted.");
+  }
+  return origin;
+}
+
+async function revokeTemporaryPermission(origin) {
+  try {
+    await chrome.permissions.remove({ origins: [origin] });
+  } catch (_error) {
+    // Permission cleanup is best-effort; the next capture still requests explicitly.
+  }
+}
+
+function optionalOriginForTabUrl(value) {
+  let parsed = null;
+  try {
+    parsed = new URL(value);
+  } catch (_error) {
+    return null;
+  }
+  if (!isBossJobDetailUrl(parsed)) {
+    return null;
+  }
+  return "https://www.zhipin.com/*";
+}
+
+function isBossJobDetailUrl(url) {
+  return url.protocol === "https:" &&
+    url.hostname.toLowerCase() === "www.zhipin.com" &&
+    /^\/job_detail\/[^/?#]+(?:\.html)?\/?$/i.test(url.pathname);
 }
 
 function renderSuccess(response) {

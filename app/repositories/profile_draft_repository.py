@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from uuid import uuid4
 
 from app.schemas.profile_draft import ProfileDraft, UpdateProfileDraftRequest
-from app.storage.database import get_connection, init_database
+from app.storage.database import LOCAL_USER_ID, get_connection, init_database
 
 
 def _utc_now() -> datetime:
@@ -29,6 +29,7 @@ class ProfileDraftRepository:
         strengths: list[str],
         risks: list[str],
         missing_info_questions: list[str],
+        user_id: str = LOCAL_USER_ID,
     ) -> ProfileDraft:
         now = _utc_now()
         draft = ProfileDraft(
@@ -57,6 +58,7 @@ class ProfileDraftRepository:
                     profile_draft_id,
                     session_id,
                     parsed_review_id,
+                    user_id,
                     summary,
                     target_roles_json,
                     target_directions_json,
@@ -71,12 +73,13 @@ class ProfileDraftRepository:
                     created_at,
                     updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     draft.profile_draft_id,
                     draft.session_id,
                     draft.parsed_review_id,
+                    user_id,
                     draft.summary,
                     json.dumps(draft.target_roles),
                     json.dumps(draft.target_directions),
@@ -95,11 +98,16 @@ class ProfileDraftRepository:
             connection.commit()
         return draft
 
-    def get(self, profile_draft_id: str) -> ProfileDraft | None:
+    def get(self, profile_draft_id: str, *, user_id: str | None = None) -> ProfileDraft | None:
         with get_connection() as connection:
             init_database(connection)
+            where_clause = "WHERE profile_draft_id = ?"
+            parameters: tuple[str, ...] = (profile_draft_id,)
+            if user_id is not None:
+                where_clause += " AND user_id = ?"
+                parameters = (profile_draft_id, user_id)
             row = connection.execute(
-                """
+                f"""
                 SELECT
                     profile_draft_id,
                     session_id,
@@ -118,9 +126,9 @@ class ProfileDraftRepository:
                     created_at,
                     updated_at
                 FROM profile_drafts
-                WHERE profile_draft_id = ?
+                {where_clause}
                 """,
-                (profile_draft_id,),
+                parameters,
             ).fetchone()
         if row is None:
             return None
@@ -131,11 +139,17 @@ class ProfileDraftRepository:
         *,
         session_id: str,
         parsed_review_id: str,
+        user_id: str | None = None,
     ) -> ProfileDraft | None:
         with get_connection() as connection:
             init_database(connection)
+            where_clause = "WHERE session_id = ? AND parsed_review_id = ?"
+            parameters: tuple[str, ...] = (session_id, parsed_review_id)
+            if user_id is not None:
+                where_clause += " AND user_id = ?"
+                parameters = (session_id, parsed_review_id, user_id)
             row = connection.execute(
-                """
+                f"""
                 SELECT
                     profile_draft_id,
                     session_id,
@@ -154,11 +168,11 @@ class ProfileDraftRepository:
                     created_at,
                     updated_at
                 FROM profile_drafts
-                WHERE session_id = ? AND parsed_review_id = ?
+                {where_clause}
                 ORDER BY updated_at DESC, created_at DESC
                 LIMIT 1
                 """,
-                (session_id, parsed_review_id),
+                parameters,
             ).fetchone()
         if row is None:
             return None
@@ -168,8 +182,10 @@ class ProfileDraftRepository:
         self,
         profile_draft_id: str,
         payload: UpdateProfileDraftRequest,
+        *,
+        user_id: str | None = None,
     ) -> ProfileDraft | None:
-        existing = self.get(profile_draft_id)
+        existing = self.get(profile_draft_id, user_id=user_id)
         if existing is None:
             return None
 

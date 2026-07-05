@@ -42,7 +42,7 @@ resume truthfulness, search recall, candidate preservation, and ranking quality.
 | `tests/` | active | Backend, service, API, parser, provider, and frontend-helper regression tests. |
 | `docs/` | active but partly drifted | Product, API, architecture, cleanup, and planning docs. |
 | `experiments/` | experiment-only | Local DeepSeek resume extraction comparison, multidomain flow checks, and provider recall calibration; not production runtime. |
-| `browser-helper/` | browser extension | Chrome/Edge helper bridge for BOSS login-assisted job candidate payloads. |
+| `browser-helper/` | browser extension | Chrome/Edge helper for user-triggered current-page job capture. |
 | `data/` | local runtime data | SQLite database and local generated state. Should not be treated as source. |
 | `.ai/` | local/supporting | Local assistant or project-support metadata. Not part of the app runtime. |
 | `.github/` | repo support | GitHub configuration if present. |
