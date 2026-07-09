@@ -12,12 +12,18 @@ import {
   uniqueSourceKeys
 } from "../services/jobSearchSources";
 import { useProfileSessionStore } from "../stores/profileSession";
+import { useSavedJobsStore } from "../stores/savedJobs";
+import type { JobSearchResult } from "../types/profileSession";
 
 const route = useRoute();
 const router = useRouter();
 const profileSessionStore = useProfileSessionStore();
+const savedJobsStore = useSavedJobsStore();
 const runId = computed(() => String(route.params.runId ?? ""));
 const jobBriefHint = ref<string | null>(null);
+const savedJobMessage = ref<string | null>(null);
+const savingResultIds = ref<string[]>([]);
+const locallySavedResultIds = ref<string[]>([]);
 
 const isRunning = computed(() =>
   ["pending", "running"].includes(profileSessionStore.jobSearchRun?.status ?? "")
@@ -81,9 +87,26 @@ const resultSourceCounts = computed(() => {
 const resultSourceSummary = computed(() => {
   return resultSourceCounts.value.map((item) => `${item.label} ${item.count}`).join(", ") || "No results yet";
 });
+const savedSearchResultIds = computed(() => {
+  const ids = new Set<string>();
+  for (const job of savedJobsStore.jobs) {
+    const analysis = job.latest_analysis;
+    if (
+      analysis?.source_job_search_run_id === runId.value &&
+      analysis.source_job_result_id
+    ) {
+      ids.add(analysis.source_job_result_id);
+    }
+  }
+  for (const resultId of locallySavedResultIds.value) {
+    ids.add(resultId);
+  }
+  return ids;
+});
 
 onMounted(async () => {
   jobBriefHint.value = null;
+  savedJobMessage.value = null;
   try {
     const run = await profileSessionStore.loadJobSearchRun(runId.value);
     if (!profileSessionStore.jobSearchSteps.length) {
@@ -94,6 +117,12 @@ onMounted(async () => {
     }
   } catch {
     // Error state is rendered from the store.
+  }
+
+  try {
+    await savedJobsStore.loadJobs(false);
+  } catch {
+    // Saved job loading should not block viewing the run.
   }
 });
 
@@ -121,6 +150,40 @@ function goBackToSearchPreview() {
 
 function showJobBriefHint() {
   jobBriefHint.value = "Job Brief is postponed until search recall and ranking are reliable.";
+}
+
+function isResultSaving(resultId: string) {
+  return savingResultIds.value.includes(resultId);
+}
+
+function isResultSaved(resultId: string) {
+  return savedSearchResultIds.value.has(resultId);
+}
+
+async function saveSearchResult(result: JobSearchResult) {
+  const run = profileSessionStore.jobSearchRun;
+  if (!run || isResultSaving(result.job_result_id) || isResultSaved(result.job_result_id)) {
+    return;
+  }
+
+  savedJobMessage.value = null;
+  savingResultIds.value = [...savingResultIds.value, result.job_result_id];
+  try {
+    await savedJobsStore.saveFromSearchResult({
+      job_search_run_id: run.job_search_run_id,
+      job_result_id: result.job_result_id,
+      tags: ["search-result"],
+      status: "saved"
+    });
+    if (!locallySavedResultIds.value.includes(result.job_result_id)) {
+      locallySavedResultIds.value = [...locallySavedResultIds.value, result.job_result_id];
+    }
+    savedJobMessage.value = `${result.title} saved to job library.`;
+  } catch {
+    savedJobMessage.value = savedJobsStore.error ?? "Failed to save this result.";
+  } finally {
+    savingResultIds.value = savingResultIds.value.filter((id) => id !== result.job_result_id);
+  }
 }
 
 function statusTagType(status: string) {
@@ -264,6 +327,7 @@ function formatTraceDetail(value: unknown) {
       </n-card>
 
       <p v-if="jobBriefHint" class="flow-meta">{{ jobBriefHint }}</p>
+      <p v-if="savedJobMessage" class="flow-meta">{{ savedJobMessage }}</p>
 
       <div
         v-if="profileSessionStore.jobSearchRun.status === 'failed'"
@@ -356,9 +420,20 @@ function formatTraceDetail(value: unknown) {
 
           <div class="job-card-footer">
             <span>{{ result.recommended_action }}</span>
-            <n-button tertiary size="small" @click="showJobBriefHint">
-              Generate Job Brief
-            </n-button>
+            <div class="flow-toolbar-secondary">
+              <n-button
+                size="small"
+                type="primary"
+                :loading="isResultSaving(result.job_result_id)"
+                :disabled="isResultSaved(result.job_result_id)"
+                @click="saveSearchResult(result)"
+              >
+                {{ isResultSaved(result.job_result_id) ? "Saved" : "Save Job" }}
+              </n-button>
+              <n-button tertiary size="small" @click="showJobBriefHint">
+                Generate Job Brief
+              </n-button>
+            </div>
           </div>
         </n-card>
       </div>

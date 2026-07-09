@@ -1,11 +1,15 @@
 import { createRouter, createWebHistory } from "vue-router";
+import { useAuthStore } from "../stores/auth";
 import { useProfileSessionStore } from "../stores/profileSession";
 
 import HomePage from "../pages/HomePage.vue";
 import JobSearchPage from "../pages/JobSearchPage.vue";
+import LoginPage from "../pages/LoginPage.vue";
 import ProfileConfirmedPage from "../pages/ProfileConfirmedPage.vue";
 import ProfileDraftPage from "../pages/ProfileDraftPage.vue";
 import ProfileReviewPage from "../pages/ProfileReviewPage.vue";
+import ResumeProfilesPage from "../pages/ResumeProfilesPage.vue";
+import SavedJobsPage from "../pages/SavedJobsPage.vue";
 import SearchPreviewPage from "../pages/SearchPreviewPage.vue";
 
 async function requireSessionStep(sessionId: string, allowedSteps: string[]) {
@@ -24,7 +28,23 @@ async function requireSessionStep(sessionId: string, allowedSteps: string[]) {
 const router = createRouter({
   history: createWebHistory(),
   routes: [
+    {
+      path: "/login",
+      name: "login",
+      component: LoginPage,
+      meta: { public: true }
+    },
     { path: "/", name: "home", component: HomePage },
+    {
+      path: "/resume-profiles",
+      name: "resume-profiles",
+      component: ResumeProfilesPage
+    },
+    {
+      path: "/saved-jobs",
+      name: "saved-jobs",
+      component: SavedJobsPage
+    },
     {
       path: "/profile/:sessionId/review",
       name: "profile-review",
@@ -72,6 +92,27 @@ const router = createRouter({
       component: JobSearchPage
     }
   ]
+});
+
+router.beforeEach(async (to) => {
+  const authStore = useAuthStore();
+  await authStore.bootstrap();
+
+  if (to.meta.public) {
+    if (to.name === "login" && authStore.isAuthenticated) {
+      return { name: "home" };
+    }
+    return true;
+  }
+
+  if (!authStore.isAuthenticated) {
+    return {
+      name: "login",
+      query: { redirect: to.fullPath }
+    };
+  }
+
+  return true;
 });
 
 export default router;
