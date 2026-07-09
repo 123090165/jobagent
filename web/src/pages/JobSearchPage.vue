@@ -87,6 +87,23 @@ const resultSourceCounts = computed(() => {
 const resultSourceSummary = computed(() => {
   return resultSourceCounts.value.map((item) => `${item.label} ${item.count}`).join(", ") || "No results yet";
 });
+const llmProviderFromTrace = computed(() => {
+  const planningStep = profileSessionStore.jobSearchSteps.find((step) => step.name === "Search planning");
+  const provider = planningStep?.details.llm_provider;
+  return typeof provider === "string" && provider.length > 0 ? provider : null;
+});
+const llmAnalysisLabel = computed(() => {
+  const run = profileSessionStore.jobSearchRun;
+  if (!run || run.search_mode === "local_mock") {
+    return "Deterministic local demo";
+  }
+  if (!run.llm_enabled) {
+    return "Deterministic";
+  }
+  return llmProviderFromTrace.value
+    ? `LLM enabled - ${llmProviderFromTrace.value}`
+    : "LLM enabled";
+});
 const savedSearchResultIds = computed(() => {
   const ids = new Set<string>();
   for (const job of savedJobsStore.jobs) {
@@ -278,16 +295,8 @@ function formatTraceDetail(value: unknown) {
           {{ profileSessionStore.jobSearchRun.locations.join(", ") || "Not set" }}
         </p>
         <p>
-          <strong>LLM Provider:</strong>
-          {{
-            profileSessionStore.jobSearchRun.search_mode === "local_mock"
-              ? "Local demo"
-              : profileSessionStore.jobSearchRun.search_mode === "browser_helper"
-                ? "Browser helper"
-              : profileSessionStore.jobSearchRun.llm_enabled
-                ? "DeepSeek API"
-                : "Local Ollama"
-          }}
+          <strong>Analysis:</strong>
+          {{ llmAnalysisLabel }}
         </p>
         <p v-if="profileSessionStore.jobSearchRun.error_message">
           <strong>Error:</strong> {{ profileSessionStore.jobSearchRun.error_message }}

@@ -211,6 +211,7 @@ export interface JobSearchPreview {
   search_provider: string | null;
   llm_enabled: boolean;
   llm_provider: string | null;
+  analysis_mode: "deterministic" | "llm";
   query: string;
   locations: string[];
   target_roles: string[];
@@ -268,12 +269,16 @@ export interface JobSearchProviderStatus {
   detail_strategy: string;
 }
 
+export type LlmProviderName = "deepseek" | "ollama" | "mock";
+
 export interface CreateJobSearchRunPayload {
   session_id: string;
   query?: string | null;
   search_mode?: "local_mock" | "live_search";
   search_provider?: "mock" | "cuhksz_career" | "linkedin" | "remoteok" | "serper_web" | "browser_helper" | "multi_source";
   selected_sources?: Array<"cuhksz_career" | "linkedin" | "remoteok">;
+  analysis_mode?: "deterministic" | "llm";
+  llm_provider?: LlmProviderName | null;
   use_llm?: boolean;
   locations?: string[];
   target_roles?: string[];
@@ -301,6 +306,8 @@ export interface CreateBrowserHelperJobSearchPayload {
   helper_version?: string | null;
   platforms?: string[];
   selected_sources?: Array<"cuhksz_career" | "linkedin" | "remoteok">;
+  analysis_mode?: "deterministic" | "llm";
+  llm_provider?: LlmProviderName | null;
   use_llm?: boolean;
   locations?: string[];
   target_roles?: string[];

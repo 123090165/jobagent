@@ -8,7 +8,7 @@ from app.services.llm_service import LLMConfig, LLMService, LLMServiceError
 
 
 LLMProviderName = Literal["mock", "ollama", "deepseek"]
-DEFAULT_LLM_PROVIDER: LLMProviderName = "ollama"
+DEFAULT_LLM_PROVIDER: LLMProviderName = "deepseek"
 DEFAULT_OLLAMA_MODEL = "qwen2.5:1.5b"
 DEFAULT_DEEPSEEK_MODEL = "deepseek-v4-flash"
 DEFAULT_DEEPSEEK_BASE_URL = "https://api.deepseek.com"

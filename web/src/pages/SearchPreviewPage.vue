@@ -7,6 +7,7 @@ import {
   NCheckbox,
   NCheckboxGroup,
   NInputNumber,
+  NSelect,
   NSwitch,
   NTag
 } from "naive-ui";
@@ -38,7 +39,12 @@ import {
   useProfileSessionStore,
   type JobSearchPreviewControls
 } from "../stores/profileSession";
-import type { CreateJobSearchRunPayload, JobSearchPreview, JobSearchRun } from "../types/profileSession";
+import type {
+  CreateJobSearchRunPayload,
+  JobSearchPreview,
+  JobSearchRun,
+  LlmProviderName
+} from "../types/profileSession";
 
 const route = useRoute();
 const router = useRouter();
@@ -47,7 +53,8 @@ const sessionId = computed(() => String(route.params.sessionId ?? ""));
 const selectedProviderSearchSources = ref<ProviderSearchSource[]>(["cuhksz_career"]);
 const isBossSourceSelected = ref(false);
 const useLocalDemo = ref(false);
-const useLlm = ref(false);
+const useLlmAnalysis = ref(true);
+const selectedLlmProvider = ref<LlmProviderName>("deepseek");
 const maxResults = ref<number | null>(10);
 const browserHelperStatus = ref<BrowserHelperStatus | null>(null);
 const bossLoginStatus = ref<BossLoginStatus | null>(null);
@@ -57,9 +64,18 @@ const isBossSearching = ref(false);
 const isRestoringPreviewControls = ref(false);
 const browserHelperMessage = ref<string | null>(null);
 let bossLoginRefreshTimer: number | null = null;
-const selectedLlmProvider = computed(() => (useLlm.value ? "deepseek" : "ollama"));
+const llmProviderOptions = [
+  { label: "DeepSeek", value: "deepseek" },
+  { label: "Ollama", value: "ollama" }
+];
 const canStartSearch = computed(() => useLocalDemo.value || selectedSearchSources.value.length > 0);
 const effectiveMaxResults = computed(() => maxResults.value ?? 10);
+const effectiveAnalysisMode = computed(() =>
+  useLocalDemo.value || !useLlmAnalysis.value ? "deterministic" : "llm"
+);
+const effectiveLlmProvider = computed<LlmProviderName | null>(() =>
+  effectiveAnalysisMode.value === "llm" ? selectedLlmProvider.value : null
+);
 const selectedSearchSources = computed<SearchSource[]>(() => [
   ...selectedProviderSearchSources.value,
   ...(isBossSourceSelected.value ? (["boss"] as const) : [])
@@ -116,6 +132,9 @@ const latestResultRun = computed<JobSearchRun | null>(() => {
 const canSeeResult = computed(() => latestResultRun.value !== null);
 
 const llmStatusLabel = computed(() => {
+  if (effectiveAnalysisMode.value === "deterministic") {
+    return "LLM analysis disabled.";
+  }
   if (profileSessionStore.isLlmStatusLoading) {
     return "Checking LLM provider...";
   }
@@ -214,7 +233,9 @@ function buildPayload(): CreateJobSearchRunPayload {
         ? "browser_helper"
         : "multi_source",
     selected_sources: useLocalDemo.value ? [] : selectedProviderSources,
-    use_llm: useLocalDemo.value ? false : useLlm.value,
+    analysis_mode: effectiveAnalysisMode.value,
+    llm_provider: effectiveLlmProvider.value,
+    use_llm: effectiveLlmProvider.value === "deepseek",
     max_results: effectiveMaxResults.value
   };
 }
@@ -225,7 +246,9 @@ function saveCurrentPreviewControls(): void {
     selectedProviderSearchSources: normalizeProviderSearchSources(selectedProviderSearchSources.value),
     isBossSourceSelected: isBossSourceSelected.value,
     useLocalDemo: useLocalDemo.value,
-    useLlm: useLocalDemo.value ? false : useLlm.value,
+    useLlm: effectiveLlmProvider.value === "deepseek",
+    useLlmAnalysis: useLocalDemo.value ? false : useLlmAnalysis.value,
+    llmProvider: selectedLlmProvider.value,
     maxResults: maxResults.value
   };
   profileSessionStore.saveJobSearchPreviewControls(controls);
@@ -246,7 +269,10 @@ async function restorePreviewControls(): Promise<boolean> {
       controls.isBossSourceSelected || legacySources.includes("boss")
     );
     useLocalDemo.value = controls.useLocalDemo;
-    useLlm.value = controls.useLocalDemo ? false : controls.useLlm;
+    useLlmAnalysis.value = controls.useLocalDemo
+      ? false
+      : controls.useLlmAnalysis ?? true;
+    selectedLlmProvider.value = controls.llmProvider ?? (controls.useLlm ? "deepseek" : "ollama");
     maxResults.value = controls.maxResults;
     await nextTick();
     return true;
@@ -264,7 +290,9 @@ function canReuseStoredPreview(): boolean {
   return (
     preview.search_mode === payload.search_mode &&
     preview.search_provider === expectedStoredPreviewProvider(payload) &&
-    preview.llm_enabled === Boolean(payload.use_llm) &&
+    preview.analysis_mode === payload.analysis_mode &&
+    preview.llm_enabled === (payload.analysis_mode === "llm") &&
+    preview.llm_provider === (payload.analysis_mode === "llm" ? payload.llm_provider : null) &&
     sameProviderSearchSources(
       normalizeProviderSearchSources(preview.selected_sources ?? []),
       payload.selected_sources ?? []
@@ -315,7 +343,7 @@ onMounted(async () => {
       await profileSessionStore.loadConfirmedProfile(session.confirmed_profile_id);
     }
     await profileSessionStore.loadJobSearchRuns(sessionId.value);
-    await profileSessionStore.loadLlmStatus(useLlm.value);
+    await profileSessionStore.loadLlmStatus(selectedLlmProvider.value);
     await profileSessionStore.loadJobSearchProviderStatus(providerStatusTarget.value);
     if (!restoredPreviewControls || !canReuseStoredPreview()) {
       await refreshPreview();
@@ -350,7 +378,7 @@ watch(useLocalDemo, async (value) => {
     return;
   }
   if (value) {
-    useLlm.value = false;
+    useLlmAnalysis.value = false;
   }
   saveCurrentPreviewControls();
   try {
@@ -361,7 +389,20 @@ watch(useLocalDemo, async (value) => {
   }
 });
 
-watch(useLlm, async (value) => {
+watch(useLlmAnalysis, async () => {
+  if (isRestoringPreviewControls.value) {
+    return;
+  }
+  saveCurrentPreviewControls();
+  try {
+    await profileSessionStore.loadLlmStatus(selectedLlmProvider.value);
+    await refreshPreview();
+  } catch {
+    // Error state is rendered from the store.
+  }
+});
+
+watch(selectedLlmProvider, async (value) => {
   if (isRestoringPreviewControls.value) {
     return;
   }
@@ -498,7 +539,9 @@ async function startBrowserHelperJobSearch() {
       helper_version: result.version,
       platforms: ["boss"],
       selected_sources: selectedProviderSources,
-      use_llm: useLlm.value,
+      analysis_mode: effectiveAnalysisMode.value,
+      llm_provider: effectiveLlmProvider.value,
+      use_llm: effectiveLlmProvider.value === "deepseek",
       locations: preview.locations,
       target_roles: preview.target_roles,
       keywords: preview.keywords,
@@ -649,8 +692,19 @@ function seeResult() {
           </div>
 
           <div class="job-search-setup-row">
-            <span class="job-search-setup-label">Use DeepSeek API for analysis</span>
-            <n-switch v-model:value="useLlm" :disabled="useLocalDemo" />
+            <span class="job-search-setup-label">LLM Analysis</span>
+            <n-switch v-model:value="useLlmAnalysis" :disabled="useLocalDemo" />
+          </div>
+
+          <div class="job-search-setup-row">
+            <span class="job-search-setup-label">LLM Provider</span>
+            <n-select
+              v-model:value="selectedLlmProvider"
+              :options="llmProviderOptions"
+              :disabled="useLocalDemo || !useLlmAnalysis"
+              size="small"
+              class="job-search-provider-select"
+            />
           </div>
 
           <div class="job-search-setup-row">
@@ -686,7 +740,7 @@ function seeResult() {
               >
                 {{ profileSessionStore.llmStatus?.configured ? "Configured" : "Fallback Ready" }}
               </n-tag>
-              <span>{{ selectedLlmProvider }} / {{ llmStatusLabel }}</span>
+              <span>{{ effectiveAnalysisMode === "llm" ? selectedLlmProvider : "deterministic" }} / {{ llmStatusLabel }}</span>
             </div>
           </div>
 

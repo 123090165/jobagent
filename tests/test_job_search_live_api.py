@@ -127,10 +127,11 @@ def test_live_search_create_returns_running_or_completed(monkeypatch, tmp_path) 
     confirmed = _create_session_with_confirmed_profile(tmp_path, monkeypatch, "job-search-live-create.sqlite3")
     monkeypatch.setenv("JOBAGENT_JOB_SEARCH_PROVIDER", "mock")
     monkeypatch.setattr(
-        "app.application.job_search_usecases.resolve_llm_provider_for_switch",
-        lambda *, use_deepseek: SimpleNamespace(
-            provider="deepseek" if use_deepseek else "ollama",
+        "app.application.job_search_usecases.resolve_llm_provider",
+        lambda provider=None: SimpleNamespace(
+            provider=provider or "deepseek",
             service=FakeJSONLLM(),
+            configured=True,
         ),
     )
 
@@ -232,4 +233,4 @@ def test_live_run_steps_endpoint_returns_trace(monkeypatch, tmp_path) -> None:
     assert items[1]["details"]["query_count"] >= 1
     assert "source_stats" in items[1]["details"]
     assert "logical_provider_call_count" in items[1]["details"]
-    assert run_response.job_search_run.llm_enabled is False
+    assert run_response.job_search_run.llm_enabled is True

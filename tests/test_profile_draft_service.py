@@ -30,7 +30,7 @@ def test_create_profile_draft_builds_search_ready_profile() -> None:
     draft = _create("anker_ai_health_algorithm")
 
     assert draft.status == "draft"
-    assert draft.llm_provider == "ollama"
+    assert draft.llm_provider == "deepseek"
     assert draft.search_ready_profile.target_directions
     assert "PPG" in draft.search_ready_profile.search_keywords
     assert draft.source_profile_snapshot
@@ -101,7 +101,7 @@ def test_confirm_profile_draft_returns_payload() -> None:
     assert payload["confirmed_search_ready_profile"]["summary"]
     assert payload["source_profile_snapshot"]
     assert payload["missing_info_answers"] == {}
-    assert payload["llm_provider_metadata"]["provider"] == "ollama"
+    assert payload["llm_provider_metadata"]["provider"] == "deepseek"
     assert payload["save_payload_ready"] is True
 
 

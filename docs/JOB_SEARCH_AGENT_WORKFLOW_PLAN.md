@@ -17,6 +17,14 @@ and model-provider agnostic. DeepSeek can be the default runtime provider, but
 business logic should continue to call the internal LLM provider interface instead
 of importing or invoking DeepSeek directly.
 
+Search configuration should keep two decisions separate:
+
+- `analysis_mode` controls whether the workflow uses deterministic analysis or
+  LLM-assisted planning/filtering/JD analysis.
+- `llm_provider` controls which provider backs LLM-assisted analysis. DeepSeek is
+  the default runtime provider, while Ollama and mock remain behind the same
+  provider abstraction.
+
 ## Near-Term Work
 
 ### Parallel JD Analysis

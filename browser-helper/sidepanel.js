@@ -16,7 +16,7 @@ async function init() {
   const stored = await chrome.storage.local.get(STORAGE_KEYS);
   backendUrlInput.value = stored.backendUrl || DEFAULT_BACKEND_URL;
   sessionIdInput.value = stored.sessionId || "";
-  useLlmInput.checked = Boolean(stored.useLlm);
+  useLlmInput.checked = stored.useLlm !== false;
 
   analyzeButton.addEventListener("click", analyzeCurrentJob);
   backendUrlInput.addEventListener("change", saveSettings);
@@ -44,7 +44,9 @@ async function analyzeCurrentJob() {
       action: "analyzeCurrentJob",
       backendUrl: backendUrlInput.value.trim() || DEFAULT_BACKEND_URL,
       sessionId: sessionIdInput.value.trim(),
-      useLlm: useLlmInput.checked
+      useLlm: useLlmInput.checked,
+      analysisMode: useLlmInput.checked ? "llm" : "deterministic",
+      llmProvider: "deepseek"
     });
     if (!response?.ok) {
       renderFailure(response);

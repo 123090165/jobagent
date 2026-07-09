@@ -20,6 +20,16 @@ def disable_application_llm_network(monkeypatch: pytest.MonkeyPatch) -> None:
             service=NoNetworkJSONLLM(),
         )
 
+    def resolve_provider(provider: str | None = None) -> SimpleNamespace:
+        return SimpleNamespace(
+            provider=provider or "deepseek",
+            service=NoNetworkJSONLLM(),
+            configured=provider != "deepseek",
+            model=None,
+            base_url=None,
+            reason="Test LLM provider is disabled to avoid network calls.",
+        )
+
     monkeypatch.setattr(
         "app.application.resume_review_usecases.resolve_llm_provider_for_switch",
         resolve_for_switch,
@@ -27,4 +37,9 @@ def disable_application_llm_network(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         "app.application.job_search_usecases.resolve_llm_provider_for_switch",
         resolve_for_switch,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        "app.application.job_search_usecases.resolve_llm_provider",
+        resolve_provider,
     )

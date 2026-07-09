@@ -8,6 +8,7 @@ import type {
   JobSearchTraceStepListResponse,
   JobSearchRunListResponse,
   JobSearchRunResponse,
+  LlmProviderName,
   LlmStatus,
   ParsedResumeReview,
   ParsedResumeReviewResponse,
@@ -157,9 +158,9 @@ export async function previewJobSearchRun(
   return response.data;
 }
 
-export async function getLlmStatus(useDeepseek = false): Promise<LlmStatus> {
+export async function getLlmStatus(provider: LlmProviderName = "deepseek"): Promise<LlmStatus> {
   const response = await client.get<LlmStatus>("/api/v1/llm/status", {
-    params: { use_deepseek: useDeepseek }
+    params: { provider }
   });
   return response.data;
 }

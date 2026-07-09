@@ -17,8 +17,8 @@ build candidate profile first
 
 - Profile creation is now a step-by-step flow.
 - Global LLM task checkboxes are replaced by provider selection.
-- The default provider is local `ollama`.
-- `deepseek` is an optional cloud provider.
+- The default provider is `deepseek`.
+- Local `ollama` remains selectable through the provider abstraction.
 - `mock` remains internal fallback only and is not shown as a primary user choice.
 
 ## Flow

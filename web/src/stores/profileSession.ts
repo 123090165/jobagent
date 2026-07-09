@@ -31,6 +31,7 @@ import type {
   JobSearchRun,
   JobSearchTraceStep,
   LlmStatus,
+  LlmProviderName,
   ParsedResumeReview,
   ProfileDraft,
   ProfileSession,
@@ -75,7 +76,9 @@ export interface JobSearchPreviewControls {
   selectedProviderSearchSources: ProviderSearchSource[];
   isBossSourceSelected: boolean;
   useLocalDemo: boolean;
-  useLlm: boolean;
+  useLlm?: boolean;
+  useLlmAnalysis: boolean;
+  llmProvider: LlmProviderName;
   maxResults: number | null;
 }
 
@@ -355,11 +358,11 @@ export const useProfileSessionStore = defineStore("profileSession", {
         this.isConfirmedLoading = false;
       }
     },
-    async loadLlmStatus(useDeepseek = false): Promise<LlmStatus> {
+    async loadLlmStatus(provider: LlmProviderName = "deepseek"): Promise<LlmStatus> {
       this.isLlmStatusLoading = true;
       this.error = null;
       try {
-        this.llmStatus = await getLlmStatus(useDeepseek);
+        this.llmStatus = await getLlmStatus(provider);
         return this.llmStatus;
       } catch (error) {
         this.llmStatus = null;

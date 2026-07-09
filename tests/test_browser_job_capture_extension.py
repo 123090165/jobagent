@@ -34,6 +34,8 @@ def test_browser_helper_background_supports_user_triggered_current_page_capture(
     assert "captureCurrentJobPage" in background
     assert "document.body?.innerText" in background
     assert "/api/v1/browser/job-captures/analyze" in background
+    assert "capture.analysis_mode = requestedAnalysisMode" in background
+    assert "capture.llm_provider = requestedLlmProvider" in background
     assert "CURRENT_PAGE_MIN_TEXT_LENGTH = 80" in background
     assert "Generic visible-text extractor was used" in background
     assert "chrome.sidePanel.setPanelBehavior" in background
@@ -83,6 +85,9 @@ def test_browser_helper_side_panel_exposes_required_states_and_settings() -> Non
     assert "Analyze current job" in html
     assert "chrome.storage.local" in script
     assert "chrome.runtime.sendMessage" in script
+    assert 'analysisMode: useLlmInput.checked ? "llm" : "deterministic"' in script
+    assert 'llmProvider: "deepseek"' in script
+    assert "stored.useLlm !== false" in script
     assert "chrome.permissions.request" in script
     assert "chrome.permissions.remove" in script
     assert "https://www.zhipin.com/*" in script

@@ -18,8 +18,8 @@ def test_normalize_llm_provider_accepts_supported_values() -> None:
     assert normalize_llm_provider("deepseek") == "deepseek"
 
 
-def test_default_provider_is_ollama() -> None:
-    assert DEFAULT_LLM_PROVIDER == "ollama"
+def test_default_provider_is_deepseek() -> None:
+    assert DEFAULT_LLM_PROVIDER == "deepseek"
 
 
 def test_resolve_mock_provider_returns_fake_marker() -> None:

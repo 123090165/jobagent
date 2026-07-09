@@ -105,15 +105,15 @@ onMounted(async () => {
     if (session.current_step === "resume_review" && session.parsed_review_id) {
       await profileSessionStore.loadParsedReview(sessionId.value);
     }
-    await profileSessionStore.loadLlmStatus(useLlmResumeAnalysis.value);
+    await profileSessionStore.loadLlmStatus(selectedLlmProvider.value);
   } catch {
     // Error state is rendered from the store.
   }
 });
 
-watch(useLlmResumeAnalysis, async (value) => {
+watch(useLlmResumeAnalysis, async () => {
   try {
-    await profileSessionStore.loadLlmStatus(value);
+    await profileSessionStore.loadLlmStatus(selectedLlmProvider.value);
   } catch {
     // Error state is rendered from the store.
   }

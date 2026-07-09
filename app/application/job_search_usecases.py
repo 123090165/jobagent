@@ -4,6 +4,7 @@ import os
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
+from typing import Literal
 from uuid import NAMESPACE_URL, uuid5
 
 from fastapi import BackgroundTasks
@@ -73,7 +74,13 @@ from app.services.job_search_providers.serper_web_provider import (
     configured_serper_search_sites,
 )
 from app.services.job_search_providers.remoteok_provider import REMOTEOK_API_URL
-from app.services.llm_provider import JSONChatLLM, resolve_llm_provider_for_switch
+from app.services.llm_provider import (
+    DEFAULT_LLM_PROVIDER,
+    JSONChatLLM,
+    LLMProviderName,
+    normalize_llm_provider,
+    resolve_llm_provider,
+)
 from app.storage.database import LOCAL_USER_ID
 
 TRACE_STEP_NAMES = [
@@ -106,6 +113,16 @@ MAX_JD_ANALYSIS_CONCURRENCY = 8
 
 def _uses_job_search_analysis(search_mode: str) -> bool:
     return search_mode in {"live_search", "browser_helper"}
+
+
+@dataclass(frozen=True)
+class JobSearchAnalysisConfig:
+    enabled: bool
+    provider: LLMProviderName | None = None
+
+    @property
+    def mode(self) -> Literal["deterministic", "llm"]:
+        return "llm" if self.enabled else "deterministic"
 
 
 @dataclass
@@ -230,6 +247,7 @@ def create_job_search_run(
         if job_search_provider is not None
         else _provider_name_from_selected_sources(payload, selected_sources)
     )
+    analysis_config = _resolve_job_search_analysis_config(payload)
     run = search_repository.create_pending(
         session_id=session.session_id,
         confirmed_profile_id=confirmed_profile.confirmed_profile_id,
@@ -238,7 +256,7 @@ def create_job_search_run(
         target_roles=target_roles,
         keywords=keywords,
         search_mode=payload.search_mode,
-        llm_enabled=payload.use_llm,
+        llm_enabled=analysis_config.enabled,
         search_provider=provider_name,
         user_id=user_id or LOCAL_USER_ID,
     )
@@ -255,6 +273,8 @@ def create_job_search_run(
             search_repository=search_repository,
             job_search_provider=job_search_provider,
             llm_service=llm_service,
+            analysis_mode=analysis_config.mode,
+            llm_provider=analysis_config.provider,
             max_results=payload.max_results,
         )
 
@@ -293,6 +313,7 @@ def create_browser_helper_job_search_run(
     )
     if selected_sources:
         provider = _compose_browser_helper_provider(provider, selected_sources)
+    analysis_config = _resolve_browser_helper_analysis_config(payload)
     run_response = create_job_search_run(
         JobSearchRunCreateRequest(
             session_id=payload.session_id,
@@ -300,6 +321,8 @@ def create_browser_helper_job_search_run(
             search_mode="browser_helper",
             search_provider=provider.provider_name,
             selected_sources=payload.selected_sources,
+            analysis_mode=analysis_config.mode,
+            llm_provider=analysis_config.provider,
             use_llm=payload.use_llm,
             locations=payload.locations,
             target_roles=payload.target_roles,
@@ -323,6 +346,8 @@ def create_browser_helper_job_search_run(
         search_repository=search_repository,
         job_search_provider=provider,
         llm_service=llm_service,
+        analysis_mode=analysis_config.mode,
+        llm_provider=analysis_config.provider,
         max_results=payload.max_results,
     )
 
@@ -343,6 +368,8 @@ def analyze_browser_job_capture(
             query=payload.title or payload.page_title,
             helper_version=payload.extractor_version,
             platforms=[payload.source],
+            analysis_mode=payload.analysis_mode,
+            llm_provider=payload.llm_provider,
             use_llm=payload.use_llm,
             max_results=1,
             candidates=[candidate],
@@ -426,6 +453,8 @@ def execute_job_search_run(
     search_repository: JobSearchRepository = job_search_repository,
     job_search_provider: JobSearchProvider | None = None,
     llm_service: JSONChatLLM | None = None,
+    analysis_mode: str | None = None,
+    llm_provider: str | None = None,
     max_results: int = 10,
 ) -> JobSearchRunResponse:
     run = search_repository.get(run_id)
@@ -445,9 +474,21 @@ def execute_job_search_run(
             status_code=404,
         )
 
-    llm_resolution = resolve_llm_provider_for_switch(use_deepseek=run.llm_enabled)
-    effective_llm_service = llm_service if llm_service is not None else llm_resolution.service
-    use_llm_analysis = _uses_job_search_analysis(run.search_mode)
+    use_llm_analysis = _resolve_execution_analysis_enabled(run, analysis_mode=analysis_mode)
+    requested_llm_provider = _resolve_execution_llm_provider(
+        analysis_enabled=use_llm_analysis,
+        llm_provider=llm_provider,
+    )
+    llm_resolution = (
+        resolve_llm_provider(requested_llm_provider)
+        if requested_llm_provider is not None
+        else None
+    )
+    effective_llm_service = (
+        llm_service
+        if llm_service is not None
+        else llm_resolution.service if llm_resolution is not None else None
+    )
     provider = job_search_provider or resolve_job_search_provider(run.search_provider)
     steps = _ensure_trace_steps(run_id, search_repository)
     session_repository.mark_job_search_running(session_id=run.session_id)
@@ -481,6 +522,9 @@ def execute_job_search_run(
                 "target_roles": search_plan.target_roles,
                 "locations": search_plan.locations,
                 "planning_mode": search_plan.mode,
+                "analysis_mode": "llm" if use_llm_analysis else "deterministic",
+                "llm_provider": requested_llm_provider,
+                "llm_configured": llm_resolution.configured if llm_resolution is not None else None,
             },
         )
 
@@ -537,6 +581,8 @@ def execute_job_search_run(
                 "selected_candidate_count": len(filtered.selected_candidates),
                 "selected_indexes": filtered.selected_indexes,
                 "llm_request_count": 1 if use_llm_analysis and raw_candidates else 0,
+                "analysis_mode": "llm" if use_llm_analysis else "deterministic",
+                "llm_provider": requested_llm_provider,
             },
         )
 
@@ -565,6 +611,7 @@ def execute_job_search_run(
                 "analysis_concurrency": analyses["concurrency"],
                 "fallback_count": analyses["fallback_count"],
                 "analysis_mode_counts": analyses["mode_counts"],
+                "llm_provider": requested_llm_provider,
             },
         )
 
@@ -712,11 +759,12 @@ def preview_job_search_run(
         )
 
     query, locations, target_roles, keywords = _resolve_search_inputs(payload, confirmed_profile)
-    use_llm_analysis = _uses_job_search_analysis(payload.search_mode)
-    llm_provider: str | None = None
+    analysis_config = _resolve_job_search_analysis_config(payload)
+    use_llm_analysis = analysis_config.enabled
+    llm_provider: str | None = analysis_config.provider
     effective_llm_service = llm_service
     if use_llm_analysis:
-        llm_resolution = resolve_llm_provider_for_switch(use_deepseek=payload.use_llm)
+        llm_resolution = resolve_llm_provider(llm_provider)
         llm_provider = llm_resolution.provider
         effective_llm_service = llm_service if llm_service is not None else llm_resolution.service
 
@@ -762,8 +810,9 @@ def preview_job_search_run(
         search_mode=payload.search_mode,
         search_provider=provider_name,
         selected_sources=selected_sources,
-        llm_enabled=payload.use_llm,
+        llm_enabled=use_llm_analysis,
         llm_provider=llm_provider,
+        analysis_mode=analysis_config.mode,
         query=query,
         locations=search_plan.locations,
         target_roles=search_plan.target_roles,
@@ -824,6 +873,70 @@ def _resolve_selected_sources(payload: JobSearchRunCreateRequest) -> list[str]:
     if provider_name == "multi_source":
         return ["cuhksz_career"]
     return []
+
+
+def _resolve_job_search_analysis_config(payload: JobSearchRunCreateRequest) -> JobSearchAnalysisConfig:
+    if not _uses_job_search_analysis(payload.search_mode):
+        return JobSearchAnalysisConfig(enabled=False)
+    if payload.analysis_mode == "deterministic":
+        return JobSearchAnalysisConfig(enabled=False)
+    return JobSearchAnalysisConfig(
+        enabled=True,
+        provider=_resolve_requested_llm_provider(
+            llm_provider=payload.llm_provider,
+            legacy_use_llm=payload.use_llm,
+        ),
+    )
+
+
+def _resolve_browser_helper_analysis_config(
+    payload: BrowserHelperJobSearchRunCreateRequest,
+) -> JobSearchAnalysisConfig:
+    if payload.analysis_mode == "deterministic":
+        return JobSearchAnalysisConfig(enabled=False)
+    return JobSearchAnalysisConfig(
+        enabled=True,
+        provider=_resolve_requested_llm_provider(
+            llm_provider=payload.llm_provider,
+            legacy_use_llm=payload.use_llm,
+        ),
+    )
+
+
+def _resolve_requested_llm_provider(
+    *,
+    llm_provider: str | None,
+    legacy_use_llm: bool | None,
+) -> LLMProviderName:
+    if llm_provider is not None:
+        return normalize_llm_provider(llm_provider)
+    if legacy_use_llm is not None:
+        return "deepseek" if legacy_use_llm else "ollama"
+    return DEFAULT_LLM_PROVIDER
+
+
+def _resolve_execution_analysis_enabled(
+    run: JobSearchRun,
+    *,
+    analysis_mode: str | None,
+) -> bool:
+    if not _uses_job_search_analysis(run.search_mode):
+        return False
+    if analysis_mode is not None:
+        return analysis_mode == "llm"
+    return run.llm_enabled
+
+
+def _resolve_execution_llm_provider(
+    *,
+    analysis_enabled: bool,
+    llm_provider: str | None,
+) -> LLMProviderName | None:
+    if not analysis_enabled:
+        return None
+    if llm_provider is not None:
+        return normalize_llm_provider(llm_provider)
+    return DEFAULT_LLM_PROVIDER
 
 
 def _provider_name_from_selected_sources(

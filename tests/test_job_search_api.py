@@ -147,6 +147,46 @@ def test_job_search_preview_returns_cuhksz_search_urls(monkeypatch, tmp_path) ->
     assert payload["ranking_signals"]
 
 
+def test_job_search_preview_separates_analysis_mode_from_provider(monkeypatch, tmp_path) -> None:
+    confirmed = _create_session_with_confirmed_profile(tmp_path, monkeypatch, "job-search-preview-llm-config.sqlite3")
+    session_id = confirmed["profile_session"]["session_id"]
+
+    deterministic_response = client.post(
+        "/api/v1/job-search-runs/preview",
+        json={
+            "session_id": session_id,
+            "search_mode": "live_search",
+            "search_provider": "cuhksz_career",
+            "analysis_mode": "deterministic",
+            "llm_provider": "deepseek",
+        },
+    )
+    llm_response = client.post(
+        "/api/v1/job-search-runs/preview",
+        json={
+            "session_id": session_id,
+            "search_mode": "live_search",
+            "search_provider": "cuhksz_career",
+            "analysis_mode": "llm",
+            "llm_provider": "deepseek",
+        },
+    )
+
+    assert deterministic_response.status_code == 200
+    deterministic_payload = deterministic_response.json()
+    assert deterministic_payload["analysis_mode"] == "deterministic"
+    assert deterministic_payload["llm_enabled"] is False
+    assert deterministic_payload["llm_provider"] is None
+    assert deterministic_payload["estimated_total_llm_requests"] == 0
+
+    assert llm_response.status_code == 200
+    llm_payload = llm_response.json()
+    assert llm_payload["analysis_mode"] == "llm"
+    assert llm_payload["llm_enabled"] is True
+    assert llm_payload["llm_provider"] == "deepseek"
+    assert llm_payload["estimated_total_llm_requests"] > 0
+
+
 def test_job_search_preview_returns_web_search_source_strategy(monkeypatch, tmp_path) -> None:
     monkeypatch.setenv("JOBAGENT_WEB_SEARCH_SITES", "career.example.com")
     confirmed = _create_session_with_confirmed_profile(tmp_path, monkeypatch, "job-search-preview-web.sqlite3")

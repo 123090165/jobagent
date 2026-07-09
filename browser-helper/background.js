@@ -235,7 +235,9 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         const result = await analyzeCurrentJobPage({
           backendUrl: message.backendUrl,
           sessionId: message.sessionId,
-          useLlm: message.useLlm
+          useLlm: message.useLlm,
+          analysisMode: message.analysisMode,
+          llmProvider: message.llmProvider
         });
         sendResponse({
           ok: true,
@@ -253,7 +255,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   return true;
 });
 
-async function analyzeCurrentJobPage({ backendUrl, sessionId, useLlm }) {
+async function analyzeCurrentJobPage({ backendUrl, sessionId, useLlm, analysisMode, llmProvider }) {
   const normalizedSessionId = String(sessionId || "").trim();
   if (!normalizedSessionId) {
     return {
@@ -338,7 +340,15 @@ async function analyzeCurrentJobPage({ backendUrl, sessionId, useLlm }) {
     };
   }
   capture.session_id = normalizedSessionId;
-  capture.use_llm = Boolean(useLlm);
+  const requestedAnalysisMode = analysisMode === "deterministic" || useLlm === false
+    ? "deterministic"
+    : "llm";
+  const requestedLlmProvider = requestedAnalysisMode === "llm"
+    ? String(llmProvider || "deepseek").trim().toLowerCase()
+    : null;
+  capture.analysis_mode = requestedAnalysisMode;
+  capture.llm_provider = requestedLlmProvider;
+  capture.use_llm = requestedAnalysisMode === "llm" && requestedLlmProvider === "deepseek";
   if (capture.jd_text.length < CURRENT_PAGE_MIN_TEXT_LENGTH) {
     return {
       ok: false,

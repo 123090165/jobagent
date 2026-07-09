@@ -7,10 +7,21 @@ from app.main import app
 client = TestClient(app)
 
 
-def test_llm_status_endpoint_reports_configuration_without_network(monkeypatch) -> None:
-    monkeypatch.setenv("OLLAMA_BASE_URL", "http://localhost:11434")
+def test_llm_status_endpoint_reports_default_deepseek_without_network(monkeypatch) -> None:
+    monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
 
     response = client.get("/api/v1/llm/status")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["provider"] == "deepseek"
+    assert payload["configured"] is False
+
+
+def test_llm_status_endpoint_accepts_provider_parameter(monkeypatch) -> None:
+    monkeypatch.setenv("OLLAMA_BASE_URL", "http://localhost:11434")
+
+    response = client.get("/api/v1/llm/status?provider=ollama")
 
     assert response.status_code == 200
     payload = response.json()

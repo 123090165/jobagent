@@ -468,6 +468,10 @@ h2 {
   color: var(--muted);
 }
 
+.job-search-provider-select {
+  max-width: 220px;
+}
+
 .review-layout,
 .draft-layout,
 .confirmed-layout,

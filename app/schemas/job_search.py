@@ -9,6 +9,8 @@ from pydantic import BaseModel, Field, field_validator
 from app.schemas.profile_session import ProfileSession
 
 JobSearchMode: TypeAlias = Literal["local_mock", "live_search", "browser_helper"]
+JobSearchRequestedAnalysisMode: TypeAlias = Literal["deterministic", "llm"]
+JobSearchLlmProvider: TypeAlias = Literal["mock", "ollama", "deepseek"]
 JobSearchRunStatus: TypeAlias = Literal["pending", "running", "completed", "failed"]
 JobSearchStepStatus: TypeAlias = Literal["pending", "running", "completed", "failed"]
 JobSearchStepMode: TypeAlias = Literal["deterministic", "llm", "provider", "fallback", "mock"]
@@ -114,7 +116,9 @@ class JobSearchRunCreateRequest(BaseModel):
     search_mode: JobSearchMode = "live_search"
     search_provider: str | None = None
     selected_sources: list[JobSearchSelectedSource] = Field(default_factory=list)
-    use_llm: bool = False
+    analysis_mode: JobSearchRequestedAnalysisMode | None = None
+    llm_provider: JobSearchLlmProvider | None = None
+    use_llm: bool | None = None
     locations: list[str] = Field(default_factory=list)
     target_roles: list[str] = Field(default_factory=list)
     keywords: list[str] = Field(default_factory=list)
@@ -141,7 +145,9 @@ class BrowserHelperJobSearchRunCreateRequest(BaseModel):
     helper_version: str | None = None
     platforms: list[str] = Field(default_factory=list)
     selected_sources: list[JobSearchSelectedSource] = Field(default_factory=list)
-    use_llm: bool = False
+    analysis_mode: JobSearchRequestedAnalysisMode | None = None
+    llm_provider: JobSearchLlmProvider | None = None
+    use_llm: bool | None = None
     locations: list[str] = Field(default_factory=list)
     target_roles: list[str] = Field(default_factory=list)
     keywords: list[str] = Field(default_factory=list)
@@ -163,7 +169,9 @@ class BrowserJobCaptureRequest(BaseModel):
     captured_at: datetime
     extractor_version: str
     warnings: list[str] = Field(default_factory=list)
-    use_llm: bool = False
+    analysis_mode: JobSearchRequestedAnalysisMode | None = None
+    llm_provider: JobSearchLlmProvider | None = None
+    use_llm: bool | None = None
 
     @field_validator("session_id", "source_url", "page_title", "extractor_version")
     @classmethod
@@ -274,6 +282,7 @@ class JobSearchPreviewResponse(BaseModel):
     selected_sources: list[str] = Field(default_factory=list)
     llm_enabled: bool = False
     llm_provider: str | None = None
+    analysis_mode: JobSearchRequestedAnalysisMode = "deterministic"
     query: str
     locations: list[str] = Field(default_factory=list)
     target_roles: list[str] = Field(default_factory=list)

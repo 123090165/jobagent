@@ -76,7 +76,7 @@ Live public API surface used by the Vue frontend.
 | `confirmed_profiles.py` | live | Load a persisted confirmed profile. |
 | `job_search_runs.py` | live | Preview search, create a run, fetch run status, fetch trace steps. |
 | `job_search_providers.py` | live | Provider status endpoint for mock, native job-board/API, search-engine, and multi-source providers. |
-| `llm.py` | live | LLM status endpoint; off means local Ollama, on means DeepSeek API. |
+| `llm.py` | live | LLM status endpoint for explicit providers such as DeepSeek, Ollama, and mock. |
 
 ### `app/application/`
 
@@ -161,7 +161,7 @@ current Vue `/api/v1` flow and should be treated carefully before deletion.
 
 | File/Path | Status | Purpose |
 | --- | --- | --- |
-| `llm_provider.py` | live | Resolves provider for the frontend switch: local Ollama when off, DeepSeek API when on. |
+| `llm_provider.py` | live | Resolves provider-agnostic LLM services; DeepSeek is the current default while Ollama remains selectable. |
 | `llm_service.py` | live | OpenAI-compatible JSON chat completion service. |
 | `config/env_loader.py` | live | Loads local env files, including the DeepSeek local env workflow. |
 | `prompts/loader.py` | live | Safe UTF-8 prompt loading from `app/prompts`. |
