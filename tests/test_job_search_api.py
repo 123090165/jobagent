@@ -35,6 +35,12 @@ def _create_session_with_confirmed_profile(
     return confirmed
 
 
+def _get_run_payload(run_id: str) -> dict:
+    response = client.get(f"/api/v1/job-search-runs/{run_id}")
+    assert response.status_code == 200
+    return response.json()
+
+
 def test_job_search_requires_existing_session(monkeypatch, tmp_path) -> None:
     monkeypatch.setenv("JOBAGENT_DB_PATH", str(tmp_path / "job-search-missing-session.sqlite3"))
 
@@ -248,13 +254,17 @@ def test_browser_helper_job_search_accepts_payload_candidates(monkeypatch, tmp_p
     assert response.status_code == 200
     payload = response.json()
     run = payload["job_search_run"]
-    assert run["status"] == "completed"
+    assert run["status"] == "running"
     assert run["search_mode"] == "browser_helper"
     assert run["search_provider"] == "browser_helper:demo"
+    assert run["results"] == []
+    completed_payload = _get_run_payload(run["job_search_run_id"])
+    run = completed_payload["job_search_run"]
+    assert run["status"] == "completed"
     assert run["results"]
     assert run["results"][0]["source_provider"] == "browser_helper_demo"
     assert run["results"][0]["source_url"] == "https://jobs.example.com/browser-helper/backend"
-    provider_step = next(step for step in payload["steps"] if step["name"] == "Provider search")
+    provider_step = next(step for step in completed_payload["steps"] if step["name"] == "Provider search")
     assert provider_step["details"]["source_candidate_counts"]["browser_helper_demo"] == 1
 
 
@@ -322,13 +332,18 @@ def test_browser_helper_job_search_combines_selected_sources(monkeypatch, tmp_pa
     assert response.status_code == 200
     payload = response.json()
     run = payload["job_search_run"]
+    assert run["status"] == "running"
     assert run["search_provider"] == "browser_helper:boss,cuhksz_career,remoteok"
     assert run["selected_sources"] == ["cuhksz_career", "remoteok"]
+    assert run["results"] == []
+    completed_payload = _get_run_payload(run["job_search_run_id"])
+    run = completed_payload["job_search_run"]
+    assert run["status"] == "completed"
     source_providers = {item["source_provider"] for item in run["results"]}
     assert "boss_zhipin" in source_providers
     assert "cuhksz_career" in source_providers
     assert "remoteok" in source_providers
-    provider_step = next(step for step in payload["steps"] if step["name"] == "Provider search")
+    provider_step = next(step for step in completed_payload["steps"] if step["name"] == "Provider search")
     details = provider_step["details"]
     assert details["provider"] == "browser_helper:boss,cuhksz_career,remoteok"
     assert details["source_kind"] == "hybrid"
@@ -396,12 +411,17 @@ def test_browser_helper_empty_candidates_still_runs_selected_sources(monkeypatch
     assert response.status_code == 200
     payload = response.json()
     run = payload["job_search_run"]
+    assert run["status"] == "running"
     assert run["search_provider"] == "browser_helper:boss,cuhksz_career"
     assert run["selected_sources"] == ["cuhksz_career"]
+    assert run["results"] == []
+    completed_payload = _get_run_payload(run["job_search_run_id"])
+    run = completed_payload["job_search_run"]
+    assert run["status"] == "completed"
     source_providers = {item["source_provider"] for item in run["results"]}
     assert "cuhksz_career" in source_providers
     assert "boss_zhipin" not in source_providers
-    provider_step = next(step for step in payload["steps"] if step["name"] == "Provider search")
+    provider_step = next(step for step in completed_payload["steps"] if step["name"] == "Provider search")
     details = provider_step["details"]
     assert details["source_candidate_counts"]["cuhksz_career"] >= 1
     source_attempts = details["source_attempts"]

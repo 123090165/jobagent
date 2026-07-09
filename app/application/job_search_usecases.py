@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import os
 from collections import Counter
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from uuid import NAMESPACE_URL, uuid5
 
@@ -98,6 +100,8 @@ ASSEMBLY_GUARDRAILS = [
 MAX_PROVIDER_QUERIES_PER_RUN = 3
 MAX_PROVIDER_LOCATIONS_PER_RUN = 3
 MAX_PROVIDER_PREVIEW_TERMS = 8
+DEFAULT_JD_ANALYSIS_CONCURRENCY = 3
+MAX_JD_ANALYSIS_CONCURRENCY = 8
 
 
 def _uses_job_search_analysis(search_mode: str) -> bool:
@@ -265,6 +269,7 @@ def create_browser_helper_job_search_run(
     payload: BrowserHelperJobSearchRunCreateRequest,
     *,
     user_id: str | None = None,
+    background_tasks: BackgroundTasks | None = None,
     session_repository: ProfileSessionRepository = profile_session_repository,
     confirmed_repository: ConfirmedProfileRepository = confirmed_profile_repository,
     search_repository: JobSearchRepository = job_search_repository,
@@ -301,7 +306,7 @@ def create_browser_helper_job_search_run(
             keywords=payload.keywords,
             max_results=payload.max_results,
         ),
-        background_tasks=None,
+        background_tasks=background_tasks,
         session_repository=session_repository,
         confirmed_repository=confirmed_repository,
         search_repository=search_repository,
@@ -309,6 +314,8 @@ def create_browser_helper_job_search_run(
         llm_service=llm_service,
         user_id=user_id,
     )
+    if background_tasks is not None:
+        return run_response
     return execute_job_search_run(
         run_response.job_search_run.job_search_run_id,
         session_repository=session_repository,
@@ -555,6 +562,9 @@ def execute_job_search_run(
             details={
                 "analyzed_candidate_count": len(analyses["items"]),
                 "llm_request_count": len(analyses["items"]) if use_llm_analysis else 0,
+                "analysis_concurrency": analyses["concurrency"],
+                "fallback_count": analyses["fallback_count"],
+                "analysis_mode_counts": analyses["mode_counts"],
             },
         )
 
@@ -1323,15 +1333,38 @@ def _analyze_candidates(
     quality_warnings: list[str] = []
     fallback_reason: str | None = None
     scorecards_by_index = {scorecard.candidate_index: scorecard for scorecard in filtered.scorecards}
-    for candidate_index, candidate in zip(filtered.selected_indexes, filtered.selected_candidates):
-        text = candidate.raw_description or candidate.snippet
-        result = run_jd_analysis_agent(
-            text,
-            use_llm=use_llm,
-            service=llm_service,  # type: ignore[arg-type]
-        )
-        metadata = result.metadata
+    selected = list(zip(filtered.selected_indexes, filtered.selected_candidates))
+    concurrency = _jd_analysis_concurrency(use_llm=use_llm, candidate_count=len(selected))
+    if concurrency <= 1:
+        analyzed_records = [
+            _analyze_candidate_for_job_search(
+                candidate,
+                use_llm=use_llm,
+                llm_service=llm_service,
+                scorecard=scorecards_by_index.get(candidate_index),
+            )
+            for candidate_index, candidate in selected
+        ]
+    else:
+        with ThreadPoolExecutor(max_workers=concurrency) as executor:
+            analyzed_records = list(
+                executor.map(
+                    lambda item: _analyze_candidate_for_job_search(
+                        item[1],
+                        use_llm=use_llm,
+                        llm_service=llm_service,
+                        scorecard=scorecards_by_index.get(item[0]),
+                    ),
+                    selected,
+                )
+            )
+
+    fallback_count = 0
+    for record in analyzed_records:
+        metadata = record["metadata"]
         mode_counter[metadata.mode] += 1
+        if metadata.mode == "fallback" or metadata.fallback_reason:
+            fallback_count += 1
         if metadata.fallback_reason and fallback_reason is None:
             fallback_reason = metadata.fallback_reason
         for item in metadata.guardrails:
@@ -1340,21 +1373,68 @@ def _analyze_candidates(
         for item in metadata.quality_warnings:
             if item not in quality_warnings:
                 quality_warnings.append(item)
-        items.append(
-            {
-                "candidate": candidate,
-                "analysis": result.output,
-                "analysis_mode": metadata.mode,
-                "scorecard": scorecards_by_index.get(candidate_index),
-            }
-        )
+        items.append(record["item"])
     return {
         "items": items,
         "mode": _summarize_analysis_mode(mode_counter),
         "fallback_reason": fallback_reason,
         "guardrails": guardrails,
         "quality_warnings": quality_warnings + filtered.quality_warnings,
+        "concurrency": concurrency,
+        "fallback_count": fallback_count,
+        "mode_counts": dict(mode_counter),
     }
+
+
+def _analyze_candidate_for_job_search(
+    candidate: RawJobCandidate,
+    *,
+    use_llm: bool,
+    llm_service: JSONChatLLM | None,
+    scorecard: CandidateScorecard | None,
+) -> dict[str, object]:
+    text = (candidate.raw_description or candidate.snippet or candidate.title or "No job description provided.").strip()
+    try:
+        result = run_jd_analysis_agent(
+            text,
+            use_llm=use_llm,
+            service=llm_service,  # type: ignore[arg-type]
+        )
+    except Exception as exc:
+        result = run_jd_analysis_agent(text, use_llm=False)
+        result = type(result)(
+            output=result.output,
+            metadata=result.metadata.model_copy(
+                update={
+                    "mode": "fallback",
+                    "fallback_reason": type(exc).__name__,
+                    "quality_warnings": [
+                        f"JD analysis fallback triggered: {type(exc).__name__}."
+                    ],
+                }
+            ),
+        )
+    return {
+        "metadata": result.metadata,
+        "item": {
+            "candidate": candidate,
+            "analysis": result.output,
+            "analysis_mode": result.metadata.mode,
+            "scorecard": scorecard,
+        },
+    }
+
+
+def _jd_analysis_concurrency(*, use_llm: bool, candidate_count: int) -> int:
+    if not use_llm or candidate_count <= 1:
+        return 1
+    raw_value = os.getenv("JOBAGENT_JD_ANALYSIS_CONCURRENCY")
+    try:
+        configured = int(raw_value) if raw_value else DEFAULT_JD_ANALYSIS_CONCURRENCY
+    except ValueError:
+        configured = DEFAULT_JD_ANALYSIS_CONCURRENCY
+    capped = min(configured, MAX_JD_ANALYSIS_CONCURRENCY, candidate_count)
+    return max(1, capped)
 
 
 def _summarize_analysis_mode(mode_counter: Counter[str]) -> str:

@@ -45,10 +45,15 @@ def preview_job_search_run_endpoint(
 
 @router.post("/browser-helper", response_model=JobSearchRunResponse)
 def create_browser_helper_job_search_run_endpoint(
+    background_tasks: BackgroundTasks,
     payload: BrowserHelperJobSearchRunCreateRequest,
     current_user: UserAccount = Depends(get_current_user),
 ) -> JobSearchRunResponse:
-    return create_browser_helper_job_search_run(payload, user_id=current_user.user_id)
+    return create_browser_helper_job_search_run(
+        payload,
+        background_tasks=background_tasks,
+        user_id=current_user.user_id,
+    )
 
 
 @router.get("/{run_id}", response_model=JobSearchRunResponse)
