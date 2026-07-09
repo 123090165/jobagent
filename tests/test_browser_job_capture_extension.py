@@ -16,13 +16,12 @@ def test_browser_helper_manifest_exposes_current_page_capture_side_panel() -> No
     assert "activeTab" in manifest["permissions"]
     assert "scripting" in manifest["permissions"]
     assert "storage" in manifest["permissions"]
-    assert "cookies" not in manifest["permissions"]
+    assert "cookies" in manifest["permissions"]
     assert manifest["side_panel"]["default_path"] == "sidepanel.html"
     assert "http://127.0.0.1:8000/*" in manifest["host_permissions"]
     assert "http://localhost:8000/*" in manifest["host_permissions"]
-    assert "*://*.zhipin.com/*" not in manifest.get("host_permissions", [])
-    assert "*://zhipin.com/*" not in manifest.get("host_permissions", [])
-    assert "https://www.zhipin.com/*" in manifest.get("optional_host_permissions", [])
+    assert "*://*.zhipin.com/*" in manifest.get("host_permissions", [])
+    assert "*://zhipin.com/*" in manifest.get("host_permissions", [])
     assert "<all_urls>" not in manifest.get("host_permissions", [])
 
 
@@ -40,11 +39,15 @@ def test_browser_helper_background_supports_user_triggered_current_page_capture(
     assert "chrome.sidePanel.setPanelBehavior" in background
 
 
-def test_boss_capture_is_manual_dom_only_and_blocks_automation() -> None:
+def test_boss_search_and_current_page_capture_are_both_available() -> None:
     background = _read("browser-helper/background.js")
 
-    assert "BOSS automated search and live probes are disabled" in background
-    assert 'capabilities: ["ping", "openBossLogin", "analyzeCurrentJob", "bossCurrentPageCapture"]' in background
+    assert "BOSS_AUTOMATION_DISABLED_MESSAGE" not in background
+    assert '"checkBossLogin"' in background
+    assert '"searchBoss"' in background
+    assert "BOSS login is required before searching." in background
+    assert "fetchBossJobsFromWorkerApi" in background
+    assert "fetchBossJobsFromPageApi" in background
     assert "BOSS current-page capture used DOM text only" in background
     assert "isBossJobDetailUrl" in background
     assert "\\/job_detail\\/" in background
@@ -52,7 +55,6 @@ def test_boss_capture_is_manual_dom_only_and_blocks_automation() -> None:
     assert "capture_safety" in background
     assert "BOSS appears to require security verification" in background
     assert "searchBossJobs({ queries, location, jobType, limit })" in background
-    assert "BOSS_AUTOMATION_DISABLED_MESSAGE" in background
 
 
 def test_current_page_capture_injected_function_is_self_contained() -> None:

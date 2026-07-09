@@ -1,7 +1,7 @@
 const READY_MESSAGE = {
   __jobagentHelper: true,
   type: "JOBAGENT_HELPER_READY",
-  version: "0.3.1"
+  version: "0.3.2"
 };
 
 window.postMessage(READY_MESSAGE, "*");

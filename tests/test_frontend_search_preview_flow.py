@@ -134,18 +134,16 @@ def test_search_preview_page_exposes_browser_helper_probe() -> None:
 
     assert "Browser Helper" in search_preview
     assert "Check Helper" in search_preview
-    assert "Check BOSS Login" not in search_preview
-    assert "Open BOSS" in search_preview
+    assert "Check BOSS Login" in search_preview
+    assert "Open BOSS Login" in search_preview
     assert "Start Job Search" in search_preview
     assert "pingBrowserHelper" in search_preview
-    assert "checkBossLoginStatus" not in search_preview
-    assert "startBossLoginAutoRefresh" not in search_preview
-    assert "stopBossLoginAutoRefresh" not in search_preview
-    assert "BOSS login verified by a live page probe" not in search_preview
-    assert "fetchBossCandidates" not in search_preview
+    assert "checkBossLoginStatus" in search_preview
+    assert "startBossLoginAutoRefresh" in search_preview
+    assert "stopBossLoginAutoRefresh" in search_preview
+    assert "BOSS login verified by a live page probe" in search_preview
+    assert "fetchBossCandidates" in search_preview
     assert "startBrowserHelperJobSearch" in search_preview
-    assert "Manual current-page capture only" in search_preview
-    assert "automatic BOSS search is disabled" in search_preview
     assert "legacySelectedSearchSources" in search_preview
     assert "normalizeProviderSearchSources" in search_preview
     assert "formatSearchSources" in search_preview
@@ -153,16 +151,16 @@ def test_search_preview_page_exposes_browser_helper_probe() -> None:
     assert "formatProviderName" in source_service
     assert "formatSourceName" in source_service
     assert "normalizeProviderSearchSources" in source_service
-    assert "BOSS Queries" not in search_preview
     assert "providerSourcesForRun(profileSessionStore.jobSearchPreview)" in search_preview
     assert "backendProviderSourceLabel" in search_preview
     assert "Backend Sources" in search_preview
+    assert "BOSS Queries" in search_preview
     assert "profileSessionStore.jobSearchPreviewControls?.selectedProviderSearchSources" in search_preview
-    assert "if (!selectedProviderSources.length)" in search_preview
+    assert "createBrowserHelperJobSearch" in search_preview
     assert "preview?.selected_sources" in search_preview
     assert "!profileSessionStore.isJobSearchPreviewLoading" in search_preview
     assert "__jobagentHelper" in helper_service
-    assert "BOSS automated search and login probing are disabled" in helper_service
+    assert 'action: "searchBoss"' in helper_service
     assert "BossSearchDiagnostics" in helper_service
     assert "attemptedQueries" in helper_service
     assert "searchAttempts" in helper_service
@@ -170,16 +168,17 @@ def test_search_preview_page_exposes_browser_helper_probe() -> None:
     assert "sessionVerified" in helper_service
 
 
-def test_browser_helper_boss_automation_is_disabled() -> None:
+def test_browser_helper_boss_automation_is_available() -> None:
     helper_background = Path("browser-helper/background.js").read_text(encoding="utf-8")
     manifest = json.loads(Path("browser-helper/manifest.json").read_text(encoding="utf-8"))
 
-    assert "BOSS_AUTOMATION_DISABLED_MESSAGE" in helper_background
-    assert "BOSS automated search and live probes are disabled" in helper_background
-    assert 'capabilities: ["ping", "openBossLogin", "analyzeCurrentJob", "bossCurrentPageCapture"]' in helper_background
+    assert "BOSS_AUTOMATION_DISABLED_MESSAGE" not in helper_background
+    assert "BOSS login is required before searching." in helper_background
+    assert '"checkBossLogin"' in helper_background
+    assert '"searchBoss"' in helper_background
     assert "BOSS current-page capture used DOM text only" in helper_background
     assert "isBossJobDetailUrl" in helper_background
     assert "capture_safety" in helper_background
-    assert "cookies" not in manifest["permissions"]
-    assert "*://*.zhipin.com/*" not in manifest.get("host_permissions", [])
-    assert "*://zhipin.com/*" not in manifest.get("host_permissions", [])
+    assert "cookies" in manifest["permissions"]
+    assert "*://*.zhipin.com/*" in manifest.get("host_permissions", [])
+    assert "*://zhipin.com/*" in manifest.get("host_permissions", [])

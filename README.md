@@ -71,11 +71,14 @@ npm run build
 ## Browser Job Capture Extension
 
 The development Chrome/Edge extension lives in `browser-helper/`. It supports
-user-triggered current-page job capture from the extension Side Panel.
-Automated BOSS search, login probing, hidden tabs, polling, and BOSS API
-fetches are disabled.
+two user-triggered BOSS flows:
 
-To test current-page capture:
+- Search Preview can verify the local BOSS login state and run a BOSS provider
+  search through the extension.
+- The extension Side Panel can capture the current BOSS job detail page after a
+  user click.
+
+To test BOSS extension flows:
 
 1. Start FastAPI:
 
@@ -91,26 +94,31 @@ To test current-page capture:
 D:\projects\jobagent\browser-helper
 ```
 
-5. Open a visible job detail page and click the JobAgent extension icon.
-6. In the Side Panel, set:
+5. Go to Search Preview, select BOSS, click `Check Helper`, and complete
+   `Open BOSS Login` / `Check BOSS Login` if needed.
+6. Click `Start Job Search`; the BOSS candidates should be sent through
+   `/api/v1/job-search-runs/browser-helper`.
+7. To test current-page capture separately, open a visible BOSS job detail page
+   and click the JobAgent extension icon.
+8. In the Side Panel, set:
 
 ```text
 Backend URL: http://127.0.0.1:8000
 Profile session ID: <confirmed ProfileSession session_id>
 ```
 
-7. Click `Analyze current job`.
+9. Click `Analyze current job`.
 
-The extension reads only visible page text after the user clicks. It sends
-structured text, URL, page title, extractor version, and warnings to
-`POST /api/v1/browser/job-captures/analyze`. The backend reuses the existing
-Job Search pipeline for JD analysis and profile matching.
+For Side Panel capture, the extension reads only visible page text after the
+user clicks. It sends structured text, URL, page title, extractor version, and
+warnings to `POST /api/v1/browser/job-captures/analyze`. The backend reuses the
+existing Job Search pipeline for JD analysis and profile matching.
 
 Current limitations:
 
 - no automatic application submission;
-- no batch crawling, automatic search, or automatic pagination;
-- no CAPTCHA handling or anti-bot bypass;
+- no continuous background crawling, automatic pagination, CAPTCHA handling, or
+  anti-bot bypass;
 - no browser cookies or LLM/API keys are sent to the backend;
 - generic extraction may miss structured title/company/location fields.
 

@@ -101,8 +101,6 @@ export interface BossSearchResult {
 const DEFAULT_RESPONSE_TIMEOUT_MS = 3000;
 const BOSS_LOGIN_RESPONSE_TIMEOUT_MS = 8000;
 const BOSS_SEARCH_RESPONSE_TIMEOUT_MS = 90000;
-const BOSS_AUTOMATION_DISABLED_MESSAGE =
-  "BOSS automated search and login probing are disabled. Open a BOSS job detail page manually, then use the JobAgent extension Side Panel to analyze the current page.";
 
 export interface BossSearchDiagnostics {
   apiTransport?: string | null;
@@ -162,7 +160,35 @@ export async function pingBrowserHelper(): Promise<BrowserHelperStatus> {
 }
 
 export async function checkBossLoginStatus(): Promise<BossLoginStatus> {
-  throw new Error(BOSS_AUTOMATION_DISABLED_MESSAGE);
+  const response = await sendHelperRequest<BossLoginResponse>(
+    { action: "checkBossLogin" },
+    {
+      timeoutMs: BOSS_LOGIN_RESPONSE_TIMEOUT_MS,
+      timeoutMessage: "BOSS login status check timed out. Confirm the Browser Helper is enabled on this page."
+    }
+  );
+  if (!response.ok) {
+    throw new Error(response.error ?? "BOSS login status check failed.");
+  }
+  return {
+    platform: "boss",
+    loggedIn: Boolean(response.loggedIn),
+    loginUrl: response.loginUrl ?? "https://www.zhipin.com/",
+    cookieCount: response.cookieCount ?? 0,
+    cookieLoggedIn: Boolean(response.cookieLoggedIn),
+    matchedAuthCookies: response.matchedAuthCookies ?? [],
+    missingAuthCookies: response.missingAuthCookies ?? [],
+    sessionVerified: Boolean(response.sessionVerified),
+    verificationStatus: response.verificationStatus ?? "unknown",
+    verificationReason: response.verificationReason ?? null,
+    probeUrl: response.probeUrl ?? null,
+    probePageTitle: response.probePageTitle ?? null,
+    probeBodyTextLength: response.probeBodyTextLength ?? 0,
+    probeJobCardCount: response.probeJobCardCount ?? 0,
+    probeValidJobDetailLinkCount: response.probeValidJobDetailLinkCount ?? 0,
+    loginLikelyRequired: Boolean(response.loginLikelyRequired),
+    verificationLikelyRequired: Boolean(response.verificationLikelyRequired)
+  };
 }
 
 export async function openBossLoginPage(): Promise<void> {
@@ -187,12 +213,39 @@ export async function fetchBossCandidates(
   queries: string[] = [],
   jobType = "intern"
 ): Promise<BossSearchResult> {
-  void query;
-  void location;
-  void limit;
-  void queries;
-  void jobType;
-  throw new Error(BOSS_AUTOMATION_DISABLED_MESSAGE);
+  const helperQuery = queries[0] ?? query;
+  const response = await sendHelperRequest<BossSearchResponse>(
+    {
+      action: "searchBoss",
+      query: helperQuery,
+      queries,
+      location: location ?? "",
+      jobType,
+      limit
+    },
+    {
+      timeoutMs: BOSS_SEARCH_RESPONSE_TIMEOUT_MS,
+      timeoutMessage: "BOSS helper search timed out while loading or parsing the BOSS page."
+    }
+  );
+  if (!response.ok) {
+    throw new Error(response.error ?? "BOSS helper search failed.");
+  }
+  return {
+    version: response.version ?? null,
+    platforms: response.platforms ?? ["boss"],
+    attemptedQueries: response.attemptedQueries ?? queries,
+    successfulQuery: response.successfulQuery ?? null,
+    searchAttempts: response.searchAttempts ?? [],
+    searchUrl: response.searchUrl ?? null,
+    pageUrl: response.pageUrl ?? null,
+    pageTitle: response.pageTitle ?? null,
+    tabId: response.tabId ?? null,
+    tabKeptOpen: Boolean(response.tabKeptOpen),
+    warnings: response.warnings ?? [],
+    diagnostics: response.diagnostics ?? null,
+    candidates: response.candidates ?? []
+  };
 }
 
 interface HelperRequestOptions {

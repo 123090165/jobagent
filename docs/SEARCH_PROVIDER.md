@@ -280,26 +280,29 @@ It also supports the frontend multi-source shape:
 
 The local `slate-helper/` extension is kept as a reference implementation for
 browser-assisted providers. JobAgent's active extension is `browser-helper/`.
-Its BOSS path is currently manual current-page capture only:
+Its BOSS path has two user-triggered modes:
 
-- the user opens BOSS and navigates to a specific job detail page manually;
-- the extension captures only after the user clicks `Analyze current job`;
-- BOSS pages must match `/job_detail/...`, with or without a `.html` suffix;
-- the helper stops on BOSS login, verification, blank, search, or home pages;
-- the extension does not read BOSS cookies, does not open hidden BOSS tabs,
-  does not poll BOSS pages, and does not fetch BOSS APIs;
-- `https://www.zhipin.com/*` is an optional host permission requested only when
-  the user clicks `Analyze current job`, then removed after the attempt;
-- the backend receives standardized job candidates only, never platform cookies.
+- Search Preview can check helper availability, verify local BOSS login, and
+  run BOSS search through the extension's `searchBoss` action.
+- The Side Panel can capture a user-opened BOSS job detail page after the user
+  clicks `Analyze current job`.
+- Search candidates are normalized and sent to
+  `/api/v1/job-search-runs/browser-helper`; the backend receives standardized
+  job candidates, never platform cookies.
+- Current-page capture still requires BOSS pages to match `/job_detail/...`,
+  with or without a `.html` suffix, and stops on login, verification, blank,
+  search, or home pages.
+- BOSS host access and cookies are used only inside the local browser extension
+  to operate in the user's browser session.
 
-This should be treated as a `browser_helper` current-page capture path, not as
-a replacement for public direct providers such as CUHKSZ Career or RemoteOK.
+This should be treated as a `browser_helper` provider path that complements
+public direct providers such as CUHKSZ Career or RemoteOK.
 
 Current implementation status:
 
 - `browser-helper/` can be loaded as a Chrome/Edge unpacked extension;
-- Search Preview can detect the helper and optionally open BOSS in a foreground
-  tab, but automated BOSS search and login probing are disabled;
+- Search Preview can detect the helper, verify BOSS login, optionally open BOSS
+  in a foreground tab, and run user-triggered BOSS search through the helper;
 - backend endpoint `POST /api/v1/job-search-runs/browser-helper` accepts
   standardized helper candidates and runs them through the existing ranking
   pipeline;

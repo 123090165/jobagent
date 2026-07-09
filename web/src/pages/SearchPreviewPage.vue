@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import {
   NButton,
@@ -13,10 +13,18 @@ import {
 
 import FlowPageHeader from "../components/FlowPageHeader.vue";
 import {
+  checkBossLoginStatus,
+  fetchBossCandidates,
   openBossLoginPage,
   pingBrowserHelper,
+  type BossLoginStatus,
   type BrowserHelperStatus
 } from "../services/browserHelper";
+import {
+  BOSS_DEFAULT_JOB_TYPE,
+  buildBossSearchQueries,
+  formatBossEmptyResultMessage
+} from "../services/bossSearchPlanning";
 import {
   formatSearchSources,
   legacySelectedSearchSources,
@@ -42,10 +50,13 @@ const useLocalDemo = ref(false);
 const useLlm = ref(false);
 const maxResults = ref<number | null>(10);
 const browserHelperStatus = ref<BrowserHelperStatus | null>(null);
+const bossLoginStatus = ref<BossLoginStatus | null>(null);
 const isBrowserHelperChecking = ref(false);
+const isBossLoginChecking = ref(false);
 const isBossSearching = ref(false);
 const isRestoringPreviewControls = ref(false);
 const browserHelperMessage = ref<string | null>(null);
+let bossLoginRefreshTimer: number | null = null;
 const selectedLlmProvider = computed(() => (useLlm.value ? "deepseek" : "ollama"));
 const canStartSearch = computed(() => useLocalDemo.value || selectedSearchSources.value.length > 0);
 const effectiveMaxResults = computed(() => maxResults.value ?? 10);
@@ -57,6 +68,11 @@ const providerSearchSources = computed<ProviderSearchSource[]>(() => {
   return [...selectedProviderSearchSources.value];
 });
 const isBossSelected = computed(() => isBossSourceSelected.value);
+const bossSearchQueriesForPreview = computed(() => {
+  return profileSessionStore.jobSearchPreview
+    ? buildBossSearchQueries(profileSessionStore.jobSearchPreview)
+    : [];
+});
 const usesBrowserHelper = computed(() => isBossSelected.value && !useLocalDemo.value);
 const selectedSourceLabel = computed(() => {
   if (useLocalDemo.value) {
@@ -153,14 +169,21 @@ const browserHelperStatusTag = computed(() => {
   return browserHelperStatus.value.installed ? "Detected" : "Not detected";
 });
 
-const canOpenBossLogin = computed(() => Boolean(browserHelperStatus.value?.installed));
-
-const bossCaptureStatusSummary = computed(() => {
-  if (!browserHelperStatus.value?.installed) {
-    return "Detect the Browser Helper, open a BOSS job detail page manually, then use the extension Side Panel.";
+const bossLoginStatusTag = computed(() => {
+  if (!bossLoginStatus.value) {
+    return "Not checked";
   }
-  return "Automatic BOSS search and login probing are disabled. Use Side Panel current-page capture only.";
+  return bossLoginStatus.value.loggedIn ? "Logged in" : "Login required";
 });
+
+const bossLoginStatusSummary = computed(() => {
+  if (!bossLoginStatus.value) {
+    return "Check after detecting helper";
+  }
+  return formatBossLoginStatusSummary(bossLoginStatus.value);
+});
+
+const canCheckBossLogin = computed(() => Boolean(browserHelperStatus.value?.installed));
 
 const providerStatusTarget = computed<"mock" | "browser_helper" | "multi_source">(() => {
   if (useLocalDemo.value) {
@@ -302,6 +325,10 @@ onMounted(async () => {
   }
 });
 
+onUnmounted(() => {
+  stopBossLoginAutoRefresh();
+});
+
 watch(selectedSearchSources, async () => {
   if (isRestoringPreviewControls.value) {
     return;
@@ -383,11 +410,34 @@ async function checkBrowserHelper() {
   browserHelperMessage.value = null;
   try {
     browserHelperStatus.value = await pingBrowserHelper();
-    browserHelperMessage.value =
-      browserHelperStatus.value.error ??
-      (browserHelperStatus.value.installed ? bossCaptureStatusSummary.value : null);
+    browserHelperMessage.value = browserHelperStatus.value.error;
+    if (browserHelperStatus.value.installed) {
+      await checkBossLogin();
+    } else {
+      bossLoginStatus.value = null;
+    }
   } finally {
     isBrowserHelperChecking.value = false;
+  }
+}
+
+async function checkBossLogin() {
+  if (!browserHelperStatus.value?.installed) {
+    browserHelperMessage.value = "Install and detect the Browser Helper first.";
+    return;
+  }
+  isBossLoginChecking.value = true;
+  browserHelperMessage.value = null;
+  try {
+    bossLoginStatus.value = await checkBossLoginStatus();
+    browserHelperMessage.value = formatBossLoginStatusMessage(bossLoginStatus.value);
+    if (bossLoginStatus.value.loggedIn) {
+      stopBossLoginAutoRefresh();
+    }
+  } catch (error) {
+    browserHelperMessage.value = error instanceof Error ? error.message : "BOSS login status check failed.";
+  } finally {
+    isBossLoginChecking.value = false;
   }
 }
 
@@ -398,9 +448,11 @@ async function openBossLogin() {
   }
   try {
     await openBossLoginPage();
-    browserHelperMessage.value = "BOSS opened in a foreground tab. Navigate manually to a job detail page, then use the extension Side Panel.";
+    bossLoginStatus.value = null;
+    browserHelperMessage.value = "BOSS login page opened. Login status will refresh automatically.";
+    startBossLoginAutoRefresh();
   } catch (error) {
-    browserHelperMessage.value = error instanceof Error ? error.message : "Failed to open BOSS page.";
+    browserHelperMessage.value = error instanceof Error ? error.message : "Failed to open BOSS login page.";
   }
 }
 
@@ -416,25 +468,104 @@ async function startBrowserHelperJobSearch() {
       await checkBrowserHelper();
     }
     if (!browserHelperStatus.value?.installed) {
-      browserHelperMessage.value = "Install and detect the Browser Helper before using BOSS current-page capture.";
+      browserHelperMessage.value = "Install and detect the Browser Helper before starting BOSS search.";
+      return;
+    }
+    await checkBossLogin();
+    if (!bossLoginStatus.value?.loggedIn) {
+      browserHelperMessage.value = "BOSS login is required before starting this search.";
       return;
     }
 
     const preview = profileSessionStore.jobSearchPreview;
-    if (!selectedProviderSources.length) {
-      browserHelperMessage.value =
-        "BOSS automated search is disabled. Open a BOSS job detail page manually, click the JobAgent extension icon, and use Analyze current job.";
-      return;
+    const bossQueries = buildBossSearchQueries(preview);
+    const result = await fetchBossCandidates(
+      preview.query,
+      preview.locations[0] ?? null,
+      effectiveMaxResults.value,
+      bossQueries,
+      BOSS_DEFAULT_JOB_TYPE
+    );
+    if (!result.candidates.length) {
+      browserHelperMessage.value = formatBossEmptyResultMessage(result);
+      if (!selectedProviderSources.length) {
+        return;
+      }
     }
-    browserHelperMessage.value =
-      "BOSS automated search is disabled. Running selected backend sources only; use the Side Panel separately for BOSS detail pages.";
-    const run = await profileSessionStore.createJobSearch(buildPayload());
+    const run = await profileSessionStore.createBrowserHelperJobSearch({
+      session_id: sessionId.value,
+      query: preview.query,
+      helper_version: result.version,
+      platforms: ["boss"],
+      selected_sources: selectedProviderSources,
+      use_llm: useLlm.value,
+      locations: preview.locations,
+      target_roles: preview.target_roles,
+      keywords: preview.keywords,
+      max_results: effectiveMaxResults.value,
+      candidates: result.candidates
+    });
     await router.push({ name: "job-search", params: { runId: run.job_search_run_id } });
   } catch (error) {
-    browserHelperMessage.value = error instanceof Error ? error.message : "Backend job search failed.";
+    browserHelperMessage.value = error instanceof Error ? error.message : "BOSS helper search failed.";
   } finally {
     isBossSearching.value = false;
   }
+}
+
+function startBossLoginAutoRefresh(): void {
+  stopBossLoginAutoRefresh();
+  let attempts = 0;
+  const poll = async () => {
+    attempts += 1;
+    if (!usesBrowserHelper.value || !browserHelperStatus.value?.installed) {
+      stopBossLoginAutoRefresh();
+      return;
+    }
+    await checkBossLogin();
+    if (bossLoginStatus.value?.loggedIn || attempts >= 24) {
+      if (!bossLoginStatus.value?.loggedIn && attempts >= 24) {
+        browserHelperMessage.value = "BOSS login was not verified after automatic refresh. Use Check BOSS Login after completing login or verification.";
+      }
+      stopBossLoginAutoRefresh();
+      return;
+    }
+    bossLoginRefreshTimer = window.setTimeout(() => {
+      void poll();
+    }, 5000);
+  };
+  bossLoginRefreshTimer = window.setTimeout(() => {
+    void poll();
+  }, 3000);
+}
+
+function stopBossLoginAutoRefresh(): void {
+  if (bossLoginRefreshTimer !== null) {
+    window.clearTimeout(bossLoginRefreshTimer);
+    bossLoginRefreshTimer = null;
+  }
+}
+
+function formatBossLoginStatusMessage(status: BossLoginStatus): string {
+  if (status.loggedIn) {
+    return "BOSS login verified by a live page probe.";
+  }
+  if (status.cookieLoggedIn) {
+    return `BOSS cookies exist but the live session is not usable: ${status.verificationReason ?? status.verificationStatus}.`;
+  }
+  return status.verificationReason ?? "BOSS login is required before helper search.";
+}
+
+function formatBossLoginStatusSummary(status: BossLoginStatus): string {
+  const cookieSummary = `${status.cookieCount} cookies, ${status.matchedAuthCookies.length} auth-like`;
+  const probeSummary = `${status.probeJobCardCount} cards, ${status.probeValidJobDetailLinkCount} valid links`;
+  if (status.loggedIn) {
+    return `Verified session - ${cookieSummary}; probe ${probeSummary}`;
+  }
+  if (status.cookieLoggedIn) {
+    return `Cookies present but not verified - ${status.verificationStatus}; probe ${probeSummary}`;
+  }
+  return `Not logged in - ${cookieSummary}; ${status.verificationStatus}`;
 }
 
 function seeResult() {
@@ -574,11 +705,16 @@ function seeResult() {
             </div>
           </div>
           <div v-if="usesBrowserHelper" class="job-search-setup-row">
-            <span class="job-search-setup-label">BOSS Capture</span>
+            <span class="job-search-setup-label">BOSS Login</span>
             <div class="job-search-status-copy">
-              <n-tag type="warning" round>Manual only</n-tag>
+              <n-tag
+                :type="bossLoginStatus?.loggedIn ? 'success' : 'warning'"
+                round
+              >
+                {{ bossLoginStatusTag }}
+              </n-tag>
               <span>
-                {{ bossCaptureStatusSummary }}
+                {{ bossLoginStatusSummary }}
               </span>
             </div>
           </div>
@@ -592,10 +728,18 @@ function seeResult() {
             </n-button>
             <n-button
               secondary
-              :disabled="!canOpenBossLogin"
+              :disabled="!canCheckBossLogin"
+              :loading="isBossLoginChecking"
+              @click="checkBossLogin"
+            >
+              Check BOSS Login
+            </n-button>
+            <n-button
+              secondary
+              :disabled="!canCheckBossLogin"
               @click="openBossLogin"
             >
-              Open BOSS
+              Open BOSS Login
             </n-button>
           </div>
           <p v-if="usesBrowserHelper && browserHelperMessage" class="flow-meta">{{ browserHelperMessage }}</p>
@@ -645,9 +789,9 @@ function seeResult() {
             <strong>Backend Sources:</strong>
             {{ backendProviderSourceLabel }}
           </p>
-          <p v-if="isBossSelected">
-            <strong>BOSS Capture:</strong>
-            Manual current-page capture only; automatic BOSS search is disabled.
+          <p v-if="isBossSelected && bossSearchQueriesForPreview.length">
+            <strong>BOSS Queries:</strong>
+            {{ bossSearchQueriesForPreview.join(", ") }}
           </p>
           <ul class="review-list">
             <li
