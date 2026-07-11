@@ -1,9 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { NButton, NCard, NTag } from "naive-ui";
+import { NButton, NCard, NInput, NSelect, NTag } from "naive-ui";
 
 import FlowPageHeader from "../components/FlowPageHeader.vue";
+import {
+  listJobSearchResultFeedback,
+  saveJobSearchResultFeedback
+} from "../api/profileSessions";
 import {
   formatProviderName,
   formatSourceName,
@@ -13,7 +17,12 @@ import {
 } from "../services/jobSearchSources";
 import { useProfileSessionStore } from "../stores/profileSession";
 import { useSavedJobsStore } from "../stores/savedJobs";
-import type { JobSearchResult, JobSearchTraceStep } from "../types/profileSession";
+import type {
+  JobSearchFeedbackType,
+  JobSearchResult,
+  JobSearchResultFeedback,
+  JobSearchTraceStep
+} from "../types/profileSession";
 
 const route = useRoute();
 const router = useRouter();
@@ -24,8 +33,20 @@ const jobBriefHint = ref<string | null>(null);
 const savedJobMessage = ref<string | null>(null);
 const savingResultIds = ref<string[]>([]);
 const locallySavedResultIds = ref<string[]>([]);
+const resultFeedback = ref<Record<string, JobSearchResultFeedback>>({});
+const feedbackTypes = ref<Record<string, JobSearchFeedbackType | null>>({});
+const feedbackNotes = ref<Record<string, string>>({});
+const savingFeedbackIds = ref<string[]>([]);
+const feedbackMessage = ref<string | null>(null);
 const nowMs = ref(Date.now());
 let elapsedTimer: number | null = null;
+const feedbackOptions: Array<{ label: string; value: JobSearchFeedbackType }> = [
+  { label: "Relevant", value: "relevant" },
+  { label: "Not relevant", value: "irrelevant" },
+  { label: "Duplicate", value: "duplicate" },
+  { label: "Listing expired", value: "stale" },
+  { label: "JD insufficient", value: "insufficient_jd" }
+];
 
 const isRunning = computed(() =>
   ["pending", "running"].includes(profileSessionStore.jobSearchRun?.status ?? "")
@@ -153,6 +174,7 @@ onMounted(async () => {
     if (run.status === "pending" || run.status === "running") {
       await profileSessionStore.pollJobSearchRun(runId.value);
     }
+    await loadResultFeedback();
   } catch {
     // Error state is rendered from the store.
   }
@@ -222,6 +244,42 @@ async function saveSearchResult(result: JobSearchResult) {
     savedJobMessage.value = savedJobsStore.error ?? "Failed to save this result.";
   } finally {
     savingResultIds.value = savingResultIds.value.filter((id) => id !== result.job_result_id);
+  }
+}
+
+async function loadResultFeedback() {
+  try {
+    const response = await listJobSearchResultFeedback(runId.value);
+    const next: Record<string, JobSearchResultFeedback> = {};
+    for (const item of response.items) {
+      next[item.job_result_id] = item;
+      feedbackTypes.value[item.job_result_id] = item.feedback_type;
+      feedbackNotes.value[item.job_result_id] = item.note ?? "";
+    }
+    resultFeedback.value = next;
+  } catch {
+    // Feedback loading should not block viewing search results.
+  }
+}
+
+async function submitResultFeedback(result: JobSearchResult) {
+  const feedbackType = feedbackTypes.value[result.job_result_id];
+  if (!feedbackType || savingFeedbackIds.value.includes(result.job_result_id)) return;
+  feedbackMessage.value = null;
+  savingFeedbackIds.value = [...savingFeedbackIds.value, result.job_result_id];
+  try {
+    const saved = await saveJobSearchResultFeedback(runId.value, result.job_result_id, {
+      feedback_type: feedbackType,
+      note: feedbackNotes.value[result.job_result_id]?.trim() || null
+    });
+    resultFeedback.value = { ...resultFeedback.value, [result.job_result_id]: saved };
+    feedbackMessage.value = `Feedback saved for ${result.title}.`;
+  } catch {
+    feedbackMessage.value = `Failed to save feedback for ${result.title}.`;
+  } finally {
+    savingFeedbackIds.value = savingFeedbackIds.value.filter(
+      (id) => id !== result.job_result_id
+    );
   }
 }
 
@@ -526,6 +584,7 @@ function formatQueryLabel(value: unknown): string {
 
       <p v-if="jobBriefHint" class="flow-meta">{{ jobBriefHint }}</p>
       <p v-if="savedJobMessage" class="flow-meta">{{ savedJobMessage }}</p>
+      <p v-if="feedbackMessage" class="flow-meta">{{ feedbackMessage }}</p>
 
       <div
         v-if="profileSessionStore.jobSearchRun.status === 'failed'"
@@ -630,6 +689,33 @@ function formatQueryLabel(value: unknown): string {
               </n-button>
               <n-button tertiary size="small" @click="showJobBriefHint">
                 Generate Job Brief
+              </n-button>
+            </div>
+          </div>
+
+          <div class="job-card-section result-feedback-editor">
+            <strong>Result Feedback</strong>
+            <div class="result-feedback-controls">
+              <n-select
+                v-model:value="feedbackTypes[result.job_result_id]"
+                :options="feedbackOptions"
+                placeholder="Choose feedback"
+                size="small"
+              />
+              <n-input
+                v-model:value="feedbackNotes[result.job_result_id]"
+                placeholder="Optional note"
+                maxlength="500"
+                size="small"
+              />
+              <n-button
+                size="small"
+                secondary
+                :disabled="!feedbackTypes[result.job_result_id]"
+                :loading="savingFeedbackIds.includes(result.job_result_id)"
+                @click="submitResultFeedback(result)"
+              >
+                {{ resultFeedback[result.job_result_id] ? "Update Feedback" : "Save Feedback" }}
               </n-button>
             </div>
           </div>

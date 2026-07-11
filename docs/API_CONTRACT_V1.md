@@ -61,6 +61,8 @@ POST /api/v1/job-search-runs/browser-helper
 GET  /api/v1/job-search-runs
 GET  /api/v1/job-search-runs/{run_id}
 GET  /api/v1/job-search-runs/{run_id}/steps
+GET  /api/v1/job-search-runs/{run_id}/feedback
+POST /api/v1/job-search-runs/{run_id}/results/{result_id}/feedback
 GET  /api/v1/profile-sessions/{session_id}/job-search-runs
 ~~~
 

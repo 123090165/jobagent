@@ -7,6 +7,9 @@ import type {
   JobSearchPreview,
   JobSearchTraceStepListResponse,
   JobSearchRunListResponse,
+  JobSearchResultFeedback,
+  JobSearchResultFeedbackListResponse,
+  JobSearchFeedbackType,
   JobSearchRunResponse,
   LlmProviderName,
   LlmStatus,
@@ -197,5 +200,26 @@ export async function listUserJobSearchRuns(limit = 100): Promise<JobSearchRunLi
   const response = await client.get<JobSearchRunListResponse>("/api/v1/job-search-runs", {
     params: { limit }
   });
+  return response.data;
+}
+
+export async function listJobSearchResultFeedback(
+  runId: string
+): Promise<JobSearchResultFeedbackListResponse> {
+  const response = await client.get<JobSearchResultFeedbackListResponse>(
+    `/api/v1/job-search-runs/${runId}/feedback`
+  );
+  return response.data;
+}
+
+export async function saveJobSearchResultFeedback(
+  runId: string,
+  resultId: string,
+  payload: { feedback_type: JobSearchFeedbackType; note?: string | null }
+): Promise<JobSearchResultFeedback> {
+  const response = await client.post<JobSearchResultFeedback>(
+    `/api/v1/job-search-runs/${runId}/results/${resultId}/feedback`,
+    payload
+  );
   return response.data;
 }

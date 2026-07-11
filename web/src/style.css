@@ -325,6 +325,18 @@ h2 {
   padding-bottom: 0;
 }
 
+.result-feedback-editor {
+  display: grid;
+  gap: 8px;
+}
+
+.result-feedback-controls {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.7fr) minmax(180px, 1.3fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
 .panel-heading p {
   margin: 0;
   color: var(--muted);
@@ -754,6 +766,11 @@ h2 {
   .metric-grid,
   .setting-row,
   .job-search-setup-row {
+    grid-template-columns: 1fr;
+  }
+
+  .saved-job-detail-grid,
+  .result-feedback-controls {
     grid-template-columns: 1fr;
   }
 

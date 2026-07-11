@@ -238,3 +238,48 @@ def test_saved_job_analysis_history_is_user_scoped(monkeypatch, tmp_path) -> Non
     assert len(response.json()["items"]) == 2
     assert all(item["saved_job_id"] == saved["saved_job_id"] for item in response.json()["items"])
     assert forbidden.status_code == 404
+
+
+def test_job_search_result_feedback_upserts_and_is_user_scoped(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("JOBAGENT_DB_PATH", str(tmp_path / "result-feedback.sqlite3"))
+    owner_headers = _auth_headers(_register("feedback-owner"))
+    other_headers = _auth_headers(_register("feedback-other"))
+    confirmed = _create_confirmed_profile(owner_headers)
+    run = client.post(
+        "/api/v1/job-search-runs",
+        headers=owner_headers,
+        json={
+            "session_id": confirmed["profile_session"]["session_id"],
+            "search_mode": "local_mock",
+        },
+    ).json()["job_search_run"]
+    result_id = run["results"][0]["job_result_id"]
+    endpoint = f"/api/v1/job-search-runs/{run['job_search_run_id']}/results/{result_id}/feedback"
+
+    created = client.post(
+        endpoint,
+        headers=owner_headers,
+        json={"feedback_type": "relevant", "note": "Strong match"},
+    )
+    updated = client.post(
+        endpoint,
+        headers=owner_headers,
+        json={"feedback_type": "irrelevant", "note": "Wrong seniority"},
+    )
+    listed = client.get(
+        f"/api/v1/job-search-runs/{run['job_search_run_id']}/feedback",
+        headers=owner_headers,
+    )
+    other = client.get(
+        f"/api/v1/job-search-runs/{run['job_search_run_id']}/feedback",
+        headers=other_headers,
+    )
+
+    assert created.status_code == 200
+    assert updated.status_code == 200
+    assert updated.json()["feedback_id"] == created.json()["feedback_id"]
+    assert updated.json()["feedback_type"] == "irrelevant"
+    assert updated.json()["source_provider"] == "local_mock"
+    assert updated.json()["resume_profile_id"] is not None
+    assert len(listed.json()["items"]) == 1
+    assert other.status_code == 404

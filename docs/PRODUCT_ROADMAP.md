@@ -15,6 +15,7 @@ Implemented capabilities:
 - search preview, multiple providers, bounded candidate analysis, and traces;
 - browser-assisted BOSS search and current-page capture;
 - saved JD and analysis snapshots, tags, notes, and simple application status.
+- user-visible search history, saved-job analysis history, and result feedback.
 
 ## Main Product Gap
 

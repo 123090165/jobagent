@@ -187,6 +187,31 @@ export interface JobSearchRunResponse {
   steps: JobSearchTraceStep[];
 }
 
+export type JobSearchFeedbackType =
+  | "relevant"
+  | "irrelevant"
+  | "duplicate"
+  | "stale"
+  | "insufficient_jd";
+
+export interface JobSearchResultFeedback {
+  feedback_id: string;
+  user_id: string;
+  job_search_run_id: string;
+  job_result_id: string;
+  confirmed_profile_id: string;
+  resume_profile_id: string | null;
+  source_provider: string | null;
+  feedback_type: JobSearchFeedbackType;
+  note: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface JobSearchResultFeedbackListResponse {
+  items: JobSearchResultFeedback[];
+}
+
 export interface JobSearchIntent {
   role_titles: string[];
   role_families: string[];

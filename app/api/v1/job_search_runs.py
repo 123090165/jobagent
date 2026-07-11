@@ -11,6 +11,10 @@ from app.application.job_search_usecases import (
     list_job_search_trace_steps,
     preview_job_search_run,
 )
+from app.application.job_search_feedback_usecases import (
+    list_result_feedback,
+    upsert_result_feedback,
+)
 from app.schemas.auth import UserAccount
 from app.schemas.job_search import (
     BrowserHelperJobSearchRunCreateRequest,
@@ -19,6 +23,11 @@ from app.schemas.job_search import (
     JobSearchRunResponse,
     JobSearchRunListResponse,
     JobSearchTraceStepListResponse,
+)
+from app.schemas.job_search_feedback import (
+    JobSearchResultFeedback,
+    JobSearchResultFeedbackListResponse,
+    JobSearchResultFeedbackUpsertRequest,
 )
 
 router = APIRouter(prefix="/api/v1/job-search-runs", tags=["v4-job-search-runs"])
@@ -83,4 +92,32 @@ def list_job_search_run_steps_endpoint(
 ) -> JobSearchTraceStepListResponse:
     return JobSearchTraceStepListResponse(
         items=list_job_search_trace_steps(run_id, user_id=current_user.user_id)
+    )
+
+
+@router.get("/{run_id}/feedback", response_model=JobSearchResultFeedbackListResponse)
+def list_result_feedback_endpoint(
+    run_id: str,
+    current_user: UserAccount = Depends(get_current_user),
+) -> JobSearchResultFeedbackListResponse:
+    return JobSearchResultFeedbackListResponse(
+        items=list_result_feedback(run_id, user_id=current_user.user_id)
+    )
+
+
+@router.post(
+    "/{run_id}/results/{result_id}/feedback",
+    response_model=JobSearchResultFeedback,
+)
+def upsert_result_feedback_endpoint(
+    run_id: str,
+    result_id: str,
+    payload: JobSearchResultFeedbackUpsertRequest,
+    current_user: UserAccount = Depends(get_current_user),
+) -> JobSearchResultFeedback:
+    return upsert_result_feedback(
+        run_id,
+        result_id,
+        payload,
+        user_id=current_user.user_id,
     )

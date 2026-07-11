@@ -388,6 +388,25 @@ def init_database(connection: sqlite3.Connection) -> None:
             FOREIGN KEY (source_job_search_run_id)
                 REFERENCES job_search_runs(job_search_run_id)
         );
+
+        CREATE TABLE IF NOT EXISTS job_search_result_feedback (
+            feedback_id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            job_search_run_id TEXT NOT NULL,
+            job_result_id TEXT NOT NULL,
+            confirmed_profile_id TEXT NOT NULL,
+            resume_profile_id TEXT,
+            source_provider TEXT,
+            feedback_type TEXT NOT NULL,
+            note TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users(user_id),
+            FOREIGN KEY (job_search_run_id) REFERENCES job_search_runs(job_search_run_id),
+            FOREIGN KEY (confirmed_profile_id) REFERENCES confirmed_profiles(confirmed_profile_id),
+            FOREIGN KEY (resume_profile_id) REFERENCES resume_profiles(resume_profile_id),
+            UNIQUE (user_id, job_search_run_id, job_result_id)
+        );
         """
     )
     _ensure_local_user(connection)
@@ -519,5 +538,7 @@ def _ensure_indexes(connection: sqlite3.Connection) -> None:
             WHERE normalized_source_key IS NOT NULL;
         CREATE INDEX IF NOT EXISTS idx_saved_job_analyses_saved_job_id
             ON saved_job_analyses(saved_job_id, created_at);
+        CREATE INDEX IF NOT EXISTS idx_job_search_feedback_run_id
+            ON job_search_result_feedback(user_id, job_search_run_id, updated_at);
         """
     )
