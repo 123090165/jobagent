@@ -13,7 +13,7 @@ import {
 } from "../services/jobSearchSources";
 import { useProfileSessionStore } from "../stores/profileSession";
 import { useSavedJobsStore } from "../stores/savedJobs";
-import type { JobSearchResult } from "../types/profileSession";
+import type { JobSearchResult, JobSearchTraceStep } from "../types/profileSession";
 
 const route = useRoute();
 const router = useRouter();
@@ -24,6 +24,8 @@ const jobBriefHint = ref<string | null>(null);
 const savedJobMessage = ref<string | null>(null);
 const savingResultIds = ref<string[]>([]);
 const locallySavedResultIds = ref<string[]>([]);
+const nowMs = ref(Date.now());
+let elapsedTimer: number | null = null;
 
 const isRunning = computed(() =>
   ["pending", "running"].includes(profileSessionStore.jobSearchRun?.status ?? "")
@@ -104,6 +106,24 @@ const llmAnalysisLabel = computed(() => {
     ? `LLM enabled - ${llmProviderFromTrace.value}`
     : "LLM enabled";
 });
+const clientElapsedLabel = computed(() => {
+  const startedAt = profileSessionStore.jobSearchClientStartedAt;
+  const clientRunId = profileSessionStore.jobSearchClientRunId;
+  if (startedAt === null || clientRunId !== runId.value) {
+    return null;
+  }
+  const run = profileSessionStore.jobSearchRun;
+  const completedAt = run?.status === "completed" || run?.status === "failed"
+    ? new Date(run.updated_at).getTime()
+    : nowMs.value;
+  return formatDurationMs(completedAt - startedAt);
+});
+const clientStageEntries = computed(() => {
+  if (profileSessionStore.jobSearchClientRunId !== runId.value) {
+    return [];
+  }
+  return profileSessionStore.jobSearchClientStages;
+});
 const savedSearchResultIds = computed(() => {
   const ids = new Set<string>();
   for (const job of savedJobsStore.jobs) {
@@ -122,6 +142,7 @@ const savedSearchResultIds = computed(() => {
 });
 
 onMounted(async () => {
+  startElapsedTicker();
   jobBriefHint.value = null;
   savedJobMessage.value = null;
   try {
@@ -145,6 +166,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   profileSessionStore.stopPollingJobSearchRun();
+  stopElapsedTicker();
 });
 
 function goBackToConfirmed() {
@@ -215,6 +237,119 @@ function formatTraceDetail(value: unknown) {
     return JSON.stringify(value);
   }
   return String(value ?? "");
+}
+
+function startElapsedTicker(): void {
+  stopElapsedTicker();
+  elapsedTimer = window.setInterval(() => {
+    nowMs.value = Date.now();
+  }, 1000);
+}
+
+function stopElapsedTicker(): void {
+  if (elapsedTimer !== null) {
+    window.clearInterval(elapsedTimer);
+    elapsedTimer = null;
+  }
+}
+
+function stepElapsedMs(step: JobSearchTraceStep): number | null {
+  if (step.duration_ms !== null) {
+    return step.duration_ms;
+  }
+  if (step.status === "running" && step.started_at) {
+    return nowMs.value - new Date(step.started_at).getTime();
+  }
+  return null;
+}
+
+function formatDurationMs(value: number | null | undefined): string {
+  if (value === null || value === undefined || Number.isNaN(value)) {
+    return "not started";
+  }
+  const milliseconds = Math.max(0, value);
+  if (milliseconds < 1000) {
+    return `${Math.round(milliseconds)}ms`;
+  }
+  const seconds = milliseconds / 1000;
+  if (seconds < 60) {
+    return `${seconds.toFixed(seconds < 10 ? 1 : 0)}s`;
+  }
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = Math.round(seconds % 60);
+  return `${minutes}m ${remainingSeconds}s`;
+}
+
+function traceTimingEntries(step: JobSearchTraceStep): Array<[string, string]> {
+  const timings = step.details.timings_ms;
+  if (!timings || Array.isArray(timings) || typeof timings !== "object") {
+    return [];
+  }
+  return Object.entries(timings)
+    .filter(([, value]) => typeof value === "number")
+    .map(([key, value]) => [formatTimingLabel(key), formatDurationMs(value as number)]);
+}
+
+function visibleTraceDetails(step: JobSearchTraceStep): Array<[string, unknown]> {
+  const hiddenKeys = new Set([
+    "timings_ms",
+    "candidate_runs",
+    "payload_stats",
+    "provider_queries",
+    "recall_queries",
+    "ranking_signals",
+    "query_stats",
+    "source_attempts",
+    "selected_indexes"
+  ]);
+  return Object.entries(step.details).filter(([key]) => !hiddenKeys.has(key));
+}
+
+function providerQueryRuns(step: JobSearchTraceStep): Array<Record<string, unknown>> {
+  const runs = step.details.query_stats;
+  if (!Array.isArray(runs)) {
+    return [];
+  }
+  return runs
+    .filter((item): item is Record<string, unknown> => item !== null && typeof item === "object")
+    .filter((item) => typeof item.duration_ms === "number")
+    .slice(0, 6);
+}
+
+function slowCandidateRuns(step: JobSearchTraceStep): Array<Record<string, unknown>> {
+  const runs = step.details.candidate_runs;
+  if (!Array.isArray(runs)) {
+    return [];
+  }
+  return [...runs]
+    .filter((item): item is Record<string, unknown> => item !== null && typeof item === "object")
+    .sort((left, right) => Number(right.duration_ms ?? 0) - Number(left.duration_ms ?? 0))
+    .slice(0, 3);
+}
+
+function formatTimingLabel(key: string): string {
+  const labels: Record<string, string> = {
+    intent_extraction: "Intent",
+    plan_assembly: "Plan",
+    deterministic_ranking: "Local rank",
+    prompt_build: "Prompt",
+    llm_request: "LLM request",
+    response_validation: "Validation",
+    total_candidate_work: "Candidate work",
+    min_candidate: "Min candidate",
+    max_candidate: "Max candidate",
+    average_candidate: "Avg candidate",
+    total: "Total"
+  };
+  return labels[key] ?? key.replace(/_/g, " ");
+}
+
+function formatQueryLabel(value: unknown): string {
+  const text = String(value ?? "").trim();
+  if (text.length <= 64) {
+    return text || "query";
+  }
+  return `${text.slice(0, 63)}...`;
 }
 </script>
 
@@ -298,6 +433,23 @@ function formatTraceDetail(value: unknown) {
           <strong>Analysis:</strong>
           {{ llmAnalysisLabel }}
         </p>
+        <p v-if="clientElapsedLabel">
+          <strong>Client Elapsed:</strong>
+          {{ clientElapsedLabel }}
+        </p>
+        <div v-if="clientStageEntries.length" class="job-card-section">
+          <strong>Client Stages</strong>
+          <div class="job-chip-row">
+            <n-tag
+              v-for="stage in clientStageEntries"
+              :key="`${stage.label}-${stage.duration_ms}`"
+              size="small"
+              round
+            >
+              {{ stage.label }} {{ formatDurationMs(stage.duration_ms) }}
+            </n-tag>
+          </div>
+        </div>
         <p v-if="profileSessionStore.jobSearchRun.error_message">
           <strong>Error:</strong> {{ profileSessionStore.jobSearchRun.error_message }}
         </p>
@@ -314,16 +466,53 @@ function formatTraceDetail(value: unknown) {
             <div class="trace-step-header">
               <strong>{{ step.step_index }}. {{ step.name }}</strong>
               <div class="trace-step-tags">
+                <n-tag size="small" round>{{ formatDurationMs(stepElapsedMs(step)) }}</n-tag>
                 <n-tag :type="statusTagType(step.status)" round>{{ step.status }}</n-tag>
                 <n-tag size="small" round>{{ step.mode }}</n-tag>
               </div>
             </div>
             <p>{{ step.summary }}</p>
             <p v-if="step.fallback_reason"><strong>Fallback:</strong> {{ step.fallback_reason }}</p>
-            <div v-if="Object.keys(step.details).length" class="job-card-section">
+            <div v-if="traceTimingEntries(step).length" class="job-card-section">
+              <strong>Timings</strong>
+              <div class="job-chip-row">
+                <n-tag
+                  v-for="[key, value] in traceTimingEntries(step)"
+                  :key="key"
+                  size="small"
+                  round
+                >
+                  {{ key }} {{ value }}
+                </n-tag>
+              </div>
+            </div>
+            <div v-if="providerQueryRuns(step).length" class="job-card-section">
+              <strong>Provider Calls</strong>
+              <ul class="review-list">
+                <li v-for="queryRun in providerQueryRuns(step)" :key="`${queryRun.query}-${queryRun.location}`">
+                  {{ formatQueryLabel(queryRun.query) }} -
+                  {{ queryRun.returned_count ?? 0 }} returned /
+                  {{ queryRun.new_candidate_count ?? 0 }} new -
+                  {{ formatDurationMs(Number(queryRun.duration_ms ?? 0)) }}
+                </li>
+              </ul>
+            </div>
+            <div v-if="slowCandidateRuns(step).length" class="job-card-section">
+              <strong>Slowest Candidates</strong>
+              <ul class="review-list">
+                <li v-for="candidate in slowCandidateRuns(step)" :key="String(candidate.candidate_index)">
+                  #{{ candidate.candidate_index }} {{ candidate.title || "Untitled" }} -
+                  {{ formatDurationMs(Number(candidate.duration_ms ?? 0)) }}
+                  <template v-if="candidate.fallback_reason">
+                    - fallback {{ candidate.fallback_reason }}
+                  </template>
+                </li>
+              </ul>
+            </div>
+            <div v-if="visibleTraceDetails(step).length" class="job-card-section">
               <strong>Trace Details</strong>
               <ul class="review-list">
-                <li v-for="[key, value] in Object.entries(step.details)" :key="key">
+                <li v-for="[key, value] in visibleTraceDetails(step)" :key="key">
                   {{ key }}: {{ formatTraceDetail(value) }}
                 </li>
               </ul>

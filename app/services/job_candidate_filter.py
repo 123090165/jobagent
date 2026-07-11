@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import time
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -125,6 +126,7 @@ class CandidateFilterResult(BaseModel):
     mode: Literal["deterministic", "llm", "fallback"]
     fallback_reason: str | None = None
     quality_warnings: list[str] = Field(default_factory=list)
+    diagnostics: dict[str, object] = Field(default_factory=dict)
 
 
 def filter_candidates(
@@ -136,9 +138,24 @@ def filter_candidates(
     llm_service: JSONChatLLM | None = None,
     limit: int | None = None,
 ) -> CandidateFilterResult:
+    total_start = time.perf_counter()
+    deterministic_start = time.perf_counter()
     deterministic = _deterministic_filter(confirmed_profile, search_plan, candidates, limit=limit)
+    base_diagnostics = {
+        "timings_ms": {
+            "deterministic_ranking": _elapsed_ms(deterministic_start),
+        },
+        "payload_stats": {
+            "candidate_count": len(candidates),
+            "requested_limit": limit or len(candidates),
+        },
+    }
     if not use_llm:
-        return deterministic
+        return deterministic.model_copy(
+            update={
+                "diagnostics": _with_total_timing(base_diagnostics, total_start),
+            }
+        )
 
     if llm_service is None:
         return deterministic.model_copy(
@@ -146,42 +163,117 @@ def filter_candidates(
                 "mode": "fallback",
                 "fallback_reason": "llm_service_unavailable",
                 "quality_warnings": deterministic.quality_warnings + ["LLM filtering unavailable. Used deterministic ranking."],
+                "diagnostics": _with_total_timing(
+                    {
+                        **base_diagnostics,
+                        "fallback_diagnostics": {
+                            "reason": "llm_service_unavailable",
+                        },
+                    },
+                    total_start,
+                ),
             }
         )
 
+    llm_timings: dict[str, float] = {}
+    llm_payload_stats: dict[str, object] = {}
+    request_start: float | None = None
+    validation_start: float | None = None
     try:
+        prompt_start = time.perf_counter()
+        candidates_json = json.dumps(
+            [
+                {**candidate.model_dump(mode="json"), "index": index}
+                for index, candidate in enumerate(candidates)
+            ],
+            ensure_ascii=False,
+        )
+        user_prompt = (
+            f"Requested result limit: {limit or len(candidates)}\n\n"
+            "Confirmed profile JSON:\n"
+            f"{json.dumps(confirmed_profile.model_dump(mode='json'), ensure_ascii=False)}\n\n"
+            "Search plan JSON:\n"
+            f"{search_plan.model_dump_json()}\n\n"
+            "Candidates JSON:\n"
+            f"{candidates_json}"
+        )
+        prompt_build_ms = _elapsed_ms(prompt_start)
+        llm_timings["prompt_build"] = prompt_build_ms
+        llm_payload_stats.update(
+            {
+                "system_prompt_chars": len(LLM_CANDIDATE_RANKING_SYSTEM_PROMPT),
+                "user_prompt_chars": len(user_prompt),
+                "candidate_payload_chars": len(candidates_json),
+            }
+        )
+        request_start = time.perf_counter()
         payload = llm_service.chat_completion_json(
             system_prompt=LLM_CANDIDATE_RANKING_SYSTEM_PROMPT,
-            user_prompt=(
-                f"Requested result limit: {limit or len(candidates)}\n\n"
-                "Confirmed profile JSON:\n"
-                f"{json.dumps(confirmed_profile.model_dump(mode='json'), ensure_ascii=False)}\n\n"
-                "Search plan JSON:\n"
-                f"{search_plan.model_dump_json()}\n\n"
-                "Candidates JSON:\n"
-                f"{json.dumps([{**candidate.model_dump(mode='json'), 'index': index} for index, candidate in enumerate(candidates)], ensure_ascii=False)}"
-            ),
+            user_prompt=user_prompt,
         )
+        llm_request_ms = _elapsed_ms(request_start)
+        llm_timings["llm_request"] = llm_request_ms
+        validation_start = time.perf_counter()
         scorecards = _validate_llm_scorecards(payload, candidate_count=len(candidates), limit=limit)
+        validation_ms = _elapsed_ms(validation_start)
+        llm_timings["response_validation"] = validation_ms
         valid_indexes = [scorecard.candidate_index for scorecard in scorecards]
         if limit is not None:
             valid_indexes = valid_indexes[:limit]
         if not valid_indexes:
             raise ValueError("LLM did not select any valid candidates")
+        quality_warnings = _dedupe_list(payload.get("quality_warnings", []))
         return CandidateFilterResult(
             selected_candidates=[candidates[index] for index in valid_indexes],
             selected_indexes=valid_indexes,
             scorecards=scorecards[: len(valid_indexes)],
             mode="llm",
             fallback_reason=None,
-            quality_warnings=_dedupe_list(payload.get("quality_warnings", [])),
+            quality_warnings=quality_warnings,
+            diagnostics=_with_total_timing(
+                {
+                    **base_diagnostics,
+                    "timings_ms": {
+                        **base_diagnostics["timings_ms"],
+                        **llm_timings,
+                    },
+                    "payload_stats": {
+                        **base_diagnostics["payload_stats"],
+                        **llm_payload_stats,
+                        "returned_scorecard_count": len(scorecards),
+                        "quality_warning_count": len(quality_warnings),
+                    },
+                },
+                total_start,
+            ),
         )
     except (LLMServiceError, TypeError, ValueError) as exc:
+        if request_start is not None and "llm_request" not in llm_timings:
+            llm_timings["llm_request"] = _elapsed_ms(request_start)
+        if validation_start is not None and "response_validation" not in llm_timings:
+            llm_timings["response_validation"] = _elapsed_ms(validation_start)
         return deterministic.model_copy(
             update={
                 "mode": "fallback",
                 "fallback_reason": type(exc).__name__,
                 "quality_warnings": deterministic.quality_warnings + [f"LLM filtering fallback triggered: {type(exc).__name__}."],
+                "diagnostics": _with_total_timing(
+                    {
+                        **base_diagnostics,
+                        "timings_ms": {
+                            **base_diagnostics["timings_ms"],
+                            **llm_timings,
+                        },
+                        "payload_stats": {
+                            **base_diagnostics["payload_stats"],
+                            **llm_payload_stats,
+                        },
+                        "fallback_diagnostics": {
+                            "reason": type(exc).__name__,
+                        },
+                    },
+                    total_start,
+                ),
             }
         )
 
@@ -649,3 +741,13 @@ def _dedupe_list(values: list[str] | object) -> list[str]:
         seen.add(key)
         items.append(text)
     return items
+
+
+def _elapsed_ms(start: float) -> float:
+    return round((time.perf_counter() - start) * 1000.0, 3)
+
+
+def _with_total_timing(diagnostics: dict[str, object], start: float) -> dict[str, object]:
+    timings = dict(diagnostics.get("timings_ms", {}))
+    timings["total"] = _elapsed_ms(start)
+    return {**diagnostics, "timings_ms": timings}

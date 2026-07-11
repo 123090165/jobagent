@@ -69,6 +69,14 @@ interface ProfileSessionState {
   jobSearchPollTimer: number | null;
   jobSearchPreviewRequestId: number;
   jobSearchPreviewControls: JobSearchPreviewControls | null;
+  jobSearchClientStartedAt: number | null;
+  jobSearchClientRunId: string | null;
+  jobSearchClientStages: JobSearchClientStage[];
+}
+
+export interface JobSearchClientStage {
+  label: string;
+  duration_ms: number;
 }
 
 export interface JobSearchPreviewControls {
@@ -115,7 +123,10 @@ export const useProfileSessionStore = defineStore("profileSession", {
     error: null,
     jobSearchPollTimer: null,
     jobSearchPreviewRequestId: 0,
-    jobSearchPreviewControls: null
+    jobSearchPreviewControls: null,
+    jobSearchClientStartedAt: null,
+    jobSearchClientRunId: null,
+    jobSearchClientStages: []
   }),
   actions: {
     async createSession(): Promise<ProfileSession> {
@@ -391,6 +402,19 @@ export const useProfileSessionStore = defineStore("profileSession", {
       this.jobSearchSteps = [];
       this.error = null;
     },
+    beginJobSearchClientTiming(): void {
+      this.jobSearchClientStartedAt = Date.now();
+      this.jobSearchClientRunId = null;
+      this.jobSearchClientStages = [];
+    },
+    clearJobSearchClientTiming(): void {
+      this.jobSearchClientStartedAt = null;
+      this.jobSearchClientRunId = null;
+      this.jobSearchClientStages = [];
+    },
+    addJobSearchClientStage(stage: JobSearchClientStage): void {
+      this.jobSearchClientStages = [...this.jobSearchClientStages, stage];
+    },
     saveJobSearchPreviewControls(controls: JobSearchPreviewControls): void {
       this.jobSearchPreviewControls = {
         ...controls,
@@ -407,6 +431,9 @@ export const useProfileSessionStore = defineStore("profileSession", {
         const response = await createJobSearchRun(payload);
         this.session = response.profile_session;
         this.jobSearchRun = response.job_search_run;
+        if (this.jobSearchClientStartedAt !== null) {
+          this.jobSearchClientRunId = response.job_search_run.job_search_run_id;
+        }
         this.jobSearchSteps = response.steps;
         this.jobSearchRuns = [response.job_search_run, ...this.jobSearchRuns.filter(
           (item) => item.job_search_run_id !== response.job_search_run.job_search_run_id
@@ -429,6 +456,9 @@ export const useProfileSessionStore = defineStore("profileSession", {
         const response = await createBrowserHelperJobSearchRun(payload);
         this.session = response.profile_session;
         this.jobSearchRun = response.job_search_run;
+        if (this.jobSearchClientStartedAt !== null) {
+          this.jobSearchClientRunId = response.job_search_run.job_search_run_id;
+        }
         this.jobSearchSteps = response.steps;
         this.jobSearchRuns = [response.job_search_run, ...this.jobSearchRuns.filter(
           (item) => item.job_search_run_id !== response.job_search_run.job_search_run_id

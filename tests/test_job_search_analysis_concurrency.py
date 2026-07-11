@@ -7,6 +7,7 @@ from app.agents.types import AgentRunMetadata, AgentRunResult
 from app.application import job_search_usecases
 from app.schemas.job import JobAnalysis
 from app.services.job_candidate_filter import CandidateFilterResult
+from app.services.job_search_execution import candidate_analysis
 from app.services.job_search_providers.base import RawJobCandidate
 
 
@@ -57,7 +58,7 @@ def test_jd_analysis_uses_bounded_parallelism(monkeypatch) -> None:
 
     monkeypatch.setenv("JOBAGENT_JD_ANALYSIS_CONCURRENCY", "3")
     monkeypatch.setattr(
-        job_search_usecases,
+        candidate_analysis,
         "run_jd_analysis_agent",
         fake_run_jd_analysis_agent,
     )
@@ -100,7 +101,7 @@ def test_jd_analysis_concurrency_one_preserves_serial_behavior(monkeypatch) -> N
 
     monkeypatch.setenv("JOBAGENT_JD_ANALYSIS_CONCURRENCY", "1")
     monkeypatch.setattr(
-        job_search_usecases,
+        candidate_analysis,
         "run_jd_analysis_agent",
         fake_run_jd_analysis_agent,
     )
@@ -130,7 +131,7 @@ def test_jd_analysis_parallel_failure_falls_back_per_candidate(monkeypatch) -> N
 
     monkeypatch.setenv("JOBAGENT_JD_ANALYSIS_CONCURRENCY", "3")
     monkeypatch.setattr(
-        job_search_usecases,
+        candidate_analysis,
         "run_jd_analysis_agent",
         fake_run_jd_analysis_agent,
     )

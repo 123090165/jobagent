@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -25,6 +26,7 @@ class JobSearchPlan(BaseModel):
     mode: Literal["deterministic", "llm", "fallback"]
     fallback_reason: str | None = None
     quality_warnings: list[str] = Field(default_factory=list)
+    diagnostics: dict[str, object] = Field(default_factory=dict)
 
 
 def build_search_plan(
@@ -33,12 +35,34 @@ def build_search_plan(
     use_llm: bool,
     llm_service: JSONChatLLM | None = None,
 ) -> JobSearchPlan:
+    total_start = time.perf_counter()
+    intent_start = time.perf_counter()
     intent = build_search_intent(
         confirmed_profile,
         use_llm=use_llm,
         llm_service=llm_service,
     )
-    return _build_plan_from_intent(confirmed_profile, intent)
+    intent_ms = _elapsed_ms(intent_start)
+    assembly_start = time.perf_counter()
+    plan = _build_plan_from_intent(confirmed_profile, intent)
+    assembly_ms = _elapsed_ms(assembly_start)
+    return plan.model_copy(
+        update={
+            "diagnostics": {
+                "timings_ms": {
+                    "intent_extraction": intent_ms,
+                    "plan_assembly": assembly_ms,
+                    "total": _elapsed_ms(total_start),
+                },
+                "payload_stats": {
+                    "query_count": len(plan.queries),
+                    "target_role_count": len(plan.target_roles),
+                    "ranking_signal_count": len(plan.must_have_signals),
+                    "planning_mode": plan.mode,
+                },
+            }
+        }
+    )
 
 
 def _build_plan_from_intent(
@@ -134,3 +158,7 @@ def _overlaps_target_role(term: str, target_roles: list[str]) -> bool:
         if role_key and (term_key == role_key or term_key in role_key or role_key in term_key):
             return True
     return False
+
+
+def _elapsed_ms(start: float) -> float:
+    return round((time.perf_counter() - start) * 1000.0, 3)

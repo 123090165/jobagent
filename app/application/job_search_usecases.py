@@ -1,15 +1,9 @@
 from __future__ import annotations
 
-import os
-from collections import Counter
-from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Literal
-from uuid import NAMESPACE_URL, uuid5
-
 from fastapi import BackgroundTasks
 
-from app.agents.jd_analysis_agent import run_jd_analysis_agent
 from app.application.profile_session_usecases import get_profile_session
 from app.repositories.confirmed_profile_repository import (
     ConfirmedProfileRepository,
@@ -25,12 +19,8 @@ from app.repositories.profile_session_repository import (
 )
 from app.schemas.confirmed_profile import ConfirmedProfile
 from app.schemas.job_search import (
-    BROWSER_CAPTURE_PREVIEW_LENGTH,
     BrowserJobCaptureAnalyzeResponse,
-    BrowserJobCaptureReport,
     BrowserJobCaptureRequest,
-    BrowserJobCaptureSummary,
-    BrowserHelperJobCandidate,
     BrowserHelperJobSearchRunCreateRequest,
     JobSearchResult,
     JobSearchPreviewResponse,
@@ -40,40 +30,59 @@ from app.schemas.job_search import (
     JobSearchTraceStep,
 )
 from app.services.errors import JobAgentError
-from app.services.job_candidate_filter import (
-    CandidateFilterResult,
-    CandidateScorecard,
-    filter_candidates,
+from app.services.job_candidate_filter import filter_candidates
+from app.services.job_search_execution.candidate_analysis import _analyze_candidates
+from app.services.job_search_execution.browser_capture import (
+    _browser_capture_report,
+    _browser_helper_candidate_to_raw,
+    _capture_summary,
+    _trace_quality_warnings,
+    browser_job_capture_to_candidate,
+)
+from app.services.job_search_execution.preview import (
+    _augment_search_plan,
+    _augment_search_plan_from_inputs,
+    _build_provider_preview_searches,
+    _estimate_query_budget,
+    _provider_name_from_selected_sources,
+    _ranking_signals_from_plan,
+    _recall_queries_from_plan,
+    _resolve_search_inputs,
+    _resolve_selected_sources,
+    _search_source_notes,
+)
+from app.services.job_search_execution.provider_search import (
+    MAX_PROVIDER_QUERIES_PER_RUN,
+    _provider_source_kind,
+    _run_provider_search,
+)
+from app.services.job_search_execution.trace import (
+    ASSEMBLY_GUARDRAILS,
+    FILTER_GUARDRAILS,
+    PLANNING_GUARDRAILS,
+    TRACE_STEP_NAMES,
+    _create_initial_trace_steps,
+    _ensure_trace_steps,
+    _find_running_or_pending_step,
 )
 from app.services.job_search_planner import (
     JobSearchPlan,
-    build_focused_provider_queries,
     build_search_plan,
 )
-from app.services.job_search_recall_metrics import (
-    build_source_recall_stats,
-    candidate_recall_key,
+from app.services.job_search_execution.result_builder import (
+    _assemble_results,
+    _build_local_mock_results,
+    _match_candidates,
+    _source_provider_counts,
 )
 from app.services.job_search_providers import (
     BrowserHelperPayloadProvider,
     JobSearchProvider,
-    RawJobCandidate,
-    encode_selected_sources,
     normalize_job_search_provider_name,
     normalize_job_search_source_name,
     resolve_job_search_provider,
-    selected_sources_from_provider_name,
-)
-from app.services.job_search_providers.cuhksz_career_provider import (
-    build_cuhksz_search_url,
-    build_cuhksz_title_terms,
 )
 from app.services.job_search_providers.multi_source_provider import MultiSourceJobSearchProvider
-from app.services.job_search_providers.serper_web_provider import (
-    build_serper_preview_search_url,
-    configured_serper_search_sites,
-)
-from app.services.job_search_providers.remoteok_provider import REMOTEOK_API_URL
 from app.services.llm_provider import (
     DEFAULT_LLM_PROVIDER,
     JSONChatLLM,
@@ -82,34 +91,6 @@ from app.services.llm_provider import (
     resolve_llm_provider,
 )
 from app.storage.database import LOCAL_USER_ID
-
-TRACE_STEP_NAMES = [
-    "Search planning",
-    "Provider search",
-    "Candidate filtering",
-    "JD analysis",
-    "Profile matching",
-    "Result assembly",
-]
-
-PLANNING_GUARDRAILS = [
-    "Only derive job search intent from the confirmed profile.",
-    "Do not invent missing work history, domain experience, or credentials.",
-]
-FILTER_GUARDRAILS = [
-    "Only rank candidates returned by the search provider.",
-    "Do not create or merge candidates.",
-]
-ASSEMBLY_GUARDRAILS = [
-    "Only return jobs backed by provider results and source metadata.",
-    "Do not invent source URLs or provider names.",
-]
-MAX_PROVIDER_QUERIES_PER_RUN = 3
-MAX_PROVIDER_LOCATIONS_PER_RUN = 3
-MAX_PROVIDER_PREVIEW_TERMS = 8
-DEFAULT_JD_ANALYSIS_CONCURRENCY = 3
-MAX_JD_ANALYSIS_CONCURRENCY = 8
-
 
 def _uses_job_search_analysis(search_mode: str) -> bool:
     return search_mode in {"live_search", "browser_helper"}
@@ -123,63 +104,6 @@ class JobSearchAnalysisConfig:
     @property
     def mode(self) -> Literal["deterministic", "llm"]:
         return "llm" if self.enabled else "deterministic"
-
-
-@dataclass
-class ProviderQueryStat:
-    query: str
-    location: str | None
-    requested_limit: int
-    returned_count: int
-    new_candidate_count: int
-    source_count: int = 1
-    logical_request_count: int = 1
-
-    def to_dict(self) -> dict[str, object]:
-        return {
-            "query": self.query,
-            "location": self.location,
-            "requested_limit": self.requested_limit,
-            "returned_count": self.returned_count,
-            "new_candidate_count": self.new_candidate_count,
-            "source_count": self.source_count,
-            "logical_request_count": self.logical_request_count,
-        }
-
-
-@dataclass
-class ProviderRecallResult:
-    candidates: list[RawJobCandidate]
-    provider_name: str
-    provider_kind: str
-    query_stats: list[ProviderQueryStat] = field(default_factory=list)
-    raw_candidates: list[RawJobCandidate] = field(default_factory=list, repr=False)
-    raw_candidate_count: int = 0
-    duplicate_count: int = 0
-    truncated_candidate_count: int = 0
-    candidate_pool_cap: int = 0
-    source_attempts: list[dict[str, object]] = field(default_factory=list)
-
-    def details(self) -> dict[str, object]:
-        source_stats = build_source_recall_stats(self.raw_candidates, self.candidates)
-        return {
-            "provider": self.provider_name,
-            "source_kind": self.provider_kind,
-            "selected_sources": selected_sources_from_provider_name(self.provider_name),
-            "source_candidate_counts": dict(Counter(candidate.source_provider for candidate in self.candidates)),
-            "source_stats": [item.to_dict() for item in source_stats],
-            "query_count": len(self.query_stats),
-            "logical_provider_call_count": sum(item.logical_request_count for item in self.query_stats),
-            "raw_candidate_count": self.raw_candidate_count,
-            "duplicate_count": self.duplicate_count,
-            "truncated_candidate_count": self.truncated_candidate_count,
-            "deduped_candidate_count": len(self.candidates),
-            "missing_source_url_count": sum(item.missing_url_count for item in source_stats),
-            "missing_detail_count": sum(item.missing_detail_count for item in source_stats),
-            "candidate_pool_cap": self.candidate_pool_cap,
-            "query_stats": [item.to_dict() for item in self.query_stats],
-            "source_attempts": self.source_attempts,
-        }
 
 
 def create_job_search_run(
@@ -408,26 +332,6 @@ def analyze_browser_job_capture(
     )
 
 
-def browser_job_capture_to_candidate(payload: BrowserJobCaptureRequest) -> BrowserHelperJobCandidate:
-    warnings = _browser_capture_warnings(payload)
-    title = payload.title or payload.page_title or "Untitled captured role"
-    snippet = payload.jd_text[:BROWSER_CAPTURE_PREVIEW_LENGTH]
-    source_provider = f"browser_capture_{payload.source}"
-    return BrowserHelperJobCandidate(
-        title=title,
-        company=payload.company,
-        location=payload.location,
-        source_url=payload.source_url,
-        source_provider=source_provider,
-        snippet=snippet,
-        raw_description=payload.jd_text,
-        discovery_query=title,
-        discovery_rank=1,
-        detail_status="browser_job_capture_payload",
-        provider_warnings=warnings,
-    )
-
-
 def _compose_browser_helper_provider(
     helper_provider: BrowserHelperPayloadProvider,
     selected_sources: list[str],
@@ -525,6 +429,8 @@ def execute_job_search_run(
                 "analysis_mode": "llm" if use_llm_analysis else "deterministic",
                 "llm_provider": requested_llm_provider,
                 "llm_configured": llm_resolution.configured if llm_resolution is not None else None,
+                "timings_ms": search_plan.diagnostics.get("timings_ms", {}),
+                "payload_stats": search_plan.diagnostics.get("payload_stats", {}),
             },
         )
 
@@ -583,6 +489,9 @@ def execute_job_search_run(
                 "llm_request_count": 1 if use_llm_analysis and raw_candidates else 0,
                 "analysis_mode": "llm" if use_llm_analysis else "deterministic",
                 "llm_provider": requested_llm_provider,
+                "timings_ms": filtered.diagnostics.get("timings_ms", {}),
+                "payload_stats": filtered.diagnostics.get("payload_stats", {}),
+                "fallback_diagnostics": filtered.diagnostics.get("fallback_diagnostics", {}),
             },
         )
 
@@ -612,6 +521,9 @@ def execute_job_search_run(
                 "fallback_count": analyses["fallback_count"],
                 "analysis_mode_counts": analyses["mode_counts"],
                 "llm_provider": requested_llm_provider,
+                "timings_ms": analyses["timings_ms"],
+                "candidate_runs": analyses["candidate_runs"],
+                "fallback_reasons": analyses["fallback_reasons"],
             },
         )
 
@@ -842,39 +754,6 @@ def preview_job_search_run(
     )
 
 
-def _resolve_search_inputs(
-    payload: JobSearchRunCreateRequest,
-    confirmed_profile: ConfirmedProfile,
-) -> tuple[str, list[str], list[str], list[str]]:
-    locations = _clean_list(payload.locations) or _clean_list(confirmed_profile.preferred_locations)
-    target_roles = _clean_list(payload.target_roles) or _clean_list(confirmed_profile.target_roles)
-    keywords = (
-        _clean_list(payload.keywords)
-        or _clean_list(confirmed_profile.search_keywords)
-        or _clean_list(confirmed_profile.core_skills)
-    )
-    query = (payload.query or "").strip()
-    if not query:
-        query = (target_roles[0] if target_roles else " ".join(keywords[:3])).strip()
-    if not query:
-        query = "Software Engineer"
-    return query, locations, target_roles, keywords
-
-
-def _resolve_selected_sources(payload: JobSearchRunCreateRequest) -> list[str]:
-    if payload.search_mode == "local_mock":
-        return []
-    if payload.selected_sources:
-        return _clean_list([normalize_job_search_source_name(source) for source in payload.selected_sources])
-    provider_name = normalize_job_search_provider_name(payload.search_provider)
-    provider_sources = selected_sources_from_provider_name(provider_name)
-    if provider_sources:
-        return provider_sources
-    if provider_name == "multi_source":
-        return ["cuhksz_career"]
-    return []
-
-
 def _resolve_job_search_analysis_config(payload: JobSearchRunCreateRequest) -> JobSearchAnalysisConfig:
     if not _uses_job_search_analysis(payload.search_mode):
         return JobSearchAnalysisConfig(enabled=False)
@@ -937,920 +816,6 @@ def _resolve_execution_llm_provider(
     if llm_provider is not None:
         return normalize_llm_provider(llm_provider)
     return DEFAULT_LLM_PROVIDER
-
-
-def _provider_name_from_selected_sources(
-    payload: JobSearchRunCreateRequest,
-    selected_sources: list[str],
-) -> str:
-    if selected_sources:
-        return encode_selected_sources(selected_sources)
-    return normalize_job_search_provider_name(payload.search_provider)
-
-
-def _build_provider_preview_searches(
-    provider_name: str | None,
-    provider_queries: list[str],
-    *,
-    selected_sources: list[str] | None = None,
-) -> tuple[list[str], list[str]]:
-    if selected_sources and (provider_name or "").startswith("multi_source:"):
-        terms: list[str] = []
-        urls: list[str] = []
-        for source in selected_sources:
-            source_terms, source_urls = _build_provider_preview_searches(
-                source,
-                provider_queries,
-                selected_sources=None,
-            )
-            terms.extend(source_terms)
-            urls.extend(source_urls)
-        return _clean_list(terms)[:MAX_PROVIDER_PREVIEW_TERMS * max(1, len(selected_sources))], _clean_list(urls)
-    if provider_name == "linkedin":
-        queries = _clean_list(provider_queries)[:MAX_PROVIDER_QUERIES_PER_RUN]
-        return queries, [
-            build_serper_preview_search_url(query, search_sites=["linkedin.com/jobs"])
-            for query in queries
-        ]
-    if provider_name == "remoteok":
-        queries = _clean_list(provider_queries)[:MAX_PROVIDER_QUERIES_PER_RUN]
-        return queries, [REMOTEOK_API_URL]
-    if provider_name == "serper_web":
-        queries = _clean_list(provider_queries)[:MAX_PROVIDER_QUERIES_PER_RUN]
-        sites = configured_serper_search_sites()
-        return queries, [
-            build_serper_preview_search_url(query, search_sites=sites)
-            for query in queries
-        ]
-    if provider_name != "cuhksz_career":
-        return [], []
-    terms: list[str] = []
-    for query in provider_queries[:MAX_PROVIDER_QUERIES_PER_RUN]:
-        terms.extend(build_cuhksz_title_terms(query))
-    terms = _clean_list(terms)[:MAX_PROVIDER_PREVIEW_TERMS]
-    return terms, [build_cuhksz_search_url(term) for term in terms]
-
-
-def _provider_source_kind(provider_name: str | None, search_mode: str) -> str:
-    if search_mode == "local_mock" or provider_name == "mock":
-        return "mock"
-    if search_mode == "browser_helper" or (provider_name or "").startswith("browser_helper"):
-        return "browser_helper"
-    if (provider_name or "").startswith("multi_source:") or provider_name == "multi_source":
-        return "hybrid"
-    if provider_name in {"serper_web", "linkedin"}:
-        return "search_engine"
-    if provider_name == "remoteok":
-        return "native_api"
-    if provider_name == "cuhksz_career":
-        return "native_job_board"
-    return "direct_crawler"
-
-
-def _search_source_notes(provider_name: str | None, source_kind: str) -> list[str]:
-    if source_kind == "mock":
-        return ["Local mock source; no external search is executed."]
-    if provider_name == "serper_web":
-        return [
-            "Search engine discovery broadens recall by finding public job pages and keeping source links.",
-            "Result snippets are retained even when a detail page is not fetched.",
-            "Optional site filters come from JOBAGENT_WEB_SEARCH_SITES, not hardcoded platform logic.",
-        ]
-    if provider_name == "cuhksz_career":
-        return [
-            "Native job board search uses short recall terms for provider-side retrieval.",
-            "Profile-specific skills are treated as ranking signals instead of mandatory title keywords.",
-            "Detail pages are fetched when the provider exposes stable public links.",
-        ]
-    if provider_name == "linkedin":
-        return [
-            "LinkedIn is used as search-engine discovery only.",
-            "Profile pages and broad LinkedIn list pages are filtered out.",
-            "Result links are preserved for the user to open; detail scraping is not performed.",
-        ]
-    if provider_name == "remoteok":
-        return [
-            "RemoteOK uses its public JSON API rather than HTML search-page scraping.",
-            "RemoteOK source links and attribution warnings are preserved.",
-        ]
-    if provider_name == "multi_source" or (provider_name or "").startswith("multi_source:"):
-        return [
-            "Selected sources are searched as one candidate pool.",
-            "CUHKSZ uses direct public list/detail crawling, LinkedIn uses external-link discovery, and RemoteOK uses its public API.",
-            "Each candidate keeps its own source provider for downstream ranking and display.",
-        ]
-    return [
-        "Provider is treated as a pluggable direct crawler/search source.",
-        "Candidate preservation and downstream ranking use the shared provider contract.",
-    ]
-
-
-def _estimate_query_budget(
-    *,
-    provider_name: str,
-    search_mode: str,
-    provider_queries: list[str],
-    locations: list[str],
-    max_results: int,
-    llm_planning_enabled: bool,
-    llm_filtering_enabled: bool,
-    llm_analysis_enabled: bool,
-) -> dict[str, object]:
-    if search_mode == "local_mock" or provider_name == "mock":
-        return {
-            "provider_query_count": 0,
-            "estimated_provider_requests": 0,
-            "estimated_candidate_pool_size": 0,
-            "estimated_llm_planning_requests": 0,
-            "estimated_llm_filtering_requests": 0,
-            "estimated_llm_analysis_requests": 0,
-            "estimated_total_llm_requests": 0,
-            "query_strategy_notes": ["Local mock search does not call external providers or LLMs."],
-        }
-
-    executable_queries = _clean_list(provider_queries)[:MAX_PROVIDER_QUERIES_PER_RUN]
-    executable_locations = _effective_provider_locations(provider_name, locations)
-    per_call_limit = max(1, min(max_results, 5))
-    source_count = max(1, len(selected_sources_from_provider_name(provider_name)))
-    candidate_pool_size = min(
-        max_results * 2,
-        len(executable_queries) * len(executable_locations) * per_call_limit * source_count,
-    )
-    list_request_count = len(executable_queries) * len(executable_locations) * source_count
-    notes = [
-        f"Provider search executes at most {MAX_PROVIDER_QUERIES_PER_RUN} provider query groups.",
-        f"Candidate pool is capped at roughly 2x max_results before filtering.",
-    ]
-    detail_request_count = 0
-
-    if provider_name == "cuhksz_career":
-        title_terms: list[str] = []
-        for query in executable_queries:
-            title_terms.extend(build_cuhksz_title_terms(query))
-        unique_title_terms = _clean_list(title_terms)
-        list_request_count = len(unique_title_terms)
-        detail_request_count = candidate_pool_size
-        notes.append("CUHKSZ expands provider queries into deduped title search terms.")
-        notes.append("CUHKSZ location preferences are used for ranking context, not repeated live URL calls.")
-    elif provider_name in {"serper_web", "linkedin"}:
-        notes.append("Search engine discovery keeps provider queries broad and preserves public result links.")
-        if provider_name == "linkedin":
-            notes.append("LinkedIn discovery filters out profile pages and broad list pages.")
-        elif configured_serper_search_sites():
-            notes.append("Search engine site filters are loaded from JOBAGENT_WEB_SEARCH_SITES.")
-        else:
-            notes.append("No search engine site filter is configured; results may be broader.")
-    elif provider_name == "remoteok":
-        list_request_count = 1
-        notes.append("RemoteOK uses its public JSON API and filters the returned feed locally.")
-    elif provider_name == "multi_source" or provider_name.startswith("multi_source:"):
-        selected_sources = selected_sources_from_provider_name(provider_name)
-        list_request_count = 0
-        detail_request_count = 0
-        for source in selected_sources:
-            if source == "cuhksz_career":
-                title_terms = []
-                for query in executable_queries:
-                    title_terms.extend(build_cuhksz_title_terms(query))
-                list_request_count += len(_clean_list(title_terms))
-                detail_request_count += candidate_pool_size
-            elif source == "remoteok":
-                list_request_count += 1
-            else:
-                list_request_count += len(executable_queries) * len(executable_locations)
-        notes.append("Multi-source search runs selected providers into one deduped candidate pool.")
-        notes.append("LinkedIn candidates are external links; CUHKSZ and RemoteOK can provide structured details.")
-
-    estimated_provider_requests = list_request_count + detail_request_count
-    notes.append(
-        f"Estimated provider requests split: search/list {list_request_count}, detail {detail_request_count}."
-    )
-    planning_requests = 1 if llm_planning_enabled else 0
-    filtering_requests = 1 if llm_filtering_enabled and candidate_pool_size else 0
-    analysis_requests = min(max_results, candidate_pool_size) if llm_analysis_enabled else 0
-    total_llm_requests = planning_requests + filtering_requests + analysis_requests
-    return {
-        "provider_query_count": len(executable_queries),
-        "estimated_provider_requests": estimated_provider_requests,
-        "estimated_candidate_pool_size": candidate_pool_size,
-        "estimated_llm_planning_requests": planning_requests,
-        "estimated_llm_filtering_requests": filtering_requests,
-        "estimated_llm_analysis_requests": analysis_requests,
-        "estimated_total_llm_requests": total_llm_requests,
-        "query_strategy_notes": notes,
-    }
-
-
-def _build_local_mock_results(
-    *,
-    query: str,
-    locations: list[str],
-    target_roles: list[str],
-    keywords: list[str],
-    confirmed_profile: ConfirmedProfile,
-) -> list[JobSearchResult]:
-    role_catalog = [
-        {
-            "role": "Backend Engineer",
-            "company": "Maple Stack",
-            "description": "Build internal APIs, data services, and workflow automation for product teams.",
-            "signals": ["python", "fastapi", "sql", "api", "backend"],
-            "risks": ["May expect deeper database tuning experience."],
-        },
-        {
-            "role": "AI Application Engineer",
-            "company": "Northstar Agents",
-            "description": "Ship agent workflows, prompt tooling, and retrieval-backed internal assistants.",
-            "signals": ["llm", "rag", "agent", "evaluation", "prompt"],
-            "risks": ["May expect hands-on evaluation and prompt iteration examples."],
-        },
-        {
-            "role": "Data Engineer",
-            "company": "Riverlane Metrics",
-            "description": "Maintain ETL pipelines, analytics datasets, and platform data contracts.",
-            "signals": ["sql", "python", "etl", "data", "warehouse"],
-            "risks": ["May expect stronger pipeline orchestration evidence."],
-        },
-        {
-            "role": "Embedded Software Engineer",
-            "company": "Harbor Embedded",
-            "description": "Develop firmware-adjacent services and device integration tooling.",
-            "signals": ["stm32", "rtos", "embedded", "c++", "uart"],
-            "risks": ["May expect hardware bring-up or board-level debugging examples."],
-        },
-        {
-            "role": "Full Stack Developer",
-            "company": "Cedar Product Studio",
-            "description": "Deliver end-to-end product features across API and frontend surfaces.",
-            "signals": ["vue", "typescript", "python", "api", "product"],
-            "risks": ["Role may lean more frontend than the profile prefers."],
-        },
-        {
-            "role": "Platform Engineer",
-            "company": "Granite Cloud",
-            "description": "Improve developer workflows, service deployment, and internal platform reliability.",
-            "signals": ["docker", "ci", "testing", "platform", "python"],
-            "risks": ["May expect production infrastructure ownership examples."],
-        },
-    ]
-    normalized_keywords = _clean_list(
-        keywords + confirmed_profile.core_skills + confirmed_profile.supporting_skills
-    )
-    normalized_roles = _clean_list(target_roles)
-    derived_locations = locations or ["Remote", "Tokyo", "Shenzhen"]
-
-    results: list[JobSearchResult] = []
-    for index, item in enumerate(role_catalog):
-        matched_keywords = [
-            keyword
-            for keyword in normalized_keywords
-            if any(signal in keyword.lower() or keyword.lower() in signal for signal in item["signals"])
-        ]
-        role_match = any(
-            item["role"].lower() in role.lower() or role.lower() in item["role"].lower()
-            for role in normalized_roles
-        )
-        if role_match and item["role"] not in normalized_roles:
-            matched_keywords = matched_keywords or [item["role"]]
-        score = min(95, 60 + len(matched_keywords) * 5 + (10 if role_match else 0))
-        match_reasons = []
-        if role_match:
-            match_reasons.append(f"Target role overlap with {item['role']}.")
-        if matched_keywords:
-            match_reasons.append("Matched keywords: " + ", ".join(matched_keywords[:4]) + ".")
-        if confirmed_profile.work_arrangements:
-            match_reasons.append("Can be filtered later by preferred work arrangements.")
-        if not match_reasons:
-            match_reasons.append("Broad software profile alignment from confirmed profile.")
-
-        location = derived_locations[index % len(derived_locations)]
-        result_id = str(uuid5(NAMESPACE_URL, f"{query}:{item['role']}:{item['company']}:{location}"))
-        results.append(
-            JobSearchResult(
-                job_result_id=result_id,
-                title=item["role"],
-                company=item["company"],
-                location=location,
-                source="local_mock",
-                source_provider="local_mock",
-                source_url=None,
-                raw_snippet=item["description"],
-                description=item["description"],
-                matched_keywords=matched_keywords[:6],
-                match_reasons=match_reasons,
-                risks=item["risks"],
-                match_score=score,
-                recommended_action="Review fit, then tailor resume bullets before applying.",
-                analysis_mode="mock",
-                confidence_label=_confidence_label_for_score(score),
-            )
-        )
-
-    results.sort(key=lambda item: item.match_score, reverse=True)
-    return results[:6]
-
-
-def _create_initial_trace_steps(
-    run_id: str,
-    repository: JobSearchRepository,
-) -> list[JobSearchTraceStep]:
-    return [
-        repository.create_trace_step(
-            job_search_run_id=run_id,
-            step_index=index + 1,
-            name=name,
-            status="pending",
-            mode="deterministic",
-            summary="Queued.",
-        )
-        for index, name in enumerate(TRACE_STEP_NAMES)
-    ]
-
-
-def _ensure_trace_steps(run_id: str, repository: JobSearchRepository) -> list[JobSearchTraceStep]:
-    steps = repository.list_trace_steps(run_id)
-    if steps:
-        return steps
-    return _create_initial_trace_steps(run_id, repository)
-
-
-def _augment_search_plan(plan: JobSearchPlan, run: JobSearchRun) -> JobSearchPlan:
-    return _augment_search_plan_from_inputs(
-        plan,
-        query=run.query,
-        locations=run.locations,
-        target_roles=run.target_roles,
-        keywords=run.keywords,
-    )
-
-
-def _augment_search_plan_from_inputs(
-    plan: JobSearchPlan,
-    *,
-    query: str,
-    locations: list[str],
-    target_roles: list[str],
-    keywords: list[str],
-) -> JobSearchPlan:
-    input_queries = build_focused_provider_queries(target_roles, keywords)
-    queries = _clean_list([query] + input_queries + plan.queries)
-    merged_locations = _clean_list(locations + plan.locations)
-    merged_roles = _clean_list(target_roles + plan.target_roles)
-    must_have = _clean_list(keywords + plan.must_have_signals)
-    return plan.model_copy(
-        update={
-            "queries": queries,
-            "locations": merged_locations,
-            "target_roles": merged_roles,
-            "must_have_signals": must_have,
-        }
-    )
-
-
-def _run_provider_search(
-    provider: JobSearchProvider,
-    *,
-    search_plan: JobSearchPlan,
-    max_results: int,
-) -> ProviderRecallResult:
-    provider_name = getattr(provider, "provider_name", "mock")
-    provider_kind = getattr(provider, "provider_kind", _provider_source_kind(provider_name, "live_search"))
-    queries = search_plan.queries[: max(1, min(len(search_plan.queries), MAX_PROVIDER_QUERIES_PER_RUN))]
-    locations = _effective_provider_locations(provider_name, search_plan.locations)
-    per_call_limit = max(1, min(max_results, 5))
-    candidate_pool_cap = max_results * 2
-    if provider_kind == "browser_helper":
-        query = queries[0] if queries else ""
-        location = locations[0] if locations else None
-        returned = provider.search_jobs(query=query, location=location, limit=candidate_pool_cap)
-        deduped: dict[str, RawJobCandidate] = {}
-        duplicate_count = 0
-        truncated_candidate_count = 0
-        for candidate in returned:
-            key = candidate_recall_key(candidate)
-            if key in deduped:
-                duplicate_count += 1
-                continue
-            if len(deduped) >= candidate_pool_cap:
-                truncated_candidate_count += 1
-                continue
-            deduped[key] = candidate
-        return ProviderRecallResult(
-            candidates=list(deduped.values()),
-            provider_name=provider_name,
-            provider_kind=provider_kind,
-            query_stats=[
-                ProviderQueryStat(
-                    query=query,
-                    location=location,
-                    requested_limit=candidate_pool_cap,
-                    returned_count=len(returned),
-                    new_candidate_count=len(deduped),
-                    source_count=_provider_source_count(provider, provider_name),
-                    logical_request_count=1,
-                )
-            ],
-            raw_candidates=returned,
-            raw_candidate_count=len(returned),
-            duplicate_count=duplicate_count,
-            truncated_candidate_count=truncated_candidate_count,
-            candidate_pool_cap=candidate_pool_cap,
-            source_attempts=_provider_source_attempts(provider),
-        )
-    deduped: dict[str, RawJobCandidate] = {}
-    seen_keys: set[str] = set()
-    stats: list[ProviderQueryStat] = []
-    raw_candidates: list[RawJobCandidate] = []
-    raw_candidate_count = 0
-    duplicate_count = 0
-    truncated_candidate_count = 0
-    source_count = _provider_source_count(provider, provider_name)
-    for query in queries:
-        for location in locations:
-            before_count = len(deduped)
-            returned = provider.search_jobs(query=query, location=location, limit=per_call_limit)
-            raw_candidates.extend(returned)
-            raw_candidate_count += len(returned)
-            for candidate in returned:
-                key = candidate_recall_key(candidate)
-                if key in seen_keys:
-                    duplicate_count += 1
-                    continue
-                seen_keys.add(key)
-                if len(deduped) >= candidate_pool_cap:
-                    truncated_candidate_count += 1
-                else:
-                    deduped[key] = candidate
-            stats.append(
-                ProviderQueryStat(
-                    query=query,
-                    location=location,
-                    requested_limit=per_call_limit,
-                    returned_count=len(returned),
-                    new_candidate_count=max(0, len(deduped) - before_count),
-                    source_count=source_count,
-                    logical_request_count=source_count,
-                )
-            )
-            if len(deduped) >= candidate_pool_cap:
-                break
-        if len(deduped) >= candidate_pool_cap:
-            break
-    return ProviderRecallResult(
-        candidates=list(deduped.values())[:candidate_pool_cap],
-        provider_name=provider_name,
-        provider_kind=provider_kind,
-        query_stats=stats,
-        raw_candidates=raw_candidates,
-        raw_candidate_count=raw_candidate_count,
-        duplicate_count=duplicate_count,
-        truncated_candidate_count=truncated_candidate_count,
-        candidate_pool_cap=candidate_pool_cap,
-        source_attempts=_provider_source_attempts(provider),
-    )
-
-
-def _provider_source_attempts(provider: JobSearchProvider) -> list[dict[str, object]]:
-    attempts = getattr(provider, "source_attempts", None)
-    if not isinstance(attempts, list):
-        return []
-    return [dict(item) for item in attempts if isinstance(item, dict)]
-
-
-def _provider_source_count(provider: JobSearchProvider, provider_name: str) -> int:
-    source_names = getattr(provider, "source_names", None)
-    if isinstance(source_names, list) and source_names:
-        return len(source_names)
-    return max(1, len(selected_sources_from_provider_name(provider_name)) or 1)
-
-
-def _effective_provider_locations(provider_name: str | None, locations: list[str]) -> list[str | None]:
-    if provider_name == "cuhksz_career":
-        return [None]
-    if provider_name in {"remoteok", "linkedin"}:
-        return locations[:1] or [None]
-    if provider_name == "multi_source" or (provider_name or "").startswith("multi_source:"):
-        return locations[:1] or [None]
-    return locations[:MAX_PROVIDER_LOCATIONS_PER_RUN] or [None]
-
-
-def _analyze_candidates(
-    filtered: CandidateFilterResult,
-    *,
-    use_llm: bool,
-    llm_service: JSONChatLLM | None,
-) -> dict[str, object]:
-    items: list[dict[str, object]] = []
-    mode_counter: Counter[str] = Counter()
-    guardrails: list[str] = []
-    quality_warnings: list[str] = []
-    fallback_reason: str | None = None
-    scorecards_by_index = {scorecard.candidate_index: scorecard for scorecard in filtered.scorecards}
-    selected = list(zip(filtered.selected_indexes, filtered.selected_candidates))
-    concurrency = _jd_analysis_concurrency(use_llm=use_llm, candidate_count=len(selected))
-    if concurrency <= 1:
-        analyzed_records = [
-            _analyze_candidate_for_job_search(
-                candidate,
-                use_llm=use_llm,
-                llm_service=llm_service,
-                scorecard=scorecards_by_index.get(candidate_index),
-            )
-            for candidate_index, candidate in selected
-        ]
-    else:
-        with ThreadPoolExecutor(max_workers=concurrency) as executor:
-            analyzed_records = list(
-                executor.map(
-                    lambda item: _analyze_candidate_for_job_search(
-                        item[1],
-                        use_llm=use_llm,
-                        llm_service=llm_service,
-                        scorecard=scorecards_by_index.get(item[0]),
-                    ),
-                    selected,
-                )
-            )
-
-    fallback_count = 0
-    for record in analyzed_records:
-        metadata = record["metadata"]
-        mode_counter[metadata.mode] += 1
-        if metadata.mode == "fallback" or metadata.fallback_reason:
-            fallback_count += 1
-        if metadata.fallback_reason and fallback_reason is None:
-            fallback_reason = metadata.fallback_reason
-        for item in metadata.guardrails:
-            if item not in guardrails:
-                guardrails.append(item)
-        for item in metadata.quality_warnings:
-            if item not in quality_warnings:
-                quality_warnings.append(item)
-        items.append(record["item"])
-    return {
-        "items": items,
-        "mode": _summarize_analysis_mode(mode_counter),
-        "fallback_reason": fallback_reason,
-        "guardrails": guardrails,
-        "quality_warnings": quality_warnings + filtered.quality_warnings,
-        "concurrency": concurrency,
-        "fallback_count": fallback_count,
-        "mode_counts": dict(mode_counter),
-    }
-
-
-def _analyze_candidate_for_job_search(
-    candidate: RawJobCandidate,
-    *,
-    use_llm: bool,
-    llm_service: JSONChatLLM | None,
-    scorecard: CandidateScorecard | None,
-) -> dict[str, object]:
-    text = (candidate.raw_description or candidate.snippet or candidate.title or "No job description provided.").strip()
-    try:
-        result = run_jd_analysis_agent(
-            text,
-            use_llm=use_llm,
-            service=llm_service,  # type: ignore[arg-type]
-        )
-    except Exception as exc:
-        result = run_jd_analysis_agent(text, use_llm=False)
-        result = type(result)(
-            output=result.output,
-            metadata=result.metadata.model_copy(
-                update={
-                    "mode": "fallback",
-                    "fallback_reason": type(exc).__name__,
-                    "quality_warnings": [
-                        f"JD analysis fallback triggered: {type(exc).__name__}."
-                    ],
-                }
-            ),
-        )
-    return {
-        "metadata": result.metadata,
-        "item": {
-            "candidate": candidate,
-            "analysis": result.output,
-            "analysis_mode": result.metadata.mode,
-            "scorecard": scorecard,
-        },
-    }
-
-
-def _jd_analysis_concurrency(*, use_llm: bool, candidate_count: int) -> int:
-    if not use_llm or candidate_count <= 1:
-        return 1
-    raw_value = os.getenv("JOBAGENT_JD_ANALYSIS_CONCURRENCY")
-    try:
-        configured = int(raw_value) if raw_value else DEFAULT_JD_ANALYSIS_CONCURRENCY
-    except ValueError:
-        configured = DEFAULT_JD_ANALYSIS_CONCURRENCY
-    capped = min(configured, MAX_JD_ANALYSIS_CONCURRENCY, candidate_count)
-    return max(1, capped)
-
-
-def _summarize_analysis_mode(mode_counter: Counter[str]) -> str:
-    if not mode_counter:
-        return "mock"
-    if mode_counter.get("fallback"):
-        return "fallback"
-    if mode_counter.get("llm"):
-        return "llm"
-    return "mock"
-
-
-def _match_candidates(
-    confirmed_profile: ConfirmedProfile,
-    search_plan: JobSearchPlan,
-    analyzed_items: list[dict[str, object]],
-) -> list[dict[str, object]]:
-    profile_terms = _clean_list(
-        confirmed_profile.target_roles
-        + confirmed_profile.search_keywords
-        + confirmed_profile.core_skills
-        + confirmed_profile.supporting_skills
-        + search_plan.must_have_signals
-    )
-    target_roles = [item.lower() for item in _clean_list(confirmed_profile.target_roles + search_plan.target_roles)]
-
-    matched_items: list[dict[str, object]] = []
-    for item in analyzed_items:
-        candidate = item["candidate"]
-        analysis = item["analysis"]
-        scorecard = item.get("scorecard")
-        if isinstance(scorecard, CandidateScorecard):
-            matched_items.append(
-                {
-                    "candidate": candidate,
-                    "analysis": analysis,
-                    "analysis_mode": item["analysis_mode"],
-                    "match_score": scorecard.match_score,
-                    "score_breakdown": scorecard.score_breakdown,
-                    "evidence_quotes": scorecard.evidence_quotes,
-                    "matched_keywords": scorecard.matched_keywords[:6],
-                    "match_reasons": (
-                        scorecard.match_reasons
-                        or ["Candidate was selected by the shared LLM scoring rubric."]
-                    ),
-                    "risks": _clean_list(scorecard.risks + _metadata_risks(candidate, confirmed_profile)),
-                    "confidence_label": scorecard.confidence_label,
-                }
-            )
-            continue
-        text_parts = [
-            getattr(candidate, "title", "") or "",
-            getattr(candidate, "company", "") or "",
-            getattr(candidate, "location", "") or "",
-            getattr(candidate, "snippet", "") or "",
-            getattr(analysis, "raw_jd", "") or "",
-            " ".join(getattr(analysis, "keywords", []) or []),
-            " ".join(getattr(analysis, "required_skills", []) or []),
-            " ".join(getattr(analysis, "preferred_skills", []) or []),
-        ]
-        combined_text = " ".join(text_parts).lower()
-        matched_keywords = [term for term in profile_terms if term.lower() in combined_text]
-        role_overlap = any(role in combined_text for role in target_roles)
-        required_skill_count = len(set(matched_keywords))
-        score = min(98, 45 + required_skill_count * 7 + (15 if role_overlap else 0))
-        risks = []
-        if not getattr(candidate, "source_url", None):
-            risks.append("Source URL is missing.")
-        if not matched_keywords:
-            risks.append("Limited explicit keyword overlap with the confirmed profile.")
-        if getattr(candidate, "location", None) is None and confirmed_profile.preferred_locations:
-            risks.append("Location metadata is incomplete.")
-
-        match_reasons = []
-        if role_overlap:
-            match_reasons.append("Target role language overlaps with the confirmed profile.")
-        if matched_keywords:
-            match_reasons.append("Matched profile signals: " + ", ".join(matched_keywords[:5]) + ".")
-        if not match_reasons:
-            match_reasons.append("Candidate remains in scope based on broad search-plan alignment.")
-
-        matched_items.append(
-            {
-                "candidate": candidate,
-                "analysis": analysis,
-                "analysis_mode": item["analysis_mode"],
-                "match_score": score,
-                "score_breakdown": {},
-                "evidence_quotes": [],
-                "matched_keywords": matched_keywords[:6],
-                "match_reasons": match_reasons,
-                "risks": _clean_list(risks),
-                "confidence_label": _confidence_label_for_score(score),
-            }
-        )
-
-    matched_items.sort(key=lambda item: int(item["match_score"]), reverse=True)
-    return matched_items
-
-
-def _assemble_results(
-    matched_items: list[dict[str, object]],
-    *,
-    source: str,
-) -> list[JobSearchResult]:
-    results: list[JobSearchResult] = []
-    seen_result_keys: set[str] = set()
-    for item in matched_items:
-        candidate = item["candidate"]
-        result_key = candidate_recall_key(candidate)
-        if result_key in seen_result_keys:
-            continue
-        seen_result_keys.add(result_key)
-        analysis = item["analysis"]
-        description = getattr(candidate, "snippet", None) or getattr(analysis, "raw_jd", "")
-        source_url = getattr(candidate, "source_url", None)
-        title = getattr(candidate, "title", None) or getattr(analysis, "job_title", None) or "Untitled role"
-        company = getattr(candidate, "company", None) or getattr(analysis, "company", None) or "Unknown company"
-        location = getattr(candidate, "location", None) or getattr(analysis, "location", None) or "Unspecified"
-        result_id = str(uuid5(NAMESPACE_URL, f"{source}:{title}:{company}:{location}:{source_url or description}"))
-        score = int(item["match_score"])
-        results.append(
-            JobSearchResult(
-                job_result_id=result_id,
-                title=title,
-                company=company,
-                location=location,
-                source=source,
-                source_provider=getattr(candidate, "source_provider", None),
-                source_url=source_url,
-                raw_snippet=getattr(candidate, "snippet", None),
-                description=description,
-                matched_keywords=list(item["matched_keywords"]),
-                match_reasons=list(item["match_reasons"]),
-                risks=list(item["risks"]),
-                match_score=score,
-                score_breakdown=dict(item.get("score_breakdown", {})),
-                evidence_quotes=list(item.get("evidence_quotes", [])),
-                recommended_action=_recommended_action(score),
-                analysis_mode=item["analysis_mode"],
-                confidence_label=item["confidence_label"],
-            )
-        )
-    return results
-
-
-def _metadata_risks(candidate: object, confirmed_profile: ConfirmedProfile) -> list[str]:
-    risks: list[str] = []
-    if not getattr(candidate, "source_url", None):
-        risks.append("Source URL is missing.")
-    if getattr(candidate, "location", None) is None and confirmed_profile.preferred_locations:
-        risks.append("Location metadata is incomplete.")
-    for warning in getattr(candidate, "provider_warnings", []) or []:
-        warning_text = str(warning)
-        if _is_boilerplate_browser_helper_warning(warning_text):
-            continue
-        risks.append(warning_text)
-    return risks
-
-
-def _is_boilerplate_browser_helper_warning(warning: str) -> bool:
-    normalized = warning.lower()
-    return any(
-        fragment in normalized
-        for fragment in (
-            "browser helper",
-            "platform cookies",
-            "local boss browser session",
-            "cookies were not sent",
-            "cookies are not stored",
-        )
-    )
-
-
-def _find_running_or_pending_step(steps: list[JobSearchTraceStep]) -> JobSearchTraceStep | None:
-    for status in ("running", "pending"):
-        for step in steps:
-            if step.status == status:
-                return step
-    return None
-
-
-def _confidence_label_for_score(score: int) -> str:
-    if score >= 85:
-        return "strong"
-    if score >= 72:
-        return "medium"
-    if score >= 58:
-        return "limited"
-    return "weak"
-
-
-def _recommended_action(score: int) -> str:
-    if score >= 85:
-        return "Prioritize this role and tailor resume bullets before applying."
-    if score >= 72:
-        return "Worth reviewing closely and tailoring before applying."
-    if score >= 58:
-        return "Review the requirements carefully before investing more time."
-    return "Keep as a lower-priority option unless the role is especially attractive."
-
-
-def _recall_queries_from_plan(search_plan: JobSearchPlan) -> list[str]:
-    if search_plan.search_intent is None:
-        return _clean_list(search_plan.queries[:MAX_PROVIDER_QUERIES_PER_RUN])
-    intent = search_plan.search_intent
-    return _clean_list(
-        intent.broad_queries
-        + intent.domain_queries
-        + search_plan.target_roles
-        + search_plan.queries
-    )[:MAX_PROVIDER_PREVIEW_TERMS]
-
-
-def _ranking_signals_from_plan(search_plan: JobSearchPlan) -> list[str]:
-    if search_plan.search_intent is None:
-        return _clean_list(search_plan.must_have_signals)
-    intent = search_plan.search_intent
-    return _clean_list(
-        intent.industry_domains
-        + intent.evidence_skills
-        + intent.generic_tools
-        + search_plan.must_have_signals
-    )[:16]
-
-
-def _source_provider_counts(results: list[JobSearchResult]) -> dict[str, int]:
-    counts: Counter[str] = Counter()
-    for result in results:
-        counts[result.source_provider or result.source] += 1
-    return dict(counts)
-
-
-def _browser_helper_candidate_to_raw(candidate: BrowserHelperJobCandidate) -> RawJobCandidate:
-    source_provider = candidate.source_provider.strip() or "browser_helper"
-    warnings = [
-        *candidate.provider_warnings,
-        "Candidate came from browser helper payload; platform cookies are not stored by backend.",
-    ]
-    return RawJobCandidate(
-        title=candidate.title.strip(),
-        company=(candidate.company or "").strip() or None,
-        location=(candidate.location or "").strip() or None,
-        source_url=(candidate.source_url or "").strip() or None,
-        source_provider=source_provider,
-        snippet=candidate.snippet.strip(),
-        raw_description=(candidate.raw_description or "").strip() or candidate.snippet.strip(),
-        discovery_query=(candidate.discovery_query or "").strip() or None,
-        discovery_rank=candidate.discovery_rank,
-        detail_status=(candidate.detail_status or "").strip() or "browser_helper_payload",
-        provider_warnings=_clean_list(warnings),
-    )
-
-
-def _capture_summary(payload: BrowserJobCaptureRequest) -> BrowserJobCaptureSummary:
-    return BrowserJobCaptureSummary(
-        source=payload.source,
-        source_url=payload.source_url,
-        page_title=payload.page_title,
-        title=payload.title,
-        company=payload.company,
-        location=payload.location,
-        salary=payload.salary,
-        jd_text_preview=payload.jd_text[:BROWSER_CAPTURE_PREVIEW_LENGTH],
-        captured_at=payload.captured_at,
-        extractor_version=payload.extractor_version,
-    )
-
-
-def _browser_capture_report(result: JobSearchResult) -> BrowserJobCaptureReport:
-    return BrowserJobCaptureReport(
-        overall_score=result.match_score,
-        recommendation=result.recommended_action,
-        matched_strengths=_clean_list(result.match_reasons + result.matched_keywords),
-        critical_gaps=result.risks,
-        resume_actions=[result.recommended_action] if result.recommended_action else [],
-        interview_questions=[],
-        confidence_label=result.confidence_label,
-        analysis_mode=result.analysis_mode,
-    )
-
-
-def _browser_capture_warnings(payload: BrowserJobCaptureRequest) -> list[str]:
-    warnings = list(payload.warnings)
-    if payload.title is None:
-        warnings.append("Job title was not confidently extracted from the browser page.")
-    if payload.company is None:
-        warnings.append("Company was not confidently extracted from the browser page.")
-    if payload.location is None:
-        warnings.append("Location was not confidently extracted from the browser page.")
-    warnings.append(f"Browser capture page title: {payload.page_title}")
-    warnings.append(f"Browser capture extractor version: {payload.extractor_version}")
-    warnings.append(f"Browser capture captured_at: {payload.captured_at.isoformat()}")
-    return _clean_list(warnings)
-
-
-def _trace_quality_warnings(steps: list[JobSearchTraceStep]) -> list[str]:
-    warnings: list[str] = []
-    for step in steps:
-        warnings.extend(step.quality_warnings)
-        if step.status == "failed" and step.summary:
-            warnings.append(step.summary)
-    return _clean_list(warnings)
 
 
 def _clean_list(values: list[str]) -> list[str]:

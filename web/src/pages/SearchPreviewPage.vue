@@ -63,7 +63,9 @@ const isBossLoginChecking = ref(false);
 const isBossSearching = ref(false);
 const isRestoringPreviewControls = ref(false);
 const browserHelperMessage = ref<string | null>(null);
+const nowMs = ref(Date.now());
 let bossLoginRefreshTimer: number | null = null;
+let searchElapsedTimer: number | null = null;
 const llmProviderOptions = [
   { label: "DeepSeek", value: "deepseek" },
   { label: "Ollama", value: "ollama" }
@@ -203,6 +205,19 @@ const bossLoginStatusSummary = computed(() => {
 });
 
 const canCheckBossLogin = computed(() => Boolean(browserHelperStatus.value?.installed));
+const activeSearchElapsedLabel = computed(() => {
+  if (
+    !isBossSearching.value &&
+    !profileSessionStore.isJobSearchCreating
+  ) {
+    return null;
+  }
+  const startedAt = profileSessionStore.jobSearchClientStartedAt;
+  if (startedAt === null) {
+    return null;
+  }
+  return formatDuration(nowMs.value - startedAt);
+});
 
 const providerStatusTarget = computed<"mock" | "browser_helper" | "multi_source">(() => {
   if (useLocalDemo.value) {
@@ -336,6 +351,7 @@ async function refreshPreview() {
 }
 
 onMounted(async () => {
+  startSearchElapsedTicker();
   try {
     const restoredPreviewControls = await restorePreviewControls();
     const session = await profileSessionStore.loadSession(sessionId.value);
@@ -355,6 +371,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   stopBossLoginAutoRefresh();
+  stopSearchElapsedTicker();
 });
 
 watch(selectedSearchSources, async () => {
@@ -433,15 +450,19 @@ function goBackToConfirmed() {
 
 async function startJobSearch() {
   saveCurrentPreviewControls();
+  profileSessionStore.beginJobSearchClientTiming();
   profileSessionStore.prepareNewJobSearch();
   if (usesBrowserHelper.value) {
     await startBrowserHelperJobSearch();
     return;
   }
   try {
-    const run = await profileSessionStore.createJobSearch(buildPayload());
+    const run = await measureSearchStage("Backend start", () =>
+      profileSessionStore.createJobSearch(buildPayload())
+    );
     await router.push({ name: "job-search", params: { runId: run.job_search_run_id } });
   } catch {
+    profileSessionStore.clearJobSearchClientTiming();
     // Error state is rendered from the store.
   }
 }
@@ -506,54 +527,96 @@ async function startBrowserHelperJobSearch() {
   browserHelperMessage.value = null;
   try {
     if (!browserHelperStatus.value?.installed) {
-      await checkBrowserHelper();
+      await measureSearchStage("Helper check", checkBrowserHelper);
     }
     if (!browserHelperStatus.value?.installed) {
       browserHelperMessage.value = "Install and detect the Browser Helper before starting BOSS search.";
+      profileSessionStore.clearJobSearchClientTiming();
       return;
     }
-    await checkBossLogin();
+    await measureSearchStage("BOSS login check", checkBossLogin);
     if (!bossLoginStatus.value?.loggedIn) {
       browserHelperMessage.value = "BOSS login is required before starting this search.";
+      profileSessionStore.clearJobSearchClientTiming();
       return;
     }
 
     const preview = profileSessionStore.jobSearchPreview;
     const bossQueries = buildBossSearchQueries(preview);
-    const result = await fetchBossCandidates(
-      preview.query,
-      preview.locations[0] ?? null,
-      effectiveMaxResults.value,
-      bossQueries,
-      BOSS_DEFAULT_JOB_TYPE
+    const result = await measureSearchStage(
+      "BOSS capture",
+      () => fetchBossCandidates(
+        preview.query,
+        preview.locations[0] ?? null,
+        effectiveMaxResults.value,
+        bossQueries,
+        BOSS_DEFAULT_JOB_TYPE
+      )
     );
     if (!result.candidates.length) {
       browserHelperMessage.value = formatBossEmptyResultMessage(result);
       if (!selectedProviderSources.length) {
+        profileSessionStore.clearJobSearchClientTiming();
         return;
       }
     }
-    const run = await profileSessionStore.createBrowserHelperJobSearch({
-      session_id: sessionId.value,
-      query: preview.query,
-      helper_version: result.version,
-      platforms: ["boss"],
-      selected_sources: selectedProviderSources,
-      analysis_mode: effectiveAnalysisMode.value,
-      llm_provider: effectiveLlmProvider.value,
-      use_llm: effectiveLlmProvider.value === "deepseek",
-      locations: preview.locations,
-      target_roles: preview.target_roles,
-      keywords: preview.keywords,
-      max_results: effectiveMaxResults.value,
-      candidates: result.candidates
-    });
+    const run = await measureSearchStage("Backend import", () =>
+      profileSessionStore.createBrowserHelperJobSearch({
+        session_id: sessionId.value,
+        query: preview.query,
+        helper_version: result.version,
+        platforms: ["boss"],
+        selected_sources: selectedProviderSources,
+        analysis_mode: effectiveAnalysisMode.value,
+        llm_provider: effectiveLlmProvider.value,
+        use_llm: effectiveLlmProvider.value === "deepseek",
+        locations: preview.locations,
+        target_roles: preview.target_roles,
+        keywords: preview.keywords,
+        max_results: effectiveMaxResults.value,
+        candidates: result.candidates
+      })
+    );
     await router.push({ name: "job-search", params: { runId: run.job_search_run_id } });
   } catch (error) {
     browserHelperMessage.value = error instanceof Error ? error.message : "BOSS helper search failed.";
+    profileSessionStore.clearJobSearchClientTiming();
   } finally {
     isBossSearching.value = false;
   }
+}
+
+async function measureSearchStage<T>(label: string, action: () => Promise<T>): Promise<T> {
+  const startedAt = Date.now();
+  try {
+    return await action();
+  } finally {
+    profileSessionStore.addJobSearchClientStage({
+      label,
+      duration_ms: Date.now() - startedAt
+    });
+  }
+}
+
+function startSearchElapsedTicker(): void {
+  stopSearchElapsedTicker();
+  searchElapsedTimer = window.setInterval(() => {
+    nowMs.value = Date.now();
+  }, 1000);
+}
+
+function stopSearchElapsedTicker(): void {
+  if (searchElapsedTimer !== null) {
+    window.clearInterval(searchElapsedTimer);
+    searchElapsedTimer = null;
+  }
+}
+
+function formatDuration(milliseconds: number): string {
+  const totalSeconds = Math.max(0, Math.round(milliseconds / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
 }
 
 function startBossLoginAutoRefresh(): void {
@@ -795,6 +858,22 @@ function seeResult() {
             >
               Open BOSS Login
             </n-button>
+          </div>
+          <p v-if="activeSearchElapsedLabel" class="flow-meta">
+            Search elapsed: {{ activeSearchElapsedLabel }}
+          </p>
+          <div
+            v-if="profileSessionStore.jobSearchClientStages.length"
+            class="job-chip-row"
+          >
+            <n-tag
+              v-for="stage in profileSessionStore.jobSearchClientStages"
+              :key="`${stage.label}-${stage.duration_ms}`"
+              size="small"
+              round
+            >
+              {{ stage.label }} {{ formatDuration(stage.duration_ms) }}
+            </n-tag>
           </div>
           <p v-if="usesBrowserHelper && browserHelperMessage" class="flow-meta">{{ browserHelperMessage }}</p>
         </div>
