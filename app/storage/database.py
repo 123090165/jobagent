@@ -419,6 +419,27 @@ def init_database(connection: sqlite3.Connection) -> None:
             FOREIGN KEY (saved_job_id) REFERENCES saved_jobs(saved_job_id),
             FOREIGN KEY (user_id) REFERENCES users(user_id)
         );
+
+        CREATE TABLE IF NOT EXISTS search_missions (
+            search_mission_id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            session_id TEXT NOT NULL,
+            confirmed_profile_id TEXT NOT NULL,
+            status TEXT NOT NULL,
+            input_json TEXT NOT NULL,
+            mission_json TEXT NOT NULL,
+            analysis_mode TEXT NOT NULL,
+            analysis_provider TEXT,
+            fallback_reason TEXT,
+            revision INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            confirmed_at TEXT,
+            FOREIGN KEY (user_id) REFERENCES users(user_id),
+            FOREIGN KEY (session_id) REFERENCES profile_sessions(session_id),
+            FOREIGN KEY (confirmed_profile_id) REFERENCES confirmed_profiles(confirmed_profile_id),
+            UNIQUE (user_id, session_id)
+        );
         """
     )
     _ensure_local_user(connection)
@@ -586,5 +607,7 @@ def _ensure_indexes(connection: sqlite3.Connection) -> None:
             ON job_search_result_feedback(user_id, job_search_run_id, updated_at);
         CREATE INDEX IF NOT EXISTS idx_saved_job_status_events_job_id
             ON saved_job_status_events(user_id, saved_job_id, changed_at);
+        CREATE INDEX IF NOT EXISTS idx_search_missions_user_session
+            ON search_missions(user_id, session_id, status);
         """
     )

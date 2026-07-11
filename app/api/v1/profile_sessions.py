@@ -18,6 +18,12 @@ from app.application.resume_review_usecases import (
     get_parsed_resume_review,
     parse_resume_for_review,
 )
+from app.application.search_mission_usecases import (
+    confirm_search_mission,
+    get_search_mission,
+    interpret_saved_search_mission,
+    save_search_mission_input,
+)
 from app.schemas.auth import UserAccount
 from app.schemas.job_search import JobSearchRunListResponse
 from app.schemas.parsed_resume_review import ParsedResumeReviewResponse
@@ -25,6 +31,11 @@ from app.schemas.profile_draft import ProfileDraftResponse
 from app.schemas.profile_session import ProfileSession
 from app.schemas.resume_document import ResumeDocument
 from app.schemas.resume_intake import ResumeIntakeResponse, ResumeTextRequest
+from app.schemas.search_mission import (
+    SearchMission,
+    SearchMissionInput,
+    SearchMissionInterpretRequest,
+)
 
 router = APIRouter(prefix="/api/v1/profile-sessions", tags=["v4-profile-sessions"])
 
@@ -132,3 +143,42 @@ def list_job_search_runs_endpoint(
     return JobSearchRunListResponse(
         items=list_job_search_runs(session_id, user_id=current_user.user_id)
     )
+
+
+@router.get("/{session_id}/search-mission", response_model=SearchMission)
+def get_search_mission_endpoint(
+    session_id: str,
+    current_user: UserAccount = Depends(get_current_user),
+) -> SearchMission:
+    return get_search_mission(session_id, user_id=current_user.user_id)
+
+
+@router.put("/{session_id}/search-mission", response_model=SearchMission)
+def save_search_mission_endpoint(
+    session_id: str,
+    payload: SearchMissionInput,
+    current_user: UserAccount = Depends(get_current_user),
+) -> SearchMission:
+    return save_search_mission_input(session_id, payload, user_id=current_user.user_id)
+
+
+@router.post("/{session_id}/search-mission/interpret", response_model=SearchMission)
+def interpret_search_mission_endpoint(
+    session_id: str,
+    payload: SearchMissionInterpretRequest,
+    current_user: UserAccount = Depends(get_current_user),
+) -> SearchMission:
+    return interpret_saved_search_mission(
+        session_id,
+        user_id=current_user.user_id,
+        use_llm=payload.use_llm,
+        llm_provider=payload.llm_provider,
+    )
+
+
+@router.post("/{session_id}/search-mission/confirm", response_model=SearchMission)
+def confirm_search_mission_endpoint(
+    session_id: str,
+    current_user: UserAccount = Depends(get_current_user),
+) -> SearchMission:
+    return confirm_search_mission(session_id, user_id=current_user.user_id)

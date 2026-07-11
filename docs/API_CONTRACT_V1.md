@@ -55,6 +55,10 @@ A confirmed profile is promoted to a durable user-owned resume profile.
 ## Job Search
 
 ~~~text
+GET  /api/v1/profile-sessions/{session_id}/search-mission
+PUT  /api/v1/profile-sessions/{session_id}/search-mission
+POST /api/v1/profile-sessions/{session_id}/search-mission/interpret
+POST /api/v1/profile-sessions/{session_id}/search-mission/confirm
 POST /api/v1/job-search-runs/preview
 POST /api/v1/job-search-runs
 POST /api/v1/job-search-runs/browser-helper

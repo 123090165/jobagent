@@ -42,7 +42,7 @@ async function startJobSearch() {
   if (!profileSessionStore.session?.confirmed_profile_id) {
     return;
   }
-  void router.push({ name: "search-preview", params: { sessionId: sessionId.value } });
+  void router.push({ name: "search-mission", params: { sessionId: sessionId.value } });
 }
 </script>
 
@@ -92,7 +92,7 @@ async function startJobSearch() {
             :disabled="!profileSessionStore.confirmedProfile"
             @click="startJobSearch"
           >
-            Preview Job Search
+            Define Search Mission
           </n-button>
         </div>
       </div>

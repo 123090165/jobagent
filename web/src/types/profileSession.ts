@@ -264,6 +264,52 @@ export interface JobSearchPreview {
   planning_mode: "deterministic" | "llm" | "fallback";
   fallback_reason: string | null;
   quality_warnings: string[];
+  search_mission_id: string | null;
+  search_mission_revision: number | null;
+  mission_constraints: string[];
+  mission_excluded_roles: string[];
+}
+
+export type SearchMissionExplorationLevel = "focused" | "balanced" | "exploratory";
+
+export interface SearchMissionInput {
+  target_roles: string[];
+  excluded_roles: string[];
+  preferred_industries: string[];
+  locations: string[];
+  work_arrangements: string[];
+  employment_types: string[];
+  must_have: string[];
+  nice_to_have: string[];
+  ranking_priorities: string[];
+  exploration_level: SearchMissionExplorationLevel;
+  free_text: string | null;
+}
+
+export interface SearchMissionInterpretation extends Omit<SearchMissionInput, "free_text"> {
+  adjacent_roles: string[];
+  hard_constraints: string[];
+  soft_preferences: string[];
+  conflicts: string[];
+  assumptions: string[];
+  clarification_questions: string[];
+}
+
+export interface SearchMission {
+  search_mission_id: string;
+  user_id: string;
+  session_id: string;
+  confirmed_profile_id: string;
+  status: "draft" | "review" | "confirmed";
+  input: SearchMissionInput;
+  mission: SearchMissionInterpretation;
+  analysis_mode: "deterministic" | "llm" | "fallback";
+  analysis_provider: string | null;
+  fallback_reason: string | null;
+  revision: number;
+  created_at: string;
+  updated_at: string;
+  confirmed_at: string | null;
 }
 
 export interface JobSearchRunListResponse {

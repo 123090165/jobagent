@@ -19,6 +19,8 @@ import type {
   ProfileSession,
   ResumeDocument,
   ResumeIntakeResponse,
+  SearchMission,
+  SearchMissionInput,
   UpdateProfileDraftPayload
 } from "../types/profileSession";
 
@@ -141,6 +143,43 @@ export async function createJobSearchRun(
   payload: CreateJobSearchRunPayload
 ): Promise<JobSearchRunResponse> {
   const response = await client.post<JobSearchRunResponse>("/api/v1/job-search-runs", payload);
+  return response.data;
+}
+
+export async function getSearchMission(sessionId: string): Promise<SearchMission> {
+  const response = await client.get<SearchMission>(
+    `/api/v1/profile-sessions/${sessionId}/search-mission`
+  );
+  return response.data;
+}
+
+export async function saveSearchMission(
+  sessionId: string,
+  payload: SearchMissionInput
+): Promise<SearchMission> {
+  const response = await client.put<SearchMission>(
+    `/api/v1/profile-sessions/${sessionId}/search-mission`,
+    payload
+  );
+  return response.data;
+}
+
+export async function interpretSearchMission(
+  sessionId: string,
+  useLlm: boolean,
+  llmProvider: LlmProviderName = "deepseek"
+): Promise<SearchMission> {
+  const response = await client.post<SearchMission>(
+    `/api/v1/profile-sessions/${sessionId}/search-mission/interpret`,
+    { use_llm: useLlm, llm_provider: llmProvider }
+  );
+  return response.data;
+}
+
+export async function confirmSearchMission(sessionId: string): Promise<SearchMission> {
+  const response = await client.post<SearchMission>(
+    `/api/v1/profile-sessions/${sessionId}/search-mission/confirm`
+  );
   return response.data;
 }
 

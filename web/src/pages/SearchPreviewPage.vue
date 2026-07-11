@@ -445,7 +445,7 @@ watch(maxResults, async () => {
 });
 
 function goBackToConfirmed() {
-  void router.push({ name: "profile-confirmed", params: { sessionId: sessionId.value } });
+  void router.push({ name: "search-mission", params: { sessionId: sessionId.value } });
 }
 
 async function startJobSearch() {
@@ -877,6 +877,33 @@ function seeResult() {
           </div>
           <p v-if="usesBrowserHelper && browserHelperMessage" class="flow-meta">{{ browserHelperMessage }}</p>
         </div>
+      </n-card>
+
+      <n-card
+        v-if="profileSessionStore.jobSearchPreview?.search_mission_id"
+        title="Confirmed Search Mission"
+        size="small"
+        class="job-search-summary"
+      >
+        <div class="job-chip-row">
+          <n-tag type="success" round>
+            Revision {{ profileSessionStore.jobSearchPreview.search_mission_revision }}
+          </n-tag>
+          <n-tag
+            v-for="role in profileSessionStore.jobSearchPreview.target_roles"
+            :key="role"
+            size="small"
+            round
+          >{{ role }}</n-tag>
+        </div>
+        <p>
+          <strong>Hard Constraints:</strong>
+          {{ profileSessionStore.jobSearchPreview.mission_constraints.join(", ") || "None" }}
+        </p>
+        <p>
+          <strong>Excluded Roles:</strong>
+          {{ profileSessionStore.jobSearchPreview.mission_excluded_roles.join(", ") || "None" }}
+        </p>
       </n-card>
 
       <div

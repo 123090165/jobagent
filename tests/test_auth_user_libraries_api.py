@@ -344,3 +344,65 @@ def test_saved_job_status_history_tracks_transitions_and_is_user_scoped(
         "saved",
     ]
     assert other.status_code == 404
+
+
+def test_search_mission_is_user_scoped_and_drives_search_preview(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("JOBAGENT_DB_PATH", str(tmp_path / "search-mission.sqlite3"))
+    owner_headers = _auth_headers(_register("mission-owner"))
+    other_headers = _auth_headers(_register("mission-other"))
+    confirmed = _create_confirmed_profile(owner_headers)
+    session_id = confirmed["profile_session"]["session_id"]
+    mission_url = f"/api/v1/profile-sessions/{session_id}/search-mission"
+
+    saved = client.put(
+        mission_url,
+        headers=owner_headers,
+        json={
+            "target_roles": ["AI Application Engineer"],
+            "excluded_roles": ["Sales Engineer"],
+            "preferred_industries": ["Healthcare"],
+            "locations": ["Tokyo"],
+            "work_arrangements": ["Hybrid"],
+            "employment_types": ["Full-time"],
+            "must_have": ["LLM applications"],
+            "nice_to_have": ["FastAPI"],
+            "ranking_priorities": ["Role fit"],
+            "exploration_level": "balanced",
+            "free_text": "Prefer applied AI over pure research.",
+        },
+    )
+    interpreted = client.post(
+        f"{mission_url}/interpret",
+        headers=owner_headers,
+        json={"use_llm": False, "llm_provider": "deepseek"},
+    )
+    confirmed_mission = client.post(f"{mission_url}/confirm", headers=owner_headers)
+    preview = client.post(
+        "/api/v1/job-search-runs/preview",
+        headers=owner_headers,
+        json={"session_id": session_id, "search_mode": "local_mock"},
+    )
+    forbidden = client.get(mission_url, headers=other_headers)
+
+    assert saved.status_code == 200
+    assert saved.json()["status"] == "draft"
+    assert interpreted.status_code == 200
+    assert interpreted.json()["analysis_mode"] == "deterministic"
+    assert interpreted.json()["mission"]["target_roles"] == ["AI Application Engineer"]
+    assert len(interpreted.json()["mission"]["clarification_questions"]) <= 3
+    assert confirmed_mission.status_code == 200
+    assert confirmed_mission.json()["status"] == "confirmed"
+    assert preview.status_code == 200
+    assert preview.json()["target_roles"][0] == "AI Application Engineer"
+    assert preview.json()["locations"][0] == "Tokyo"
+    assert preview.json()["search_mission_id"] == saved.json()["search_mission_id"]
+    assert preview.json()["mission_excluded_roles"] == ["Sales Engineer"]
+    assert forbidden.status_code == 404
+
+    revised = client.put(
+        mission_url,
+        headers=owner_headers,
+        json={**saved.json()["input"], "target_roles": ["Backend Engineer"]},
+    )
+    assert revised.json()["revision"] == confirmed_mission.json()["revision"] + 1
+    assert revised.json()["status"] == "draft"

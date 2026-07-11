@@ -42,11 +42,13 @@ def test_frontend_calls_backend_search_preview_endpoint() -> None:
     assert "CreateBrowserHelperJobSearchPayload" in types
 
 
-def test_confirmed_page_routes_to_preview_instead_of_creating_search_run() -> None:
+def test_confirmed_page_routes_to_search_mission_instead_of_creating_search_run() -> None:
     confirmed_page = _read("pages/ProfileConfirmedPage.vue")
+    router = _read("router/index.ts")
 
-    assert "Preview Job Search" in confirmed_page
-    assert 'name: "search-preview"' in confirmed_page
+    assert "Define Search Mission" in confirmed_page
+    assert 'name: "search-mission"' in confirmed_page
+    assert 'path: "/profile/:sessionId/search-mission"' in router
     assert "createJobSearch(" not in confirmed_page
 
 

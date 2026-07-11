@@ -309,6 +309,10 @@ class JobSearchPreviewResponse(BaseModel):
     planning_mode: JobSearchPlanningMode
     fallback_reason: str | None = None
     quality_warnings: list[str] = Field(default_factory=list)
+    search_mission_id: str | None = None
+    search_mission_revision: int | None = None
+    mission_constraints: list[str] = Field(default_factory=list)
+    mission_excluded_roles: list[str] = Field(default_factory=list)
 
 
 class JobSearchRunListResponse(BaseModel):

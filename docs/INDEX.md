@@ -23,6 +23,8 @@ history archive. Git preserves completed plans and deleted designs.
   phased behavior-preserving split of the current search use-case module.
 - [SEARCH_HISTORY_RECOVERY.md](SEARCH_HISTORY_RECOVERY.md): user-visible run
   history and the current recovery boundary.
+- [SEARCH_MISSION.md](SEARCH_MISSION.md): intent collection, agent
+  interpretation, conflict detection, confirmation, and search integration.
 
 ## Documentation Rules
 

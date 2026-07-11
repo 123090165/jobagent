@@ -17,6 +17,10 @@ from app.repositories.profile_session_repository import (
     ProfileSessionRepository,
     profile_session_repository,
 )
+from app.repositories.search_mission_repository import (
+    SearchMissionRepository,
+    search_mission_repository,
+)
 from app.schemas.confirmed_profile import ConfirmedProfile
 from app.schemas.job_search import (
     BrowserJobCaptureAnalyzeResponse,
@@ -29,6 +33,7 @@ from app.schemas.job_search import (
     JobSearchRunResponse,
     JobSearchTraceStep,
 )
+from app.schemas.search_mission import SearchMission
 from app.services.errors import JobAgentError
 from app.services.job_candidate_filter import filter_candidates
 from app.services.job_search_execution.candidate_analysis import _analyze_candidates
@@ -116,6 +121,7 @@ def create_job_search_run(
     search_repository: JobSearchRepository = job_search_repository,
     job_search_provider: JobSearchProvider | None = None,
     llm_service: JSONChatLLM | None = None,
+    mission_repository: SearchMissionRepository = search_mission_repository,
 ) -> JobSearchRunResponse:
     session = get_profile_session(payload.session_id, repository=session_repository, user_id=user_id)
     if session.confirmed_profile_id is None:
@@ -139,7 +145,12 @@ def create_job_search_run(
             status_code=404,
         )
 
-    query, locations, target_roles, keywords = _resolve_search_inputs(payload, confirmed_profile)
+    query, locations, target_roles, keywords, _ = _resolve_inputs_with_mission(
+        payload,
+        confirmed_profile,
+        user_id=user_id or LOCAL_USER_ID,
+        mission_repository=mission_repository,
+    )
     if payload.search_mode == "local_mock":
         results = _build_local_mock_results(
             query=query,
@@ -662,6 +673,7 @@ def preview_job_search_run(
     session_repository: ProfileSessionRepository = profile_session_repository,
     confirmed_repository: ConfirmedProfileRepository = confirmed_profile_repository,
     llm_service: JSONChatLLM | None = None,
+    mission_repository: SearchMissionRepository = search_mission_repository,
 ) -> JobSearchPreviewResponse:
     session = get_profile_session(payload.session_id, repository=session_repository, user_id=user_id)
     if session.confirmed_profile_id is None:
@@ -679,7 +691,12 @@ def preview_job_search_run(
             status_code=404,
         )
 
-    query, locations, target_roles, keywords = _resolve_search_inputs(payload, confirmed_profile)
+    query, locations, target_roles, keywords, mission = _resolve_inputs_with_mission(
+        payload,
+        confirmed_profile,
+        user_id=user_id or LOCAL_USER_ID,
+        mission_repository=mission_repository,
+    )
     analysis_config = _resolve_job_search_analysis_config(payload)
     use_llm_analysis = analysis_config.enabled
     llm_provider: str | None = analysis_config.provider
@@ -760,7 +777,38 @@ def preview_job_search_run(
         planning_mode=search_plan.mode,
         fallback_reason=search_plan.fallback_reason,
         quality_warnings=search_plan.quality_warnings,
+        search_mission_id=mission.search_mission_id if mission else None,
+        search_mission_revision=mission.revision if mission else None,
+        mission_constraints=mission.mission.hard_constraints if mission else [],
+        mission_excluded_roles=mission.mission.excluded_roles if mission else [],
     )
+
+
+def _resolve_inputs_with_mission(
+    payload: JobSearchRunCreateRequest,
+    confirmed_profile: ConfirmedProfile,
+    *,
+    user_id: str,
+    mission_repository: SearchMissionRepository,
+) -> tuple[str, list[str], list[str], list[str], SearchMission | None]:
+    query, locations, target_roles, keywords = _resolve_search_inputs(payload, confirmed_profile)
+    mission = mission_repository.get(user_id=user_id, session_id=payload.session_id)
+    if mission is None or mission.status != "confirmed":
+        return query, locations, target_roles, keywords, None
+    interpreted = mission.mission
+    resolved_roles = payload.target_roles or interpreted.target_roles or target_roles
+    resolved_locations = payload.locations or interpreted.locations or locations
+    mission_signals = (
+        interpreted.must_have
+        + interpreted.nice_to_have
+        + interpreted.preferred_industries
+        + interpreted.ranking_priorities
+    )
+    resolved_keywords = payload.keywords or mission_signals or keywords
+    resolved_query = (payload.query or "").strip()
+    if not resolved_query:
+        resolved_query = " ".join((resolved_roles[:1] + resolved_keywords[:3])).strip() or query
+    return resolved_query, resolved_locations, resolved_roles, resolved_keywords, mission
 
 
 def _resolve_job_search_analysis_config(payload: JobSearchRunCreateRequest) -> JobSearchAnalysisConfig:
