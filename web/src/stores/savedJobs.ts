@@ -7,12 +7,14 @@ import {
   getSavedJob,
   listSavedJobs,
   listSavedJobAnalyses,
+  listSavedJobStatusHistory,
   saveJobFromSearchResult,
   updateSavedJob
 } from "../api/savedJobs";
 import type {
   SavedJob,
   SavedJobAnalysis,
+  SavedJobStatusEvent,
   SavedJobCreatePayload,
   SavedJobFromSearchResultPayload,
   SavedJobUpdatePayload
@@ -22,6 +24,7 @@ interface SavedJobState {
   jobs: SavedJob[];
   selectedJob: SavedJob | null;
   selectedJobAnalyses: SavedJobAnalysis[];
+  selectedJobStatusHistory: SavedJobStatusEvent[];
   isLoading: boolean;
   isSaving: boolean;
   error: string | null;
@@ -36,6 +39,7 @@ export const useSavedJobsStore = defineStore("savedJobs", {
     jobs: [],
     selectedJob: null,
     selectedJobAnalyses: [],
+    selectedJobStatusHistory: [],
     isLoading: false,
     isSaving: false,
     error: null
@@ -79,17 +83,20 @@ export const useSavedJobsStore = defineStore("savedJobs", {
       this.isLoading = true;
       this.error = null;
       try {
-        const [job, analyses] = await Promise.all([
+        const [job, analyses, statusHistory] = await Promise.all([
           getSavedJob(savedJobId),
-          listSavedJobAnalyses(savedJobId)
+          listSavedJobAnalyses(savedJobId),
+          listSavedJobStatusHistory(savedJobId)
         ]);
         this.selectedJob = job;
         this.selectedJobAnalyses = analyses.items;
+        this.selectedJobStatusHistory = statusHistory.items;
         this.mergeJob(job);
         return job;
       } catch (error) {
         this.selectedJob = null;
         this.selectedJobAnalyses = [];
+        this.selectedJobStatusHistory = [];
         this.error = toApiErrorMessage(error, "Failed to load saved job details.");
         throw error;
       } finally {
@@ -116,7 +123,10 @@ export const useSavedJobsStore = defineStore("savedJobs", {
       try {
         const job = await updateSavedJob(savedJobId, payload);
         this.mergeJob(job);
-        if (this.selectedJob?.saved_job_id === savedJobId) this.selectedJob = job;
+        if (this.selectedJob?.saved_job_id === savedJobId) {
+          this.selectedJob = job;
+          this.selectedJobStatusHistory = (await listSavedJobStatusHistory(savedJobId)).items;
+        }
         return job;
       } catch (error) {
         this.error = toApiErrorMessage(error, "Failed to update saved job.");

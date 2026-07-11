@@ -20,6 +20,7 @@ from app.schemas.saved_job import (
     SavedJobFromBrowserCaptureRequest,
     SavedJobFromSearchResultRequest,
     SavedJobUpdateRequest,
+    SavedJobStatusEvent,
 )
 from app.services.errors import JobAgentError
 
@@ -63,6 +64,17 @@ def list_saved_job_analyses(
     if repository.get(user_id=user_id, saved_job_id=saved_job_id) is None:
         raise _not_found()
     return repository.list_analyses(user_id=user_id, saved_job_id=saved_job_id)
+
+
+def list_saved_job_status_events(
+    saved_job_id: str,
+    *,
+    user_id: str,
+    repository: SavedJobRepository = saved_job_repository,
+) -> list[SavedJobStatusEvent]:
+    if repository.get(user_id=user_id, saved_job_id=saved_job_id) is None:
+        raise _not_found()
+    return repository.list_status_events(user_id=user_id, saved_job_id=saved_job_id)
 
 
 def update_saved_job(

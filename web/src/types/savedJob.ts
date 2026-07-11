@@ -1,4 +1,11 @@
-export type SavedJobStatus = "saved" | "interested" | "applied" | "rejected" | "archived";
+export type SavedJobStatus =
+  | "saved"
+  | "interested"
+  | "applied"
+  | "interviewing"
+  | "rejected"
+  | "closed"
+  | "archived";
 
 export interface SavedJobAnalysis {
   saved_job_analysis_id: string;
@@ -48,6 +55,20 @@ export interface SavedJobListResponse {
 
 export interface SavedJobAnalysisListResponse {
   items: SavedJobAnalysis[];
+}
+
+export interface SavedJobStatusEvent {
+  saved_job_status_event_id: string;
+  saved_job_id: string;
+  user_id: string;
+  from_status: SavedJobStatus | null;
+  to_status: SavedJobStatus;
+  reason: string | null;
+  changed_at: string;
+}
+
+export interface SavedJobStatusEventListResponse {
+  items: SavedJobStatusEvent[];
 }
 
 export interface SavedJobCreatePayload {

@@ -5,7 +5,15 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
 
-SavedJobStatus = Literal["saved", "interested", "applied", "rejected", "archived"]
+SavedJobStatus = Literal[
+    "saved",
+    "interested",
+    "applied",
+    "interviewing",
+    "rejected",
+    "closed",
+    "archived",
+]
 
 
 class SavedJobAnalysis(BaseModel):
@@ -102,3 +110,17 @@ class SavedJobListResponse(BaseModel):
 
 class SavedJobAnalysisListResponse(BaseModel):
     items: list[SavedJobAnalysis] = Field(default_factory=list)
+
+
+class SavedJobStatusEvent(BaseModel):
+    saved_job_status_event_id: str
+    saved_job_id: str
+    user_id: str
+    from_status: SavedJobStatus | None = None
+    to_status: SavedJobStatus
+    reason: str | None = None
+    changed_at: datetime
+
+
+class SavedJobStatusEventListResponse(BaseModel):
+    items: list[SavedJobStatusEvent] = Field(default_factory=list)

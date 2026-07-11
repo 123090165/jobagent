@@ -337,6 +337,32 @@ h2 {
   align-items: center;
 }
 
+.status-history-list {
+  display: grid;
+}
+
+.status-history-item {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+  padding: 10px 0;
+  text-transform: capitalize;
+}
+
+.status-history-item:last-child {
+  border-bottom: 0;
+}
+
+.status-history-meta {
+  display: grid;
+  gap: 2px;
+  color: var(--muted);
+  font-size: 0.86rem;
+  text-align: right;
+}
+
 .panel-heading p {
   margin: 0;
   color: var(--muted);
@@ -772,6 +798,15 @@ h2 {
   .saved-job-detail-grid,
   .result-feedback-controls {
     grid-template-columns: 1fr;
+  }
+
+  .status-history-item {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .status-history-meta {
+    text-align: left;
   }
 
   .flow-toolbar,

@@ -23,8 +23,9 @@ const statusOptions: Array<{ label: string; value: SavedJobStatus }> = [
   { label: "Saved", value: "saved" },
   { label: "Interested", value: "interested" },
   { label: "Applied", value: "applied" },
+  { label: "Interviewing", value: "interviewing" },
   { label: "Rejected", value: "rejected" },
-  { label: "Archived", value: "archived" }
+  { label: "Closed", value: "closed" }
 ];
 
 const activeJobs = computed(() => savedJobsStore.jobs.filter((job) => !job.archived_at));
@@ -101,7 +102,7 @@ function toList(value: string): string[] {
 }
 
 function statusTagType(status: SavedJobStatus) {
-  if (status === "interested" || status === "applied") return "success";
+  if (status === "interested" || status === "applied" || status === "interviewing") return "success";
   if (status === "rejected" || status === "archived") return "warning";
   return "default";
 }

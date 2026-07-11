@@ -407,6 +407,18 @@ def init_database(connection: sqlite3.Connection) -> None:
             FOREIGN KEY (resume_profile_id) REFERENCES resume_profiles(resume_profile_id),
             UNIQUE (user_id, job_search_run_id, job_result_id)
         );
+
+        CREATE TABLE IF NOT EXISTS saved_job_status_events (
+            saved_job_status_event_id TEXT PRIMARY KEY,
+            saved_job_id TEXT NOT NULL,
+            user_id TEXT NOT NULL,
+            from_status TEXT,
+            to_status TEXT NOT NULL,
+            reason TEXT,
+            changed_at TEXT NOT NULL,
+            FOREIGN KEY (saved_job_id) REFERENCES saved_jobs(saved_job_id),
+            FOREIGN KEY (user_id) REFERENCES users(user_id)
+        );
         """
     )
     _ensure_local_user(connection)
@@ -424,6 +436,7 @@ def init_database(connection: sqlite3.Connection) -> None:
     _ensure_column(connection, "parsed_resume_reviews", "analysis_warnings_json", "TEXT DEFAULT '[]'")
     _ensure_user_columns(connection)
     _backfill_user_ownership(connection)
+    _backfill_saved_job_status_events(connection)
     _ensure_indexes(connection)
     connection.execute(
         """
@@ -510,6 +523,37 @@ def _backfill_user_ownership(connection: sqlite3.Connection) -> None:
         )
 
 
+def _backfill_saved_job_status_events(connection: sqlite3.Connection) -> None:
+    connection.execute(
+        """
+        INSERT INTO saved_job_status_events (
+            saved_job_status_event_id,
+            saved_job_id,
+            user_id,
+            from_status,
+            to_status,
+            reason,
+            changed_at
+        )
+        SELECT
+            lower(hex(randomblob(16))),
+            saved_job_id,
+            user_id,
+            NULL,
+            status,
+            'Initial status backfill',
+            saved_at
+        FROM saved_jobs AS job
+        WHERE NOT EXISTS (
+            SELECT 1
+            FROM saved_job_status_events AS event
+            WHERE event.saved_job_id = job.saved_job_id
+              AND event.user_id = job.user_id
+        )
+        """
+    )
+
+
 def _ensure_indexes(connection: sqlite3.Connection) -> None:
     connection.executescript(
         """
@@ -540,5 +584,7 @@ def _ensure_indexes(connection: sqlite3.Connection) -> None:
             ON saved_job_analyses(saved_job_id, created_at);
         CREATE INDEX IF NOT EXISTS idx_job_search_feedback_run_id
             ON job_search_result_feedback(user_id, job_search_run_id, updated_at);
+        CREATE INDEX IF NOT EXISTS idx_saved_job_status_events_job_id
+            ON saved_job_status_events(user_id, saved_job_id, changed_at);
         """
     )

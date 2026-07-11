@@ -19,8 +19,9 @@ const statusOptions: Array<{ label: string; value: SavedJobStatus }> = [
   { label: "Saved", value: "saved" },
   { label: "Interested", value: "interested" },
   { label: "Applied", value: "applied" },
+  { label: "Interviewing", value: "interviewing" },
   { label: "Rejected", value: "rejected" },
-  { label: "Archived", value: "archived" }
+  { label: "Closed", value: "closed" }
 ];
 
 const job = computed(() => store.selectedJob);
@@ -122,6 +123,28 @@ function formatValue(value: unknown): string {
             <dd>{{ formatValue(value) }}</dd>
           </template>
         </dl>
+      </n-card>
+
+      <n-card title="Application Status History" size="small">
+        <p v-if="!store.selectedJobStatusHistory.length" class="flow-message">
+          No status changes recorded.
+        </p>
+        <div v-else class="status-history-list">
+          <div
+            v-for="event in store.selectedJobStatusHistory"
+            :key="event.saved_job_status_event_id"
+            class="status-history-item"
+          >
+            <div>
+              <strong>{{ event.to_status }}</strong>
+              <span v-if="event.from_status" class="flow-meta"> from {{ event.from_status }}</span>
+            </div>
+            <div class="status-history-meta">
+              <span>{{ formatDate(event.changed_at) }}</span>
+              <span v-if="event.reason">{{ event.reason }}</span>
+            </div>
+          </div>
+        </div>
       </n-card>
 
       <n-card title="Analysis History" size="small">

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import sqlite3
 from datetime import datetime, timezone
 from uuid import uuid4
 
@@ -9,6 +10,7 @@ from app.schemas.saved_job import (
     SavedJobAnalysis,
     SavedJobCreateRequest,
     SavedJobStatus,
+    SavedJobStatusEvent,
     SavedJobUpdateRequest,
 )
 from app.storage.database import get_connection, init_database
@@ -36,11 +38,16 @@ class SavedJobRepository:
             ),
         )
         if existing is not None:
+            next_status = (
+                existing.status
+                if payload.status == "saved" and existing.status != "archived"
+                else payload.status
+            )
             updated = self.update(
                 user_id=user_id,
                 saved_job_id=existing.saved_job_id,
                 payload=SavedJobUpdateRequest(
-                    status=payload.status,
+                    status=next_status,
                     notes=payload.notes if payload.notes is not None else existing.notes,
                     tags=_clean_list(existing.tags + payload.tags),
                 ),
@@ -102,6 +109,15 @@ class SavedJobRepository:
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 self._job_values(job),
+            )
+            self._insert_status_event(
+                connection,
+                user_id=user_id,
+                saved_job_id=job.saved_job_id,
+                from_status=None,
+                to_status=job.status,
+                reason="Job saved",
+                changed_at=now,
             )
             connection.commit()
         return job
@@ -268,6 +284,16 @@ class SavedJobRepository:
                     saved_job_id,
                 ),
             )
+            if next_status != existing.status:
+                self._insert_status_event(
+                    connection,
+                    user_id=user_id,
+                    saved_job_id=saved_job_id,
+                    from_status=existing.status,
+                    to_status=next_status,
+                    reason="Status updated",
+                    changed_at=updated.updated_at,
+                )
             connection.commit()
         return self.get(user_id=user_id, saved_job_id=saved_job_id)
 
@@ -286,6 +312,16 @@ class SavedJobRepository:
                 """,
                 ("archived", now, now, user_id, saved_job_id),
             )
+            if existing.status != "archived":
+                self._insert_status_event(
+                    connection,
+                    user_id=user_id,
+                    saved_job_id=saved_job_id,
+                    from_status=existing.status,
+                    to_status="archived",
+                    reason="Job archived",
+                    changed_at=datetime.fromisoformat(now),
+                )
             connection.commit()
         return self.get(user_id=user_id, saved_job_id=saved_job_id)
 
@@ -319,6 +355,21 @@ class SavedJobRepository:
                 (user_id, saved_job_id),
             ).fetchall()
         return [self._row_to_analysis(row) for row in rows]
+
+    def list_status_events(
+        self, *, user_id: str, saved_job_id: str
+    ) -> list[SavedJobStatusEvent]:
+        with get_connection() as connection:
+            init_database(connection)
+            rows = connection.execute(
+                """
+                SELECT * FROM saved_job_status_events
+                WHERE user_id = ? AND saved_job_id = ?
+                ORDER BY changed_at DESC, saved_job_status_event_id DESC
+                """,
+                (user_id, saved_job_id),
+            ).fetchall()
+        return [self._row_to_status_event(row) for row in rows]
 
     def _get_by_identity(
         self,
@@ -438,6 +489,47 @@ class SavedJobRepository:
             analysis=json.loads(row["analysis_json"] or "{}"),
             analysis_mode=row["analysis_mode"],
             created_at=datetime.fromisoformat(row["created_at"]),
+        )
+
+    @staticmethod
+    def _row_to_status_event(row: object) -> SavedJobStatusEvent:
+        return SavedJobStatusEvent(
+            saved_job_status_event_id=row["saved_job_status_event_id"],
+            saved_job_id=row["saved_job_id"],
+            user_id=row["user_id"],
+            from_status=row["from_status"],
+            to_status=row["to_status"],
+            reason=row["reason"],
+            changed_at=datetime.fromisoformat(row["changed_at"]),
+        )
+
+    @staticmethod
+    def _insert_status_event(
+        connection: sqlite3.Connection,
+        *,
+        user_id: str,
+        saved_job_id: str,
+        from_status: str | None,
+        to_status: str,
+        reason: str,
+        changed_at: datetime,
+    ) -> None:
+        connection.execute(
+            """
+            INSERT INTO saved_job_status_events (
+                saved_job_status_event_id, saved_job_id, user_id,
+                from_status, to_status, reason, changed_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                str(uuid4()),
+                saved_job_id,
+                user_id,
+                from_status,
+                to_status,
+                reason,
+                changed_at.isoformat(),
+            ),
         )
 
 

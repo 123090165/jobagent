@@ -9,6 +9,7 @@ from app.application.saved_job_usecases import (
     get_saved_job,
     list_saved_jobs,
     list_saved_job_analyses,
+    list_saved_job_status_events,
     save_job_from_browser_capture,
     save_job_from_search_result,
     update_saved_job,
@@ -22,6 +23,7 @@ from app.schemas.saved_job import (
     SavedJobFromSearchResultRequest,
     SavedJobListResponse,
     SavedJobUpdateRequest,
+    SavedJobStatusEventListResponse,
 )
 
 router = APIRouter(prefix="/api/v1/saved-jobs", tags=["v4-saved-jobs"])
@@ -79,6 +81,16 @@ def list_saved_job_analyses_endpoint(
 ) -> SavedJobAnalysisListResponse:
     return SavedJobAnalysisListResponse(
         items=list_saved_job_analyses(saved_job_id, user_id=current_user.user_id)
+    )
+
+
+@router.get("/{saved_job_id}/status-history", response_model=SavedJobStatusEventListResponse)
+def list_saved_job_status_events_endpoint(
+    saved_job_id: str,
+    current_user: UserAccount = Depends(get_current_user),
+) -> SavedJobStatusEventListResponse:
+    return SavedJobStatusEventListResponse(
+        items=list_saved_job_status_events(saved_job_id, user_id=current_user.user_id)
     )
 
 

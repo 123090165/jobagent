@@ -5,6 +5,7 @@ import type {
   SavedJobCreatePayload,
   SavedJobFromSearchResultPayload,
   SavedJobListResponse,
+  SavedJobStatusEventListResponse,
   SavedJobUpdatePayload
 } from "../types/savedJob";
 
@@ -30,6 +31,15 @@ export async function listSavedJobAnalyses(
 ): Promise<SavedJobAnalysisListResponse> {
   const response = await client.get<SavedJobAnalysisListResponse>(
     `/api/v1/saved-jobs/${savedJobId}/analyses`
+  );
+  return response.data;
+}
+
+export async function listSavedJobStatusHistory(
+  savedJobId: string
+): Promise<SavedJobStatusEventListResponse> {
+  const response = await client.get<SavedJobStatusEventListResponse>(
+    `/api/v1/saved-jobs/${savedJobId}/status-history`
   );
   return response.data;
 }
