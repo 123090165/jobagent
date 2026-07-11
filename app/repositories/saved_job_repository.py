@@ -306,6 +306,20 @@ class SavedJobRepository:
             return None
         return self._row_to_analysis(row)
 
+    def list_analyses(self, *, user_id: str, saved_job_id: str) -> list[SavedJobAnalysis]:
+        with get_connection() as connection:
+            init_database(connection)
+            rows = connection.execute(
+                """
+                SELECT *
+                FROM saved_job_analyses
+                WHERE user_id = ? AND saved_job_id = ?
+                ORDER BY created_at DESC, saved_job_analysis_id DESC
+                """,
+                (user_id, saved_job_id),
+            ).fetchall()
+        return [self._row_to_analysis(row) for row in rows]
+
     def _get_by_identity(
         self,
         *,

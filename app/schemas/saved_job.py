@@ -98,3 +98,7 @@ class SavedJobFromBrowserCaptureRequest(SavedJobCreateRequest):
 
 class SavedJobListResponse(BaseModel):
     items: list[SavedJob] = Field(default_factory=list)
+
+
+class SavedJobAnalysisListResponse(BaseModel):
+    items: list[SavedJobAnalysis] = Field(default_factory=list)

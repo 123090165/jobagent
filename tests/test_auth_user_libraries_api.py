@@ -205,3 +205,36 @@ def test_search_history_is_user_scoped_and_ordered(monkeypatch, tmp_path) -> Non
     ]
     assert first["job_search_run_id"] != second["job_search_run_id"]
     assert all(item["query"] != "private" for item in response.json()["items"])
+
+
+def test_saved_job_analysis_history_is_user_scoped(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("JOBAGENT_DB_PATH", str(tmp_path / "analysis-history.sqlite3"))
+    owner_headers = _auth_headers(_register("analysis-owner"))
+    other_headers = _auth_headers(_register("analysis-other"))
+    confirmed = _create_confirmed_profile(owner_headers)
+    session_id = confirmed["profile_session"]["session_id"]
+    run = client.post(
+        "/api/v1/job-search-runs",
+        headers=owner_headers,
+        json={"session_id": session_id, "search_mode": "local_mock"},
+    ).json()["job_search_run"]
+    request = {
+        "job_search_run_id": run["job_search_run_id"],
+        "job_result_id": run["results"][0]["job_result_id"],
+    }
+    saved = client.post(
+        "/api/v1/saved-jobs/from-search-result", headers=owner_headers, json=request
+    ).json()
+    client.post("/api/v1/saved-jobs/from-search-result", headers=owner_headers, json=request)
+
+    response = client.get(
+        f"/api/v1/saved-jobs/{saved['saved_job_id']}/analyses", headers=owner_headers
+    )
+    forbidden = client.get(
+        f"/api/v1/saved-jobs/{saved['saved_job_id']}/analyses", headers=other_headers
+    )
+
+    assert response.status_code == 200
+    assert len(response.json()["items"]) == 2
+    assert all(item["saved_job_id"] == saved["saved_job_id"] for item in response.json()["items"])
+    assert forbidden.status_code == 404

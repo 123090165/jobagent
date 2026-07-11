@@ -270,6 +270,61 @@ h2 {
   overflow-wrap: anywhere;
 }
 
+.saved-job-detail-layout {
+  display: grid;
+  gap: 18px;
+}
+
+.saved-job-detail-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
+  gap: 18px;
+}
+
+.saved-job-jd {
+  margin: 0;
+  color: var(--text);
+  line-height: 1.65;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.structured-jd-grid {
+  display: grid;
+  grid-template-columns: minmax(130px, 0.4fr) minmax(0, 1.6fr);
+  margin: 0;
+  gap: 0;
+}
+
+.structured-jd-grid dt,
+.structured-jd-grid dd {
+  margin: 0;
+  border-bottom: 1px solid var(--border);
+  padding: 9px 8px;
+  overflow-wrap: anywhere;
+}
+
+.structured-jd-grid dt {
+  color: var(--muted);
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+.analysis-history-list {
+  display: grid;
+  gap: 14px;
+}
+
+.analysis-history-item {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 14px;
+}
+
+.analysis-history-item:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
 .panel-heading p {
   margin: 0;
   color: var(--muted);

@@ -8,6 +8,7 @@ from app.application.saved_job_usecases import (
     create_saved_job,
     get_saved_job,
     list_saved_jobs,
+    list_saved_job_analyses,
     save_job_from_browser_capture,
     save_job_from_search_result,
     update_saved_job,
@@ -15,6 +16,7 @@ from app.application.saved_job_usecases import (
 from app.schemas.auth import UserAccount
 from app.schemas.saved_job import (
     SavedJob,
+    SavedJobAnalysisListResponse,
     SavedJobCreateRequest,
     SavedJobFromBrowserCaptureRequest,
     SavedJobFromSearchResultRequest,
@@ -68,6 +70,16 @@ def get_saved_job_endpoint(
     current_user: UserAccount = Depends(get_current_user),
 ) -> SavedJob:
     return get_saved_job(saved_job_id, user_id=current_user.user_id)
+
+
+@router.get("/{saved_job_id}/analyses", response_model=SavedJobAnalysisListResponse)
+def list_saved_job_analyses_endpoint(
+    saved_job_id: str,
+    current_user: UserAccount = Depends(get_current_user),
+) -> SavedJobAnalysisListResponse:
+    return SavedJobAnalysisListResponse(
+        items=list_saved_job_analyses(saved_job_id, user_id=current_user.user_id)
+    )
 
 
 @router.patch("/{saved_job_id}", response_model=SavedJob)

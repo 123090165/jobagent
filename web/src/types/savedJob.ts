@@ -46,6 +46,10 @@ export interface SavedJobListResponse {
   items: SavedJob[];
 }
 
+export interface SavedJobAnalysisListResponse {
+  items: SavedJobAnalysis[];
+}
+
 export interface SavedJobCreatePayload {
   source_provider?: string | null;
   source_url?: string | null;

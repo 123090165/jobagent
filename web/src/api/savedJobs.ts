@@ -1,6 +1,7 @@
 import { client } from "./client";
 import type {
   SavedJob,
+  SavedJobAnalysisListResponse,
   SavedJobCreatePayload,
   SavedJobFromSearchResultPayload,
   SavedJobListResponse,
@@ -16,6 +17,20 @@ export async function listSavedJobs(includeArchived = false): Promise<SavedJobLi
 
 export async function createSavedJob(payload: SavedJobCreatePayload): Promise<SavedJob> {
   const response = await client.post<SavedJob>("/api/v1/saved-jobs", payload);
+  return response.data;
+}
+
+export async function getSavedJob(savedJobId: string): Promise<SavedJob> {
+  const response = await client.get<SavedJob>(`/api/v1/saved-jobs/${savedJobId}`);
+  return response.data;
+}
+
+export async function listSavedJobAnalyses(
+  savedJobId: string
+): Promise<SavedJobAnalysisListResponse> {
+  const response = await client.get<SavedJobAnalysisListResponse>(
+    `/api/v1/saved-jobs/${savedJobId}/analyses`
+  );
   return response.data;
 }
 

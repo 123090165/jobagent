@@ -15,6 +15,7 @@ from app.repositories.saved_job_repository import (
 from app.schemas.job_search import JobSearchResult
 from app.schemas.saved_job import (
     SavedJob,
+    SavedJobAnalysis,
     SavedJobCreateRequest,
     SavedJobFromBrowserCaptureRequest,
     SavedJobFromSearchResultRequest,
@@ -51,6 +52,17 @@ def get_saved_job(
     if job is None:
         raise _not_found()
     return job
+
+
+def list_saved_job_analyses(
+    saved_job_id: str,
+    *,
+    user_id: str,
+    repository: SavedJobRepository = saved_job_repository,
+) -> list[SavedJobAnalysis]:
+    if repository.get(user_id=user_id, saved_job_id=saved_job_id) is None:
+        raise _not_found()
+    return repository.list_analyses(user_id=user_id, saved_job_id=saved_job_id)
 
 
 def update_saved_job(

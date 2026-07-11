@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
+import { useRouter } from "vue-router";
 import { NButton, NCard, NInput, NSelect, NSwitch, NTag } from "naive-ui";
 
 import FlowPageHeader from "../components/FlowPageHeader.vue";
@@ -13,6 +14,7 @@ interface SavedJobDraft {
 }
 
 const savedJobsStore = useSavedJobsStore();
+const router = useRouter();
 const includeArchived = ref(false);
 const actionMessage = ref<string | null>(null);
 const drafts = ref<Record<string, SavedJobDraft>>({});
@@ -118,6 +120,10 @@ function analysisLabel(job: SavedJob): string {
   }
   const score = analysis.match_score === null ? "unscored" : `${analysis.match_score}`;
   return `${score} / ${analysis.confidence_label || analysis.analysis_mode}`;
+}
+
+function openJob(job: SavedJob) {
+  void router.push({ name: "saved-job-detail", params: { savedJobId: job.saved_job_id } });
 }
 </script>
 
@@ -265,6 +271,7 @@ function analysisLabel(job: SavedJob): string {
         <div class="job-card-footer">
           <span>Saved {{ formatDate(job.saved_at) }}</span>
           <div class="flow-toolbar-secondary">
+            <n-button size="small" secondary @click="openJob(job)">Open Details</n-button>
             <n-button
               size="small"
               type="primary"

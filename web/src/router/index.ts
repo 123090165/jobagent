@@ -11,6 +11,7 @@ import ProfileDraftPage from "../pages/ProfileDraftPage.vue";
 import ProfileReviewPage from "../pages/ProfileReviewPage.vue";
 import ResumeProfilesPage from "../pages/ResumeProfilesPage.vue";
 import SavedJobsPage from "../pages/SavedJobsPage.vue";
+import SavedJobDetailPage from "../pages/SavedJobDetailPage.vue";
 import SearchPreviewPage from "../pages/SearchPreviewPage.vue";
 
 async function requireSessionStep(sessionId: string, allowedSteps: string[]) {
@@ -50,6 +51,11 @@ const router = createRouter({
       path: "/saved-jobs",
       name: "saved-jobs",
       component: SavedJobsPage
+    },
+    {
+      path: "/saved-jobs/:savedJobId",
+      name: "saved-job-detail",
+      component: SavedJobDetailPage
     },
     {
       path: "/profile/:sessionId/review",

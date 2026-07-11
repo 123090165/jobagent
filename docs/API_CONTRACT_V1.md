@@ -82,6 +82,7 @@ POST  /api/v1/saved-jobs
 POST  /api/v1/saved-jobs/from-search-result
 POST  /api/v1/saved-jobs/from-browser-capture
 GET   /api/v1/saved-jobs/{saved_job_id}
+GET   /api/v1/saved-jobs/{saved_job_id}/analyses
 PATCH /api/v1/saved-jobs/{saved_job_id}
 POST  /api/v1/saved-jobs/{saved_job_id}/archive
 ~~~

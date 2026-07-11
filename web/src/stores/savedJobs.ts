@@ -4,12 +4,15 @@ import { AxiosError } from "axios";
 import {
   archiveSavedJob,
   createSavedJob,
+  getSavedJob,
   listSavedJobs,
+  listSavedJobAnalyses,
   saveJobFromSearchResult,
   updateSavedJob
 } from "../api/savedJobs";
 import type {
   SavedJob,
+  SavedJobAnalysis,
   SavedJobCreatePayload,
   SavedJobFromSearchResultPayload,
   SavedJobUpdatePayload
@@ -17,6 +20,8 @@ import type {
 
 interface SavedJobState {
   jobs: SavedJob[];
+  selectedJob: SavedJob | null;
+  selectedJobAnalyses: SavedJobAnalysis[];
   isLoading: boolean;
   isSaving: boolean;
   error: string | null;
@@ -29,6 +34,8 @@ interface ApiErrorPayload {
 export const useSavedJobsStore = defineStore("savedJobs", {
   state: (): SavedJobState => ({
     jobs: [],
+    selectedJob: null,
+    selectedJobAnalyses: [],
     isLoading: false,
     isSaving: false,
     error: null
@@ -68,6 +75,27 @@ export const useSavedJobsStore = defineStore("savedJobs", {
         this.isSaving = false;
       }
     },
+    async loadJobDetail(savedJobId: string): Promise<SavedJob> {
+      this.isLoading = true;
+      this.error = null;
+      try {
+        const [job, analyses] = await Promise.all([
+          getSavedJob(savedJobId),
+          listSavedJobAnalyses(savedJobId)
+        ]);
+        this.selectedJob = job;
+        this.selectedJobAnalyses = analyses.items;
+        this.mergeJob(job);
+        return job;
+      } catch (error) {
+        this.selectedJob = null;
+        this.selectedJobAnalyses = [];
+        this.error = toApiErrorMessage(error, "Failed to load saved job details.");
+        throw error;
+      } finally {
+        this.isLoading = false;
+      }
+    },
     async saveFromSearchResult(payload: SavedJobFromSearchResultPayload): Promise<SavedJob> {
       this.isSaving = true;
       this.error = null;
@@ -88,6 +116,7 @@ export const useSavedJobsStore = defineStore("savedJobs", {
       try {
         const job = await updateSavedJob(savedJobId, payload);
         this.mergeJob(job);
+        if (this.selectedJob?.saved_job_id === savedJobId) this.selectedJob = job;
         return job;
       } catch (error) {
         this.error = toApiErrorMessage(error, "Failed to update saved job.");
@@ -102,6 +131,7 @@ export const useSavedJobsStore = defineStore("savedJobs", {
       try {
         const job = await archiveSavedJob(savedJobId);
         this.mergeJob(job);
+        if (this.selectedJob?.saved_job_id === savedJobId) this.selectedJob = job;
         return job;
       } catch (error) {
         this.error = toApiErrorMessage(error, "Failed to archive saved job.");
