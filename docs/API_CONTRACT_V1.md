@@ -1,250 +1,123 @@
 # API Contract V1
 
-`/api/v1` is the only current public product API surface for the Vue frontend in
-`web/`.
+/api/v1 is the product API used by web/ and the browser helper. FastAPI OpenAPI
+at /docs is the field-level source of truth; this document defines resource
+groups and behavioral expectations.
 
-The frontend must call HTTP endpoints and must not import backend services.
+## Authentication
 
-## Current Product Flow
+~~~text
+POST /api/v1/auth/register
+POST /api/v1/auth/login
+POST /api/v1/auth/logout
+GET  /api/v1/auth/me
+~~~
 
-```text
-Resume Intake
--> Resume Review
--> Profile Draft
--> Confirmed Profile
--> Job Search
--> Job Brief
-```
+Login returns an opaque bearer token. The server stores only its hash. Resource
+routes resolve a current user and repositories scope data by user_id.
 
-## Implemented Resources
+Current compatibility behavior: a request without credentials resolves to the
+generated local-user. This supports local development and the current Side
+Panel. It must become an explicit development mode before hosted deployment.
 
-### ProfileSession
+## Profile Workflow
 
-Primary workflow resource for one resume-to-job-search flow.
-
-Linked current-resource ids:
-
-- `resume_document_id`
-- `parsed_review_id`
-- `profile_draft_id`
-- `confirmed_profile_id`
-
-Important `current_step` values include:
-
-- `created`
-- `resume_empty`
-- `resume_ready`
-- `resume_review`
-- `profile_draft`
-- `job_search_ready`
-- `job_search_running`
-- `job_search_completed`
-- `brief_ready`
-- `archived`
-
-### ResumeDocument
-
-Uploaded or pasted resume input linked from a `ProfileSession`.
-
-### ParsedResumeReview
-
-Structured resume review generated from a `ResumeDocument`.
-
-### ProfileDraft
-
-Editable search-ready draft generated from a parsed review.
-
-### ConfirmedProfile
-
-User-confirmed, search-ready profile.
-
-### JobSearchRun
-
-Tracked job-search execution created from a confirmed profile.
-
-The current search pipeline records trace steps for:
-
-- Search planning
-- Provider search
-- Candidate filtering
-- JD analysis
-- Profile matching
-- Result assembly
-
-### BrowserJobCapture
-
-User-triggered browser job-detail input. It captures visible page text and page
-metadata from a Chrome/Edge extension, then maps that input into the existing
-JobSearchRun analysis pipeline.
-
-### JobBrief
-
-Next planned v4.6 resource. It is not implemented in the current API yet.
-
-## Implemented Routes
-
-### Profile Session And Resume Intake
-
-```text
+~~~text
 POST /api/v1/profile-sessions
 GET  /api/v1/profile-sessions/{session_id}
 POST /api/v1/profile-sessions/{session_id}/resume-text
 POST /api/v1/profile-sessions/{session_id}/resume-file
 GET  /api/v1/profile-sessions/{session_id}/resume
-```
-
-### Resume Review
-
-```text
 POST /api/v1/profile-sessions/{session_id}/parse-resume
 GET  /api/v1/profile-sessions/{session_id}/parsed-review
-```
-
-`parse-resume` accepts query flags:
-
-- `regenerate`
-- `use_llm`
-
-### Profile Draft
-
-```text
-POST  /api/v1/profile-sessions/{session_id}/profile-draft
-GET   /api/v1/profile-drafts/{draft_id}
+POST /api/v1/profile-sessions/{session_id}/profile-draft
+GET  /api/v1/profile-drafts/{draft_id}
 PATCH /api/v1/profile-drafts/{draft_id}
-POST  /api/v1/profile-drafts/{draft_id}/confirm
-```
+POST /api/v1/profile-drafts/{draft_id}/confirm
+GET  /api/v1/confirmed-profiles/{confirmed_profile_id}
+~~~
 
-`profile-draft` accepts `regenerate`.
+Resume parsing supports explicit regeneration and optional LLM analysis.
+Profile draft creation supports explicit regeneration.
 
-### Confirmed Profile
+## Resume Profile Library
 
-```text
-GET /api/v1/confirmed-profiles/{confirmed_profile_id}
-```
+~~~text
+GET  /api/v1/resume-profiles
+GET  /api/v1/resume-profiles/{profile_id}
+PATCH /api/v1/resume-profiles/{profile_id}
+POST /api/v1/resume-profiles/{profile_id}/default
+POST /api/v1/resume-profiles/{profile_id}/archive
+~~~
 
-### Job Search
+A confirmed profile is promoted to a durable user-owned resume profile.
 
-```text
+## Job Search
+
+~~~text
+POST /api/v1/job-search-runs/preview
 POST /api/v1/job-search-runs
+POST /api/v1/job-search-runs/browser-helper
 GET  /api/v1/job-search-runs/{run_id}
 GET  /api/v1/job-search-runs/{run_id}/steps
 GET  /api/v1/profile-sessions/{session_id}/job-search-runs
-```
+~~~
 
-`POST /api/v1/job-search-runs` accepts:
+Run creation persists a pending run and schedules execution. Clients poll run
+and step endpoints until completion or failure.
 
-```json
-{
-  "session_id": "uuid",
-  "search_mode": "live_search",
-  "search_provider": "cuhksz_career",
-  "use_llm": false,
-  "locations": [],
-  "target_roles": [],
-  "keywords": [],
-  "max_results": 10
-}
-```
+analysis_mode decides deterministic versus LLM-assisted behavior. llm_provider
+selects the implementation behind the shared LLM interface. Provider selection
+is independent from model selection.
 
-Supported providers:
+## Saved Job Library
 
-- `mock`
-- `cuhksz_career`
+~~~text
+GET   /api/v1/saved-jobs
+POST  /api/v1/saved-jobs
+POST  /api/v1/saved-jobs/from-search-result
+POST  /api/v1/saved-jobs/from-browser-capture
+GET   /api/v1/saved-jobs/{saved_job_id}
+PATCH /api/v1/saved-jobs/{saved_job_id}
+POST  /api/v1/saved-jobs/{saved_job_id}/archive
+~~~
 
-### Browser Job Capture
+Saving a result copies a canonical JD snapshot and a profile-specific analysis
+snapshot. Re-saving the same normalized source should reuse or update the
+existing user-owned saved job.
 
-```text
+## Browser And Status
+
+~~~text
 POST /api/v1/browser/job-captures/analyze
-```
+GET  /api/v1/job-search-providers/status
+GET  /api/v1/llm/status
+GET  /health
+~~~
 
-Request:
+Status endpoints expose configuration state, never secrets.
 
-```json
+## Errors
+
+Known application errors use:
+
+~~~json
 {
-  "session_id": "uuid",
-  "source": "company_site",
-  "source_url": "https://jobs.example.com/backend-intern",
-  "page_title": "Backend Engineer Intern - Example",
-  "title": "Backend Engineer Intern",
-  "company": "Example",
-  "location": "Remote",
-  "salary": null,
-  "jd_text": "visible job description text...",
-  "visible_text": "optional visible page text...",
-  "captured_at": "2026-07-05T00:00:00Z",
-  "extractor_version": "browser-helper-current-page-v1",
-  "warnings": [],
-  "use_llm": false
+  "detail": "Human readable message",
+  "error_code": "machine_readable_code"
 }
-```
+~~~
 
-Response:
+Use detail for recovery text and error_code for routing or state logic.
+Framework request-validation errors may retain FastAPI's default shape.
 
-```json
-{
-  "capture": {
-    "source": "company_site",
-    "source_url": "https://jobs.example.com/backend-intern",
-    "page_title": "Backend Engineer Intern - Example",
-    "title": "Backend Engineer Intern",
-    "company": "Example",
-    "location": "Remote",
-    "salary": null,
-    "jd_text_preview": "visible job description text...",
-    "captured_at": "2026-07-05T00:00:00Z",
-    "extractor_version": "browser-helper-current-page-v1"
-  },
-  "report": {
-    "overall_score": 80,
-    "recommendation": "Worth reviewing closely and tailoring before applying.",
-    "matched_strengths": [],
-    "critical_gaps": [],
-    "resume_actions": [],
-    "interview_questions": [],
-    "confidence_label": "medium",
-    "analysis_mode": "mock"
-  },
-  "warnings": [],
-  "job_search_run_id": "uuid",
-  "job_result_id": "uuid"
-}
-```
+Ownership failures should not reveal whether another user's resource exists.
+After a state error, clients reload the owning ProfileSession before routing.
 
-This endpoint requires an existing ProfileSession with a confirmed profile. It
-does not create an application record. It persists the underlying JobSearchRun
-because that is the existing analysis record for the v4 flow.
+## Contract Change Rules
 
-### Provider And LLM Status
-
-```text
-GET /api/v1/job-search-providers/status
-GET /api/v1/llm/status
-```
-
-Provider status accepts optional `provider`.
-
-## Planned v4.6 Job Brief Routes
-
-```text
-POST /api/v1/job-search-runs/{run_id}/results/{result_id}/brief
-GET  /api/v1/job-briefs/{brief_id}
-```
-
-The brief resource should be tied to:
-
-- `job_search_run_id`
-- `job_result_id`
-- `confirmed_profile_id`
-
-## Error Contract
-
-All product-flow errors use:
-
-```json
-{
-  "detail": "Human readable error message",
-  "error_code": "machine_readable_error_code"
-}
-```
-
-See `docs/V4_ERROR_CONTRACT.md` for frontend handling guidance.
+- Add Pydantic types before changing frontend clients.
+- Keep provider payloads behind normalized candidate contracts.
+- Preserve fields when adding optional diagnostics.
+- Add migration and compatibility handling for persisted contract changes.
+- Update this document and focused API tests in the same change.

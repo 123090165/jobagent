@@ -1,60 +1,49 @@
-# JobAgent Docs Index
+# JobAgent Documentation
 
-## Current product flow
+This directory contains current product and engineering guidance. It is not a
+history archive. Git preserves completed plans and deleted designs.
 
-Resume Intake -> Resume Review -> Profile Draft -> Confirmed Profile -> Search Preview -> Job Search
+## Canonical Documents
 
-Job Brief is postponed until Job Search recall and ranking are reliable.
+- [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md): product status, priorities, and
+  delivery sequence.
+- [ARCHITECTURE.md](ARCHITECTURE.md): runtime boundaries, workflow state, and
+  refactoring direction.
+- [API_CONTRACT_V1.md](API_CONTRACT_V1.md): current public API groups and error
+  behavior.
+- [DATA_SECURITY.md](DATA_SECURITY.md): persistence, authentication, privacy,
+  migration, and deployment boundaries.
+- [SEARCH_PROVIDER.md](SEARCH_PROVIDER.md): providers, ranking, LLM quality
+  controls, tracing, and future workflow evolution.
+- [BROWSER_HELPER.md](BROWSER_HELPER.md): browser extension behavior and safety
+  boundary.
+- [DEVELOPMENT.md](DEVELOPMENT.md): coding, testing, documentation, and
+  refactoring practices.
+- [JOB_SEARCH_USECASE_REFACTOR_PLAN.md](JOB_SEARCH_USECASE_REFACTOR_PLAN.md):
+  phased behavior-preserving split of the current search use-case module.
 
-## Canonical docs
+## Documentation Rules
 
-- [README.md](../README.md)
-- [docs/API_CONTRACT_V1.md](API_CONTRACT_V1.md)
-- [docs/PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md)
-- [docs/DATABASE_AUTH_AND_LIBRARY_PLAN.md](DATABASE_AUTH_AND_LIBRARY_PLAN.md)
-- [docs/V4_PRODUCT_REFACTOR_PLAN.md](V4_PRODUCT_REFACTOR_PLAN.md)
-- [docs/SEARCH_PROVIDER.md](SEARCH_PROVIDER.md)
-- [docs/JOB_SEARCH_AGENT_WORKFLOW_PLAN.md](JOB_SEARCH_AGENT_WORKFLOW_PLAN.md)
-- [docs/NEXT_DEV_PLAN.md](NEXT_DEV_PLAN.md)
-- [docs/CLEANUP_AUDIT.md](CLEANUP_AUDIT.md)
-- [docs/DELETED_FILES_2026_06_25.md](DELETED_FILES_2026_06_25.md)
-- [docs/DELETED_FILES_2026_07_02.md](DELETED_FILES_2026_07_02.md)
-- [docs/LEGACY_MAP.md](LEGACY_MAP.md)
+- Describe current behavior in present tense.
+- Put future work only in PRODUCT_ROADMAP.md unless it is a subsystem constraint.
+- Update contracts when an API, environment variable, state transition, or
+  persistence rule changes.
+- Avoid milestone diaries, deleted-file lists, and duplicated file inventories.
+- Prefer links to source directories over lists of every source file.
 
-## Current architecture
+## Current Product Flow
 
-- backend: `app/`
-- API: `app/api/v1`
-- frontend: `web/`
-- providers: `mock`, `cuhksz_career`, `linkedin`, `remoteok`, `serper_web`, `browser_helper`, `multi_source`
+~~~text
+User login
+-> Resume intake
+-> Resume review
+-> Profile draft
+-> Confirmed resume profile
+-> Search preview
+-> Provider search and analysis
+-> Search results
+-> Saved job library
+~~~
 
-## Next development plan
-
-v4.7 Job Search Reliability
-
-See [docs/NEXT_DEV_PLAN.md](NEXT_DEV_PLAN.md).
-
-## Removed legacy areas
-
-- Streamlit `frontend/`
-- old unversioned API routes
-- old workflow/LangGraph runtime
-- old tracker/import flows
-- old provider paths and provider names: `local_db`, `gemini_cli`,
-  `cuhksz_live`
-- old demo/evaluation scripts
-- old docs centered on deleted runtime paths
-
-## Supporting docs
-
-- [docs/V4_STATE_MACHINE.md](V4_STATE_MACHINE.md)
-- [docs/V4_ERROR_CONTRACT.md](V4_ERROR_CONTRACT.md)
-- [docs/V4_FRONTEND_ROUTE_GUARDS.md](V4_FRONTEND_ROUTE_GUARDS.md)
-- [docs/CONFIRMED_PROFILE_PERSISTENCE.md](CONFIRMED_PROFILE_PERSISTENCE.md)
-- [docs/LLM_ASSISTED_PROFILE_ENRICHMENT.md](LLM_ASSISTED_PROFILE_ENRICHMENT.md)
-- [docs/LLM_PROMPT_AND_QUALITY_CONTROL.md](LLM_PROMPT_AND_QUALITY_CONTROL.md)
-- [docs/PROFILE_FLOW_DECOUPLING.md](PROFILE_FLOW_DECOUPLING.md)
-- [docs/PROFILE_REVIEW_QUALITY_EVALUATION.md](PROFILE_REVIEW_QUALITY_EVALUATION.md)
-- [docs/SEARCH_READY_PROFILE_LAYER.md](SEARCH_READY_PROFILE_LAYER.md)
-- [docs/SECTION_BASED_RESUME_PARSER.md](SECTION_BASED_RESUME_PARSER.md)
-- [docs/GIT_WORKFLOW.md](GIT_WORKFLOW.md)
+Job Brief, resume tailoring, and a complete application workflow are planned,
+not implemented product flows.

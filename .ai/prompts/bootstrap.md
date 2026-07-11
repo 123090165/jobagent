@@ -44,4 +44,4 @@ JobAgent 是一个面向求职者的多智能体求职工作台，围绕用户�
 - 同时遵守 `.ai/skills/development_mentor.md`。
 - 不只作为开发者交付代码，也要作为指导者说明每个阶段的重点、开发难点、知识点和面试官可能追问。
 - 对初学者容易混淆的开发思维要主动解释。
-- 重要阶段复盘参考 `docs/DEVELOPMENT_REVIEW_GUIDE.md`。
+- 重要阶段复盘参考 `docs/DEVELOPMENT.md`。

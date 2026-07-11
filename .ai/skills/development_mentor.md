@@ -78,7 +78,7 @@
 更完整的阶段复盘、自查和面试准备指南见：
 
 ```text
-docs/DEVELOPMENT_REVIEW_GUIDE.md
+docs/DEVELOPMENT.md
 ```
 
 开发过程中如需要详细阶段说明，应先参考该文档，再继续实现。

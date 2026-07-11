@@ -1,341 +1,130 @@
-# Search Provider
+# Search And Analysis Pipeline
 
-The current v4 job search architecture is part of the `JobSearchRun` flow under
-`/api/v1`.
+## Provider Interface
 
-## Current Providers
+All search sources produce normalized RawJobCandidate records. Current provider
+names are:
 
-- `mock`
-- `cuhksz_career`
-- `linkedin` (Serper-backed discovery of public job view links)
-- `remoteok` (public JSON API)
-- `serper_web` (optional, API-key backed)
-- `browser_helper` (payload candidates collected by the local browser helper)
-- `multi_source` (aggregates selected recruiting websites)
+- mock: deterministic local fixtures;
+- cuhksz_career: public list and detail pages;
+- remoteok: public JSON API;
+- linkedin: discovery links through configured Serper search;
+- serper_web: allowlisted web search snippets;
+- multi_source: aggregation of selected backend sources;
+- browser_helper: candidates supplied by the local browser extension.
 
-Removed legacy providers and surfaces:
+The browser helper path may combine BOSS candidates with backend-native sources.
+Provider selection and LLM selection are independent.
 
-- `GeminiCLIProvider`
-- `local_db`
-- `cuhksz_live`
-- `POST /search/jobs`
+Provider adapters own network and source parsing. They must preserve source URL,
+source label, raw evidence, warnings, and enough metadata for deduplication.
 
-## Current Pipeline
+## Pipeline
 
-`JobSearchRun` execution is traced in these steps:
-
-```text
+~~~text
 Search planning
 -> Provider search
 -> Candidate filtering
 -> JD analysis
 -> Profile matching
 -> Result assembly
-```
+~~~
 
 ### Search Planning
 
-Builds search intent from the confirmed profile and optional request fields.
-Planning must not invent missing profile history, credentials, or experience.
+Build executable provider queries and ranking signals from the confirmed
+profile and user input. LLM planning is optional. Plan assembly, normalization,
+query caps, and safety rules remain deterministic.
 
 ### Provider Search
 
-Calls the selected provider and returns raw job candidates with provider
-metadata.
-
-Provider search is intentionally source-type based rather than platform-hardcoded:
-
-- `native_job_board`: use a site's public search/list/detail pages when they are stable enough.
-- `native_api`: use a public provider API and preserve provider attribution.
-- `search_engine`: use a search API to discover public job links and snippets.
-- `hybrid`: aggregate multiple selected sources into one deduped candidate pool.
-- `direct_crawler`: future provider type for allowlisted public pages or seed URLs.
-- `mock`: deterministic local provider for tests and demos.
-
-The first retrieval pass should favor broad recall. Detailed profile skills and
-constraints should be retained as ranking signals instead of being forced into
-every provider query.
+Execute a bounded query budget, normalize candidates, canonicalize source
+identity, deduplicate, and enforce a candidate-pool cap. Trace source coverage,
+missing details, duplicates, warnings, and query durations.
 
 ### Candidate Filtering
 
-Ranks provider-returned candidates against the confirmed profile and search plan.
-It must not create or merge candidates.
+Compute a deterministic scorecard baseline. In LLM mode, ask the configured
+JSON LLM to produce bounded scorecards grounded in candidate evidence. Validate
+indexes, scores, evidence, and result shape. Fall back to deterministic ranking
+on request or quality failure.
 
 ### JD Analysis
 
-Analyzes candidate descriptions using the current JD analysis path with
-deterministic fallback.
+Analyze selected candidates independently with bounded concurrency. Preserve
+candidate order. One candidate may fall back without failing the full run.
+Quality gates compare model output with deterministic evidence and reject
+unsupported or materially incomplete analysis.
 
-### Profile Matching
+### Profile Matching And Assembly
 
-Scores candidate fit against confirmed profile skills, target roles, and search
-signals.
+Combine candidate scorecards, JD analysis, and confirmed profile evidence into
+stable result cards. Reapply canonical identity so duplicate jobs cannot return
+after ranking.
 
-### Result Assembly
+## LLM Boundary
 
-Returns job cards backed by provider results. Source provider and source URL
-must be preserved.
+Business logic calls the shared JSONChatLLM interface. DeepSeek is the current
+default hosted provider. Mock and Ollama-compatible implementations may remain
+for tests or local compatibility, but features must not import a DeepSeek
+client directly.
 
-## Provider Selection
+analysis_mode controls whether a workflow is deterministic or LLM-assisted.
+llm_provider controls which model service implements the LLM call.
 
-`POST /api/v1/job-search-runs` accepts `search_provider`.
+Model output is never trusted only because it matches a schema. Validate:
 
-Allowed values:
+- grounding in resume or JD evidence;
+- required sections and useful coverage;
+- bounded scores and valid candidate indexes;
+- unsupported skill or responsibility injection;
+- stale, sparse, or missing source data.
 
-- `mock`
-- `cuhksz_career`
-- `linkedin`
-- `remoteok`
-- `serper_web`
-- `multi_source`
+Fallback is a supported product result and must expose a concise reason.
 
-For the Search Preview UI, the preferred non-BOSS live-search shape is:
+## Observability
 
-```json
-{
-  "search_provider": "multi_source",
-  "selected_sources": ["cuhksz_career", "linkedin", "remoteok"]
-}
-```
+Persist one trace step per pipeline stage with:
 
-The backend encodes the selected sources into the stored run provider name, for
-example `multi_source:cuhksz_career,linkedin,remoteok`, and each returned
-candidate keeps its own `source_provider`.
+- status and mode;
+- duration;
+- fallback reason;
+- concise quality warnings;
+- selected counts and bounded diagnostics.
 
-BOSS is no longer collected from Search Preview by automated browser search.
-When BOSS is selected there, the UI only guides the user to the manual Side
-Panel capture flow. If backend-native sources such as CUHKSZ are also selected,
-Search Preview runs those sources only. BOSS detail pages are analyzed through
-`POST /api/v1/browser/job-captures/analyze` after the user opens a detail page
-and clicks `Analyze current job` in the extension.
+Current detailed timing covers planning, provider query batches, candidate
+filtering phases, and per-candidate JD analysis totals. Frontend client stages
+cover helper checks, BOSS login/search, capture, and backend import.
 
-`GET /api/v1/job-search-providers/status` reports provider availability,
-configured provider name, search URL, allowlisted domains, source kind, and
-detail strategy.
+Do not put full prompts, tokens, cookies, resumes, or large candidate payloads
+in logs or trace details.
 
-## Frontend Source Rules
+Future operational metrics should include:
 
-Source labels and provider-key parsing live in
-`web/src/services/jobSearchSources.ts`. Keep these rules out of page components
-so Search Preview and Job Search results stay consistent.
+- run success/failure and stale-running counts;
+- provider availability and detail coverage;
+- fallback reason distribution;
+- LLM timeout/rate-limit counts;
+- Top 5 relevance and user dismiss reasons.
 
-## Mock Provider
+## Search Quality Evaluation
 
-`mock` is deterministic and network-free. It is used for tests, local demos, and
-fallback development.
+Use fixtures and representative profiles to evaluate:
 
-## CUHKSZ Career Provider
+- useful unique candidates;
+- duplicate and stale rates;
+- missing URL and missing detail rates;
+- Top 5 and Top 10 relevance;
+- scorecard evidence quality;
+- source diversity;
+- analysis fallback frequency.
 
-`cuhksz_career` fetches public CUHKSZ Career pages:
+Network and hosted LLM calls stay out of the default test suite. Live provider
+smoke and recall experiments are explicit commands under experiments/.
 
-- base URL: `https://career.cuhk.edu.cn`
-- search URL: `https://career.cuhk.edu.cn/job/search`
-- allowlisted domain: `career.cuhk.edu.cn`
+## Future Workflow Engine
 
-Boundaries:
-
-- no login
-- no captcha bypass
-- no browser automation
-- no anti-bot bypassing
-- list/detail parsing only
-- no user secrets or API keys in provider requests
-
-The provider keeps recall broad. Downstream candidate filtering, JD analysis,
-profile matching, and result assembly handle precision and ranking.
-
-## Serper Web Search Provider
-
-`serper_web` uses Serper's Google Search API as a discovery source. It is not a
-default dependency and is configured only when an API key exists:
-
-- `SERPER_API_KEY` or `JOBAGENT_SERPER_API_KEY`
-- optional `JOBAGENT_WEB_SEARCH_SITES=career.example.com,jobs.example.org`
-
-Boundaries:
-
-- no direct Google result-page scraping
-- no login/captcha bypass
-- search result snippets are preserved when detail pages are not fetched
-- source URLs are kept so users can open the original posting
-- tests must use injected fetchers and must not call Serper
-
-This provider is useful when native job-board search is too strict. For example,
-it can discover public pages with broad queries and optional `site:` filters,
-while downstream ranking still decides whether the JD actually matches the
-confirmed profile.
-
-## LinkedIn Discovery Provider
-
-`linkedin` is intentionally implemented as search-engine discovery, not direct
-LinkedIn page scraping:
-
-- uses Serper with `site:linkedin.com/jobs`
-- keeps only concrete `/jobs/view/...` links
-- filters out profile pages and broad list pages
-- preserves the LinkedIn URL for the user to open
-- does not fetch LinkedIn detail pages
-
-This keeps LinkedIn useful as a recall source while avoiding login, browser
-automation, and anti-bot bypass behavior.
-
-## RemoteOK Provider
-
-`remoteok` uses `https://remoteok.com/api` and then filters returned records
-locally against the generated provider query.
-
-Boundaries:
-
-- no HTML scraping
-- source links and RemoteOK attribution warnings are preserved
-- tests use injected JSON responses and must not call the live API
-
-## Multi-Source Provider
-
-`multi_source` runs the selected source providers and merges their candidates
-before the shared filtering/ranking stage. It is currently the main frontend
-path for live search because it lets the user choose CUHKSZ Career, LinkedIn,
-and RemoteOK independently.
-
-## Candidate Identity And Deduping
-
-All provider candidates pass through `candidate_recall_key()` in
-`app/services/job_search_recall_metrics.py`. The dedupe key first canonicalizes
-source URLs, then falls back to title/company/location when no URL exists.
-
-The canonical URL rule is deliberately provider-wide:
-
-- common URLs drop query strings and fragments;
-- BOSS/Zhipin keeps only stable `/job_detail/<id>` with an optional `.html`;
-- CUHKSZ keeps only `/job/view/id/<id>`;
-- LinkedIn keeps `/jobs/view/<id>` and also maps search URLs with
-  `currentJobId=<id>` to the same key.
-
-Provider search dedupes candidates before filtering, and result assembly applies
-the same key again so one job cannot appear twice with different scores after
-ranking.
-
-## Recall Calibration
-
-Use the provider recall calibration experiment before changing query limits or
-ranking behavior:
-
-```powershell
-.venv\Scripts\python.exe experiments\provider_recall_calibration.py `
-  --env-file .env.deepseek.local `
-  --queries-per-case 2 `
-  --limit-per-query 5
-```
-
-The experiment supports:
-
-- `--provider multi_source` with `--source cuhksz_career`, `--source linkedin`,
-  and/or `--source remoteok`;
-- `--provider cuhksz_career`;
-- `--provider linkedin`;
-- `--provider remoteok`;
-- `--provider serper_web`.
-
-The report measures raw candidates, deduped candidates, duplicates, truncated
-candidates, missing source URLs, missing detail text, detail coverage, provider
-warnings, source-provider counts, and top candidate links. It uses deterministic
-search intent during setup and does not call DeepSeek or build Job Brief.
-
-Runtime `Provider search` trace details use the same source-level recall metric
-shape so frontend/manual debugging and experiment reports share one vocabulary.
-
-## Live Smoke Checks
-
-Use the single-provider smoke check when the question is whether a provider can
-fetch a real public result page right now:
-
-```powershell
-.venv\Scripts\python.exe experiments\provider_live_smoke.py `
-  --provider cuhksz_career `
-  --url "https://career.cuhk.edu.cn/job/search?title=%E7%AE%97%E6%B3%95&title_type=1&city=&d_industry=&nature=&d_skill=&d_category=" `
-  --limit 3 `
-  --min-candidates 1 `
-  --require-detail
-```
-
-This script calls only the selected provider through the unified
-`JobSearchProvider.search_jobs()` interface. It writes JSON and Markdown reports
-with candidate counts, source URLs, detail status, raw-description length, and
-source-level recall stats.
-
-It also supports the frontend multi-source shape:
-
-```powershell
-.venv\Scripts\python.exe experiments\provider_live_smoke.py `
-  --provider multi_source `
-  --source cuhksz_career `
-  --source linkedin `
-  --source remoteok `
-  --query "brand marketing intern Shanghai" `
-  --limit 3 `
-  --min-candidates 1
-```
-
-## Browser Helper Boundary
-
-The local `slate-helper/` extension is kept as a reference implementation for
-browser-assisted providers. JobAgent's active extension is `browser-helper/`.
-Its BOSS path has two user-triggered modes:
-
-- Search Preview can check helper availability, verify local BOSS login, and
-  run BOSS search through the extension's `searchBoss` action.
-- The Side Panel can capture a user-opened BOSS job detail page after the user
-  clicks `Analyze current job`.
-- Search candidates are normalized and sent to
-  `/api/v1/job-search-runs/browser-helper`; the backend receives standardized
-  job candidates, never platform cookies.
-- Current-page capture still requires BOSS pages to match `/job_detail/...`,
-  with or without a `.html` suffix, and stops on login, verification, blank,
-  search, or home pages.
-- BOSS host access and cookies are used only inside the local browser extension
-  to operate in the user's browser session.
-
-This should be treated as a `browser_helper` provider path that complements
-public direct providers such as CUHKSZ Career or RemoteOK.
-
-Current implementation status:
-
-- `browser-helper/` can be loaded as a Chrome/Edge unpacked extension;
-- Search Preview can detect the helper, verify BOSS login, optionally open BOSS
-  in a foreground tab, and run user-triggered BOSS search through the helper;
-- backend endpoint `POST /api/v1/job-search-runs/browser-helper` accepts
-  standardized helper candidates and runs them through the existing ranking
-  pipeline;
-- Side Panel current-page capture can read the active tab's visible text after
-  a user click and call `POST /api/v1/browser/job-captures/analyze`;
-- browser job capture is normalized into the same `browser_helper` candidate
-  path before JD analysis and profile matching;
-- BOSS current-page capture is handled separately from backend-native source
-  runs.
-
-Current-page capture data flow:
-
-```text
-Chrome Side Panel
--> activeTab visible-text extractor
--> extension service worker
--> FastAPI Browser Job Capture API
--> BrowserHelperJobCandidate normalization
--> existing JobAgent job-search analysis pipeline
--> Side Panel compact report
-```
-
-This path is intentionally generic. It reads visible text and page metadata; it
-does not claim stable structured extraction for every recruiting site.
-
-## Safety Rules
-
-- Only fetch allowlisted public pages.
-- Preserve source URLs.
-- Treat parsed text as provider evidence, not invented content.
-- Capture current pages only after explicit user action.
-- Do not send browser cookies, API keys, or database secrets to the backend.
-- Keep tests network-free by using fixtures or injected fetchers.
-- Add future providers behind the same provider interface and status endpoint.
-- Preserve candidate-pool and per-query trace details so poor recall can be
-  diagnosed before changing the ranker.
+Do not introduce LangGraph for the current fixed sequence. Reconsider it when
+the workflow requires loops, policy branches, human pauses, and durable
+checkpoint/resume. If introduced, wrap it behind a JobAgent orchestration
+adapter and preserve current API, provider, LLM, and repository interfaces.
