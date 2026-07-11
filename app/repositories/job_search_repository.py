@@ -182,6 +182,41 @@ class JobSearchRepository:
             ).fetchall()
         return [self._row_to_job_search_run(row) for row in rows]
 
+    def list_recent_by_user(
+        self,
+        user_id: str,
+        *,
+        limit: int = 100,
+    ) -> list[JobSearchRun]:
+        with get_connection() as connection:
+            init_database(connection)
+            rows = connection.execute(
+                """
+                SELECT
+                    job_search_run_id,
+                    session_id,
+                    confirmed_profile_id,
+                    query,
+                    locations_json,
+                    target_roles_json,
+                    keywords_json,
+                    search_mode,
+                    llm_enabled,
+                    search_provider,
+                    status,
+                    error_message,
+                    results_json,
+                    created_at,
+                    updated_at
+                FROM job_search_runs
+                WHERE user_id = ?
+                ORDER BY updated_at DESC, created_at DESC
+                LIMIT ?
+                """,
+                (user_id, limit),
+            ).fetchall()
+        return [self._row_to_job_search_run(row) for row in rows]
+
     def create_trace_step(
         self,
         *,

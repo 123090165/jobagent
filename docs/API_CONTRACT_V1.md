@@ -58,6 +58,7 @@ A confirmed profile is promoted to a durable user-owned resume profile.
 POST /api/v1/job-search-runs/preview
 POST /api/v1/job-search-runs
 POST /api/v1/job-search-runs/browser-helper
+GET  /api/v1/job-search-runs
 GET  /api/v1/job-search-runs/{run_id}
 GET  /api/v1/job-search-runs/{run_id}/steps
 GET  /api/v1/profile-sessions/{session_id}/job-search-runs
@@ -65,6 +66,9 @@ GET  /api/v1/profile-sessions/{session_id}/job-search-runs
 
 Run creation persists a pending run and schedules execution. Clients poll run
 and step endpoints until completion or failure.
+
+The collection GET lists recent runs across the current user's profile
+sessions. The session-scoped GET remains available for workflow-local history.
 
 analysis_mode decides deterministic versus LLM-assisted behavior. llm_provider
 selects the implementation behind the shared LLM interface. Provider selection

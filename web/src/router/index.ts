@@ -4,6 +4,7 @@ import { useProfileSessionStore } from "../stores/profileSession";
 
 import HomePage from "../pages/HomePage.vue";
 import JobSearchPage from "../pages/JobSearchPage.vue";
+import JobSearchHistoryPage from "../pages/JobSearchHistoryPage.vue";
 import LoginPage from "../pages/LoginPage.vue";
 import ProfileConfirmedPage from "../pages/ProfileConfirmedPage.vue";
 import ProfileDraftPage from "../pages/ProfileDraftPage.vue";
@@ -39,6 +40,11 @@ const router = createRouter({
       path: "/resume-profiles",
       name: "resume-profiles",
       component: ResumeProfilesPage
+    },
+    {
+      path: "/search-history",
+      name: "search-history",
+      component: JobSearchHistoryPage
     },
     {
       path: "/saved-jobs",

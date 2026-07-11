@@ -35,6 +35,7 @@ async function logout() {
           <nav class="app-nav-links" aria-label="Primary">
             <RouterLink :to="{ name: 'home' }">Resume Intake</RouterLink>
             <RouterLink :to="{ name: 'resume-profiles' }">Profile Library</RouterLink>
+            <RouterLink :to="{ name: 'search-history' }">Search History</RouterLink>
             <RouterLink :to="{ name: 'saved-jobs' }">Saved Jobs</RouterLink>
           </nav>
           <div class="app-nav-user">

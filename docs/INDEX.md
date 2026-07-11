@@ -21,6 +21,8 @@ history archive. Git preserves completed plans and deleted designs.
   refactoring practices.
 - [JOB_SEARCH_USECASE_REFACTOR_PLAN.md](JOB_SEARCH_USECASE_REFACTOR_PLAN.md):
   phased behavior-preserving split of the current search use-case module.
+- [SEARCH_HISTORY_RECOVERY.md](SEARCH_HISTORY_RECOVERY.md): user-visible run
+  history and the current recovery boundary.
 
 ## Documentation Rules
 

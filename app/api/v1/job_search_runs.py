@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, BackgroundTasks, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends, Query
 
 from app.api.dependencies import get_current_user
 from app.application.job_search_usecases import (
     create_browser_helper_job_search_run,
     create_job_search_run,
     get_job_search_run,
+    list_user_job_search_runs,
     list_job_search_trace_steps,
     preview_job_search_run,
 )
@@ -16,10 +17,21 @@ from app.schemas.job_search import (
     JobSearchPreviewResponse,
     JobSearchRunCreateRequest,
     JobSearchRunResponse,
+    JobSearchRunListResponse,
     JobSearchTraceStepListResponse,
 )
 
 router = APIRouter(prefix="/api/v1/job-search-runs", tags=["v4-job-search-runs"])
+
+
+@router.get("", response_model=JobSearchRunListResponse)
+def list_user_job_search_runs_endpoint(
+    limit: int = Query(default=100, ge=1, le=200),
+    current_user: UserAccount = Depends(get_current_user),
+) -> JobSearchRunListResponse:
+    return JobSearchRunListResponse(
+        items=list_user_job_search_runs(user_id=current_user.user_id, limit=limit)
+    )
 
 
 @router.post("", response_model=JobSearchRunResponse)

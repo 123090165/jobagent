@@ -646,6 +646,15 @@ def list_job_search_runs(
     return search_repository.list_recent_by_session(session_id, user_id=user_id)
 
 
+def list_user_job_search_runs(
+    *,
+    user_id: str,
+    limit: int = 100,
+    search_repository: JobSearchRepository = job_search_repository,
+) -> list[JobSearchRun]:
+    return search_repository.list_recent_by_user(user_id, limit=limit)
+
+
 def preview_job_search_run(
     payload: JobSearchRunCreateRequest,
     *,

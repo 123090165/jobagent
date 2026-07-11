@@ -192,3 +192,10 @@ export async function listJobSearchRuns(sessionId: string): Promise<JobSearchRun
   );
   return response.data;
 }
+
+export async function listUserJobSearchRuns(limit = 100): Promise<JobSearchRunListResponse> {
+  const response = await client.get<JobSearchRunListResponse>("/api/v1/job-search-runs", {
+    params: { limit }
+  });
+  return response.data;
+}

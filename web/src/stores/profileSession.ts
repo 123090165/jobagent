@@ -16,6 +16,7 @@ import {
   getProfileDraft,
   getProfileSession,
   listJobSearchRuns,
+  listUserJobSearchRuns,
   parseResumeForReview,
   previewJobSearchRun,
   submitResumeFile,
@@ -536,6 +537,21 @@ export const useProfileSessionStore = defineStore("profileSession", {
       } catch (error) {
         this.jobSearchRuns = [];
         this.error = toApiErrorMessage(error, "Failed to load job search runs.");
+        throw error;
+      } finally {
+        this.isJobSearchLoading = false;
+      }
+    },
+    async loadUserJobSearchRuns(): Promise<JobSearchRun[]> {
+      this.isJobSearchLoading = true;
+      this.error = null;
+      try {
+        const response = await listUserJobSearchRuns();
+        this.jobSearchRuns = response.items;
+        return response.items;
+      } catch (error) {
+        this.jobSearchRuns = [];
+        this.error = toApiErrorMessage(error, "Failed to load search history.");
         throw error;
       } finally {
         this.isJobSearchLoading = false;

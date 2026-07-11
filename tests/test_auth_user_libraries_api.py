@@ -170,3 +170,38 @@ def test_save_job_from_search_result_creates_saved_job_and_analysis(monkeypatch,
     list_response = client.get("/api/v1/saved-jobs", headers=headers)
     assert list_response.status_code == 200
     assert len(list_response.json()["items"]) == 1
+
+
+def test_search_history_is_user_scoped_and_ordered(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("JOBAGENT_DB_PATH", str(tmp_path / "search-history.sqlite3"))
+    alice_headers = _auth_headers(_register("history-alice"))
+    bob_headers = _auth_headers(_register("history-bob"))
+    alice_confirmed = _create_confirmed_profile(alice_headers)
+    bob_confirmed = _create_confirmed_profile(bob_headers)
+
+    alice_session_id = alice_confirmed["profile_session"]["session_id"]
+    bob_session_id = bob_confirmed["profile_session"]["session_id"]
+    first = client.post(
+        "/api/v1/job-search-runs",
+        headers=alice_headers,
+        json={"session_id": alice_session_id, "search_mode": "local_mock", "query": "first"},
+    ).json()["job_search_run"]
+    second = client.post(
+        "/api/v1/job-search-runs",
+        headers=alice_headers,
+        json={"session_id": alice_session_id, "search_mode": "local_mock", "query": "second"},
+    ).json()["job_search_run"]
+    client.post(
+        "/api/v1/job-search-runs",
+        headers=bob_headers,
+        json={"session_id": bob_session_id, "search_mode": "local_mock", "query": "private"},
+    )
+
+    response = client.get("/api/v1/job-search-runs?limit=1", headers=alice_headers)
+
+    assert response.status_code == 200
+    assert [item["job_search_run_id"] for item in response.json()["items"]] == [
+        second["job_search_run_id"]
+    ]
+    assert first["job_search_run_id"] != second["job_search_run_id"]
+    assert all(item["query"] != "private" for item in response.json()["items"])
