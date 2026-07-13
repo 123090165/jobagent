@@ -304,6 +304,7 @@ def init_database(connection: sqlite3.Connection) -> None:
             job_search_run_id TEXT PRIMARY KEY,
             session_id TEXT NOT NULL,
             confirmed_profile_id TEXT NOT NULL,
+            resume_profile_id TEXT,
             user_id TEXT NOT NULL DEFAULT 'local-user',
             query TEXT NOT NULL,
             locations_json TEXT NOT NULL,
@@ -324,7 +325,8 @@ def init_database(connection: sqlite3.Connection) -> None:
             updated_at TEXT NOT NULL,
             FOREIGN KEY (user_id) REFERENCES users(user_id),
             FOREIGN KEY (session_id) REFERENCES profile_sessions(session_id),
-            FOREIGN KEY (confirmed_profile_id) REFERENCES confirmed_profiles(confirmed_profile_id)
+            FOREIGN KEY (confirmed_profile_id) REFERENCES confirmed_profiles(confirmed_profile_id),
+            FOREIGN KEY (resume_profile_id) REFERENCES resume_profiles(resume_profile_id)
         );
 
         CREATE TABLE IF NOT EXISTS job_search_trace_steps (
@@ -392,6 +394,28 @@ def init_database(connection: sqlite3.Connection) -> None:
             FOREIGN KEY (resume_profile_id) REFERENCES resume_profiles(resume_profile_id),
             FOREIGN KEY (source_job_search_run_id)
                 REFERENCES job_search_runs(job_search_run_id)
+        );
+
+        CREATE TABLE IF NOT EXISTS saved_job_origins (
+            saved_job_origin_id TEXT PRIMARY KEY,
+            origin_key TEXT NOT NULL,
+            user_id TEXT NOT NULL,
+            saved_job_id TEXT NOT NULL,
+            origin_type TEXT NOT NULL,
+            resume_profile_id TEXT,
+            job_search_run_id TEXT,
+            job_search_result_id TEXT,
+            saved_job_analysis_id TEXT,
+            profile_label_snapshot TEXT,
+            search_query_snapshot TEXT,
+            source_provider TEXT,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users(user_id),
+            FOREIGN KEY (saved_job_id) REFERENCES saved_jobs(saved_job_id),
+            FOREIGN KEY (resume_profile_id) REFERENCES resume_profiles(resume_profile_id),
+            FOREIGN KEY (job_search_run_id) REFERENCES job_search_runs(job_search_run_id),
+            FOREIGN KEY (saved_job_analysis_id) REFERENCES saved_job_analyses(saved_job_analysis_id),
+            UNIQUE (user_id, saved_job_id, origin_key)
         );
 
         CREATE TABLE IF NOT EXISTS job_search_result_feedback (
@@ -521,6 +545,7 @@ def init_database(connection: sqlite3.Connection) -> None:
     _ensure_column(connection, "job_search_runs", "search_mode", "TEXT DEFAULT 'local_mock'")
     _ensure_column(connection, "job_search_runs", "llm_enabled", "INTEGER DEFAULT 0")
     _ensure_column(connection, "job_search_runs", "search_provider", "TEXT")
+    _ensure_column(connection, "job_search_runs", "resume_profile_id", "TEXT")
     _ensure_column(connection, "job_search_runs", "error_message", "TEXT")
     _ensure_column(connection, "job_search_runs", "search_mission_id", "TEXT")
     _ensure_column(connection, "job_search_runs", "search_mission_revision", "INTEGER")
@@ -544,6 +569,14 @@ def init_database(connection: sqlite3.Connection) -> None:
     connection.execute(
         "INSERT OR IGNORE INTO schema_migrations (version, name) VALUES (2, 'job_preparation_and_learning_catalog')"
     )
+    lineage_migration = connection.execute(
+        "SELECT 1 FROM schema_migrations WHERE version = 3"
+    ).fetchone()
+    if lineage_migration is None:
+        _backfill_saved_job_lineage(connection)
+        connection.execute(
+            "INSERT INTO schema_migrations (version, name) VALUES (3, 'saved_job_origin_lineage')"
+        )
     _seed_learning_catalog(connection)
     connection.commit()
 
@@ -581,6 +614,76 @@ def _seed_learning_catalog(connection: sqlite3.Connection) -> None:
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
         """,
         resources,
+    )
+
+
+def _backfill_saved_job_lineage(connection: sqlite3.Connection) -> None:
+    connection.execute(
+        """
+        UPDATE job_search_runs
+        SET resume_profile_id = (
+            SELECT p.resume_profile_id
+            FROM resume_profiles p
+            WHERE p.user_id = job_search_runs.user_id
+              AND p.source_confirmed_profile_id = job_search_runs.confirmed_profile_id
+            ORDER BY p.updated_at DESC
+            LIMIT 1
+        )
+        WHERE resume_profile_id IS NULL
+          AND EXISTS (
+            SELECT 1 FROM resume_profiles p
+            WHERE p.user_id = job_search_runs.user_id
+              AND p.source_confirmed_profile_id = job_search_runs.confirmed_profile_id
+          )
+        """
+    )
+    connection.execute(
+        """
+        INSERT OR IGNORE INTO saved_job_origins (
+            saved_job_origin_id, origin_key, user_id, saved_job_id, origin_type,
+            resume_profile_id, job_search_run_id, job_search_result_id,
+            saved_job_analysis_id, profile_label_snapshot, search_query_snapshot,
+            source_provider, created_at
+        )
+        SELECT
+            'origin-' || a.saved_job_analysis_id,
+            'analysis:' || a.saved_job_analysis_id,
+            a.user_id,
+            a.saved_job_id,
+            CASE WHEN a.source_job_search_run_id IS NULL THEN 'browser_capture' ELSE 'search_result' END,
+            a.resume_profile_id,
+            a.source_job_search_run_id,
+            a.source_job_result_id,
+            a.saved_job_analysis_id,
+            p.name,
+            r.query,
+            j.source_provider,
+            a.created_at
+        FROM saved_job_analyses a
+        JOIN saved_jobs j ON j.saved_job_id = a.saved_job_id
+        LEFT JOIN resume_profiles p ON p.resume_profile_id = a.resume_profile_id
+        LEFT JOIN job_search_runs r ON r.job_search_run_id = a.source_job_search_run_id
+        """
+    )
+    connection.execute(
+        """
+        INSERT OR IGNORE INTO saved_job_origins (
+            saved_job_origin_id, origin_key, user_id, saved_job_id, origin_type,
+            source_provider, created_at
+        )
+        SELECT
+            'origin-manual-' || j.saved_job_id,
+            'manual:' || j.saved_job_id,
+            j.user_id,
+            j.saved_job_id,
+            'manual',
+            j.source_provider,
+            j.saved_at
+        FROM saved_jobs j
+        WHERE NOT EXISTS (
+            SELECT 1 FROM saved_job_origins o WHERE o.saved_job_id = j.saved_job_id
+        )
+        """
     )
 
 
@@ -704,6 +807,8 @@ def _ensure_indexes(connection: sqlite3.Connection) -> None:
             ON confirmed_profiles(user_id);
         CREATE INDEX IF NOT EXISTS idx_job_search_runs_user_id
             ON job_search_runs(user_id);
+        CREATE INDEX IF NOT EXISTS idx_job_search_runs_resume_profile
+            ON job_search_runs(user_id, resume_profile_id, created_at);
         CREATE INDEX IF NOT EXISTS idx_resume_profiles_user_id
             ON resume_profiles(user_id, archived_at, updated_at);
         CREATE UNIQUE INDEX IF NOT EXISTS idx_resume_profiles_one_default
@@ -719,6 +824,10 @@ def _ensure_indexes(connection: sqlite3.Connection) -> None:
             WHERE normalized_source_key IS NOT NULL;
         CREATE INDEX IF NOT EXISTS idx_saved_job_analyses_saved_job_id
             ON saved_job_analyses(saved_job_id, created_at);
+        CREATE INDEX IF NOT EXISTS idx_saved_job_origins_job_id
+            ON saved_job_origins(user_id, saved_job_id, created_at);
+        CREATE INDEX IF NOT EXISTS idx_saved_job_origins_profile
+            ON saved_job_origins(user_id, resume_profile_id, created_at);
         CREATE INDEX IF NOT EXISTS idx_job_search_feedback_run_id
             ON job_search_result_feedback(user_id, job_search_run_id, updated_at);
         CREATE INDEX IF NOT EXISTS idx_saved_job_status_events_job_id

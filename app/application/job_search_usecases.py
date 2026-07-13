@@ -17,6 +17,10 @@ from app.repositories.profile_session_repository import (
     ProfileSessionRepository,
     profile_session_repository,
 )
+from app.repositories.resume_profile_repository import (
+    ResumeProfileRepository,
+    resume_profile_repository,
+)
 from app.repositories.search_mission_repository import (
     SearchMissionRepository,
     search_mission_repository,
@@ -122,6 +126,7 @@ def create_job_search_run(
     job_search_provider: JobSearchProvider | None = None,
     llm_service: JSONChatLLM | None = None,
     mission_repository: SearchMissionRepository = search_mission_repository,
+    resume_profiles: ResumeProfileRepository = resume_profile_repository,
 ) -> JobSearchRunResponse:
     session = get_profile_session(payload.session_id, repository=session_repository, user_id=user_id)
     if session.confirmed_profile_id is None:
@@ -145,6 +150,11 @@ def create_job_search_run(
             status_code=404,
         )
 
+    durable_profile = resume_profiles.get_by_confirmed_profile(
+        user_id=user_id or LOCAL_USER_ID,
+        confirmed_profile_id=confirmed_profile.confirmed_profile_id,
+    )
+
     query, locations, target_roles, keywords, mission = _resolve_inputs_with_mission(
         payload,
         confirmed_profile,
@@ -162,6 +172,7 @@ def create_job_search_run(
         run = search_repository.create(
             session_id=session.session_id,
             confirmed_profile_id=confirmed_profile.confirmed_profile_id,
+            resume_profile_id=durable_profile.resume_profile_id if durable_profile else None,
             query=query,
             locations=locations,
             target_roles=target_roles,
@@ -191,6 +202,7 @@ def create_job_search_run(
     run = search_repository.create_pending(
         session_id=session.session_id,
         confirmed_profile_id=confirmed_profile.confirmed_profile_id,
+        resume_profile_id=durable_profile.resume_profile_id if durable_profile else None,
         query=query,
         locations=locations,
         target_roles=target_roles,

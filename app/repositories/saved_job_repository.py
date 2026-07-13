@@ -9,6 +9,7 @@ from app.schemas.saved_job import (
     SavedJob,
     SavedJobAnalysis,
     SavedJobCreateRequest,
+    SavedJobOrigin,
     SavedJobStatus,
     SavedJobStatusEvent,
     SavedJobUpdateRequest,
@@ -205,6 +206,78 @@ class SavedJobRepository:
             connection.commit()
         return item
 
+    def create_origin(
+        self,
+        *,
+        user_id: str,
+        saved_job_id: str,
+        origin_key: str,
+        origin_type: str,
+        resume_profile_id: str | None = None,
+        job_search_run_id: str | None = None,
+        job_search_result_id: str | None = None,
+        saved_job_analysis_id: str | None = None,
+        profile_label: str | None = None,
+        search_query: str | None = None,
+        source_provider: str | None = None,
+    ) -> SavedJobOrigin:
+        created_at = _utc_now()
+        origin_id = str(uuid4())
+        with get_connection() as connection:
+            init_database(connection)
+            connection.execute(
+                """
+                INSERT INTO saved_job_origins (
+                    saved_job_origin_id, origin_key, user_id, saved_job_id,
+                    origin_type, resume_profile_id, job_search_run_id,
+                    job_search_result_id, saved_job_analysis_id,
+                    profile_label_snapshot, search_query_snapshot,
+                    source_provider, created_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(user_id, saved_job_id, origin_key) DO UPDATE SET
+                    origin_type = excluded.origin_type,
+                    resume_profile_id = excluded.resume_profile_id,
+                    job_search_run_id = excluded.job_search_run_id,
+                    job_search_result_id = excluded.job_search_result_id,
+                    saved_job_analysis_id = excluded.saved_job_analysis_id,
+                    profile_label_snapshot = excluded.profile_label_snapshot,
+                    search_query_snapshot = excluded.search_query_snapshot,
+                    source_provider = excluded.source_provider
+                """,
+                (
+                    origin_id, origin_key, user_id, saved_job_id, origin_type,
+                    resume_profile_id, job_search_run_id, job_search_result_id,
+                    saved_job_analysis_id, _clean_optional_string(profile_label),
+                    _clean_optional_string(search_query),
+                    _clean_optional_string(source_provider), created_at.isoformat(),
+                ),
+            )
+            row = connection.execute(
+                """
+                SELECT * FROM saved_job_origins
+                WHERE user_id = ? AND saved_job_id = ? AND origin_key = ?
+                """,
+                (user_id, saved_job_id, origin_key),
+            ).fetchone()
+            connection.commit()
+        if row is None:
+            raise RuntimeError("Saved job origin disappeared after creation.")
+        return self._row_to_origin(row)
+
+    def list_origins(self, *, user_id: str, saved_job_id: str) -> list[SavedJobOrigin]:
+        with get_connection() as connection:
+            init_database(connection)
+            rows = connection.execute(
+                """
+                SELECT * FROM saved_job_origins
+                WHERE user_id = ? AND saved_job_id = ?
+                ORDER BY created_at DESC, saved_job_origin_id DESC
+                """,
+                (user_id, saved_job_id),
+            ).fetchall()
+        return [self._row_to_origin(row) for row in rows]
+
     def list_by_user(self, user_id: str, *, include_archived: bool = False) -> list[SavedJob]:
         where_clause = "WHERE user_id = ?"
         if not include_archived:
@@ -330,6 +403,10 @@ class SavedJobRepository:
             return False
         with get_connection() as connection:
             init_database(connection)
+            connection.execute(
+                "DELETE FROM saved_job_origins WHERE user_id = ? AND saved_job_id = ?",
+                (user_id, saved_job_id),
+            )
             connection.execute(
                 "DELETE FROM interview_preparations WHERE user_id = ? AND saved_job_id = ?",
                 (user_id, saved_job_id),
@@ -516,6 +593,23 @@ class SavedJobRepository:
             interview_questions=json.loads(row["interview_questions_json"] or "[]"),
             analysis=json.loads(row["analysis_json"] or "{}"),
             analysis_mode=row["analysis_mode"],
+            created_at=datetime.fromisoformat(row["created_at"]),
+        )
+
+    @staticmethod
+    def _row_to_origin(row: object) -> SavedJobOrigin:
+        return SavedJobOrigin(
+            saved_job_origin_id=row["saved_job_origin_id"],
+            user_id=row["user_id"],
+            saved_job_id=row["saved_job_id"],
+            origin_type=row["origin_type"],
+            resume_profile_id=row["resume_profile_id"],
+            job_search_run_id=row["job_search_run_id"],
+            job_search_result_id=row["job_search_result_id"],
+            saved_job_analysis_id=row["saved_job_analysis_id"],
+            profile_label=row["profile_label_snapshot"],
+            search_query=row["search_query_snapshot"],
+            source_provider=row["source_provider"],
             created_at=datetime.fromisoformat(row["created_at"]),
         )
 

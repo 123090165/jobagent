@@ -65,7 +65,8 @@ DELETE /api/v1/resume-profiles/{profile_id}
 
 A confirmed profile is promoted to a durable user-owned resume profile.
 Deleting a library profile does not delete its source session, search runs, or
-saved jobs. Profile references in analysis snapshots are detached.
+saved jobs. Profile references in analysis and origin records are detached;
+their profile-label and search-query snapshots remain available for audit.
 
 ## Job Search
 
@@ -108,6 +109,7 @@ POST  /api/v1/saved-jobs/from-browser-capture
 GET   /api/v1/saved-jobs/{saved_job_id}
 DELETE /api/v1/saved-jobs/{saved_job_id}
 GET   /api/v1/saved-jobs/{saved_job_id}/analyses
+GET   /api/v1/saved-jobs/{saved_job_id}/contexts
 GET   /api/v1/saved-jobs/{saved_job_id}/status-history
 GET   /api/v1/saved-jobs/{saved_job_id}/briefs
 POST  /api/v1/saved-jobs/{saved_job_id}/briefs
@@ -128,8 +130,10 @@ Deleting a saved job removes only that job's analysis and status history. It
 does not delete search runs or resume profiles.
 
 Saving a result copies a canonical JD snapshot and a profile-specific analysis
-snapshot. Re-saving the same normalized source should reuse or update the
-existing user-owned saved job.
+snapshot. It also records a durable context linking the saved job to its resume
+profile, search run, result, and analysis. Re-saving the same normalized source
+reuses the user-owned saved job while preserving distinct profile/search
+contexts.
 
 ## Browser And Status
 

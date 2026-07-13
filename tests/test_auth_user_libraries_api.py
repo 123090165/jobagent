@@ -127,6 +127,7 @@ def test_save_job_from_search_result_creates_saved_job_and_analysis(monkeypatch,
     headers = _auth_headers(token)
     confirmed = _create_confirmed_profile(headers)
     session_id = confirmed["profile_session"]["session_id"]
+    profile = client.get("/api/v1/resume-profiles", headers=headers).json()["items"][0]
 
     run_response = client.post(
         "/api/v1/job-search-runs",
@@ -135,6 +136,7 @@ def test_save_job_from_search_result_creates_saved_job_and_analysis(monkeypatch,
     )
     assert run_response.status_code == 200
     run = run_response.json()["job_search_run"]
+    assert run["resume_profile_id"] == profile["resume_profile_id"]
     result = run["results"][0]
 
     save_response = client.post(
@@ -166,6 +168,18 @@ def test_save_job_from_search_result_creates_saved_job_and_analysis(monkeypatch,
     )
     assert duplicate_response.status_code == 200
     assert duplicate_response.json()["saved_job_id"] == saved["saved_job_id"]
+
+    contexts_response = client.get(
+        f"/api/v1/saved-jobs/{saved['saved_job_id']}/contexts", headers=headers
+    )
+    assert contexts_response.status_code == 200
+    contexts = contexts_response.json()["items"]
+    assert len(contexts) == 1
+    assert contexts[0]["resume_profile_id"] == profile["resume_profile_id"]
+    assert contexts[0]["job_search_run_id"] == run["job_search_run_id"]
+    assert contexts[0]["job_search_result_id"] == result["job_result_id"]
+    assert contexts[0]["profile_label"] == profile["name"]
+    assert contexts[0]["search_query"] == run["query"]
 
     list_response = client.get("/api/v1/saved-jobs", headers=headers)
     assert list_response.status_code == 200
@@ -484,6 +498,9 @@ def test_library_deletes_do_not_cascade_across_product_libraries(monkeypatch, tm
     first_saved_after_profile_delete = client.get(
         f"/api/v1/saved-jobs/{first_saved['saved_job_id']}", headers=headers
     )
+    first_contexts_after_profile_delete = client.get(
+        f"/api/v1/saved-jobs/{first_saved['saved_job_id']}/contexts", headers=headers
+    )
 
     assert forbidden_delete.status_code == 404
     assert run_delete.status_code == 204
@@ -495,3 +512,6 @@ def test_library_deletes_do_not_cascade_across_product_libraries(monkeypatch, tm
     assert run_after_profile_delete.status_code == 200
     assert first_saved_after_profile_delete.status_code == 200
     assert first_saved_after_profile_delete.json()["latest_analysis"]["resume_profile_id"] is None
+    assert first_contexts_after_profile_delete.status_code == 200
+    assert first_contexts_after_profile_delete.json()["items"][0]["resume_profile_id"] is None
+    assert first_contexts_after_profile_delete.json()["items"][0]["profile_label"]

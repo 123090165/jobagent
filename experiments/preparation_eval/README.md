@@ -54,12 +54,16 @@ Run an evaluation:
 ```powershell
 .venv\Scripts\python.exe -m experiments.preparation_eval.runner `
   --env-file .env.deepseek.local `
-  --profile-id PROFILE_ID `
   --saved-job-id SAVED_JOB_ID `
   --persona-archetype "underconfident and guarded" `
   --preparation-provider deepseek `
   --pause-after 2
 ```
+
+The runner resolves the most recent non-archived Profile associated with the
+Saved Job's durable context. Use `--profile-id PROFILE_ID` only to select a
+specific associated Profile when a job has multiple contexts. Legacy databases
+fall back to the Profile reference in saved-job analyses.
 
 Use `--stop-without-summary` to evaluate voluntary early termination. Raw resume
 text is excluded from the evaluation model context unless

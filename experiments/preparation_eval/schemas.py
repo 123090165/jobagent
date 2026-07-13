@@ -61,6 +61,8 @@ class PreparationEvaluationReport(BaseModel):
     profile_id: str
     saved_job_id: str
     user_id: str
+    saved_job_origin_id: str | None = None
+    association_method: str
     evaluation_model: str
     preparation_provider: str
     profile_memory: dict[str, object]

@@ -70,6 +70,8 @@ class PreparationEvaluationAgent:
         saved_job_id: str,
         profile_memory: dict[str, object],
         job_context: dict[str, object],
+        saved_job_origin_id: str | None = None,
+        association_method: str = "explicit_profile",
     ) -> PreparationEvaluationReport:
         state = await self._graph.ainvoke({
             "user_id": user_id,
@@ -89,6 +91,8 @@ class PreparationEvaluationAgent:
             profile_id=profile_id,
             saved_job_id=saved_job_id,
             user_id=user_id,
+            saved_job_origin_id=saved_job_origin_id,
+            association_method=association_method,
             evaluation_model=self.model.model_name,
             preparation_provider=self.preparation_provider,
             profile_memory=profile_memory,

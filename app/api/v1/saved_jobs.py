@@ -17,6 +17,7 @@ from app.application.saved_job_usecases import (
     list_job_briefs,
     list_saved_jobs,
     list_saved_job_analyses,
+    list_saved_job_contexts,
     list_saved_job_status_events,
     save_job_from_browser_capture,
     save_job_from_search_result,
@@ -36,6 +37,7 @@ from app.schemas.saved_job import (
     SavedJobFromBrowserCaptureRequest,
     SavedJobFromSearchResultRequest,
     SavedJobListResponse,
+    SavedJobOriginListResponse,
     SavedJobUpdateRequest,
     SavedJobStatusEventListResponse,
 )
@@ -95,6 +97,16 @@ def list_saved_job_analyses_endpoint(
 ) -> SavedJobAnalysisListResponse:
     return SavedJobAnalysisListResponse(
         items=list_saved_job_analyses(saved_job_id, user_id=current_user.user_id)
+    )
+
+
+@router.get("/{saved_job_id}/contexts", response_model=SavedJobOriginListResponse)
+def list_saved_job_contexts_endpoint(
+    saved_job_id: str,
+    current_user: UserAccount = Depends(get_current_user),
+) -> SavedJobOriginListResponse:
+    return SavedJobOriginListResponse(
+        items=list_saved_job_contexts(saved_job_id, user_id=current_user.user_id)
     )
 
 

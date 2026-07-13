@@ -8,6 +8,7 @@ import sqlite3
 import sys
 import tempfile
 from contextlib import contextmanager
+from dataclasses import dataclass
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -29,21 +30,21 @@ def main() -> int:
     if args.list_context:
         print_context(source_db)
         return 0
-    if not args.profile_id or not args.saved_job_id:
-        raise SystemExit("--profile-id and --saved-job-id are required unless --list-context is used")
+    if not args.saved_job_id:
+        raise SystemExit("--saved-job-id is required unless --list-context is used")
 
-    user_id = resolve_shared_owner(source_db, args.profile_id, args.saved_job_id)
+    context = resolve_evaluation_context(source_db, args.saved_job_id, args.profile_id)
     model = OpenAICompatibleEvaluationModel()
     with tempfile.TemporaryDirectory(prefix="jobagent-preparation-eval-") as temp_dir:
         shadow_db = Path(temp_dir) / "evaluation.sqlite3"
         backup_database(source_db, shadow_db)
         with evaluation_database(shadow_db):
             profile = resume_profile_repository.get(
-                user_id=user_id,
-                resume_profile_id=args.profile_id,
+                user_id=context.user_id,
+                resume_profile_id=context.profile_id,
             )
             job = saved_job_repository.get(
-                user_id=user_id,
+                user_id=context.user_id,
                 saved_job_id=args.saved_job_id,
             )
             if profile is None or job is None:
@@ -61,9 +62,11 @@ def main() -> int:
                 finish_session=not args.stop_without_summary,
             )
             report = asyncio.run(agent.run(
-                user_id=user_id,
-                profile_id=args.profile_id,
+                user_id=context.user_id,
+                profile_id=context.profile_id,
                 saved_job_id=args.saved_job_id,
+                saved_job_origin_id=context.origin_id,
+                association_method=context.association_method,
                 profile_memory=profile_memory,
                 job_context=job_context,
             ))
@@ -94,23 +97,76 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def resolve_shared_owner(database_path: Path, profile_id: str, saved_job_id: str) -> str:
+@dataclass(frozen=True)
+class EvaluationContext:
+    user_id: str
+    profile_id: str
+    origin_id: str | None
+    association_method: str
+
+
+def resolve_evaluation_context(
+    database_path: Path,
+    saved_job_id: str,
+    profile_id: str | None = None,
+) -> EvaluationContext:
     if not database_path.exists():
         raise FileNotFoundError(f"JobAgent database not found: {database_path}")
     with sqlite3.connect(database_path) as connection:
-        profile = connection.execute(
-            "SELECT user_id FROM resume_profiles WHERE resume_profile_id = ?",
-            (profile_id,),
-        ).fetchone()
         job = connection.execute(
             "SELECT user_id FROM saved_jobs WHERE saved_job_id = ?",
             (saved_job_id,),
         ).fetchone()
-    if profile is None or job is None:
-        raise ValueError("Profile or saved job ID was not found")
-    if profile[0] != job[0]:
-        raise ValueError("Profile and saved job must belong to the same user")
-    return str(profile[0])
+        if job is None:
+            raise ValueError("Saved job ID was not found")
+        user_id = str(job[0])
+        has_origins = connection.execute(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'saved_job_origins'"
+        ).fetchone() is not None
+        association = None
+        if has_origins:
+            association = connection.execute(
+                """
+                SELECT o.saved_job_origin_id, o.resume_profile_id
+                FROM saved_job_origins o
+                JOIN resume_profiles p ON p.resume_profile_id = o.resume_profile_id
+                WHERE o.user_id = ? AND o.saved_job_id = ?
+                  AND p.archived_at IS NULL
+                  AND (? IS NULL OR o.resume_profile_id = ?)
+                ORDER BY o.created_at DESC
+                LIMIT 1
+                """,
+                (user_id, saved_job_id, profile_id, profile_id),
+            ).fetchone()
+        if association is not None:
+            return EvaluationContext(
+                user_id=user_id,
+                profile_id=str(association[1]),
+                origin_id=str(association[0]),
+                association_method="saved_job_origin",
+            )
+        legacy = connection.execute(
+            """
+            SELECT a.resume_profile_id
+            FROM saved_job_analyses a
+            JOIN resume_profiles p ON p.resume_profile_id = a.resume_profile_id
+            WHERE a.user_id = ? AND a.saved_job_id = ?
+              AND p.archived_at IS NULL
+              AND (? IS NULL OR a.resume_profile_id = ?)
+            ORDER BY a.created_at DESC
+            LIMIT 1
+            """,
+            (user_id, saved_job_id, profile_id, profile_id),
+        ).fetchone()
+        if legacy is not None:
+            return EvaluationContext(
+                user_id=user_id,
+                profile_id=str(legacy[0]),
+                origin_id=None,
+                association_method="legacy_saved_job_analysis",
+            )
+    requested = f" for profile {profile_id}" if profile_id else ""
+    raise ValueError(f"Saved job has no usable profile association{requested}")
 
 
 def backup_database(source: Path, destination: Path) -> None:
@@ -169,6 +225,7 @@ def render_markdown(report: PreparationEvaluationReport) -> str:
         f"- Evaluation: `{report.evaluation_id}`",
         f"- Profile: `{report.profile_id}`",
         f"- Saved job: `{report.saved_job_id}`",
+        f"- Association: `{report.association_method}`",
         f"- Evaluation model: `{report.evaluation_model}`",
         f"- Preparation provider: `{report.preparation_provider}`",
         f"- Result: `{'PASS' if report.passed else 'FAIL'}`",

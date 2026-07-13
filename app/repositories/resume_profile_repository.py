@@ -306,6 +306,14 @@ class ResumeProfileRepository:
         with get_connection() as connection:
             init_database(connection)
             connection.execute(
+                "UPDATE job_search_runs SET resume_profile_id = NULL WHERE user_id = ? AND resume_profile_id = ?",
+                (user_id, resume_profile_id),
+            )
+            connection.execute(
+                "UPDATE saved_job_origins SET resume_profile_id = NULL WHERE user_id = ? AND resume_profile_id = ?",
+                (user_id, resume_profile_id),
+            )
+            connection.execute(
                 "UPDATE interview_preparations SET resume_profile_id = NULL WHERE user_id = ? AND resume_profile_id = ?",
                 (user_id, resume_profile_id),
             )

@@ -95,6 +95,7 @@ class JobSearchRun(BaseModel):
     job_search_run_id: str
     session_id: str
     confirmed_profile_id: str
+    resume_profile_id: str | None = None
     query: str
     locations: list[str] = Field(default_factory=list)
     target_roles: list[str] = Field(default_factory=list)

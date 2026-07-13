@@ -35,6 +35,21 @@ class SavedJobAnalysis(BaseModel):
     created_at: datetime
 
 
+class SavedJobOrigin(BaseModel):
+    saved_job_origin_id: str
+    user_id: str
+    saved_job_id: str
+    origin_type: Literal["search_result", "browser_capture", "manual"]
+    resume_profile_id: str | None = None
+    job_search_run_id: str | None = None
+    job_search_result_id: str | None = None
+    saved_job_analysis_id: str | None = None
+    profile_label: str | None = None
+    search_query: str | None = None
+    source_provider: str | None = None
+    created_at: datetime
+
+
 class SavedJob(BaseModel):
     saved_job_id: str
     user_id: str
@@ -110,6 +125,10 @@ class SavedJobListResponse(BaseModel):
 
 class SavedJobAnalysisListResponse(BaseModel):
     items: list[SavedJobAnalysis] = Field(default_factory=list)
+
+
+class SavedJobOriginListResponse(BaseModel):
+    items: list[SavedJobOrigin] = Field(default_factory=list)
 
 
 class SavedJobStatusEvent(BaseModel):

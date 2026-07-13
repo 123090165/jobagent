@@ -23,6 +23,7 @@ class JobSearchRepository:
         *,
         session_id: str,
         confirmed_profile_id: str,
+        resume_profile_id: str | None = None,
         query: str,
         locations: list[str],
         target_roles: list[str],
@@ -38,6 +39,7 @@ class JobSearchRepository:
         return self._create_run(
             session_id=session_id,
             confirmed_profile_id=confirmed_profile_id,
+            resume_profile_id=resume_profile_id,
             user_id=user_id,
             query=query,
             locations=locations,
@@ -61,6 +63,7 @@ class JobSearchRepository:
         *,
         session_id: str,
         confirmed_profile_id: str,
+        resume_profile_id: str | None = None,
         query: str,
         locations: list[str],
         target_roles: list[str],
@@ -78,6 +81,7 @@ class JobSearchRepository:
         return self._create_run(
             session_id=session_id,
             confirmed_profile_id=confirmed_profile_id,
+            resume_profile_id=resume_profile_id,
             user_id=user_id,
             query=query,
             locations=locations,
@@ -142,6 +146,7 @@ class JobSearchRepository:
                     job_search_run_id,
                     session_id,
                     confirmed_profile_id,
+                    resume_profile_id,
                     query,
                     locations_json,
                     target_roles_json,
@@ -187,6 +192,7 @@ class JobSearchRepository:
                     job_search_run_id,
                     session_id,
                     confirmed_profile_id,
+                    resume_profile_id,
                     query,
                     locations_json,
                     target_roles_json,
@@ -226,6 +232,7 @@ class JobSearchRepository:
                     job_search_run_id,
                     session_id,
                     confirmed_profile_id,
+                    resume_profile_id,
                     query,
                     locations_json,
                     target_roles_json,
@@ -262,6 +269,14 @@ class JobSearchRepository:
                 UPDATE saved_job_analyses
                 SET source_job_search_run_id = NULL
                 WHERE user_id = ? AND source_job_search_run_id = ?
+                """,
+                (user_id, run_id),
+            )
+            connection.execute(
+                """
+                UPDATE saved_job_origins
+                SET job_search_run_id = NULL
+                WHERE user_id = ? AND job_search_run_id = ?
                 """,
                 (user_id, run_id),
             )
@@ -508,6 +523,7 @@ class JobSearchRepository:
         *,
         session_id: str,
         confirmed_profile_id: str,
+        resume_profile_id: str | None,
         user_id: str,
         query: str,
         locations: list[str],
@@ -530,6 +546,7 @@ class JobSearchRepository:
             job_search_run_id=str(uuid4()),
             session_id=session_id,
             confirmed_profile_id=confirmed_profile_id,
+            resume_profile_id=resume_profile_id,
             query=query,
             locations=locations,
             target_roles=target_roles,
@@ -557,6 +574,7 @@ class JobSearchRepository:
                     job_search_run_id,
                     session_id,
                     confirmed_profile_id,
+                    resume_profile_id,
                     user_id,
                     query,
                     locations_json,
@@ -576,12 +594,13 @@ class JobSearchRepository:
                     created_at,
                     updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     run.job_search_run_id,
                     run.session_id,
                     run.confirmed_profile_id,
+                    run.resume_profile_id,
                     user_id,
                     run.query,
                     json.dumps(run.locations),
@@ -698,6 +717,7 @@ class JobSearchRepository:
             job_search_run_id=row["job_search_run_id"],
             session_id=row["session_id"],
             confirmed_profile_id=row["confirmed_profile_id"],
+            resume_profile_id=row["resume_profile_id"],
             query=row["query"],
             locations=json.loads(row["locations_json"]),
             target_roles=json.loads(row["target_roles_json"]),
