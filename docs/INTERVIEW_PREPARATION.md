@@ -7,22 +7,36 @@ generate complete model answers. It identifies high-value JD evidence gaps,
 retrieves a small number of learning resources for knowledge gaps, asks concrete
 questions, and turns user-reported answers into preparation actions.
 
-The flow is:
+The guided flow is:
 
 ~~~text
 Saved Job + Profile + latest analysis
 -> classify skill evidence
--> retrieve resources for at most three knowledge gaps
--> ask at most five evidence questions
--> user answers in JobAgent or an external chat
+-> ask at most five structured evidence questions
+-> user selects the closest experience level and may add optional detail
+-> retrieve resources for at most three confirmed knowledge gaps
 -> generate bounded preparation actions
 ~~~
 
 Evidence is marked as `supported`, `partial`, `unknown`, or `missing`. Answers
 submitted by the user remain user-reported evidence and do not silently alter
-the resume profile.
+the resume profile. The required answer is one of professional work, project,
+practice/coursework, conceptual understanding, no experience, or uncertain.
+Optional natural-language detail can improve the recommendation but never
+controls the primary state transition.
+
+Preparation uses a LangGraph state graph for the human pause and resume
+boundary. The graph checkpoints by preparation ID in a local SQLite database.
+Closing with Save moves the workspace to `paused`; completing all guided
+questions produces a summary; explicitly stopping ends without a summary.
 
 ## MCP Resource Search
+
+Curated learning topics and official resources are stored in the local database
+and queried first. MCP is called only when a knowledge gap selected by the user
+needs learning material and the curated catalog is insufficient. Dynamically
+discovered links are returned as references and are not silently promoted to
+curated resources.
 
 The business use case depends on a `LearningResourceSearch` interface. Set
 `JOBAGENT_LEARNING_MCP_URL` to use a Streamable HTTP MCP server. Optional

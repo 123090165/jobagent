@@ -143,12 +143,12 @@ async def generate_interview_preparation_endpoint(
 
 
 @router.put("/{saved_job_id}/preparation/answers", response_model=InterviewPreparationWorkspace)
-def complete_interview_preparation_endpoint(
+async def complete_interview_preparation_endpoint(
     saved_job_id: str,
     payload: PreparationAnswerRequest,
     current_user: UserAccount = Depends(get_current_user),
 ) -> InterviewPreparationWorkspace:
-    return complete_interview_preparation(saved_job_id, payload, user_id=current_user.user_id)
+    return await complete_interview_preparation(saved_job_id, payload, user_id=current_user.user_id)
 
 
 @router.get("/{saved_job_id}/preparation/prompt.txt", response_class=PlainTextResponse)

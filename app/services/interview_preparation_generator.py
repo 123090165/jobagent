@@ -6,6 +6,7 @@ from uuid import NAMESPACE_URL, uuid5
 
 from app.schemas.interview_preparation import (
     PreparationAnswer,
+    PreparationAnswerOption,
     PreparationQuestion,
     PreparationRecommendation,
     PreparationSkillGap,
@@ -19,6 +20,33 @@ KNOWN_SKILLS = (
     "Python", "Java", "C++", "Git", "Docker", "Kubernetes", "FastAPI",
     "communication", "project management", "data analysis", "machine learning",
 )
+
+ANSWER_OPTIONS = [
+    PreparationAnswerOption(
+        value="work_experience", label="Used in professional work",
+        description="I used this in a real work setting with responsibilities or deliverables.",
+    ),
+    PreparationAnswerOption(
+        value="project_experience", label="Used in a project",
+        description="I used this in a personal, academic, or team project.",
+    ),
+    PreparationAnswerOption(
+        value="practice_only", label="Practice or coursework only",
+        description="I have completed exercises, tutorials, or coursework but not a substantial project.",
+    ),
+    PreparationAnswerOption(
+        value="conceptual_only", label="Conceptual understanding",
+        description="I understand the main ideas but have not used them hands-on.",
+    ),
+    PreparationAnswerOption(
+        value="no_experience", label="No current experience",
+        description="I have not learned or used this yet.",
+    ),
+    PreparationAnswerOption(
+        value="uncertain", label="Not sure",
+        description="I need more context before choosing another option.",
+    ),
+]
 
 
 def generate_preparation_questions(
@@ -170,6 +198,7 @@ def _deterministic_questions(gaps: list[PreparationSkillGap]) -> list[Preparatio
         items.append(PreparationQuestion(
             question_id=question_id, skill=gap.skill, prompt=prompt,
             why_asked=f"The JD treats {gap.skill} as important, but current evidence is {gap.evidence_status}.",
+            options=ANSWER_OPTIONS,
         ))
     return items
 
@@ -187,6 +216,7 @@ def _questions_with_ids(items: list[object]) -> list[PreparationQuestion]:
             question_id=str(uuid5(NAMESPACE_URL, f"{skill}:{prompt}")),
             skill=skill, prompt=prompt,
             why_asked=str(raw.get("why_asked") or "Clarifies an important evidence gap."),
+            options=ANSWER_OPTIONS,
         ))
     return questions
 
@@ -194,22 +224,42 @@ def _questions_with_ids(items: list[object]) -> list[PreparationQuestion]:
 def _deterministic_recommendations(
     gaps: list[PreparationSkillGap], questions: list[PreparationQuestion], answers: list[PreparationAnswer]
 ) -> list[PreparationRecommendation]:
-    answer_by_id = {item.question_id: item.answer for item in answers}
+    answer_by_id = {item.question_id: item for item in answers}
     question_by_skill = {item.skill: item for item in questions}
     result = []
     for gap in gaps[:6]:
         question = question_by_skill.get(gap.skill)
-        answer = answer_by_id.get(question.question_id, "") if question else ""
-        if answer:
+        answer = answer_by_id.get(question.question_id) if question else None
+        detail = (answer.detail or answer.answer or "") if answer else ""
+        level = answer.experience_level if answer else None
+        if level in {"work_experience", "project_experience"}:
             action = f"Turn the user-reported {gap.skill} example into a concise context-action-result story."
-            basis = [answer[:300]]
+            basis = [detail[:300]] if detail else [f"User selected {level.replace('_', ' ')}."]
+            action_type = "interview_story" if detail else "experience_inventory"
+        elif level in {"practice_only", "conceptual_only"}:
+            action = f"Build hands-on confidence in {gap.skill} with a focused exercise before preparing an interview explanation."
+            basis = [gap.jd_evidence]
+            action_type = "learning"
+        elif level == "no_experience":
+            action = f"Treat {gap.skill} as a current capability gap and avoid presenting it as prior experience."
+            basis = [gap.jd_evidence]
+            action_type = "capability_gap"
+        elif detail:
+            action = f"Clarify the user-reported {gap.skill} example before using it in interview preparation."
+            basis = [detail[:300]]
+            action_type = "experience_inventory"
         elif gap.skill_type == "knowledge":
             action = f"Review {gap.skill}, then prepare one truthful example or state the current limitation."
             basis = [gap.jd_evidence]
+            action_type = "learning"
         else:
             action = f"Prepare a concrete {gap.skill} example; do not claim experience that is not available."
             basis = [gap.jd_evidence]
-        result.append(PreparationRecommendation(title=gap.skill, action=action, evidence_basis=basis))
+            action_type = "experience_inventory"
+        result.append(PreparationRecommendation(
+            title=gap.skill, skill=gap.skill, action=action,
+            action_type=action_type, evidence_basis=basis,
+        ))
     return result
 
 

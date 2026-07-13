@@ -8,6 +8,10 @@ from urllib.parse import urlparse
 import httpx
 
 from app.schemas.interview_preparation import LearningResource
+from app.repositories.learning_resource_repository import (
+    LearningResourceRepository,
+    learning_resource_repository,
+)
 
 
 class LearningResourceSearch(Protocol):
@@ -65,15 +69,43 @@ class OfficialCatalogResourceSearch:
         return resources[:limit]
 
 
+class DatabaseCatalogResourceSearch:
+    def __init__(self, repository: LearningResourceRepository = learning_resource_repository) -> None:
+        self.repository = repository
+
+    async def search(self, topic: str, *, limit: int = 2) -> list[LearningResource]:
+        return self.repository.search(topic, limit=limit)
+
+
+class CatalogFirstResourceSearch:
+    def __init__(
+        self,
+        catalog: LearningResourceSearch,
+        remote: LearningResourceSearch | None = None,
+    ) -> None:
+        self.catalog = catalog
+        self.remote = remote
+
+    async def search(self, topic: str, *, limit: int = 2) -> list[LearningResource]:
+        curated = await self.catalog.search(topic, limit=limit)
+        if len(curated) >= limit or self.remote is None:
+            return curated
+        discovered = await self.remote.search(topic, limit=limit - len(curated))
+        seen = {item.url for item in curated}
+        return curated + [item for item in discovered if item.url not in seen][:limit - len(curated)]
+
+
 def resolve_learning_resource_search() -> tuple[LearningResourceSearch, str]:
+    catalog = DatabaseCatalogResourceSearch()
     url = os.getenv("JOBAGENT_LEARNING_MCP_URL", "").strip()
     if url and urlparse(url).scheme in {"http", "https"}:
-        return MCPStreamableHTTPResourceSearch(
-            url=url,
-            tool_name=os.getenv("JOBAGENT_LEARNING_MCP_TOOL", "search").strip() or "search",
-            query_argument=os.getenv("JOBAGENT_LEARNING_MCP_QUERY_ARGUMENT", "query").strip() or "query",
-        ), "mcp"
-    return OfficialCatalogResourceSearch(), "official_catalog"
+        remote = MCPStreamableHTTPResourceSearch(
+                url=url,
+                tool_name=os.getenv("JOBAGENT_LEARNING_MCP_TOOL", "search").strip() or "search",
+                query_argument=os.getenv("JOBAGENT_LEARNING_MCP_QUERY_ARGUMENT", "query").strip() or "query",
+            )
+        return CatalogFirstResourceSearch(catalog, remote), "catalog_mcp"
+    return CatalogFirstResourceSearch(catalog), "curated_catalog"
 
 
 def _resources_from_payloads(topic: str, payloads: list[object], *, limit: int) -> list[LearningResource]:

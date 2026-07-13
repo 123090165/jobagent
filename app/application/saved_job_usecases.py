@@ -50,6 +50,7 @@ from app.services.learning_resource_search import (
     resolve_learning_resource_search,
 )
 from app.services.llm_provider import resolve_llm_provider
+from app.services.preparation_agent import preparation_agent
 
 
 def list_saved_jobs(
@@ -181,37 +182,17 @@ async def generate_interview_preparation(
     gaps, questions, mode, fallback_reason = generate_preparation_questions(
         job, profile, analysis, llm_service=resolution.service
     )
-    resource_search, resource_mode = resolve_learning_resource_search()
-    topics = [
-        gap.skill for gap in gaps
-        if gap.skill_type == "knowledge"
-        and gap.importance in {"high", "medium"}
-        and gap.evidence_status in {"partial", "unknown", "missing"}
-    ][:3]
-    results = await asyncio.gather(
-        *(resource_search.search(topic, limit=2) for topic in topics),
-        return_exceptions=True,
-    )
-    resources = []
-    warnings = []
-    catalog = OfficialCatalogResourceSearch()
-    for topic, result in zip(topics, results):
-        if isinstance(result, Exception):
-            warnings.append(f"{topic}: {type(result).__name__}")
-            resources.extend(await catalog.search(topic, limit=2))
-        else:
-            resources.extend(result or await catalog.search(topic, limit=2))
-    if warnings and resource_mode == "mcp":
-        resource_mode = "mcp_fallback"
-    return preparations.create(
+    workspace = preparations.create(
         user_id=user_id, saved_job_id=saved_job_id,
         resume_profile_id=profile.resume_profile_id if profile else None,
         source_analysis_id=analysis.saved_job_analysis_id if analysis else None,
-        skill_gaps=gaps, questions=questions, learning_resources=resources[:6],
+        skill_gaps=gaps, questions=questions, learning_resources=[],
         analysis_mode=mode, analysis_provider=resolution.provider,
-        fallback_reason=fallback_reason, resource_mode=resource_mode,
-        resource_warning="; ".join(warnings) or None,
+        fallback_reason=fallback_reason, resource_mode="pending_answers",
+        resource_warning=None,
     )
+    preparation_agent.start(workspace.preparation_id, workspace.questions)
+    return workspace
 
 
 def get_interview_preparation(
@@ -230,26 +211,121 @@ def get_interview_preparation(
     return item
 
 
-def complete_interview_preparation(
+async def complete_interview_preparation(
     saved_job_id: str, payload: PreparationAnswerRequest, *, user_id: str,
     preparations: InterviewPreparationRepository = interview_preparation_repository,
 ) -> InterviewPreparationWorkspace:
     item = get_interview_preparation(saved_job_id, user_id=user_id, preparations=preparations)
     valid_ids = {question.question_id for question in item.questions}
-    if not payload.answers or any(answer.question_id not in valid_ids for answer in payload.answers):
+    if (payload.action != "stop" and not payload.answers) or any(
+        answer.question_id not in valid_ids for answer in payload.answers
+    ):
         raise JobAgentError(
             message="Answers must reference questions in this preparation workspace.",
             error_code="preparation_answer_invalid", status_code=400,
         )
+    normalized_answers = _classify_answer_details(payload.answers)
+    transition = preparation_agent.resume(
+        item.preparation_id,
+        normalized_answers,
+        payload.action,
+        questions=item.questions,
+    )
+    updated_gaps = _apply_preparation_answers(item.skill_gaps, item.questions, normalized_answers)
+    if payload.action in {"save", "stop"}:
+        return preparations.save_answers(
+            item.model_copy(update={"skill_gaps": updated_gaps}),
+            answers=normalized_answers,
+            status=transition["status"],
+        )
     resolution = resolve_llm_provider(payload.llm_provider)
     recommendations, mode, fallback_reason = generate_recommendations(
-        item.skill_gaps, item.questions, payload.answers, llm_service=resolution.service
+        updated_gaps, item.questions, normalized_answers, llm_service=resolution.service
+    )
+    resources, resource_mode, resource_warning = await _resources_for_preparation_answers(
+        updated_gaps, item.questions, normalized_answers
     )
     return preparations.complete(
-        item, answers=payload.answers, recommendations=recommendations,
+        item.model_copy(update={"skill_gaps": updated_gaps}),
+        answers=normalized_answers, recommendations=recommendations,
         analysis_mode=mode, analysis_provider=resolution.provider,
         fallback_reason=fallback_reason,
+        learning_resources=resources, resource_mode=resource_mode,
+        resource_warning=resource_warning,
     )
+
+
+def _apply_preparation_answers(skill_gaps, questions, answers):
+    question_by_id = {question.question_id: question for question in questions}
+    answer_by_skill = {
+        question_by_id[answer.question_id].skill: answer
+        for answer in answers if answer.question_id in question_by_id
+    }
+    updated = []
+    for gap in skill_gaps:
+        answer = answer_by_skill.get(gap.skill)
+        if answer is None:
+            updated.append(gap)
+            continue
+        level = answer.experience_level
+        if level in {"work_experience", "project_experience"}:
+            evidence_status = "supported" if (answer.detail or answer.answer) else "partial"
+        elif level in {"practice_only", "conceptual_only", "uncertain"}:
+            evidence_status = "partial"
+        elif level == "no_experience":
+            evidence_status = "missing"
+        else:
+            evidence_status = "partial"
+        updated.append(gap.model_copy(update={
+            "evidence_status": evidence_status,
+            "evidence_origin": "user_reported",
+        }))
+    return updated
+
+
+def _classify_answer_details(answers):
+    specific_markers = ("built", "created", "implemented", "used", "reduced", "increased", "result", "team")
+    normalized = []
+    for answer in answers:
+        detail = (answer.detail or answer.answer or "").strip()
+        quality = "not_provided"
+        if detail:
+            quality = "specific" if len(detail) >= 40 and any(
+                marker in detail.casefold() for marker in specific_markers
+            ) else "vague"
+        normalized.append(answer.model_copy(update={"detail_quality": quality}))
+    return normalized
+
+
+async def _resources_for_preparation_answers(gaps, questions, answers):
+    question_by_id = {question.question_id: question for question in questions}
+    learning_levels = {"practice_only", "conceptual_only", "no_experience"}
+    skills = {
+        question_by_id[answer.question_id].skill
+        for answer in answers
+        if answer.question_id in question_by_id and answer.experience_level in learning_levels
+    }
+    topics = [
+        gap.skill for gap in gaps
+        if gap.skill in skills and gap.skill_type == "knowledge"
+    ][:3]
+    search, mode = resolve_learning_resource_search()
+    results = await asyncio.gather(
+        *(search.search(topic, limit=2) for topic in topics),
+        return_exceptions=True,
+    )
+    resources = []
+    warnings = []
+    catalog = OfficialCatalogResourceSearch()
+    for topic, result in zip(topics, results):
+        if isinstance(result, Exception):
+            warnings.append(f"{topic}: {type(result).__name__}")
+            resources.extend(await catalog.search(topic, limit=2))
+        else:
+            resources.extend(result or await catalog.search(topic, limit=2))
+    if warnings and mode == "catalog_mcp":
+        mode = "catalog_mcp_fallback"
+    return resources[:6], mode if topics else "not_needed", "; ".join(warnings) or None
 
 
 def export_interview_preparation_prompt(

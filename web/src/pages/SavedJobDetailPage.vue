@@ -1,11 +1,10 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { NButton, NCard, NCollapse, NCollapseItem, NInput, NSelect, NTabPane, NTabs, NTag } from "naive-ui";
+import { NButton, NCollapse, NCollapseItem, NInput, NModal, NRadio, NRadioGroup, NSelect, NTabPane, NTabs, NTag } from "naive-ui";
 
-import { downloadPreparationPrompt } from "../api/savedJobs";
 import { useSavedJobsStore } from "../stores/savedJobs";
-import type { SavedJobStatus } from "../types/savedJob";
+import type { PreparationAnswer, PreparationExperienceLevel, SavedJobStatus } from "../types/savedJob";
 
 const route = useRoute();
 const router = useRouter();
@@ -16,9 +15,9 @@ const status = ref<SavedJobStatus>("saved");
 const notes = ref("");
 const tagsText = ref("");
 const actionMessage = ref<string | null>(null);
-const preparationAnswers = ref<Record<string, string>>({});
-const externalAnswerJson = ref("");
-const showExternalExchange = ref(false);
+const preparationDialogOpen = ref(false);
+const currentPreparationQuestion = ref(0);
+const preparationAnswers = ref<Record<string, PreparationAnswer>>({});
 const statusOptions: Array<{ label: string; value: SavedJobStatus }> = [
   { label: "Saved", value: "saved" },
   { label: "Interested", value: "interested" },
@@ -33,7 +32,12 @@ const latestAnalysis = computed(() => store.selectedJobAnalyses[0] ?? job.value?
 const latestBrief = computed(() => store.selectedJobBriefs[0] ?? null);
 const preparation = computed(() => store.selectedPreparation);
 const structuredEntries = computed(() => Object.entries(job.value?.structured_jd ?? {}));
-const preparationButtonLabel = computed(() => preparation.value ? "Refresh Preparation" : "Start Preparation");
+const activeQuestion = computed(() => preparation.value?.questions[currentPreparationQuestion.value] ?? null);
+const answeredQuestionCount = computed(() => Object.keys(preparationAnswers.value).length);
+const canCompletePreparation = computed(() =>
+  Boolean(preparation.value?.questions.length) &&
+  preparation.value!.questions.every((question) => preparationAnswers.value[question.question_id]?.experience_level)
+);
 
 onMounted(async () => {
   try {
@@ -64,7 +68,9 @@ async function saveTracking() {
 
 function syncPreparationAnswers() {
   preparationAnswers.value = Object.fromEntries(
-    (store.selectedPreparation?.answers ?? []).map((item) => [item.question_id, item.answer])
+    (store.selectedPreparation?.answers ?? [])
+      .filter((item) => item.experience_level)
+      .map((item) => [item.question_id, item])
   );
 }
 
@@ -85,68 +91,71 @@ async function generatePreparation() {
   try {
     await store.generatePreparation(job.value.saved_job_id);
     syncPreparationAnswers();
-    activeTab.value = "preparation";
-    actionMessage.value = "Preparation workspace refreshed.";
+    currentPreparationQuestion.value = 0;
+    preparationDialogOpen.value = true;
+    actionMessage.value = "Preparation session started.";
   } catch {
     // Store error is rendered above.
   }
 }
 
-async function savePreparationAnswers() {
+function updateExperienceLevel(value: PreparationExperienceLevel) {
+  if (!activeQuestion.value) return;
+  const existing = preparationAnswers.value[activeQuestion.value.question_id];
+  preparationAnswers.value[activeQuestion.value.question_id] = {
+    question_id: activeQuestion.value.question_id,
+    experience_level: value,
+    detail: existing?.detail ?? null,
+    detail_quality: "not_provided"
+  };
+}
+
+function updateAnswerDetail(value: string) {
+  if (!activeQuestion.value) return;
+  const existing = preparationAnswers.value[activeQuestion.value.question_id];
+  if (!existing) return;
+  preparationAnswers.value[activeQuestion.value.question_id] = {
+    ...existing,
+    detail: value
+  };
+}
+
+async function submitPreparation(action: "save" | "complete" | "stop") {
   if (!job.value || !preparation.value) return;
-  const answers = preparation.value.questions
-    .map((question) => ({
-      question_id: question.question_id,
-      answer: (preparationAnswers.value[question.question_id] ?? "").trim()
-    }))
-    .filter((answer) => answer.answer.length > 0);
+  const answers = Object.values(preparationAnswers.value).map((answer) => ({
+    ...answer,
+    detail: answer.detail?.trim() || null
+  }));
   if (!answers.length) {
-    actionMessage.value = "Answer at least one evidence question.";
-    return;
+    if (action !== "stop") {
+      actionMessage.value = "Choose at least one option before saving.";
+      return;
+    }
   }
   try {
-    await store.savePreparationAnswers(job.value.saved_job_id, answers);
-    actionMessage.value = "Answers saved and preparation plan updated.";
+    await store.savePreparationAnswers(job.value.saved_job_id, answers, action);
+    preparationDialogOpen.value = false;
+    activeTab.value = "preparation";
+    actionMessage.value = action === "complete"
+      ? "Preparation completed and summary created."
+      : action === "save" ? "Preparation paused. You can continue later." : "Preparation ended without a summary.";
   } catch {
     // Store error is rendered above.
-  }
-}
-
-async function exportPreparationPrompt() {
-  if (!job.value) return;
-  try {
-    const blob = await downloadPreparationPrompt(job.value.saved_job_id);
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = "interview-preparation-prompt.txt";
-    anchor.click();
-    URL.revokeObjectURL(url);
-  } catch {
-    actionMessage.value = "External chat prompt could not be exported.";
-  }
-}
-
-function importExternalAnswers() {
-  try {
-    const parsed = JSON.parse(externalAnswerJson.value) as {
-      answers?: Array<{ question_id?: string; answer?: string }>;
-    };
-    const validIds = new Set(preparation.value?.questions.map((item) => item.question_id) ?? []);
-    for (const item of parsed.answers ?? []) {
-      if (item.question_id && validIds.has(item.question_id) && item.answer?.trim()) {
-        preparationAnswers.value[item.question_id] = item.answer.trim();
-      }
-    }
-    actionMessage.value = "External answers imported. Review before creating the plan.";
-  } catch {
-    actionMessage.value = "Expected JSON with an answers array containing question_id and answer.";
   }
 }
 
 function openPreparation() {
-  if (preparation.value) activeTab.value = "preparation";
-  else void generatePreparation();
+  if (!preparation.value || preparation.value.status === "completed" || preparation.value.status === "stopped") {
+    void generatePreparation();
+    return;
+  }
+  syncPreparationAnswers();
+  currentPreparationQuestion.value = Math.min(
+    preparation.value.questions.findIndex((question) => !preparationAnswers.value[question.question_id]),
+    preparation.value.questions.length - 1
+  );
+  if (currentPreparationQuestion.value < 0) currentPreparationQuestion.value = 0;
+  preparationDialogOpen.value = true;
 }
 
 function formatDate(value: string): string {
@@ -251,10 +260,12 @@ function formatValue(value: unknown): string {
         <n-tab-pane name="preparation" tab="Preparation">
           <section class="workspace-panel preparation-workspace">
             <div class="panel-heading">
-              <div><h2>Interview Preparation</h2><p>Close knowledge gaps and develop truthful evidence for this role.</p></div>
-              <n-button secondary :loading="store.isSaving" @click="generatePreparation">{{ preparationButtonLabel }}</n-button>
+              <div><h2>Interview Preparation</h2><p>Validate your current experience and build a focused preparation plan.</p></div>
+              <n-button type="primary" :loading="store.isSaving" @click="openPreparation">
+                {{ preparation && !['completed', 'stopped'].includes(preparation.status) ? "Continue" : "Start Preparation" }}
+              </n-button>
             </div>
-            <p v-if="!preparation" class="flow-message">Start preparation to identify skill gaps, resources, and evidence questions.</p>
+            <p v-if="!preparation" class="flow-message">Start a guided session to review the most important preparation areas.</p>
             <template v-else>
               <div class="preparation-status-row">
                 <n-tag :type="preparation.status === 'completed' ? 'success' : 'warning'" round>{{ preparation.status }}</n-tag>
@@ -262,7 +273,7 @@ function formatValue(value: unknown): string {
               </div>
 
               <section class="preparation-stage">
-                <h3>1. Skill and evidence gaps</h3>
+                <h3>Preparation areas</h3>
                 <div class="preparation-gap-grid">
                   <article v-for="gap in preparation.skill_gaps" :key="gap.skill" class="preparation-gap-item">
                     <div class="job-card-header"><strong>{{ gap.skill }}</strong><n-tag size="small">{{ gap.evidence_status }}</n-tag></div>
@@ -272,8 +283,8 @@ function formatValue(value: unknown): string {
                 </div>
               </section>
 
-              <section v-if="preparation.learning_resources.length" class="preparation-stage">
-                <h3>2. Learning resources</h3>
+              <section v-if="preparation.status === 'completed' && preparation.learning_resources.length" class="preparation-stage">
+                <h3>Learning resources</h3>
                 <div class="learning-resource-list">
                   <a v-for="resource in preparation.learning_resources" :key="resource.url" :href="resource.url" target="_blank" rel="noreferrer">
                     <strong>{{ resource.title }}</strong><span>{{ resource.source }} · {{ resource.reason }}</span>
@@ -281,35 +292,18 @@ function formatValue(value: unknown): string {
                 </div>
               </section>
 
-              <section v-if="preparation.questions.length" class="preparation-stage">
-                <h3>3. Evidence questions</h3>
-                <div class="saved-job-editor preparation-questions">
-                  <label v-for="question in preparation.questions" :key="question.question_id" class="draft-field">
-                    <span>{{ question.prompt }}</span>
-                    <small class="flow-meta">{{ question.why_asked }}</small>
-                    <n-input v-model:value="preparationAnswers[question.question_id]" type="textarea" :rows="3" placeholder="Describe a truthful example, or state that you do not have one." />
-                  </label>
-                </div>
-                <div class="flow-toolbar-secondary">
-                  <n-button secondary @click="showExternalExchange = !showExternalExchange">Use External Chat</n-button>
-                  <n-button type="primary" :loading="store.isSaving" @click="savePreparationAnswers">Save Answers & Create Plan</n-button>
-                </div>
-                <div v-if="showExternalExchange" class="external-chat-panel">
-                  <p class="flow-meta">Export the guided prompt, then import the returned answer JSON.</p>
-                  <n-button secondary @click="exportPreparationPrompt">Export for External Chat</n-button>
-                  <n-input v-model:value="externalAnswerJson" type="textarea" :rows="3" placeholder='{"answers":[{"question_id":"...","answer":"..."}]}' />
-                  <n-button secondary @click="importExternalAnswers">Import External Answers</n-button>
-                </div>
-              </section>
-
               <section v-if="preparation.recommendations.length" class="preparation-stage">
-                <h3>4. Preparation plan</h3>
+                <h3>Preparation summary</h3>
                 <div class="preparation-action-list">
                   <article v-for="item in preparation.recommendations" :key="item.title">
-                    <strong>{{ item.title }}</strong><p>{{ item.action }}</p>
+                    <div class="job-card-header"><strong>{{ item.title }}</strong><n-tag size="small">{{ item.action_type.replace(/_/g, ' ') }}</n-tag></div>
+                    <p>{{ item.action }}</p>
                   </article>
                 </div>
               </section>
+              <p v-else-if="preparation.status === 'stopped'" class="flow-message">
+                This session ended before enough evidence was collected, so no summary was generated.
+              </p>
             </template>
           </section>
         </n-tab-pane>
@@ -367,6 +361,65 @@ function formatValue(value: unknown): string {
           </section>
         </n-tab-pane>
       </n-tabs>
+
+      <n-modal
+        v-model:show="preparationDialogOpen"
+        preset="card"
+        class="preparation-dialog"
+        title="Guided Preparation"
+        :mask-closable="false"
+      >
+        <template v-if="preparation && activeQuestion">
+          <div class="preparation-dialog-progress">
+            <span>Question {{ currentPreparationQuestion + 1 }} of {{ preparation.questions.length }}</span>
+            <span>{{ answeredQuestionCount }} answered</span>
+          </div>
+          <h2>{{ activeQuestion.skill }}</h2>
+          <p>{{ activeQuestion.prompt }}</p>
+          <small class="flow-meta">{{ activeQuestion.why_asked }}</small>
+
+          <n-radio-group
+            :value="preparationAnswers[activeQuestion.question_id]?.experience_level"
+            class="preparation-option-list"
+            @update:value="updateExperienceLevel"
+          >
+            <n-radio v-for="option in activeQuestion.options" :key="option.value" :value="option.value">
+              <span class="preparation-option-copy"><strong>{{ option.label }}</strong><small>{{ option.description }}</small></span>
+            </n-radio>
+          </n-radio-group>
+
+          <label v-if="preparationAnswers[activeQuestion.question_id]" class="draft-field">
+            <span>Optional detail</span>
+            <small class="flow-meta">Add a truthful example, your role, or an outcome. The selected option still controls the workflow.</small>
+            <n-input
+              :value="preparationAnswers[activeQuestion.question_id]?.detail || ''"
+              type="textarea"
+              :rows="3"
+              placeholder="Optional context..."
+              @update:value="updateAnswerDetail"
+            />
+          </label>
+
+          <div class="preparation-dialog-actions">
+            <n-button secondary :disabled="currentPreparationQuestion === 0" @click="currentPreparationQuestion--">Previous</n-button>
+            <n-button
+              v-if="currentPreparationQuestion < preparation.questions.length - 1"
+              type="primary"
+              :disabled="!preparationAnswers[activeQuestion.question_id]"
+              @click="currentPreparationQuestion++"
+            >Next</n-button>
+            <n-button v-else type="primary" :disabled="!canCompletePreparation" :loading="store.isSaving" @click="submitPreparation('complete')">
+              Finish & Create Summary
+            </n-button>
+          </div>
+        </template>
+        <template #footer>
+          <div class="preparation-dialog-footer">
+            <n-button text @click="submitPreparation('stop')">End without summary</n-button>
+            <n-button secondary :loading="store.isSaving" @click="submitPreparation('save')">Save & close</n-button>
+          </div>
+        </template>
+      </n-modal>
     </template>
   </section>
 </template>

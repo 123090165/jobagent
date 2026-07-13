@@ -470,6 +470,27 @@ def init_database(connection: sqlite3.Connection) -> None:
             UNIQUE (user_id, saved_job_id)
         );
 
+        CREATE TABLE IF NOT EXISTS learning_topics (
+            topic_id TEXT PRIMARY KEY,
+            canonical_name TEXT NOT NULL UNIQUE,
+            aliases_json TEXT NOT NULL DEFAULT '[]',
+            category TEXT NOT NULL DEFAULT 'technology'
+        );
+
+        CREATE TABLE IF NOT EXISTS learning_resources (
+            resource_id TEXT PRIMARY KEY,
+            topic_id TEXT NOT NULL,
+            title TEXT NOT NULL,
+            url TEXT NOT NULL UNIQUE,
+            source TEXT NOT NULL,
+            level TEXT NOT NULL DEFAULT 'review',
+            reason TEXT NOT NULL,
+            quality_tier INTEGER NOT NULL DEFAULT 1,
+            is_curated INTEGER NOT NULL DEFAULT 1,
+            last_verified_at TEXT,
+            FOREIGN KEY (topic_id) REFERENCES learning_topics(topic_id)
+        );
+
         CREATE TABLE IF NOT EXISTS search_missions (
             search_mission_id TEXT PRIMARY KEY,
             user_id TEXT NOT NULL,
@@ -520,7 +541,47 @@ def init_database(connection: sqlite3.Connection) -> None:
         VALUES (1, 'auth_and_user_libraries')
         """
     )
+    connection.execute(
+        "INSERT OR IGNORE INTO schema_migrations (version, name) VALUES (2, 'job_preparation_and_learning_catalog')"
+    )
+    _seed_learning_catalog(connection)
     connection.commit()
+
+
+def _seed_learning_catalog(connection: sqlite3.Connection) -> None:
+    topics = [
+        ("python", "Python", '["python3"]'),
+        ("sql", "SQL", '["relational database", "databases"]'),
+        ("linux", "Linux", '["unix", "shell"]'),
+        ("git", "Git", '["version control"]'),
+        ("docker", "Docker", '["containers", "containerization"]'),
+        ("kubernetes", "Kubernetes", '["k8s"]'),
+        ("typescript", "TypeScript", '["ts"]'),
+        ("microsoft-office", "Microsoft Office", '["excel", "word", "powerpoint", "microsoft 365"]'),
+    ]
+    connection.executemany(
+        "INSERT OR IGNORE INTO learning_topics (topic_id, canonical_name, aliases_json) VALUES (?, ?, ?)",
+        topics,
+    )
+    resources = [
+        ("python-tutorial", "python", "The Python Tutorial", "https://docs.python.org/3/tutorial/", "Python Documentation", "beginner", "Official language tutorial covering Python fundamentals and standard workflows.", 3),
+        ("sql-postgresql", "sql", "PostgreSQL SQL Tutorial", "https://www.postgresql.org/docs/current/tutorial-sql.html", "PostgreSQL Documentation", "beginner", "Official hands-on introduction to relational queries and SQL concepts.", 3),
+        ("linux-ubuntu-cli", "linux", "The Linux command line for beginners", "https://documentation.ubuntu.com/desktop/en/latest/tutorial/the-linux-command-line-for-beginners/", "Ubuntu Documentation", "beginner", "Official practical introduction to commands, files, pipes, and permissions.", 3),
+        ("git-book", "git", "Pro Git", "https://git-scm.com/book/en/v2", "Git", "beginner", "Official Git book with practical version-control workflows.", 3),
+        ("docker-start", "docker", "Docker Get Started", "https://docs.docker.com/get-started/", "Docker Documentation", "beginner", "Official guided introduction to images, containers, and application packaging.", 3),
+        ("kubernetes-basics", "kubernetes", "Learn Kubernetes Basics", "https://kubernetes.io/docs/tutorials/kubernetes-basics/", "Kubernetes Documentation", "beginner", "Official interactive overview of deploying and managing containerized applications.", 3),
+        ("typescript-handbook", "typescript", "The TypeScript Handbook", "https://www.typescriptlang.org/docs/handbook/intro.html", "TypeScript Documentation", "beginner", "Official guide to TypeScript's type system and common development patterns.", 3),
+        ("office-training", "microsoft-office", "Microsoft 365 training", "https://support.microsoft.com/en-us/training", "Microsoft Support", "beginner", "Official training hub for Excel, Word, PowerPoint, and Microsoft 365.", 3),
+    ]
+    connection.executemany(
+        """
+        INSERT OR IGNORE INTO learning_resources (
+            resource_id, topic_id, title, url, source, level, reason, quality_tier,
+            last_verified_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        """,
+        resources,
+    )
 
 
 def _ensure_column(

@@ -16,6 +16,8 @@ Register or login
 -> Provider search and analysis
 -> Search results
 -> Saved jobs
+-> Job Brief
+-> Guided Preparation
 ~~~
 
 Current product capabilities include:
@@ -29,9 +31,11 @@ Current product capabilities include:
   provider adapters;
 - browser-assisted BOSS search and current-page capture;
 - persisted search traces, structured JD snapshots, and saved analysis.
+- versioned Job Briefs and LangGraph-backed guided preparation with curated
+  learning resources and MCP fallback.
 
-Job Brief, resume tailoring, durable distributed workers, and a complete
-application-outcome loop remain planned work.
+Resume tailoring, durable distributed workers, and a complete application-outcome
+loop remain planned work.
 
 ## Stack
 

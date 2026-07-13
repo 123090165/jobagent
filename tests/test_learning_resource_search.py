@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 
 from app.services.learning_resource_search import (
+    DatabaseCatalogResourceSearch,
     OfficialCatalogResourceSearch,
     _resources_from_payloads,
     resolve_learning_resource_search,
@@ -43,4 +44,14 @@ def test_invalid_mcp_url_falls_back_to_catalog(monkeypatch) -> None:
 
     _search, mode = resolve_learning_resource_search()
 
-    assert mode == "official_catalog"
+    assert mode == "curated_catalog"
+
+
+def test_database_catalog_uses_aliases_and_curated_priority(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("JOBAGENT_DB_PATH", str(tmp_path / "learning-catalog.sqlite3"))
+    search = DatabaseCatalogResourceSearch()
+
+    resources = asyncio.run(search.search("containerization with Docker", limit=2))
+
+    assert resources
+    assert resources[0].source == "Docker Documentation"

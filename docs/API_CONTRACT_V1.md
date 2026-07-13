@@ -119,6 +119,11 @@ PATCH /api/v1/saved-jobs/{saved_job_id}
 POST  /api/v1/saved-jobs/{saved_job_id}/archive
 ~~~
 
+Preparation answers use a required structured `experience_level` and optional
+free-text `detail`. The request action is `save`, `complete`, or `stop`. Saving
+checkpoints a paused session, completing generates recommendations and any
+needed learning resources, and stopping intentionally produces no summary.
+
 Deleting a saved job removes only that job's analysis and status history. It
 does not delete search runs or resume profiles.
 

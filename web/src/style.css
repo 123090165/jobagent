@@ -536,6 +536,58 @@ h2 {
   padding-top: 0;
 }
 
+.preparation-dialog {
+  width: min(720px, calc(100vw - 32px));
+}
+
+.preparation-dialog-progress,
+.preparation-dialog-actions,
+.preparation-dialog-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.preparation-dialog-progress {
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin-bottom: 20px;
+}
+
+.preparation-option-list {
+  display: grid;
+  gap: 10px;
+  margin: 24px 0;
+  width: 100%;
+}
+
+.preparation-option-list .n-radio {
+  align-items: flex-start;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+  width: 100%;
+}
+
+.preparation-option-copy {
+  display: grid;
+  gap: 3px;
+  white-space: normal;
+}
+
+.preparation-option-copy small {
+  color: var(--muted);
+}
+
+.preparation-dialog-actions {
+  margin-top: 24px;
+}
+
+.preparation-dialog-footer {
+  width: 100%;
+}
+
 .external-chat-panel {
   display: grid;
   gap: 10px;

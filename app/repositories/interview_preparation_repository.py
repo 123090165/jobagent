@@ -74,11 +74,27 @@ class InterviewPreparationRepository:
         self, item: InterviewPreparationWorkspace, *, answers: list[PreparationAnswer],
         recommendations: list[PreparationRecommendation], analysis_mode: str,
         analysis_provider: str | None, fallback_reason: str | None,
+        learning_resources: list[LearningResource] | None = None,
+        resource_mode: str | None = None, resource_warning: str | None = None,
     ) -> InterviewPreparationWorkspace:
         return self.save(item.model_copy(update={
             "status": "completed", "answers": answers,
             "recommendations": recommendations, "analysis_mode": analysis_mode,
             "analysis_provider": analysis_provider, "fallback_reason": fallback_reason,
+            "learning_resources": learning_resources if learning_resources is not None else item.learning_resources,
+            "resource_mode": resource_mode or item.resource_mode,
+            "resource_warning": resource_warning,
+            "updated_at": datetime.now(timezone.utc),
+        }))
+
+    def save_answers(
+        self, item: InterviewPreparationWorkspace, *, answers: list[PreparationAnswer],
+        status: str,
+    ) -> InterviewPreparationWorkspace:
+        return self.save(item.model_copy(update={
+            "status": status,
+            "answers": answers,
+            "recommendations": [] if status != "completed" else item.recommendations,
             "updated_at": datetime.now(timezone.utc),
         }))
 

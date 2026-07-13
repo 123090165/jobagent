@@ -53,9 +53,8 @@ def test_preparation_generates_gaps_resources_questions_and_prompt(monkeypatch, 
     assert {item["skill"] for item in workspace["skill_gaps"]} >= {"Microsoft Office", "Linux"}
     assert len(workspace["questions"]) <= 5
     assert all("Do you know" not in item["prompt"] for item in workspace["questions"])
-    assert {item["source"] for item in workspace["learning_resources"]} >= {
-        "Ubuntu Documentation", "Microsoft Support"
-    }
+    assert workspace["learning_resources"] == []
+    assert workspace["resource_mode"] == "pending_answers"
 
     prompt = client.get(
         f"/api/v1/saved-jobs/{job['saved_job_id']}/preparation/prompt.txt",
@@ -109,3 +108,63 @@ def test_preparation_accepts_answers_and_preserves_saved_job(monkeypatch, tmp_pa
         json={"answers": [{"question_id": "unknown", "answer": "value"}]},
     )
     assert invalid.status_code == 400
+
+
+def test_preparation_structured_answers_control_state_and_recommendation(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("JOBAGENT_DB_PATH", str(tmp_path / "preparation-structured.sqlite3"))
+    headers = _headers("preparation-structured")
+    job = _job(headers)
+    workspace = client.post(
+        f"/api/v1/saved-jobs/{job['saved_job_id']}/preparation",
+        headers=headers,
+        json={},
+    ).json()
+    questions = workspace["questions"]
+    assert questions[0]["options"]
+
+    answers = [
+        {"question_id": question["question_id"], "experience_level": "no_experience"}
+        for question in questions
+    ]
+    paused = client.put(
+        f"/api/v1/saved-jobs/{job['saved_job_id']}/preparation/answers",
+        headers=headers,
+        json={"answers": answers[:1], "action": "save"},
+    )
+    assert paused.status_code == 200
+    assert paused.json()["status"] == "paused"
+    assert paused.json()["recommendations"] == []
+
+    completed = client.put(
+        f"/api/v1/saved-jobs/{job['saved_job_id']}/preparation/answers",
+        headers=headers,
+        json={"answers": answers, "action": "complete"},
+    )
+    assert completed.status_code == 200
+    assert completed.json()["status"] == "completed"
+    assert all(gap["evidence_origin"] == "user_reported" for gap in completed.json()["skill_gaps"])
+    assert {item["action_type"] for item in completed.json()["recommendations"]} == {"capability_gap"}
+    assert {item["source"] for item in completed.json()["learning_resources"]} >= {
+        "Ubuntu Documentation", "Microsoft Support"
+    }
+
+
+def test_preparation_can_stop_without_answers_or_summary(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("JOBAGENT_DB_PATH", str(tmp_path / "preparation-stop.sqlite3"))
+    headers = _headers("preparation-stop")
+    job = _job(headers)
+    client.post(
+        f"/api/v1/saved-jobs/{job['saved_job_id']}/preparation",
+        headers=headers,
+        json={},
+    )
+
+    stopped = client.put(
+        f"/api/v1/saved-jobs/{job['saved_job_id']}/preparation/answers",
+        headers=headers,
+        json={"answers": [], "action": "stop"},
+    )
+
+    assert stopped.status_code == 200
+    assert stopped.json()["status"] == "stopped"
+    assert stopped.json()["recommendations"] == []

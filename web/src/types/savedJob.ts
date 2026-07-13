@@ -97,6 +97,21 @@ export interface PreparationSkillGap {
   jd_evidence: string;
   profile_evidence: string[];
   rationale: string;
+  evidence_origin: "resume" | "user_reported" | "none";
+}
+
+export type PreparationExperienceLevel =
+  | "work_experience"
+  | "project_experience"
+  | "practice_only"
+  | "conceptual_only"
+  | "no_experience"
+  | "uncertain";
+
+export interface PreparationAnswerOption {
+  value: PreparationExperienceLevel;
+  label: string;
+  description: string;
 }
 
 export interface PreparationQuestion {
@@ -104,11 +119,14 @@ export interface PreparationQuestion {
   skill: string;
   prompt: string;
   why_asked: string;
+  options: PreparationAnswerOption[];
 }
 
 export interface PreparationAnswer {
   question_id: string;
-  answer: string;
+  experience_level: PreparationExperienceLevel;
+  detail?: string | null;
+  detail_quality?: "not_provided" | "specific" | "vague";
 }
 
 export interface LearningResource {
@@ -123,6 +141,8 @@ export interface LearningResource {
 export interface PreparationRecommendation {
   title: string;
   action: string;
+  action_type: "learning" | "experience_inventory" | "interview_story" | "capability_gap";
+  skill: string | null;
   evidence_basis: string[];
 }
 
@@ -132,7 +152,7 @@ export interface InterviewPreparationWorkspace {
   user_id: string;
   resume_profile_id: string | null;
   source_analysis_id: string | null;
-  status: "questions_ready" | "completed";
+  status: "questions_ready" | "paused" | "completed" | "stopped";
   skill_gaps: PreparationSkillGap[];
   questions: PreparationQuestion[];
   answers: PreparationAnswer[];
