@@ -8,9 +8,34 @@ from fastapi.testclient import TestClient
 from app.main import app
 from app.repositories.resume_profile_repository import resume_profile_repository
 from app.repositories.saved_job_repository import saved_job_repository
-from experiments.preparation_eval.agent import PreparationEvaluationAgent
+from experiments.preparation_eval.agent import (
+    PreparationEvaluationAgent,
+    _normalize_persona_response,
+)
+from experiments.preparation_eval.schemas import CandidateSelfAssessment
 
 client = TestClient(app)
+
+
+def test_candidate_self_assessment_accepts_zero_scores() -> None:
+    assessment = CandidateSelfAssessment(
+        felt_understood=0,
+        truthfulness=0,
+        learning_value=0,
+        interview_value=0,
+        actionability=0,
+        candidate_reflection="The preparation provided no useful support.",
+    )
+
+    assert assessment.actionability == 0
+
+
+def test_persona_confidence_normalizes_compound_label() -> None:
+    response = _normalize_persona_response({
+        "skill_calibrations": [{"skill": "Python", "confidence": "medium-high"}]
+    })
+
+    assert response["skill_calibrations"][0]["confidence"] == "medium"
 
 
 class FakeEvaluationModel:

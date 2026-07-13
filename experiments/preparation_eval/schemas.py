@@ -37,11 +37,11 @@ class CandidateTurn(BaseModel):
 
 
 class CandidateSelfAssessment(BaseModel):
-    felt_understood: int = Field(ge=1, le=5)
-    truthfulness: int = Field(ge=1, le=5)
-    learning_value: int = Field(ge=1, le=5)
-    interview_value: int = Field(ge=1, le=5)
-    actionability: int = Field(ge=1, le=5)
+    felt_understood: int = Field(ge=0, le=5)
+    truthfulness: int = Field(ge=0, le=5)
+    learning_value: int = Field(ge=0, le=5)
+    interview_value: int = Field(ge=0, le=5)
+    actionability: int = Field(ge=0, le=5)
     helpful_items: list[str] = Field(default_factory=list)
     unhelpful_items: list[str] = Field(default_factory=list)
     misunderstandings: list[str] = Field(default_factory=list)

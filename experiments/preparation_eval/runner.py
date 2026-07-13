@@ -35,7 +35,10 @@ def main() -> int:
 
     context = resolve_evaluation_context(source_db, args.saved_job_id, args.profile_id)
     model = OpenAICompatibleEvaluationModel()
-    with tempfile.TemporaryDirectory(prefix="jobagent-preparation-eval-") as temp_dir:
+    with tempfile.TemporaryDirectory(
+        prefix="jobagent-preparation-eval-",
+        ignore_cleanup_errors=True,
+    ) as temp_dir:
         shadow_db = Path(temp_dir) / "evaluation.sqlite3"
         backup_database(source_db, shadow_db)
         with evaluation_database(shadow_db):

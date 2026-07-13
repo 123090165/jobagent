@@ -140,7 +140,7 @@ class PreparationEvaluationAgent:
                 "job_context": state["job_context"],
             }),
         )
-        persona = CandidatePersona.model_validate(response)
+        persona = CandidatePersona.model_validate(_normalize_persona_response(response))
         return {"persona_memory": persona.model_dump(mode="json")}
 
     async def _start_preparation(self, state: EvaluationState) -> EvaluationState:
@@ -282,6 +282,39 @@ class PreparationEvaluationAgent:
             ),
         ]
         return {"rule_checks": [item.model_dump(mode="json") for item in checks]}
+
+
+def _normalize_persona_response(response: dict[str, object]) -> dict[str, object]:
+    normalized = {**response}
+    calibrations = response.get("skill_calibrations")
+    if not isinstance(calibrations, list):
+        return normalized
+    normalized["skill_calibrations"] = [
+        {
+            **item,
+            "confidence": _normalize_confidence_label(item.get("confidence")),
+        }
+        if isinstance(item, dict)
+        else item
+        for item in calibrations
+    ]
+    return normalized
+
+
+def _normalize_confidence_label(value: object) -> object:
+    if not isinstance(value, str):
+        return value
+    cleaned = value.strip().casefold().replace("_", "-").replace(" ", "-")
+    if cleaned in {"low", "medium", "high"}:
+        return cleaned
+    parts = {part for part in cleaned.split("-") if part}
+    if "medium" in parts:
+        return "medium"
+    if "high" in parts:
+        return "high"
+    if "low" in parts:
+        return "low"
+    return value
 
 
 def _prompt(name: str) -> str:

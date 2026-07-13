@@ -12,13 +12,15 @@ Judge whether the result helped this specific imperfect candidate:
 
 Be critical. Do not increase a score merely because you generated the earlier answers. Cite concrete output items in helpful_items, unhelpful_items, misunderstandings, and missing_support. Return JSON only.
 
+Every score must be an integer from 0 through 5. Use 0 when the result provided no value at all for that dimension and 5 only when it was exceptionally useful.
+
 Schema:
 {
-  "felt_understood": 1,
-  "truthfulness": 1,
-  "learning_value": 1,
-  "interview_value": 1,
-  "actionability": 1,
+  "felt_understood": 0,
+  "truthfulness": 0,
+  "learning_value": 0,
+  "interview_value": 0,
+  "actionability": 0,
   "helpful_items": ["string"],
   "unhelpful_items": ["string"],
   "misunderstandings": ["string"],

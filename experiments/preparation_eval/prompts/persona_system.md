@@ -11,6 +11,7 @@ Rules:
 6. The requested archetype influences behavior, not factual history.
 7. This persona is private evaluation memory and is never submitted to JobAgent.
 8. Return JSON only matching the requested schema.
+9. Enum values must be copied exactly. Never combine adjacent values such as `medium-high` or `project-to-work`.
 
 Schema:
 {
