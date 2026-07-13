@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+from io import BytesIO
+
+import fitz
 import pytest
+from docx import Document
 
 from app.services.resume_file_service import (
     DEFAULT_MAX_RESUME_FILE_BYTES,
@@ -35,6 +39,36 @@ def test_extract_text_from_md_file() -> None:
     assert get_resume_file_type("resume.md") == "md"
 
 
+def test_extract_text_from_pdf_file() -> None:
+    document = fitz.open()
+    page = document.new_page()
+    page.insert_text((72, 72), "Backend Engineer\nPython FastAPI SQL")
+    content = document.tobytes()
+    document.close()
+
+    text = extract_text_from_resume_file("resume.pdf", content)
+
+    assert "Backend Engineer" in text
+    assert "Python FastAPI SQL" in text
+    assert get_resume_file_type("resume.pdf") == "pdf"
+
+
+def test_extract_text_from_docx_paragraphs_and_tables() -> None:
+    document = Document()
+    document.add_paragraph("Backend Engineer")
+    table = document.add_table(rows=1, cols=2)
+    table.cell(0, 0).text = "Skills"
+    table.cell(0, 1).text = "Python, FastAPI, SQL"
+    buffer = BytesIO()
+    document.save(buffer)
+
+    text = extract_text_from_resume_file("resume.docx", buffer.getvalue())
+
+    assert "Backend Engineer" in text
+    assert "Skills\tPython, FastAPI, SQL" in text
+    assert get_resume_file_type("resume.docx") == "docx"
+
+
 def test_extract_text_normalizes_filename() -> None:
     filename = normalize_resume_filename(r"C:\fake\path\resume.TXT")
     text = extract_text_from_resume_file(filename, SAMPLE_RESUME.encode("utf-8"))
@@ -54,8 +88,27 @@ def test_extract_text_rejects_empty_file() -> None:
 
 def test_extract_text_rejects_unsupported_extension() -> None:
     with pytest.raises(ResumeFileParseError, match="unsupported resume file type") as exc_info:
-        extract_text_from_resume_file("resume.pdf", b"fake pdf")
+        extract_text_from_resume_file("resume.doc", b"fake word document")
     assert exc_info.value.error_code == "resume_file_type_unsupported"
+
+
+def test_extract_text_rejects_pdf_without_text_layer() -> None:
+    document = fitz.open()
+    document.new_page()
+    content = document.tobytes()
+    document.close()
+
+    with pytest.raises(ResumeFileParseError, match="no extractable text") as exc_info:
+        extract_text_from_resume_file("resume.pdf", content)
+
+    assert exc_info.value.error_code == "resume_file_no_extractable_text"
+
+
+def test_extract_text_rejects_invalid_docx() -> None:
+    with pytest.raises(ResumeFileParseError, match="DOCX could not be read") as exc_info:
+        extract_text_from_resume_file("resume.docx", b"not a zip archive")
+
+    assert exc_info.value.error_code == "resume_docx_parse_failed"
 
 
 def test_extract_text_rejects_decode_failure() -> None:

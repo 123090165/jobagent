@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
-import { NButton, NCard, NSwitch, NTag } from "naive-ui";
+import { NButton, NCard, NPopconfirm, NSwitch, NTag } from "naive-ui";
 
 import FlowPageHeader from "../components/FlowPageHeader.vue";
 import { useResumeProfilesStore } from "../stores/resumeProfiles";
@@ -58,6 +58,26 @@ async function archiveProfile(profile: ResumeProfile) {
   }
 }
 
+async function restoreProfile(profile: ResumeProfile) {
+  actionMessage.value = null;
+  try {
+    await resumeProfilesStore.restoreProfile(profile.resume_profile_id);
+    actionMessage.value = `${profile.name} restored.`;
+  } catch {
+    // Error state is rendered from the store.
+  }
+}
+
+async function deleteProfile(profile: ResumeProfile) {
+  actionMessage.value = null;
+  try {
+    await resumeProfilesStore.deleteProfile(profile.resume_profile_id);
+    actionMessage.value = `${profile.name} deleted. Search and saved-job records remain.`;
+  } catch {
+    // Error state is rendered from the store.
+  }
+}
+
 function startNewProfile() {
   void router.push({ name: "home" });
 }
@@ -87,7 +107,7 @@ function formatDate(value: string | null): string {
       title="Resume Profile Library"
       description="Manage confirmed resume profiles saved under the current account."
       meta="User data"
-      :active-step="3"
+      :active-step="0"
     />
 
     <div v-if="resumeProfilesStore.error" class="error-banner">
@@ -201,6 +221,14 @@ function formatDate(value: string | null): string {
         <div class="job-card-footer">
           <span>{{ profile.resume_profile_id }}</span>
           <div class="flow-toolbar-secondary">
+            <n-popconfirm @positive-click="deleteProfile(profile)">
+              <template #trigger>
+                <n-button size="small" tertiary type="error" :loading="resumeProfilesStore.isSaving">
+                  Delete
+                </n-button>
+              </template>
+              Permanently delete this profile library entry? Searches and saved jobs will remain.
+            </n-popconfirm>
             <n-button
               size="small"
               secondary
@@ -219,13 +247,22 @@ function formatDate(value: string | null): string {
               Open Source
             </n-button>
             <n-button
+              v-if="!profile.archived_at"
               size="small"
               tertiary
-              :disabled="Boolean(profile.archived_at)"
               :loading="resumeProfilesStore.isSaving"
               @click="archiveProfile(profile)"
             >
               Archive
+            </n-button>
+            <n-button
+              v-if="profile.archived_at"
+              size="small"
+              secondary
+              :loading="resumeProfilesStore.isSaving"
+              @click="restoreProfile(profile)"
+            >
+              Restore
             </n-button>
           </div>
         </div>

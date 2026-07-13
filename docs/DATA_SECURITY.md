@@ -76,6 +76,19 @@ validation, output grounding, and deterministic quality gates. Job description
 text may contain prompt-injection instructions; prompts must identify it as
 evidence, never as control instructions.
 
+Resume uploads accept only allowlisted extensions. PDF parsing is bounded by
+file size and page count. DOCX parsing is bounded by compressed upload size,
+archive entry count, and total uncompressed size. Extracted document text is
+untrusted input and receives the same validation and LLM prompt boundary as
+pasted resume text.
+
+Interview learning-resource MCP calls send only a bounded skill-topic search
+query, not the resume, JD, profile, user answers, or authentication data. The
+MCP endpoint is backend configuration and must use a trusted HTTP(S) server.
+Returned URLs are treated as untrusted external links and restricted to HTTP(S).
+Exporting an external-model prompt is an explicit user action because that file
+contains selected JD and profile context.
+
 ## Database Evolution
 
 init_database() currently combines table creation, additive column checks,

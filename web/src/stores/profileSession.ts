@@ -7,6 +7,7 @@ import {
   createJobSearchRun,
   createProfileDraft,
   createProfileSession,
+  deleteJobSearchRun,
   getConfirmedProfile,
   getJobSearchProviderStatus,
   getJobSearchRun,
@@ -552,6 +553,22 @@ export const useProfileSessionStore = defineStore("profileSession", {
       } catch (error) {
         this.jobSearchRuns = [];
         this.error = toApiErrorMessage(error, "Failed to load search history.");
+        throw error;
+      } finally {
+        this.isJobSearchLoading = false;
+      }
+    },
+    async deleteJobSearchRun(runId: string): Promise<void> {
+      this.isJobSearchLoading = true;
+      this.error = null;
+      try {
+        await deleteJobSearchRun(runId);
+        this.jobSearchRuns = this.jobSearchRuns.filter(
+          (run) => run.job_search_run_id !== runId
+        );
+        if (this.jobSearchRun?.job_search_run_id === runId) this.jobSearchRun = null;
+      } catch (error) {
+        this.error = toApiErrorMessage(error, "Failed to delete search history.");
         throw error;
       } finally {
         this.isJobSearchLoading = false;

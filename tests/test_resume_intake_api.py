@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+from io import BytesIO
+
+import fitz
+from docx import Document
 from fastapi.testclient import TestClient
 
 from app.main import app
@@ -73,13 +77,62 @@ def test_post_resume_file_accepts_md(monkeypatch, tmp_path) -> None:
     assert response.json()["resume_document"]["file_type"] == "md"
 
 
-def test_post_resume_file_rejects_pdf(monkeypatch, tmp_path) -> None:
+def test_post_resume_file_accepts_pdf(monkeypatch, tmp_path) -> None:
     monkeypatch.setenv("JOBAGENT_DB_PATH", str(tmp_path / "resume-file-pdf.sqlite3"))
+    session = client.post("/api/v1/profile-sessions").json()
+    document = fitz.open()
+    page = document.new_page()
+    page.insert_text((72, 72), "Backend Engineer\nPython FastAPI SQL")
+    content = document.tobytes()
+    document.close()
+
+    response = client.post(
+        f"/api/v1/profile-sessions/{session['session_id']}/resume-file",
+        files={"file": ("resume.pdf", content, "application/pdf")},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["resume_document"]["file_type"] == "pdf"
+    assert "Backend Engineer" in response.json()["resume_document"]["text"]
+
+
+def test_post_resume_file_accepts_docx_and_continues_to_parse(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("JOBAGENT_DB_PATH", str(tmp_path / "resume-file-docx.sqlite3"))
+    session = client.post("/api/v1/profile-sessions").json()
+    document = Document()
+    document.add_paragraph("Backend Engineer")
+    document.add_paragraph("Skills: Python, FastAPI, SQL")
+    buffer = BytesIO()
+    document.save(buffer)
+
+    upload = client.post(
+        f"/api/v1/profile-sessions/{session['session_id']}/resume-file",
+        files={
+            "file": (
+                "resume.docx",
+                buffer.getvalue(),
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            )
+        },
+    )
+
+    assert upload.status_code == 200
+    assert upload.json()["resume_document"]["file_type"] == "docx"
+    parse = client.post(
+        f"/api/v1/profile-sessions/{session['session_id']}/parse-resume",
+        params={"use_llm": False},
+    )
+    assert parse.status_code == 200
+    assert "Python" in parse.json()["parsed_review"]["skills"]["items"]
+
+
+def test_post_resume_file_rejects_legacy_doc(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("JOBAGENT_DB_PATH", str(tmp_path / "resume-file-doc.sqlite3"))
     session = client.post("/api/v1/profile-sessions").json()
 
     response = client.post(
         f"/api/v1/profile-sessions/{session['session_id']}/resume-file",
-        files={"file": ("resume.pdf", b"%PDF-1.7", "application/pdf")},
+        files={"file": ("resume.doc", b"legacy word", "application/msword")},
     )
 
     assert response.status_code == 400

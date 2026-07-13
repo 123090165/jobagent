@@ -174,6 +174,11 @@ export interface JobSearchRun {
   llm_enabled: boolean;
   search_provider: string | null;
   selected_sources: string[];
+  search_mission_id: string | null;
+  search_mission_revision: number | null;
+  mission_constraints: string[];
+  mission_excluded_roles: string[];
+  mission_ranking_priorities: string[];
   status: "pending" | "running" | "completed" | "failed";
   error_message: string | null;
   results: JobSearchResult[];
@@ -272,6 +277,11 @@ export interface JobSearchPreview {
 
 export type SearchMissionExplorationLevel = "focused" | "balanced" | "exploratory";
 
+export interface SearchMissionClarificationAnswer {
+  question: string;
+  answer: string;
+}
+
 export interface SearchMissionInput {
   target_roles: string[];
   excluded_roles: string[];
@@ -284,9 +294,10 @@ export interface SearchMissionInput {
   ranking_priorities: string[];
   exploration_level: SearchMissionExplorationLevel;
   free_text: string | null;
+  clarification_answers: SearchMissionClarificationAnswer[];
 }
 
-export interface SearchMissionInterpretation extends Omit<SearchMissionInput, "free_text"> {
+export interface SearchMissionInterpretation extends Omit<SearchMissionInput, "free_text" | "clarification_answers"> {
   adjacent_roles: string[];
   hard_constraints: string[];
   soft_preferences: string[];

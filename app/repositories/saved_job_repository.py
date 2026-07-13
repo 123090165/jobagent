@@ -325,6 +325,34 @@ class SavedJobRepository:
             connection.commit()
         return self.get(user_id=user_id, saved_job_id=saved_job_id)
 
+    def delete(self, *, user_id: str, saved_job_id: str) -> bool:
+        if self.get(user_id=user_id, saved_job_id=saved_job_id) is None:
+            return False
+        with get_connection() as connection:
+            init_database(connection)
+            connection.execute(
+                "DELETE FROM interview_preparations WHERE user_id = ? AND saved_job_id = ?",
+                (user_id, saved_job_id),
+            )
+            connection.execute(
+                "DELETE FROM job_briefs WHERE user_id = ? AND saved_job_id = ?",
+                (user_id, saved_job_id),
+            )
+            connection.execute(
+                "DELETE FROM saved_job_analyses WHERE user_id = ? AND saved_job_id = ?",
+                (user_id, saved_job_id),
+            )
+            connection.execute(
+                "DELETE FROM saved_job_status_events WHERE user_id = ? AND saved_job_id = ?",
+                (user_id, saved_job_id),
+            )
+            cursor = connection.execute(
+                "DELETE FROM saved_jobs WHERE user_id = ? AND saved_job_id = ?",
+                (user_id, saved_job_id),
+            )
+            connection.commit()
+        return cursor.rowcount > 0
+
     def latest_analysis(self, *, user_id: str, saved_job_id: str) -> SavedJobAnalysis | None:
         with get_connection() as connection:
             init_database(connection)

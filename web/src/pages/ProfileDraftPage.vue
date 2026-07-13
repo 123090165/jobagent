@@ -150,7 +150,7 @@ function goBackToReview() {
       title="Profile Draft"
       description="Edit the search-ready profile that will be confirmed and used by job search."
       :meta="`Session ${sessionId}`"
-      :active-step="2"
+      :active-step="0"
     />
 
     <div v-if="profileSessionStore.error" class="error-banner">

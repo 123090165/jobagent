@@ -3,8 +3,10 @@ import { AxiosError } from "axios";
 
 import {
   archiveResumeProfile,
+  deleteResumeProfile,
   getResumeProfile,
   listResumeProfiles,
+  restoreResumeProfile,
   setDefaultResumeProfile,
   updateResumeProfile
 } from "../api/resumeProfiles";
@@ -113,6 +115,34 @@ export const useResumeProfilesStore = defineStore("resumeProfiles", {
         return profile;
       } catch (error) {
         this.error = toApiErrorMessage(error, "Failed to archive resume profile.");
+        throw error;
+      } finally {
+        this.isSaving = false;
+      }
+    },
+    async restoreProfile(resumeProfileId: string): Promise<ResumeProfile> {
+      this.isSaving = true;
+      this.error = null;
+      try {
+        const profile = await restoreResumeProfile(resumeProfileId);
+        this.mergeProfile(profile);
+        return profile;
+      } catch (error) {
+        this.error = toApiErrorMessage(error, "Failed to restore resume profile.");
+        throw error;
+      } finally {
+        this.isSaving = false;
+      }
+    },
+    async deleteProfile(resumeProfileId: string): Promise<void> {
+      this.isSaving = true;
+      this.error = null;
+      try {
+        await deleteResumeProfile(resumeProfileId);
+        this.items = this.items.filter((item) => item.resume_profile_id !== resumeProfileId);
+        if (this.selected?.resume_profile_id === resumeProfileId) this.selected = null;
+      } catch (error) {
+        this.error = toApiErrorMessage(error, "Failed to delete resume profile.");
         throw error;
       } finally {
         this.isSaving = false;

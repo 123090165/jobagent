@@ -152,7 +152,7 @@ async function continueToDraft() {
       title="Profile Review"
       description="Review the parsed resume signal before creating an editable search profile."
       :meta="`Session ${sessionId}`"
-      :active-step="1"
+      :active-step="0"
     />
 
     <div v-if="profileSessionStore.error" class="error-banner">

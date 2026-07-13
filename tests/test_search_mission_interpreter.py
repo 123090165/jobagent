@@ -1,5 +1,5 @@
 from app.schemas.confirmed_profile import ConfirmedProfile
-from app.schemas.search_mission import SearchMissionInput
+from app.schemas.search_mission import SearchMissionClarificationAnswer, SearchMissionInput
 from app.services.search_mission_interpreter import interpret_search_mission
 
 
@@ -59,3 +59,28 @@ def test_interpreter_falls_back_when_llm_fails() -> None:
     assert mode == "fallback"
     assert fallback == "provider unavailable"
     assert result.target_roles == ["Backend Engineer"]
+
+
+def test_interpreter_applies_answers_and_does_not_repeat_questions() -> None:
+    question = (
+        "Are the unevidenced must-have items job requirements, or skills you already have "
+        "but the resume omits?"
+    )
+    result, mode, fallback = interpret_search_mission(
+        SearchMissionInput(
+            target_roles=["Backend Engineer"],
+            must_have=["Kubernetes"],
+            clarification_answers=[
+                SearchMissionClarificationAnswer(
+                    question=question,
+                    answer="Kubernetes is a job requirement I want to learn, not current resume evidence.",
+                )
+            ],
+        ),
+        _profile(),
+    )
+
+    assert mode == "deterministic"
+    assert fallback is None
+    assert question not in result.clarification_questions
+    assert any("User clarification:" in item for item in result.assumptions)

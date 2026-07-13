@@ -109,7 +109,7 @@ def _build_local_mock_results(
                 match_reasons=match_reasons,
                 risks=item["risks"],
                 match_score=score,
-                recommended_action="Review fit, then tailor resume bullets before applying.",
+                recommended_action="Review this role as a candidate for deeper application planning.",
                 analysis_mode="mock",
                 confidence_label=_confidence_label_for_score(score),
             )
@@ -293,9 +293,9 @@ def _confidence_label_for_score(score: int) -> str:
 
 def _recommended_action(score: int) -> str:
     if score >= 85:
-        return "Prioritize this role and tailor resume bullets before applying."
+        return "Prioritize this role for detailed review."
     if score >= 72:
-        return "Worth reviewing closely and tailoring before applying."
+        return "Worth reviewing closely before deciding whether to save."
     if score >= 58:
         return "Review the requirements carefully before investing more time."
     return "Keep as a lower-priority option unless the role is especially attractive."

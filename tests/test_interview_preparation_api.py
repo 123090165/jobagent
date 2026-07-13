@@ -1,0 +1,111 @@
+from __future__ import annotations
+
+from fastapi.testclient import TestClient
+
+from app.main import app
+
+client = TestClient(app)
+
+
+def _headers(username: str) -> dict[str, str]:
+    response = client.post(
+        "/api/v1/auth/register",
+        json={"username": username, "password": "password-123"},
+    )
+    assert response.status_code == 201
+    return {"Authorization": f"Bearer {response.json()['access_token']}"}
+
+
+def _job(headers: dict[str, str]) -> dict:
+    response = client.post(
+        "/api/v1/saved-jobs",
+        headers=headers,
+        json={
+            "title": "Operations Analyst",
+            "company": "Example",
+            "raw_jd_text": (
+                "Use Microsoft Office for weekly reporting and perform basic Linux operations. "
+                "Analyze data with SQL and communicate findings to stakeholders."
+            ),
+        },
+    )
+    assert response.status_code == 200
+    return response.json()
+
+
+def test_preparation_generates_gaps_resources_questions_and_prompt(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("JOBAGENT_DB_PATH", str(tmp_path / "preparation.sqlite3"))
+    monkeypatch.delenv("JOBAGENT_LEARNING_MCP_URL", raising=False)
+    alice = _headers("preparation-alice")
+    bob = _headers("preparation-bob")
+    job = _job(alice)
+
+    response = client.post(
+        f"/api/v1/saved-jobs/{job['saved_job_id']}/preparation",
+        headers=alice,
+        json={"llm_provider": "deepseek"},
+    )
+
+    assert response.status_code == 200
+    workspace = response.json()
+    assert workspace["status"] == "questions_ready"
+    assert workspace["analysis_mode"] == "fallback"
+    assert {item["skill"] for item in workspace["skill_gaps"]} >= {"Microsoft Office", "Linux"}
+    assert len(workspace["questions"]) <= 5
+    assert all("Do you know" not in item["prompt"] for item in workspace["questions"])
+    assert {item["source"] for item in workspace["learning_resources"]} >= {
+        "Ubuntu Documentation", "Microsoft Support"
+    }
+
+    prompt = client.get(
+        f"/api/v1/saved-jobs/{job['saved_job_id']}/preparation/prompt.txt",
+        headers=alice,
+    )
+    assert prompt.status_code == 200
+    assert "JOBAGENT EVIDENCE INTERVIEW" in prompt.text
+    assert "user-reported" in prompt.text
+    assert "attachment" in prompt.headers["content-disposition"]
+
+    other_user = client.get(
+        f"/api/v1/saved-jobs/{job['saved_job_id']}/preparation", headers=bob
+    )
+    assert other_user.status_code == 404
+
+
+def test_preparation_accepts_answers_and_preserves_saved_job(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("JOBAGENT_DB_PATH", str(tmp_path / "preparation-answer.sqlite3"))
+    headers = _headers("preparation-answer")
+    job = _job(headers)
+    workspace = client.post(
+        f"/api/v1/saved-jobs/{job['saved_job_id']}/preparation",
+        headers=headers,
+        json={},
+    ).json()
+    question = workspace["questions"][0]
+
+    response = client.put(
+        f"/api/v1/saved-jobs/{job['saved_job_id']}/preparation/answers",
+        headers=headers,
+        json={
+            "answers": [{
+                "question_id": question["question_id"],
+                "answer": "I diagnosed a Linux permission failure using ls -l and chmod, then reran the service check.",
+            }]
+        },
+    )
+
+    assert response.status_code == 200
+    completed = response.json()
+    assert completed["status"] == "completed"
+    assert completed["answers"][0]["question_id"] == question["question_id"]
+    assert completed["recommendations"]
+    assert client.get(
+        f"/api/v1/saved-jobs/{job['saved_job_id']}", headers=headers
+    ).status_code == 200
+
+    invalid = client.put(
+        f"/api/v1/saved-jobs/{job['saved_job_id']}/preparation/answers",
+        headers=headers,
+        json={"answers": [{"question_id": "unknown", "answer": "value"}]},
+    )
+    assert invalid.status_code == 400

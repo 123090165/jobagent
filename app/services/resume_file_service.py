@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import os
+from io import BytesIO
 from pathlib import Path
+from zipfile import BadZipFile, ZipFile
 
 from app.services.errors import JobAgentError
 
@@ -9,9 +11,14 @@ from app.services.errors import JobAgentError
 SUPPORTED_RESUME_FILE_TYPES = {
     ".txt": "txt",
     ".md": "md",
+    ".pdf": "pdf",
+    ".docx": "docx",
 }
-DEFAULT_MAX_RESUME_FILE_BYTES = 1 * 1024 * 1024
+DEFAULT_MAX_RESUME_FILE_BYTES = 5 * 1024 * 1024
 MAX_RESUME_FILE_BYTES_ENV = "JOBAGENT_MAX_RESUME_FILE_BYTES"
+MAX_PDF_PAGES = 50
+MAX_DOCX_UNCOMPRESSED_BYTES = 20 * 1024 * 1024
+MAX_DOCX_ARCHIVE_ENTRIES = 2_000
 
 
 class ResumeFileParseError(JobAgentError):
@@ -65,11 +72,16 @@ def validate_resume_file_size(content: bytes) -> None:
 
 
 def extract_text_from_resume_file(filename: str | None, content: bytes) -> str:
-    """Validate a supported resume file and return its UTF-8 text content."""
-    get_resume_file_type(filename)
+    """Validate a supported resume file and return extracted plain text."""
+    file_type = get_resume_file_type(filename)
     validate_resume_file_size(content)
     if not content:
         raise ResumeFileParseError("resume file cannot be empty", "resume_file_empty")
+
+    if file_type == "pdf":
+        return _extract_pdf_text(content)
+    if file_type == "docx":
+        return _extract_docx_text(content)
 
     try:
         text = content.decode("utf-8-sig")
@@ -82,4 +94,76 @@ def extract_text_from_resume_file(filename: str | None, content: bytes) -> str:
     extracted_text = text.strip()
     if not extracted_text:
         raise ResumeFileParseError("resume file cannot be empty", "resume_file_empty")
+    return extracted_text
+
+
+def _extract_pdf_text(content: bytes) -> str:
+    try:
+        import fitz
+
+        with fitz.open(stream=content, filetype="pdf") as document:
+            if document.page_count > MAX_PDF_PAGES:
+                raise ResumeFileParseError(
+                    f"resume PDF exceeds the {MAX_PDF_PAGES}-page limit",
+                    "resume_pdf_too_many_pages",
+                )
+            text = "\n".join(page.get_text("text") for page in document)
+    except ResumeFileParseError:
+        raise
+    except Exception as exc:
+        raise ResumeFileParseError(
+            "resume PDF could not be read",
+            "resume_pdf_parse_failed",
+        ) from exc
+    return _require_extracted_text(text, file_type="PDF")
+
+
+def _extract_docx_text(content: bytes) -> str:
+    _validate_docx_archive(content)
+    try:
+        from docx import Document
+
+        document = Document(BytesIO(content))
+        lines = [paragraph.text for paragraph in document.paragraphs]
+        for table in document.tables:
+            for row in table.rows:
+                lines.append("\t".join(cell.text.strip() for cell in row.cells if cell.text.strip()))
+    except Exception as exc:
+        raise ResumeFileParseError(
+            "resume DOCX could not be read",
+            "resume_docx_parse_failed",
+        ) from exc
+    return _require_extracted_text("\n".join(lines), file_type="DOCX")
+
+
+def _validate_docx_archive(content: bytes) -> None:
+    try:
+        with ZipFile(BytesIO(content)) as archive:
+            entries = archive.infolist()
+            if len(entries) > MAX_DOCX_ARCHIVE_ENTRIES:
+                raise ResumeFileParseError(
+                    "resume DOCX contains too many archive entries",
+                    "resume_docx_too_complex",
+                )
+            if sum(entry.file_size for entry in entries) > MAX_DOCX_UNCOMPRESSED_BYTES:
+                raise ResumeFileParseError(
+                    "resume DOCX expands beyond the allowed size",
+                    "resume_docx_too_complex",
+                )
+    except ResumeFileParseError:
+        raise
+    except BadZipFile as exc:
+        raise ResumeFileParseError(
+            "resume DOCX could not be read",
+            "resume_docx_parse_failed",
+        ) from exc
+
+
+def _require_extracted_text(text: str, *, file_type: str) -> str:
+    extracted_text = text.strip()
+    if not extracted_text:
+        raise ResumeFileParseError(
+            f"resume {file_type} contains no extractable text; scanned files require OCR",
+            "resume_file_no_extractable_text",
+        )
     return extracted_text

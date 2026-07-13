@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, Query, Response, status
 
 from app.api.dependencies import get_current_user
 from app.application.job_search_usecases import (
     create_browser_helper_job_search_run,
     create_job_search_run,
+    delete_job_search_run,
     get_job_search_run,
     list_user_job_search_runs,
     list_job_search_trace_steps,
@@ -41,6 +42,15 @@ def list_user_job_search_runs_endpoint(
     return JobSearchRunListResponse(
         items=list_user_job_search_runs(user_id=current_user.user_id, limit=limit)
     )
+
+
+@router.delete("/{run_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_job_search_run_endpoint(
+    run_id: str,
+    current_user: UserAccount = Depends(get_current_user),
+) -> Response:
+    delete_job_search_run(run_id, user_id=current_user.user_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post("", response_model=JobSearchRunResponse)

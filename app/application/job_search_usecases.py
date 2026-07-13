@@ -145,7 +145,7 @@ def create_job_search_run(
             status_code=404,
         )
 
-    query, locations, target_roles, keywords, _ = _resolve_inputs_with_mission(
+    query, locations, target_roles, keywords, mission = _resolve_inputs_with_mission(
         payload,
         confirmed_profile,
         user_id=user_id or LOCAL_USER_ID,
@@ -168,6 +168,11 @@ def create_job_search_run(
             keywords=keywords,
             results=results,
             user_id=user_id or LOCAL_USER_ID,
+            search_mission_id=mission.search_mission_id if mission else None,
+            search_mission_revision=mission.revision if mission else None,
+            mission_constraints=mission.mission.hard_constraints if mission else [],
+            mission_excluded_roles=mission.mission.excluded_roles if mission else [],
+            mission_ranking_priorities=mission.mission.ranking_priorities if mission else [],
         )
         updated_session = session_repository.mark_job_search_completed(session_id=session.session_id)
         return JobSearchRunResponse(
@@ -194,6 +199,11 @@ def create_job_search_run(
         llm_enabled=analysis_config.enabled,
         search_provider=provider_name,
         user_id=user_id or LOCAL_USER_ID,
+        search_mission_id=mission.search_mission_id if mission else None,
+        search_mission_revision=mission.revision if mission else None,
+        mission_constraints=mission.mission.hard_constraints if mission else [],
+        mission_excluded_roles=mission.mission.excluded_roles if mission else [],
+        mission_ranking_priorities=mission.mission.ranking_priorities if mission else [],
     )
     steps = _create_initial_trace_steps(run.job_search_run_id, search_repository)
     run = search_repository.mark_running(run.job_search_run_id) or run
@@ -664,6 +674,33 @@ def list_user_job_search_runs(
     search_repository: JobSearchRepository = job_search_repository,
 ) -> list[JobSearchRun]:
     return search_repository.list_recent_by_user(user_id, limit=limit)
+
+
+def delete_job_search_run(
+    run_id: str,
+    *,
+    user_id: str,
+    search_repository: JobSearchRepository = job_search_repository,
+) -> None:
+    run = search_repository.get(run_id, user_id=user_id)
+    if run is None:
+        raise JobAgentError(
+            message="Job search run not found.",
+            error_code="job_search_run_not_found",
+            status_code=404,
+        )
+    if run.status in {"pending", "running"}:
+        raise JobAgentError(
+            message="A running job search cannot be deleted.",
+            error_code="job_search_run_active",
+            status_code=409,
+        )
+    if not search_repository.delete(user_id=user_id, run_id=run_id):
+        raise JobAgentError(
+            message="Job search run not found.",
+            error_code="job_search_run_not_found",
+            status_code=404,
+        )
 
 
 def preview_job_search_run(

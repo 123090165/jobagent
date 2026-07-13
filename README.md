@@ -21,7 +21,7 @@ Register or login
 Current product capabilities include:
 
 - username/password authentication and user-owned resources;
-- text and .txt/.md resume intake;
+- pasted text and .txt/.md/.pdf/.docx resume intake;
 - deterministic resume parsing with optional LLM enrichment;
 - editable and reusable resume profile library;
 - deterministic or LLM-assisted search analysis;

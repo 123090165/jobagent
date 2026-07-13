@@ -688,7 +688,7 @@ function seeResult() {
       title="Search Preview"
       description="Confirm retrieval sources, query scope, and analysis mode before creating a job search run."
       :meta="`Session ${sessionId}`"
-      :active-step="4"
+      :active-step="1"
     />
 
     <div v-if="profileSessionStore.error" class="error-banner">

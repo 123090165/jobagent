@@ -29,7 +29,6 @@ const router = useRouter();
 const profileSessionStore = useProfileSessionStore();
 const savedJobsStore = useSavedJobsStore();
 const runId = computed(() => String(route.params.runId ?? ""));
-const jobBriefHint = ref<string | null>(null);
 const savedJobMessage = ref<string | null>(null);
 const savingResultIds = ref<string[]>([]);
 const locallySavedResultIds = ref<string[]>([]);
@@ -164,7 +163,6 @@ const savedSearchResultIds = computed(() => {
 
 onMounted(async () => {
   startElapsedTicker();
-  jobBriefHint.value = null;
   savedJobMessage.value = null;
   try {
     const run = await profileSessionStore.loadJobSearchRun(runId.value);
@@ -209,10 +207,6 @@ function goBackToSearchPreview() {
   void router.push({ name: "search-preview", params: { sessionId } });
 }
 
-function showJobBriefHint() {
-  jobBriefHint.value = "Job Brief is postponed until search recall and ranking are reliable.";
-}
-
 function isResultSaving(resultId: string) {
   return savingResultIds.value.includes(resultId);
 }
@@ -221,16 +215,28 @@ function isResultSaved(resultId: string) {
   return savedSearchResultIds.value.has(resultId);
 }
 
+function savedJobForResult(resultId: string) {
+  return savedJobsStore.jobs.find((job) => {
+    const analysis = job.latest_analysis;
+    return analysis?.source_job_search_run_id === runId.value
+      && analysis.source_job_result_id === resultId;
+  }) ?? null;
+}
+
 async function saveSearchResult(result: JobSearchResult) {
   const run = profileSessionStore.jobSearchRun;
-  if (!run || isResultSaving(result.job_result_id) || isResultSaved(result.job_result_id)) {
-    return;
+  const existing = savedJobForResult(result.job_result_id);
+  if (existing) {
+    return existing;
+  }
+  if (!run || isResultSaving(result.job_result_id)) {
+    return null;
   }
 
   savedJobMessage.value = null;
   savingResultIds.value = [...savingResultIds.value, result.job_result_id];
   try {
-    await savedJobsStore.saveFromSearchResult({
+    const savedJob = await savedJobsStore.saveFromSearchResult({
       job_search_run_id: run.job_search_run_id,
       job_result_id: result.job_result_id,
       tags: ["search-result"],
@@ -240,10 +246,45 @@ async function saveSearchResult(result: JobSearchResult) {
       locallySavedResultIds.value = [...locallySavedResultIds.value, result.job_result_id];
     }
     savedJobMessage.value = `${result.title} saved to job library.`;
+    return savedJob;
   } catch {
     savedJobMessage.value = savedJobsStore.error ?? "Failed to save this result.";
+    return null;
   } finally {
     savingResultIds.value = savingResultIds.value.filter((id) => id !== result.job_result_id);
+  }
+}
+
+async function generateBriefForResult(result: JobSearchResult) {
+  if (isResultSaving(result.job_result_id)) return;
+  savedJobMessage.value = null;
+  savingResultIds.value = [...savingResultIds.value, result.job_result_id];
+  try {
+    let savedJob = savedJobForResult(result.job_result_id);
+    if (!savedJob) {
+      const run = profileSessionStore.jobSearchRun;
+      if (!run) return;
+      savedJob = await savedJobsStore.saveFromSearchResult({
+        job_search_run_id: run.job_search_run_id,
+        job_result_id: result.job_result_id,
+        tags: ["search-result"],
+        status: "saved"
+      });
+      if (!locallySavedResultIds.value.includes(result.job_result_id)) {
+        locallySavedResultIds.value = [...locallySavedResultIds.value, result.job_result_id];
+      }
+    }
+    await savedJobsStore.generateBrief(savedJob.saved_job_id);
+    await router.push({
+      name: "saved-job-detail",
+      params: { savedJobId: savedJob.saved_job_id }
+    });
+  } catch {
+    savedJobMessage.value = savedJobsStore.error ?? "Failed to generate the Job Brief.";
+  } finally {
+    savingResultIds.value = savingResultIds.value.filter(
+      (id) => id !== result.job_result_id
+    );
   }
 }
 
@@ -417,7 +458,7 @@ function formatQueryLabel(value: unknown): string {
       title="Job Search Run"
       description="Follow retrieval and analysis steps, then review ranked job cards."
       :meta="`Run ${runId}`"
-      :active-step="4"
+      :active-step="2"
     />
 
     <div v-if="profileSessionStore.error" class="error-banner">
@@ -582,7 +623,6 @@ function formatQueryLabel(value: unknown): string {
         </div>
       </n-card>
 
-      <p v-if="jobBriefHint" class="flow-meta">{{ jobBriefHint }}</p>
       <p v-if="savedJobMessage" class="flow-meta">{{ savedJobMessage }}</p>
       <p v-if="feedbackMessage" class="flow-meta">{{ feedbackMessage }}</p>
 
@@ -627,7 +667,7 @@ function formatQueryLabel(value: unknown): string {
           </div>
 
           <div class="job-card-section">
-            <strong>Analysis</strong>
+            <strong>Search Fit</strong>
             <p>{{ result.analysis_mode }} - {{ result.confidence_label }}</p>
           </div>
 
@@ -687,8 +727,13 @@ function formatQueryLabel(value: unknown): string {
               >
                 {{ isResultSaved(result.job_result_id) ? "Saved" : "Save Job" }}
               </n-button>
-              <n-button tertiary size="small" @click="showJobBriefHint">
-                Generate Job Brief
+              <n-button
+                tertiary
+                size="small"
+                :loading="isResultSaving(result.job_result_id)"
+                @click="generateBriefForResult(result)"
+              >
+                {{ isResultSaved(result.job_result_id) ? "Generate Job Brief" : "Save & Generate Brief" }}
               </n-button>
             </div>
           </div>

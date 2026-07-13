@@ -103,6 +103,11 @@ class JobSearchRun(BaseModel):
     llm_enabled: bool = False
     search_provider: str | None = None
     selected_sources: list[str] = Field(default_factory=list)
+    search_mission_id: str | None = None
+    search_mission_revision: int | None = None
+    mission_constraints: list[str] = Field(default_factory=list)
+    mission_excluded_roles: list[str] = Field(default_factory=list)
+    mission_ranking_priorities: list[str] = Field(default_factory=list)
     status: JobSearchRunStatus = "completed"
     error_message: str | None = None
     results: list[JobSearchResult] = Field(default_factory=list)

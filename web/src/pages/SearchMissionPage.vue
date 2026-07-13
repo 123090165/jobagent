@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from "vue";
 import { AxiosError } from "axios";
 import { useRoute, useRouter } from "vue-router";
-import { NButton, NCard, NInput, NSelect, NSwitch, NTag } from "naive-ui";
+import { NButton, NCard, NCollapse, NCollapseItem, NInput, NSelect, NTag } from "naive-ui";
 
 import {
   confirmSearchMission,
@@ -18,7 +18,7 @@ import type {
   SearchMissionInput
 } from "../types/profileSession";
 
-type ListField = Exclude<keyof SearchMissionInput, "exploration_level" | "free_text">;
+type ListField = Exclude<keyof SearchMissionInput, "exploration_level" | "free_text" | "clarification_answers">;
 
 const route = useRoute();
 const router = useRouter();
@@ -27,7 +27,6 @@ const sessionId = computed(() => String(route.params.sessionId ?? ""));
 const mission = ref<SearchMission | null>(null);
 const isLoading = ref(true);
 const isSaving = ref(false);
-const useLlm = ref(true);
 const message = ref<string | null>(null);
 const listText = ref<Record<ListField, string>>({
   target_roles: "",
@@ -42,22 +41,34 @@ const listText = ref<Record<ListField, string>>({
 });
 const explorationLevel = ref<SearchMissionExplorationLevel>("balanced");
 const freeText = ref("");
+const clarificationAnswers = ref<Record<string, string>>({});
 const explorationOptions = [
   { label: "Focused", value: "focused" },
   { label: "Balanced", value: "balanced" },
   { label: "Exploratory", value: "exploratory" }
 ];
-const fields: Array<{ key: ListField; label: string; placeholder: string }> = [
+const highImpactFields: Array<{ key: ListField; label: string; placeholder: string }> = [
   { key: "target_roles", label: "Target Roles", placeholder: "AI Application Engineer, Backend Engineer" },
   { key: "excluded_roles", label: "Excluded Roles", placeholder: "Pure research, Sales" },
-  { key: "preferred_industries", label: "Industries", placeholder: "Healthcare, Developer tools" },
   { key: "locations", label: "Locations", placeholder: "Shenzhen, Remote" },
-  { key: "work_arrangements", label: "Work Arrangements", placeholder: "Hybrid, Remote" },
-  { key: "employment_types", label: "Employment Types", placeholder: "Internship, Full-time" },
   { key: "must_have", label: "Must Have", placeholder: "LLM application work, Python" },
-  { key: "nice_to_have", label: "Nice to Have", placeholder: "Healthcare data, FastAPI" },
   { key: "ranking_priorities", label: "Ranking Priorities", placeholder: "Role fit, Learning opportunity, Location" }
 ];
+const advancedFields: Array<{ key: ListField; label: string; placeholder: string }> = [
+  { key: "preferred_industries", label: "Industries", placeholder: "Healthcare, Developer tools" },
+  { key: "work_arrangements", label: "Work Arrangements", placeholder: "Hybrid, Remote" },
+  { key: "employment_types", label: "Employment Types", placeholder: "Internship, Full-time" },
+  { key: "nice_to_have", label: "Nice to Have", placeholder: "Healthcare data, FastAPI" }
+];
+const allFields = [...highImpactFields, ...advancedFields];
+const needsConfirmation = computed(() => Boolean(
+  mission.value?.mission.conflicts.length || unansweredQuestions.value.length
+));
+const unansweredQuestions = computed(() => (
+  mission.value?.mission.clarification_questions.filter(
+    (question) => !clarificationAnswers.value[question]?.trim()
+  ) ?? []
+));
 
 onMounted(async () => {
   try {
@@ -78,9 +89,12 @@ onMounted(async () => {
 
 function applyMission(value: SearchMission) {
   mission.value = value;
-  for (const field of fields) listText.value[field.key] = value.input[field.key].join(", ");
+  for (const field of allFields) listText.value[field.key] = value.input[field.key].join(", ");
   explorationLevel.value = value.input.exploration_level;
   freeText.value = value.input.free_text ?? "";
+  clarificationAnswers.value = Object.fromEntries(
+    value.input.clarification_answers.map((item) => [item.question, item.answer])
+  );
 }
 
 function applyProfileDefaults() {
@@ -104,34 +118,45 @@ function payload(): SearchMissionInput {
     nice_to_have: toList(listText.value.nice_to_have),
     ranking_priorities: toList(listText.value.ranking_priorities),
     exploration_level: explorationLevel.value,
-    free_text: freeText.value.trim() || null
+    free_text: freeText.value.trim() || null,
+    clarification_answers: Object.entries(clarificationAnswers.value)
+      .filter(([, answer]) => answer.trim())
+      .map(([question, answer]) => ({ question, answer: answer.trim() }))
   };
 }
 
-async function analyzeMission() {
+async function continueToSources() {
   isSaving.value = true;
   message.value = null;
   try {
     await saveSearchMission(sessionId.value, payload());
-    applyMission(await interpretSearchMission(sessionId.value, useLlm.value));
-    message.value = "Mission interpreted. Review conflicts and questions before confirmation.";
+    applyMission(await interpretSearchMission(sessionId.value, true));
+    if (needsConfirmation.value) {
+      message.value = unansweredQuestions.value.length
+        ? "Answer the highlighted preferences before continuing."
+        : "Review the remaining search conflict before continuing.";
+      return;
+    }
+    await confirmAndOpenPreview();
   } catch {
-    message.value = "Mission interpretation failed.";
+    message.value = "Search setup could not be prepared.";
   } finally {
     isSaving.value = false;
   }
 }
 
-async function confirmMission() {
+async function confirmAndOpenPreview() {
+  mission.value = await confirmSearchMission(sessionId.value);
+  await router.push({ name: "search-preview", params: { sessionId: sessionId.value } });
+}
+
+async function acceptAndContinue() {
   isSaving.value = true;
   message.value = null;
   try {
-    await saveSearchMission(sessionId.value, payload());
-    mission.value = await interpretSearchMission(sessionId.value, useLlm.value);
-    mission.value = await confirmSearchMission(sessionId.value);
-    await router.push({ name: "search-preview", params: { sessionId: sessionId.value } });
+    await confirmAndOpenPreview();
   } catch {
-    message.value = "At least one interpreted target role is required before confirmation.";
+    message.value = "At least one target role is required before continuing.";
   } finally {
     isSaving.value = false;
   }
@@ -146,10 +171,10 @@ function toList(value: string): string[] {
   <section class="flow-page flow-page-wide">
     <FlowPageHeader
       eyebrow="Intent"
-      title="Search Mission"
-      description="Define what you want now, separately from what your resume proves."
+      title="Search Setup"
+      description="Confirm the few preferences that materially change search recall and ranking."
       :meta="`Session ${sessionId}`"
-      :active-step="4"
+      :active-step="1"
     />
 
     <div v-if="message" class="flow-meta library-message">{{ message }}</div>
@@ -157,14 +182,10 @@ function toList(value: string): string[] {
     <div v-else class="search-mission-layout">
       <div class="workspace-panel intake-panel">
         <div class="panel-heading">
-          <div><h2>Current search intent</h2><p>Use commas or new lines for multiple values.</p></div>
-          <div class="flow-toolbar-secondary">
-            <span class="flow-meta">LLM interpretation</span>
-            <n-switch v-model:value="useLlm" />
-          </div>
+          <div><h2>Search priorities</h2><p>Use commas or new lines for multiple values.</p></div>
         </div>
         <div class="search-mission-grid">
-          <label v-for="field in fields" :key="field.key" class="draft-field">
+          <label v-for="field in highImpactFields" :key="field.key" class="draft-field">
             <span>{{ field.label }}</span>
             <n-input v-model:value="listText[field.key]" :placeholder="field.placeholder" />
           </label>
@@ -172,43 +193,68 @@ function toList(value: string): string[] {
             <span>Exploration Level</span>
             <n-select v-model:value="explorationLevel" :options="explorationOptions" />
           </label>
-          <label class="draft-field search-mission-statement">
-            <span>What are you trying to achieve?</span>
-            <n-input v-model:value="freeText" type="textarea" :rows="4" maxlength="2000" />
-          </label>
         </div>
+        <div v-if="mission?.mission.clarification_questions.length" class="search-clarification-fields">
+          <div class="panel-heading">
+            <div><h2>Preferences to clarify</h2><p>These answers directly update how your search direction is interpreted.</p></div>
+          </div>
+          <div class="search-mission-grid">
+            <label
+              v-for="(question, index) in mission.mission.clarification_questions"
+              :key="question"
+              class="draft-field search-mission-statement"
+            >
+              <span>{{ index + 1 }}. {{ question }}</span>
+              <n-input
+                v-model:value="clarificationAnswers[question]"
+                type="textarea"
+                :rows="2"
+                maxlength="2000"
+                placeholder="Enter your preference or explain the constraint"
+              />
+            </label>
+          </div>
+        </div>
+        <n-collapse class="search-setup-advanced">
+          <n-collapse-item title="Optional preferences" name="optional-preferences">
+            <div class="search-mission-grid">
+              <label v-for="field in advancedFields" :key="field.key" class="draft-field">
+                <span>{{ field.label }}</span>
+                <n-input v-model:value="listText[field.key]" :placeholder="field.placeholder" />
+              </label>
+              <label class="draft-field search-mission-statement">
+                <span>Additional context</span>
+                <n-input v-model:value="freeText" type="textarea" :rows="3" maxlength="2000" />
+              </label>
+            </div>
+          </n-collapse-item>
+        </n-collapse>
         <div class="flow-toolbar">
           <n-button secondary @click="router.push({ name: 'profile-confirmed', params: { sessionId } })">Back to Profile</n-button>
-          <div class="flow-toolbar-secondary">
-            <n-button secondary :loading="isSaving" @click="analyzeMission">Interpret Mission</n-button>
-            <n-button type="primary" :loading="isSaving" @click="confirmMission">Confirm and Preview</n-button>
-          </div>
+          <n-button type="primary" :loading="isSaving" @click="continueToSources">
+            {{ unansweredQuestions.length ? "Apply Answers & Continue" : "Continue to Sources" }}
+          </n-button>
         </div>
       </div>
 
-      <template v-if="mission?.status === 'review' || mission?.status === 'confirmed'">
-        <n-card title="Agent Interpretation" size="small">
+      <template v-if="needsConfirmation && mission">
+        <n-card title="Confirm Search Direction" size="small">
           <div class="job-chip-row">
-            <n-tag round>{{ mission.analysis_mode }}</n-tag>
-            <n-tag v-if="mission.analysis_provider" round>{{ mission.analysis_provider }}</n-tag>
-            <n-tag :type="mission.status === 'confirmed' ? 'success' : 'warning'" round>{{ mission.status }}</n-tag>
+            <n-tag type="warning" round>Review needed</n-tag>
           </div>
-          <p v-if="mission.fallback_reason"><strong>Fallback:</strong> {{ mission.fallback_reason }}</p>
           <div class="mission-summary-grid">
             <div><strong>Target Roles</strong><p>{{ mission.mission.target_roles.join(", ") || "Not set" }}</p></div>
             <div><strong>Adjacent Roles</strong><p>{{ mission.mission.adjacent_roles.join(", ") || "None" }}</p></div>
             <div><strong>Hard Constraints</strong><p>{{ mission.mission.hard_constraints.join(", ") || "None" }}</p></div>
             <div><strong>Ranking Priorities</strong><p>{{ mission.mission.ranking_priorities.join(", ") || "Not set" }}</p></div>
           </div>
+          <div class="flow-toolbar">
+            <span class="flow-meta">Edit the setup above, or continue with these assumptions.</span>
+            <n-button type="primary" :loading="isSaving" @click="acceptAndContinue">Accept and Continue</n-button>
+          </div>
         </n-card>
         <n-card v-if="mission.mission.conflicts.length" title="Conflicts" size="small">
           <ul class="review-list"><li v-for="item in mission.mission.conflicts" :key="item">{{ item }}</li></ul>
-        </n-card>
-        <n-card v-if="mission.mission.clarification_questions.length" title="Questions to Resolve" size="small">
-          <ul class="review-list"><li v-for="item in mission.mission.clarification_questions" :key="item">{{ item }}</li></ul>
-        </n-card>
-        <n-card v-if="mission.mission.assumptions.length" title="Assumptions" size="small">
-          <ul class="review-list"><li v-for="item in mission.mission.assumptions" :key="item">{{ item }}</li></ul>
         </n-card>
       </template>
     </div>

@@ -57,6 +57,96 @@ export interface SavedJobAnalysisListResponse {
   items: SavedJobAnalysis[];
 }
 
+export interface JobBriefContent {
+  decision_summary: string;
+  fit_signals: string[];
+  evidence_gaps: string[];
+  resume_actions: string[];
+  interview_focus: string[];
+  next_actions: string[];
+}
+
+export interface JobBrief {
+  job_brief_id: string;
+  saved_job_id: string;
+  user_id: string;
+  resume_profile_id: string | null;
+  source_analysis_id: string | null;
+  version: number;
+  content: JobBriefContent;
+  analysis_mode: string;
+  analysis_provider: string | null;
+  fallback_reason: string | null;
+  created_at: string;
+}
+
+export interface JobBriefListResponse {
+  items: JobBrief[];
+}
+
+export interface JobBriefGeneratePayload {
+  resume_profile_id?: string | null;
+  llm_provider?: string | null;
+}
+
+export interface PreparationSkillGap {
+  skill: string;
+  importance: "high" | "medium" | "low";
+  evidence_status: "supported" | "partial" | "unknown" | "missing";
+  skill_type: "knowledge" | "experience";
+  jd_evidence: string;
+  profile_evidence: string[];
+  rationale: string;
+}
+
+export interface PreparationQuestion {
+  question_id: string;
+  skill: string;
+  prompt: string;
+  why_asked: string;
+}
+
+export interface PreparationAnswer {
+  question_id: string;
+  answer: string;
+}
+
+export interface LearningResource {
+  topic: string;
+  title: string;
+  url: string;
+  source: string;
+  level: string;
+  reason: string;
+}
+
+export interface PreparationRecommendation {
+  title: string;
+  action: string;
+  evidence_basis: string[];
+}
+
+export interface InterviewPreparationWorkspace {
+  preparation_id: string;
+  saved_job_id: string;
+  user_id: string;
+  resume_profile_id: string | null;
+  source_analysis_id: string | null;
+  status: "questions_ready" | "completed";
+  skill_gaps: PreparationSkillGap[];
+  questions: PreparationQuestion[];
+  answers: PreparationAnswer[];
+  learning_resources: LearningResource[];
+  recommendations: PreparationRecommendation[];
+  analysis_mode: string;
+  analysis_provider: string | null;
+  fallback_reason: string | null;
+  resource_mode: string;
+  resource_warning: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface SavedJobStatusEvent {
   saved_job_status_event_id: string;
   saved_job_id: string;

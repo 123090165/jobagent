@@ -1,0 +1,46 @@
+from __future__ import annotations
+
+import asyncio
+
+from app.services.learning_resource_search import (
+    OfficialCatalogResourceSearch,
+    _resources_from_payloads,
+    resolve_learning_resource_search,
+)
+
+
+def test_official_catalog_returns_only_matching_verified_resources() -> None:
+    search = OfficialCatalogResourceSearch()
+
+    linux = asyncio.run(search.search("Linux basic operations"))
+    office = asyncio.run(search.search("Microsoft Office"))
+    unknown = asyncio.run(search.search("unknown proprietary system"))
+
+    assert linux[0].source == "Ubuntu Documentation"
+    assert office[0].source == "Microsoft Support"
+    assert unknown == []
+
+
+def test_mcp_payload_parser_accepts_bounded_http_results() -> None:
+    resources = _resources_from_payloads(
+        "Linux",
+        [{
+            "results": [
+                {"title": "Tutorial", "url": "https://example.com/tutorial", "snippet": "Useful"},
+                {"title": "Unsafe", "url": "file:///tmp/local"},
+                {"title": "Extra", "link": "https://example.org/extra"},
+            ]
+        }],
+        limit=1,
+    )
+
+    assert len(resources) == 1
+    assert resources[0].url == "https://example.com/tutorial"
+
+
+def test_invalid_mcp_url_falls_back_to_catalog(monkeypatch) -> None:
+    monkeypatch.setenv("JOBAGENT_LEARNING_MCP_URL", "file:///tmp/server")
+
+    _search, mode = resolve_learning_resource_search()
+
+    assert mode == "official_catalog"

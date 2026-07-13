@@ -406,3 +406,92 @@ def test_search_mission_is_user_scoped_and_drives_search_preview(monkeypatch, tm
     )
     assert revised.json()["revision"] == confirmed_mission.json()["revision"] + 1
     assert revised.json()["status"] == "draft"
+
+    answered = client.put(
+        mission_url,
+        headers=owner_headers,
+        json={
+            **revised.json()["input"],
+            "clarification_answers": [{
+                "question": "Should the search emphasize applied work?",
+                "answer": "Yes, prioritize applied product engineering roles.",
+            }],
+        },
+    )
+    assert answered.status_code == 200
+    assert answered.json()["revision"] == revised.json()["revision"]
+    assert answered.json()["input"]["clarification_answers"][0]["answer"].startswith("Yes")
+
+
+def test_library_deletes_do_not_cascade_across_product_libraries(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("JOBAGENT_DB_PATH", str(tmp_path / "independent-delete.sqlite3"))
+    headers = _auth_headers(_register("delete-owner"))
+    other_headers = _auth_headers(_register("delete-other"))
+    confirmed = _create_confirmed_profile(headers)
+    session_id = confirmed["profile_session"]["session_id"]
+
+    first_run = client.post(
+        "/api/v1/job-search-runs",
+        headers=headers,
+        json={"session_id": session_id, "search_mode": "local_mock"},
+    ).json()["job_search_run"]
+    first_saved = client.post(
+        "/api/v1/saved-jobs/from-search-result",
+        headers=headers,
+        json={
+            "job_search_run_id": first_run["job_search_run_id"],
+            "job_result_id": first_run["results"][0]["job_result_id"],
+        },
+    ).json()
+    profile = client.get("/api/v1/resume-profiles", headers=headers).json()["items"][0]
+
+    forbidden_delete = client.delete(
+        f"/api/v1/job-search-runs/{first_run['job_search_run_id']}", headers=other_headers
+    )
+    run_delete = client.delete(
+        f"/api/v1/job-search-runs/{first_run['job_search_run_id']}", headers=headers
+    )
+    saved_after_run_delete = client.get(
+        f"/api/v1/saved-jobs/{first_saved['saved_job_id']}", headers=headers
+    )
+
+    second_run = client.post(
+        "/api/v1/job-search-runs",
+        headers=headers,
+        json={"session_id": session_id, "search_mode": "local_mock"},
+    ).json()["job_search_run"]
+    second_saved = client.post(
+        "/api/v1/saved-jobs/from-search-result",
+        headers=headers,
+        json={
+            "job_search_run_id": second_run["job_search_run_id"],
+            "job_result_id": second_run["results"][1]["job_result_id"],
+        },
+    ).json()
+    saved_delete = client.delete(
+        f"/api/v1/saved-jobs/{second_saved['saved_job_id']}", headers=headers
+    )
+    run_after_saved_delete = client.get(
+        f"/api/v1/job-search-runs/{second_run['job_search_run_id']}", headers=headers
+    )
+
+    profile_delete = client.delete(
+        f"/api/v1/resume-profiles/{profile['resume_profile_id']}", headers=headers
+    )
+    run_after_profile_delete = client.get(
+        f"/api/v1/job-search-runs/{second_run['job_search_run_id']}", headers=headers
+    )
+    first_saved_after_profile_delete = client.get(
+        f"/api/v1/saved-jobs/{first_saved['saved_job_id']}", headers=headers
+    )
+
+    assert forbidden_delete.status_code == 404
+    assert run_delete.status_code == 204
+    assert saved_after_run_delete.status_code == 200
+    assert saved_after_run_delete.json()["latest_analysis"]["source_job_search_run_id"] is None
+    assert saved_delete.status_code == 204
+    assert run_after_saved_delete.status_code == 200
+    assert profile_delete.status_code == 204
+    assert run_after_profile_delete.status_code == 200
+    assert first_saved_after_profile_delete.status_code == 200
+    assert first_saved_after_profile_delete.json()["latest_analysis"]["resume_profile_id"] is None

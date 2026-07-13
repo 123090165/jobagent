@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
-import { NButton, NCard, NSelect, NTag } from "naive-ui";
+import { NButton, NCard, NPopconfirm, NSelect, NTag } from "naive-ui";
 
 import FlowPageHeader from "../components/FlowPageHeader.vue";
 import { formatProviderName } from "../services/jobSearchSources";
@@ -44,6 +44,14 @@ function searchAgain(run: JobSearchRun) {
   void router.push({ name: "search-preview", params: { sessionId: run.session_id } });
 }
 
+async function deleteRun(run: JobSearchRun) {
+  try {
+    await store.deleteJobSearchRun(run.job_search_run_id);
+  } catch {
+    // Store error is rendered above.
+  }
+}
+
 function statusType(status: JobSearchRun["status"]): "success" | "warning" | "error" | "info" {
   if (status === "completed") return "success";
   if (status === "failed") return "error";
@@ -63,7 +71,7 @@ function formatDate(value: string): string {
       title="Search History"
       description="Reopen persisted searches and continue watching active runs."
       meta="User data"
-      :active-step="4"
+      :active-step="2"
     />
 
     <div v-if="store.error" class="error-banner">{{ store.error }}</div>
@@ -108,6 +116,20 @@ function formatDate(value: string): string {
         <div class="job-card-footer">
           <span>Created {{ formatDate(run.created_at) }}</span>
           <div class="flow-toolbar-secondary">
+            <n-popconfirm
+              :disabled="['pending', 'running'].includes(run.status)"
+              @positive-click="deleteRun(run)"
+            >
+              <template #trigger>
+                <n-button
+                  size="small"
+                  tertiary
+                  type="error"
+                  :disabled="['pending', 'running'].includes(run.status)"
+                >Delete</n-button>
+              </template>
+              Delete this run history? Saved jobs will remain unchanged.
+            </n-popconfirm>
             <n-button size="small" secondary @click="searchAgain(run)">Search Again</n-button>
             <n-button size="small" type="primary" @click="openRun(run)">
               {{ ["pending", "running"].includes(run.status) ? "Watch Run" : "Open Run" }}

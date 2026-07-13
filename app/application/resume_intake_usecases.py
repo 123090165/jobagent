@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 from fastapi import UploadFile
 
 from app.application.profile_session_usecases import get_profile_session
@@ -16,13 +14,15 @@ from app.repositories.resume_document_repository import (
 from app.schemas.resume_document import ResumeDocument
 from app.schemas.resume_intake import ResumeIntakeResponse
 from app.services.errors import JobAgentError
+from app.services.resume_file_service import (
+    ResumeFileParseError,
+    extract_text_from_resume_file,
+    get_resume_file_type,
+    normalize_resume_filename,
+)
 from app.storage.database import LOCAL_USER_ID
 
 MAX_RESUME_TEXT_LENGTH = 100_000
-MAX_RESUME_FILE_SIZE_BYTES = 1_000_000
-SUPPORTED_RESUME_FILE_TYPES = {".txt": "txt", ".md": "md"}
-
-
 def submit_resume_text(
     session_id: str,
     text: str,
@@ -58,44 +58,24 @@ async def submit_resume_file(
     resume_repository: ResumeDocumentRepository = resume_document_repository,
 ) -> ResumeIntakeResponse:
     session = get_profile_session(session_id, repository=session_repository, user_id=user_id)
-    filename = upload_file.filename or ""
-    file_extension = Path(filename).suffix.lower()
-    if file_extension not in SUPPORTED_RESUME_FILE_TYPES:
-        raise JobAgentError(
-            message="Only .txt and .md resume files are supported in v4.1.",
-            error_code="resume_file_unsupported_type",
-            status_code=400,
-        )
-
+    filename = normalize_resume_filename(upload_file.filename)
     raw_bytes = await upload_file.read()
-    if not raw_bytes:
-        raise JobAgentError(
-            message="Resume file is empty.",
-            error_code="resume_file_empty",
-            status_code=400,
-        )
-    if len(raw_bytes) > MAX_RESUME_FILE_SIZE_BYTES:
-        raise JobAgentError(
-            message="Resume file is too large.",
-            error_code="resume_file_too_large",
-            status_code=400,
-        )
-
     try:
-        text = raw_bytes.decode("utf-8")
-    except UnicodeDecodeError as exc:
-        raise JobAgentError(
-            message="Resume file must be valid UTF-8 text.",
-            error_code="resume_file_unsupported_type",
-            status_code=400,
-        ) from exc
-
+        text = extract_text_from_resume_file(filename, raw_bytes)
+    except ResumeFileParseError as exc:
+        if exc.error_code in {"resume_file_type_unsupported", "resume_file_decode_failed"}:
+            raise JobAgentError(
+                message=exc.message,
+                error_code="resume_file_unsupported_type",
+                status_code=exc.status_code,
+            ) from exc
+        raise
     _validate_resume_text(text, empty_error_code="resume_file_empty", empty_message="Resume file is empty.")
     document = resume_repository.create(
         session_id=session.session_id,
         source_type="file",
         filename=filename,
-        file_type=SUPPORTED_RESUME_FILE_TYPES[file_extension],
+        file_type=get_resume_file_type(filename),
         text=text,
         user_id=user_id or LOCAL_USER_ID,
     )

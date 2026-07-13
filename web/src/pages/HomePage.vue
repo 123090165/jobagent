@@ -29,7 +29,7 @@ const resumePreview = computed(() => {
     return `${resumeText.value.trim().length} characters ready to submit`;
   }
   return intakeMode.value === "file"
-    ? "Choose a txt or md resume file."
+    ? "Choose a PDF, DOCX, TXT, or Markdown resume file."
     : "Paste plain resume text.";
 });
 
@@ -78,11 +78,11 @@ async function submitResume() {
       <div v-if="intakeMode === 'file'" class="intake-choice">
         <div>
           <strong>Resume file</strong>
-          <p class="intake-helper">Supported formats: .txt, .md.</p>
+          <p class="intake-helper">Supported formats: .pdf, .docx, .txt, .md.</p>
         </div>
         <label class="file-picker">
           <input
-            accept=".txt,.md,text/plain,text/markdown"
+            accept=".pdf,.docx,.txt,.md,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/markdown"
             type="file"
             @change="onFileSelected"
           />

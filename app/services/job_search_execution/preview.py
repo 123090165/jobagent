@@ -249,12 +249,24 @@ def _estimate_query_budget(
 
 
 def _augment_search_plan(plan: JobSearchPlan, run: JobSearchRun) -> JobSearchPlan:
-    return _augment_search_plan_from_inputs(
+    augmented = _augment_search_plan_from_inputs(
         plan,
         query=run.query,
         locations=run.locations,
         target_roles=run.target_roles,
         keywords=run.keywords,
+    )
+    return augmented.model_copy(
+        update={
+            "must_have_signals": _clean_list(
+                augmented.must_have_signals
+                + run.mission_constraints
+                + run.mission_ranking_priorities
+            ),
+            "avoid_signals": _clean_list(
+                augmented.avoid_signals + run.mission_excluded_roles
+            ),
+        }
     )
 
 

@@ -70,9 +70,10 @@ branching is a demonstrated requirement.
 
 When a confirmed mission exists, preview and run creation use its target roles,
 locations, and positive search signals unless the API request explicitly
-overrides a field. Excluded roles and constraints are exposed in preview and
-become ranking inputs in a later scoring refinement. Runs persist their resolved
-inputs, so historical results remain reproducible if the mission changes.
+overrides a field. Each run snapshots the mission id, revision, hard constraints,
+excluded roles, and ranking priorities. Candidate filtering consumes the
+snapshot in both LLM and deterministic modes. A deterministic post-validation
+penalty enforces excluded signals even when an LLM scorecard omits them.
 
 ## Non-Goals
 

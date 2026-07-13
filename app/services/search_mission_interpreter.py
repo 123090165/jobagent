@@ -25,7 +25,9 @@ def interpret_search_mission(
                 "You interpret a job seeker's current search mission. Return JSON only. "
                 "Separate hard constraints from preferences, do not invent intent or resume "
                 "evidence, identify conflicts, state assumptions, and ask at most three "
-                "high-impact clarification questions. Use exactly these keys: target_roles, "
+                "high-impact clarification questions. Treat clarification_answers as user intent, "
+                "apply them when resolving ambiguity, and never repeat an answered question. "
+                "Use exactly these keys: target_roles, "
                 "adjacent_roles, excluded_roles, preferred_industries, locations, "
                 "work_arrangements, employment_types, must_have, nice_to_have, "
                 "hard_constraints, soft_preferences, ranking_priorities, exploration_level, "
@@ -57,7 +59,14 @@ def _deterministic_interpretation(
     payload: SearchMissionInput,
     profile: ConfirmedProfile,
 ) -> SearchMissionInterpretation:
-    target_roles = payload.target_roles or profile.target_roles
+    answered_questions = {
+        item.question.casefold(): item.answer for item in payload.clarification_answers
+    }
+    target_role_question = "What role should this search prioritize?"
+    target_role_answer = answered_questions.get(target_role_question.casefold())
+    target_roles = payload.target_roles or (
+        _answer_items(target_role_answer) if target_role_answer else profile.target_roles
+    )
     locations = payload.locations or profile.preferred_locations
     work_arrangements = payload.work_arrangements or profile.work_arrangements
     profile_text = " ".join(
@@ -73,7 +82,11 @@ def _deterministic_interpretation(
         item.casefold() for item in payload.excluded_roles
     ):
         conflicts.append("A target role is also listed as an excluded role.")
-        questions.append("Which role should take priority where target and exclusion lists overlap?")
+        _append_unanswered_question(
+            questions,
+            answered_questions,
+            "Which role should take priority where target and exclusion lists overlap?",
+        )
     unsupported_roles = [role for role in target_roles if role.casefold() not in profile_text]
     if unsupported_roles:
         conflicts.append(
@@ -85,8 +98,10 @@ def _deterministic_interpretation(
             "Must-have preferences are not evidenced in the resume: "
             + ", ".join(unsupported_must_have)
         )
-        questions.append(
-            "Are the unevidenced must-have items job requirements, or skills you already have but the resume omits?"
+        _append_unanswered_question(
+            questions,
+            answered_questions,
+            "Are the unevidenced must-have items job requirements, or skills you already have but the resume omits?",
         )
     assumptions: list[str] = []
     if not locations:
@@ -95,8 +110,11 @@ def _deterministic_interpretation(
         assumptions.append("Employment type is flexible.")
     if payload.exploration_level == "exploratory":
         assumptions.append("Adjacent role titles may be included when skills transfer well.")
-    if not target_roles:
-        questions.insert(0, "What role should this search prioritize?")
+    assumptions.extend(
+        f"User clarification: {item.answer}" for item in payload.clarification_answers
+    )
+    if not target_roles and target_role_question.casefold() not in answered_questions:
+        questions.insert(0, target_role_question)
     return SearchMissionInterpretation(
         target_roles=target_roles,
         adjacent_roles=profile.target_directions if payload.exploration_level != "focused" else [],
@@ -115,3 +133,16 @@ def _deterministic_interpretation(
         assumptions=assumptions,
         clarification_questions=questions[:3],
     )
+
+
+def _append_unanswered_question(
+    questions: list[str],
+    answered_questions: dict[str, str],
+    question: str,
+) -> None:
+    if question.casefold() not in answered_questions:
+        questions.append(question)
+
+
+def _answer_items(answer: str) -> list[str]:
+    return [item.strip() for item in answer.replace("\n", ",").split(",") if item.strip()]

@@ -52,7 +52,7 @@ async function startJobSearch() {
       title="Profile Confirmed"
       description="Review the locked profile before preparing a provider-specific search plan."
       :meta="`Session ${sessionId}`"
-      :active-step="3"
+      :active-step="0"
     />
 
     <div v-if="profileSessionStore.error" class="error-banner">
@@ -92,7 +92,7 @@ async function startJobSearch() {
             :disabled="!profileSessionStore.confirmedProfile"
             @click="startJobSearch"
           >
-            Define Search Mission
+            Set Search Preferences
           </n-button>
         </div>
       </div>

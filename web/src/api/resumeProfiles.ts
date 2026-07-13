@@ -43,3 +43,14 @@ export async function archiveResumeProfile(resumeProfileId: string): Promise<Res
   );
   return response.data;
 }
+
+export async function restoreResumeProfile(resumeProfileId: string): Promise<ResumeProfile> {
+  const response = await client.post<ResumeProfile>(
+    `/api/v1/resume-profiles/${resumeProfileId}/restore`
+  );
+  return response.data;
+}
+
+export async function deleteResumeProfile(resumeProfileId: string): Promise<void> {
+  await client.delete(`/api/v1/resume-profiles/${resumeProfileId}`);
+}

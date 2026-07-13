@@ -242,6 +242,10 @@ export async function listUserJobSearchRuns(limit = 100): Promise<JobSearchRunLi
   return response.data;
 }
 
+export async function deleteJobSearchRun(runId: string): Promise<void> {
+  await client.delete(`/api/v1/job-search-runs/${runId}`);
+}
+
 export async function listJobSearchResultFeedback(
   runId: string
 ): Promise<JobSearchResultFeedbackListResponse> {

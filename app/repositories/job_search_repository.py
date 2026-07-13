@@ -28,6 +28,11 @@ class JobSearchRepository:
         target_roles: list[str],
         keywords: list[str],
         results: list[JobSearchResult],
+        search_mission_id: str | None = None,
+        search_mission_revision: int | None = None,
+        mission_constraints: list[str] | None = None,
+        mission_excluded_roles: list[str] | None = None,
+        mission_ranking_priorities: list[str] | None = None,
         user_id: str = LOCAL_USER_ID,
     ) -> JobSearchRun:
         return self._create_run(
@@ -44,6 +49,11 @@ class JobSearchRepository:
             status="completed",
             error_message=None,
             results=results,
+            search_mission_id=search_mission_id,
+            search_mission_revision=search_mission_revision,
+            mission_constraints=mission_constraints or [],
+            mission_excluded_roles=mission_excluded_roles or [],
+            mission_ranking_priorities=mission_ranking_priorities or [],
         )
 
     def create_pending(
@@ -58,6 +68,11 @@ class JobSearchRepository:
         search_mode: str,
         llm_enabled: bool,
         search_provider: str | None,
+        search_mission_id: str | None = None,
+        search_mission_revision: int | None = None,
+        mission_constraints: list[str] | None = None,
+        mission_excluded_roles: list[str] | None = None,
+        mission_ranking_priorities: list[str] | None = None,
         user_id: str = LOCAL_USER_ID,
     ) -> JobSearchRun:
         return self._create_run(
@@ -74,6 +89,11 @@ class JobSearchRepository:
             status="pending",
             error_message=None,
             results=[],
+            search_mission_id=search_mission_id,
+            search_mission_revision=search_mission_revision,
+            mission_constraints=mission_constraints or [],
+            mission_excluded_roles=mission_excluded_roles or [],
+            mission_ranking_priorities=mission_ranking_priorities or [],
         )
 
     def mark_running(self, run_id: str) -> JobSearchRun | None:
@@ -129,6 +149,11 @@ class JobSearchRepository:
                     search_mode,
                     llm_enabled,
                     search_provider,
+                    search_mission_id,
+                    search_mission_revision,
+                    mission_constraints_json,
+                    mission_excluded_roles_json,
+                    mission_ranking_priorities_json,
                     status,
                     error_message,
                     results_json,
@@ -169,6 +194,11 @@ class JobSearchRepository:
                     search_mode,
                     llm_enabled,
                     search_provider,
+                    search_mission_id,
+                    search_mission_revision,
+                    mission_constraints_json,
+                    mission_excluded_roles_json,
+                    mission_ranking_priorities_json,
                     status,
                     error_message,
                     results_json,
@@ -203,6 +233,11 @@ class JobSearchRepository:
                     search_mode,
                     llm_enabled,
                     search_provider,
+                    search_mission_id,
+                    search_mission_revision,
+                    mission_constraints_json,
+                    mission_excluded_roles_json,
+                    mission_ranking_priorities_json,
                     status,
                     error_message,
                     results_json,
@@ -216,6 +251,34 @@ class JobSearchRepository:
                 (user_id, limit),
             ).fetchall()
         return [self._row_to_job_search_run(row) for row in rows]
+
+    def delete(self, *, user_id: str, run_id: str) -> bool:
+        if self.get(run_id, user_id=user_id) is None:
+            return False
+        with get_connection() as connection:
+            init_database(connection)
+            connection.execute(
+                """
+                UPDATE saved_job_analyses
+                SET source_job_search_run_id = NULL
+                WHERE user_id = ? AND source_job_search_run_id = ?
+                """,
+                (user_id, run_id),
+            )
+            connection.execute(
+                "DELETE FROM job_search_result_feedback WHERE user_id = ? AND job_search_run_id = ?",
+                (user_id, run_id),
+            )
+            connection.execute(
+                "DELETE FROM job_search_trace_steps WHERE job_search_run_id = ?",
+                (run_id,),
+            )
+            cursor = connection.execute(
+                "DELETE FROM job_search_runs WHERE user_id = ? AND job_search_run_id = ?",
+                (user_id, run_id),
+            )
+            connection.commit()
+        return cursor.rowcount > 0
 
     def create_trace_step(
         self,
@@ -456,6 +519,11 @@ class JobSearchRepository:
         status: str,
         error_message: str | None,
         results: list[JobSearchResult],
+        search_mission_id: str | None,
+        search_mission_revision: int | None,
+        mission_constraints: list[str],
+        mission_excluded_roles: list[str],
+        mission_ranking_priorities: list[str],
     ) -> JobSearchRun:
         now = _utc_now()
         run = JobSearchRun(
@@ -470,6 +538,11 @@ class JobSearchRepository:
             llm_enabled=llm_enabled,
             search_provider=search_provider,
             selected_sources=selected_sources_from_provider_name(search_provider),
+            search_mission_id=search_mission_id,
+            search_mission_revision=search_mission_revision,
+            mission_constraints=mission_constraints,
+            mission_excluded_roles=mission_excluded_roles,
+            mission_ranking_priorities=mission_ranking_priorities,
             status=status,
             error_message=error_message,
             results=results,
@@ -492,13 +565,18 @@ class JobSearchRepository:
                     search_mode,
                     llm_enabled,
                     search_provider,
+                    search_mission_id,
+                    search_mission_revision,
+                    mission_constraints_json,
+                    mission_excluded_roles_json,
+                    mission_ranking_priorities_json,
                     status,
                     error_message,
                     results_json,
                     created_at,
                     updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     run.job_search_run_id,
@@ -512,6 +590,11 @@ class JobSearchRepository:
                     run.search_mode,
                     1 if run.llm_enabled else 0,
                     run.search_provider,
+                    run.search_mission_id,
+                    run.search_mission_revision,
+                    json.dumps(run.mission_constraints),
+                    json.dumps(run.mission_excluded_roles),
+                    json.dumps(run.mission_ranking_priorities),
                     run.status,
                     run.error_message,
                     json.dumps([item.model_dump(mode="json") for item in run.results]),
@@ -623,6 +706,11 @@ class JobSearchRepository:
             llm_enabled=bool(row["llm_enabled"]),
             search_provider=row["search_provider"],
             selected_sources=selected_sources_from_provider_name(row["search_provider"]),
+            search_mission_id=row["search_mission_id"],
+            search_mission_revision=row["search_mission_revision"],
+            mission_constraints=json.loads(row["mission_constraints_json"] or "[]"),
+            mission_excluded_roles=json.loads(row["mission_excluded_roles_json"] or "[]"),
+            mission_ranking_priorities=json.loads(row["mission_ranking_priorities_json"] or "[]"),
             status=row["status"],
             error_message=row["error_message"],
             results=[

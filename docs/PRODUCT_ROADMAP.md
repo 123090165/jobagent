@@ -9,13 +9,16 @@ testing. It is not ready to be exposed as a public multi-user service.
 Implemented capabilities:
 
 - username/password authentication and user-owned data;
-- text and .txt/.md resume intake;
+- pasted text and .txt/.md/.pdf/.docx resume intake;
 - deterministic parsing with optional LLM-assisted enrichment;
 - user review, editable profile draft, and confirmed profile library;
 - search preview, multiple providers, bounded candidate analysis, and traces;
 - browser-assisted BOSS search and current-page capture;
 - saved JD and analysis snapshots, tags, notes, and simple application status.
 - user-visible search history, saved-job analysis history, and result feedback.
+- versioned Job Brief generation for a selected saved job.
+- evidence-based interview preparation with bounded MCP learning resources and
+  portable external-model prompts.
 
 ## Main Product Gap
 
@@ -37,6 +40,9 @@ Search history
 Do not prioritize more agent frameworks or a large provider count before this
 loop produces measurable user value.
 
+The user-visible workflow is intentionally compressed to Profile, Search Setup,
+and Results. Internal workflow states remain available for recovery and tracing.
+
 ## Delivery Priorities
 
 ### 1. Product Quality Loop
@@ -45,9 +51,8 @@ loop produces measurable user value.
 - Add a saved-job detail view with analysis history.
 - Record relevant, irrelevant, duplicate, stale, and insufficient-JD feedback.
 - Track saved, interested, applied, interviewing, rejected, and closed states.
-- Add Job Brief, resume-tailoring guidance, and interview preparation for a
-  selected saved job.
-- Add PDF and DOCX resume intake.
+- Add resume-tailoring guidance for a selected saved job, building on the
+  current Job Brief and evidence preparation workspace.
 - Measure Top 5 relevance, save rate, dismiss reasons, apply rate, fallback
   rate, and provider detail coverage.
 

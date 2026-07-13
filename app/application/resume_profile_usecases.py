@@ -70,6 +70,28 @@ def archive_resume_profile(
     return profile
 
 
+def restore_resume_profile(
+    resume_profile_id: str,
+    *,
+    user_id: str,
+    repository: ResumeProfileRepository = resume_profile_repository,
+) -> ResumeProfile:
+    profile = repository.restore(user_id=user_id, resume_profile_id=resume_profile_id)
+    if profile is None:
+        raise _not_found()
+    return profile
+
+
+def delete_resume_profile(
+    resume_profile_id: str,
+    *,
+    user_id: str,
+    repository: ResumeProfileRepository = resume_profile_repository,
+) -> None:
+    if not repository.delete(user_id=user_id, resume_profile_id=resume_profile_id):
+        raise _not_found()
+
+
 def _not_found() -> JobAgentError:
     return JobAgentError(
         message="Resume profile not found.",

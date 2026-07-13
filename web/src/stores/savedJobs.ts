@@ -4,7 +4,13 @@ import { AxiosError } from "axios";
 import {
   archiveSavedJob,
   createSavedJob,
+  deleteSavedJob,
   getSavedJob,
+  generateJobBrief,
+  generateInterviewPreparation,
+  getInterviewPreparation,
+  listJobBriefs,
+  submitPreparationAnswers,
   listSavedJobs,
   listSavedJobAnalyses,
   listSavedJobStatusHistory,
@@ -13,6 +19,9 @@ import {
 } from "../api/savedJobs";
 import type {
   SavedJob,
+  JobBrief,
+  InterviewPreparationWorkspace,
+  PreparationAnswer,
   SavedJobAnalysis,
   SavedJobStatusEvent,
   SavedJobCreatePayload,
@@ -25,6 +34,8 @@ interface SavedJobState {
   selectedJob: SavedJob | null;
   selectedJobAnalyses: SavedJobAnalysis[];
   selectedJobStatusHistory: SavedJobStatusEvent[];
+  selectedJobBriefs: JobBrief[];
+  selectedPreparation: InterviewPreparationWorkspace | null;
   isLoading: boolean;
   isSaving: boolean;
   error: string | null;
@@ -40,6 +51,8 @@ export const useSavedJobsStore = defineStore("savedJobs", {
     selectedJob: null,
     selectedJobAnalyses: [],
     selectedJobStatusHistory: [],
+    selectedJobBriefs: [],
+    selectedPreparation: null,
     isLoading: false,
     isSaving: false,
     error: null
@@ -83,20 +96,26 @@ export const useSavedJobsStore = defineStore("savedJobs", {
       this.isLoading = true;
       this.error = null;
       try {
-        const [job, analyses, statusHistory] = await Promise.all([
+        const [job, analyses, statusHistory, briefs, preparation] = await Promise.all([
           getSavedJob(savedJobId),
           listSavedJobAnalyses(savedJobId),
-          listSavedJobStatusHistory(savedJobId)
+          listSavedJobStatusHistory(savedJobId),
+          listJobBriefs(savedJobId),
+          getInterviewPreparation(savedJobId).catch(() => null)
         ]);
         this.selectedJob = job;
         this.selectedJobAnalyses = analyses.items;
         this.selectedJobStatusHistory = statusHistory.items;
+        this.selectedJobBriefs = briefs.items;
+        this.selectedPreparation = preparation;
         this.mergeJob(job);
         return job;
       } catch (error) {
         this.selectedJob = null;
         this.selectedJobAnalyses = [];
         this.selectedJobStatusHistory = [];
+        this.selectedJobBriefs = [];
+        this.selectedPreparation = null;
         this.error = toApiErrorMessage(error, "Failed to load saved job details.");
         throw error;
       } finally {
@@ -145,6 +164,71 @@ export const useSavedJobsStore = defineStore("savedJobs", {
         return job;
       } catch (error) {
         this.error = toApiErrorMessage(error, "Failed to archive saved job.");
+        throw error;
+      } finally {
+        this.isSaving = false;
+      }
+    },
+    async generateBrief(savedJobId: string): Promise<JobBrief> {
+      this.isSaving = true;
+      this.error = null;
+      try {
+        const brief = await generateJobBrief(savedJobId);
+        this.selectedJobBriefs = [brief, ...this.selectedJobBriefs];
+        return brief;
+      } catch (error) {
+        this.error = toApiErrorMessage(error, "Failed to generate job brief.");
+        throw error;
+      } finally {
+        this.isSaving = false;
+      }
+    },
+    async generatePreparation(savedJobId: string): Promise<InterviewPreparationWorkspace> {
+      this.isSaving = true;
+      this.error = null;
+      try {
+        const workspace = await generateInterviewPreparation(savedJobId);
+        this.selectedPreparation = workspace;
+        return workspace;
+      } catch (error) {
+        this.error = toApiErrorMessage(error, "Failed to prepare interview evidence questions.");
+        throw error;
+      } finally {
+        this.isSaving = false;
+      }
+    },
+    async savePreparationAnswers(
+      savedJobId: string,
+      answers: PreparationAnswer[]
+    ): Promise<InterviewPreparationWorkspace> {
+      this.isSaving = true;
+      this.error = null;
+      try {
+        const workspace = await submitPreparationAnswers(savedJobId, answers);
+        this.selectedPreparation = workspace;
+        return workspace;
+      } catch (error) {
+        this.error = toApiErrorMessage(error, "Failed to save preparation answers.");
+        throw error;
+      } finally {
+        this.isSaving = false;
+      }
+    },
+    async deleteJob(savedJobId: string): Promise<void> {
+      this.isSaving = true;
+      this.error = null;
+      try {
+        await deleteSavedJob(savedJobId);
+        this.jobs = this.jobs.filter((job) => job.saved_job_id !== savedJobId);
+        if (this.selectedJob?.saved_job_id === savedJobId) {
+          this.selectedJob = null;
+          this.selectedJobAnalyses = [];
+          this.selectedJobStatusHistory = [];
+          this.selectedJobBriefs = [];
+          this.selectedPreparation = null;
+        }
+      } catch (error) {
+        this.error = toApiErrorMessage(error, "Failed to delete saved job.");
         throw error;
       } finally {
         this.isSaving = false;

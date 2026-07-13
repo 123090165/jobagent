@@ -1,6 +1,11 @@
 import { client } from "./client";
 import type {
   SavedJob,
+  JobBrief,
+  JobBriefGeneratePayload,
+  JobBriefListResponse,
+  InterviewPreparationWorkspace,
+  PreparationAnswer,
   SavedJobAnalysisListResponse,
   SavedJobCreatePayload,
   SavedJobFromSearchResultPayload,
@@ -44,6 +49,62 @@ export async function listSavedJobStatusHistory(
   return response.data;
 }
 
+export async function listJobBriefs(savedJobId: string): Promise<JobBriefListResponse> {
+  const response = await client.get<JobBriefListResponse>(
+    `/api/v1/saved-jobs/${savedJobId}/briefs`
+  );
+  return response.data;
+}
+
+export async function generateJobBrief(
+  savedJobId: string,
+  payload: JobBriefGeneratePayload = {}
+): Promise<JobBrief> {
+  const response = await client.post<JobBrief>(
+    `/api/v1/saved-jobs/${savedJobId}/briefs`,
+    payload
+  );
+  return response.data;
+}
+
+export async function getInterviewPreparation(
+  savedJobId: string
+): Promise<InterviewPreparationWorkspace> {
+  const response = await client.get<InterviewPreparationWorkspace>(
+    `/api/v1/saved-jobs/${savedJobId}/preparation`
+  );
+  return response.data;
+}
+
+export async function generateInterviewPreparation(
+  savedJobId: string
+): Promise<InterviewPreparationWorkspace> {
+  const response = await client.post<InterviewPreparationWorkspace>(
+    `/api/v1/saved-jobs/${savedJobId}/preparation`,
+    {}
+  );
+  return response.data;
+}
+
+export async function submitPreparationAnswers(
+  savedJobId: string,
+  answers: PreparationAnswer[]
+): Promise<InterviewPreparationWorkspace> {
+  const response = await client.put<InterviewPreparationWorkspace>(
+    `/api/v1/saved-jobs/${savedJobId}/preparation/answers`,
+    { answers }
+  );
+  return response.data;
+}
+
+export async function downloadPreparationPrompt(savedJobId: string): Promise<Blob> {
+  const response = await client.get(
+    `/api/v1/saved-jobs/${savedJobId}/preparation/prompt.txt`,
+    { responseType: "blob" }
+  );
+  return response.data as Blob;
+}
+
 export async function saveJobFromSearchResult(
   payload: SavedJobFromSearchResultPayload
 ): Promise<SavedJob> {
@@ -65,4 +126,8 @@ export async function updateSavedJob(
 export async function archiveSavedJob(savedJobId: string): Promise<SavedJob> {
   const response = await client.post<SavedJob>(`/api/v1/saved-jobs/${savedJobId}/archive`);
   return response.data;
+}
+
+export async function deleteSavedJob(savedJobId: string): Promise<void> {
+  await client.delete(`/api/v1/saved-jobs/${savedJobId}`);
 }

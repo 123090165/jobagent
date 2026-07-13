@@ -1,12 +1,20 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Response, status
+from fastapi.responses import PlainTextResponse
 
 from app.api.dependencies import get_current_user
 from app.application.saved_job_usecases import (
     archive_saved_job,
     create_saved_job,
+    delete_saved_job,
     get_saved_job,
+    generate_job_brief,
+    generate_interview_preparation,
+    get_interview_preparation,
+    complete_interview_preparation,
+    export_interview_preparation_prompt,
+    list_job_briefs,
     list_saved_jobs,
     list_saved_job_analyses,
     list_saved_job_status_events,
@@ -15,6 +23,12 @@ from app.application.saved_job_usecases import (
     update_saved_job,
 )
 from app.schemas.auth import UserAccount
+from app.schemas.job_brief import JobBrief, JobBriefGenerateRequest, JobBriefListResponse
+from app.schemas.interview_preparation import (
+    InterviewPreparationWorkspace,
+    PreparationAnswerRequest,
+    PreparationGenerateRequest,
+)
 from app.schemas.saved_job import (
     SavedJob,
     SavedJobAnalysisListResponse,
@@ -94,6 +108,61 @@ def list_saved_job_status_events_endpoint(
     )
 
 
+@router.get("/{saved_job_id}/briefs", response_model=JobBriefListResponse)
+def list_job_briefs_endpoint(
+    saved_job_id: str,
+    current_user: UserAccount = Depends(get_current_user),
+) -> JobBriefListResponse:
+    return JobBriefListResponse(items=list_job_briefs(saved_job_id, user_id=current_user.user_id))
+
+
+@router.post("/{saved_job_id}/briefs", response_model=JobBrief)
+def generate_job_brief_endpoint(
+    saved_job_id: str,
+    payload: JobBriefGenerateRequest,
+    current_user: UserAccount = Depends(get_current_user),
+) -> JobBrief:
+    return generate_job_brief(saved_job_id, payload, user_id=current_user.user_id)
+
+
+@router.get("/{saved_job_id}/preparation", response_model=InterviewPreparationWorkspace)
+def get_interview_preparation_endpoint(
+    saved_job_id: str,
+    current_user: UserAccount = Depends(get_current_user),
+) -> InterviewPreparationWorkspace:
+    return get_interview_preparation(saved_job_id, user_id=current_user.user_id)
+
+
+@router.post("/{saved_job_id}/preparation", response_model=InterviewPreparationWorkspace)
+async def generate_interview_preparation_endpoint(
+    saved_job_id: str,
+    payload: PreparationGenerateRequest,
+    current_user: UserAccount = Depends(get_current_user),
+) -> InterviewPreparationWorkspace:
+    return await generate_interview_preparation(saved_job_id, payload, user_id=current_user.user_id)
+
+
+@router.put("/{saved_job_id}/preparation/answers", response_model=InterviewPreparationWorkspace)
+def complete_interview_preparation_endpoint(
+    saved_job_id: str,
+    payload: PreparationAnswerRequest,
+    current_user: UserAccount = Depends(get_current_user),
+) -> InterviewPreparationWorkspace:
+    return complete_interview_preparation(saved_job_id, payload, user_id=current_user.user_id)
+
+
+@router.get("/{saved_job_id}/preparation/prompt.txt", response_class=PlainTextResponse)
+def export_interview_preparation_prompt_endpoint(
+    saved_job_id: str,
+    current_user: UserAccount = Depends(get_current_user),
+) -> PlainTextResponse:
+    text = export_interview_preparation_prompt(saved_job_id, user_id=current_user.user_id)
+    return PlainTextResponse(
+        text,
+        headers={"Content-Disposition": 'attachment; filename="interview-preparation-prompt.txt"'},
+    )
+
+
 @router.patch("/{saved_job_id}", response_model=SavedJob)
 def update_saved_job_endpoint(
     saved_job_id: str,
@@ -109,3 +178,12 @@ def archive_saved_job_endpoint(
     current_user: UserAccount = Depends(get_current_user),
 ) -> SavedJob:
     return archive_saved_job(saved_job_id, user_id=current_user.user_id)
+
+
+@router.delete("/{saved_job_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_saved_job_endpoint(
+    saved_job_id: str,
+    current_user: UserAccount = Depends(get_current_user),
+) -> Response:
+    delete_saved_job(saved_job_id, user_id=current_user.user_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

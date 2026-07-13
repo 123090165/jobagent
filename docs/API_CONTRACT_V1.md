@@ -40,6 +40,17 @@ GET  /api/v1/confirmed-profiles/{confirmed_profile_id}
 Resume parsing supports explicit regeneration and optional LLM analysis.
 Profile draft creation supports explicit regeneration.
 
+Resume file intake accepts UTF-8 `.txt` and `.md`, text-layer `.pdf`, and
+Open XML `.docx` files. PDF text is extracted with PyMuPDF; DOCX paragraphs and
+tables are extracted with python-docx. All formats produce the same persisted
+plain-text ResumeDocument and continue through the existing deterministic or
+LLM-assisted parse endpoint. Scanned PDFs without a text layer require OCR and
+are rejected by the current intake boundary.
+
+`JOBAGENT_MAX_RESUME_FILE_BYTES` controls the upload limit and defaults to 5 MB.
+PDFs are limited to 50 pages. DOCX archives are checked for bounded entry count
+and uncompressed size before parsing.
+
 ## Resume Profile Library
 
 ~~~text
@@ -48,9 +59,13 @@ GET  /api/v1/resume-profiles/{profile_id}
 PATCH /api/v1/resume-profiles/{profile_id}
 POST /api/v1/resume-profiles/{profile_id}/default
 POST /api/v1/resume-profiles/{profile_id}/archive
+POST /api/v1/resume-profiles/{profile_id}/restore
+DELETE /api/v1/resume-profiles/{profile_id}
 ~~~
 
 A confirmed profile is promoted to a durable user-owned resume profile.
+Deleting a library profile does not delete its source session, search runs, or
+saved jobs. Profile references in analysis snapshots are detached.
 
 ## Job Search
 
@@ -64,6 +79,7 @@ POST /api/v1/job-search-runs
 POST /api/v1/job-search-runs/browser-helper
 GET  /api/v1/job-search-runs
 GET  /api/v1/job-search-runs/{run_id}
+DELETE /api/v1/job-search-runs/{run_id}
 GET  /api/v1/job-search-runs/{run_id}/steps
 GET  /api/v1/job-search-runs/{run_id}/feedback
 POST /api/v1/job-search-runs/{run_id}/results/{result_id}/feedback
@@ -75,6 +91,8 @@ and step endpoints until completion or failure.
 
 The collection GET lists recent runs across the current user's profile
 sessions. The session-scoped GET remains available for workflow-local history.
+Deleting a run retains saved jobs and their analysis snapshots while detaching
+the source-run reference.
 
 analysis_mode decides deterministic versus LLM-assisted behavior. llm_provider
 selects the implementation behind the shared LLM interface. Provider selection
@@ -88,11 +106,21 @@ POST  /api/v1/saved-jobs
 POST  /api/v1/saved-jobs/from-search-result
 POST  /api/v1/saved-jobs/from-browser-capture
 GET   /api/v1/saved-jobs/{saved_job_id}
+DELETE /api/v1/saved-jobs/{saved_job_id}
 GET   /api/v1/saved-jobs/{saved_job_id}/analyses
 GET   /api/v1/saved-jobs/{saved_job_id}/status-history
+GET   /api/v1/saved-jobs/{saved_job_id}/briefs
+POST  /api/v1/saved-jobs/{saved_job_id}/briefs
+GET   /api/v1/saved-jobs/{saved_job_id}/preparation
+POST  /api/v1/saved-jobs/{saved_job_id}/preparation
+PUT   /api/v1/saved-jobs/{saved_job_id}/preparation/answers
+GET   /api/v1/saved-jobs/{saved_job_id}/preparation/prompt.txt
 PATCH /api/v1/saved-jobs/{saved_job_id}
 POST  /api/v1/saved-jobs/{saved_job_id}/archive
 ~~~
+
+Deleting a saved job removes only that job's analysis and status history. It
+does not delete search runs or resume profiles.
 
 Saving a result copies a canonical JD snapshot and a profile-specific analysis
 snapshot. Re-saving the same normalized source should reuse or update the

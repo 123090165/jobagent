@@ -9,12 +9,9 @@ const props = withDefaults(
 );
 
 const steps = [
-  { label: "Intake", detail: "Resume" },
-  { label: "Review", detail: "Parse" },
-  { label: "Draft", detail: "Profile" },
-  { label: "Confirm", detail: "Ready" },
-  { label: "Search", detail: "Results" },
-  { label: "Brief", detail: "Planned" }
+  { label: "Profile", detail: "Resume" },
+  { label: "Search Setup", detail: "Sources" },
+  { label: "Results", detail: "Jobs" }
 ];
 </script>
 

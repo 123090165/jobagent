@@ -10,6 +10,16 @@ SearchMissionStatus = Literal["draft", "review", "confirmed"]
 SearchMissionAnalysisMode = Literal["deterministic", "llm", "fallback"]
 
 
+class SearchMissionClarificationAnswer(BaseModel):
+    question: str = Field(min_length=1, max_length=500)
+    answer: str = Field(min_length=1, max_length=2000)
+
+    @field_validator("question", "answer")
+    @classmethod
+    def _clean_text(cls, value: str) -> str:
+        return " ".join(value.strip().split())
+
+
 class SearchMissionInput(BaseModel):
     target_roles: list[str] = Field(default_factory=list)
     excluded_roles: list[str] = Field(default_factory=list)
@@ -22,6 +32,10 @@ class SearchMissionInput(BaseModel):
     ranking_priorities: list[str] = Field(default_factory=list)
     exploration_level: ExplorationLevel = "balanced"
     free_text: str | None = Field(default=None, max_length=2000)
+    clarification_answers: list[SearchMissionClarificationAnswer] = Field(
+        default_factory=list,
+        max_length=3,
+    )
 
     @field_validator(
         "target_roles",

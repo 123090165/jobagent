@@ -67,6 +67,8 @@ Hard guardrails:
 - Prefer role/domain evidence over generic tool overlap. Python, MATLAB, PyTorch, SQL, FastAPI, Docker, Git, and similar tool words are weak signals unless the role/domain also matches.
 - Use only evidence visible in the candidate title, company, location, snippet, raw_description, provider_warnings, confirmed profile, and search plan.
 - Make the same decision for the same input: use integer scores, no randomness, no prose outside JSON, and break exact score ties by lower candidate index.
+- Treat search_plan.must_have_signals and target_roles as the user's current mission, not merely resume evidence.
+- Apply a clear risk penalty when candidate title or duties match search_plan.avoid_signals. State the violated mission signal in risks.
 
 Return only this JSON object:
 {
@@ -215,6 +217,7 @@ def filter_candidates(
         llm_timings["llm_request"] = llm_request_ms
         validation_start = time.perf_counter()
         scorecards = _validate_llm_scorecards(payload, candidate_count=len(candidates), limit=limit)
+        scorecards = _apply_mission_penalties(scorecards, candidates, search_plan.avoid_signals)
         validation_ms = _elapsed_ms(validation_start)
         llm_timings["response_validation"] = validation_ms
         valid_indexes = [scorecard.candidate_index for scorecard in scorecards]
@@ -677,6 +680,48 @@ def _scorecard_from_llm_item(raw_item: dict) -> CandidateScorecard:
         risks=_dedupe_list(raw_item.get("risks", []))[:6],
         evidence_quotes=_dedupe_list(raw_item.get("evidence_quotes", []))[:6],
     )
+
+
+def _apply_mission_penalties(
+    scorecards: list[CandidateScorecard],
+    candidates: list[RawJobCandidate],
+    avoid_signals: list[str],
+) -> list[CandidateScorecard]:
+    adjusted: list[CandidateScorecard] = []
+    for scorecard in scorecards:
+        text = _candidate_text(candidates[scorecard.candidate_index])
+        hits = [signal for signal in avoid_signals if signal and _contains_signal(text, signal)]
+        if not hits:
+            adjusted.append(scorecard)
+            continue
+        breakdown = dict(scorecard.score_breakdown)
+        breakdown["risk_penalty"] = min(
+            30,
+            max(breakdown.get("risk_penalty", 0), len(hits) * 6),
+        )
+        score = _score_from_breakdown(breakdown)
+        adjusted.append(
+            scorecard.model_copy(
+                update={
+                    "match_score": score,
+                    "confidence_label": _confidence_label_for_score(score),
+                    "score_breakdown": breakdown,
+                    "risks": _dedupe_list(
+                        scorecard.risks
+                        + [f"Conflicts with excluded mission signal: {hit}" for hit in hits]
+                    )[:6],
+                }
+            )
+        )
+    adjusted.sort(
+        key=lambda item: (
+            -item.match_score,
+            -item.score_breakdown.get("role_alignment", 0),
+            -item.score_breakdown.get("domain_alignment", 0),
+            item.candidate_index,
+        )
+    )
+    return adjusted
 
 
 def _normalize_score_breakdown(value: object) -> dict[str, int]:

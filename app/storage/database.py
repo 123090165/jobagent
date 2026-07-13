@@ -312,6 +312,11 @@ def init_database(connection: sqlite3.Connection) -> None:
             search_mode TEXT NOT NULL DEFAULT 'local_mock',
             llm_enabled INTEGER NOT NULL DEFAULT 0,
             search_provider TEXT,
+            search_mission_id TEXT,
+            search_mission_revision INTEGER,
+            mission_constraints_json TEXT NOT NULL DEFAULT '[]',
+            mission_excluded_roles_json TEXT NOT NULL DEFAULT '[]',
+            mission_ranking_priorities_json TEXT NOT NULL DEFAULT '[]',
             status TEXT NOT NULL,
             error_message TEXT,
             results_json TEXT NOT NULL,
@@ -420,6 +425,51 @@ def init_database(connection: sqlite3.Connection) -> None:
             FOREIGN KEY (user_id) REFERENCES users(user_id)
         );
 
+        CREATE TABLE IF NOT EXISTS job_briefs (
+            job_brief_id TEXT PRIMARY KEY,
+            saved_job_id TEXT NOT NULL,
+            user_id TEXT NOT NULL,
+            resume_profile_id TEXT,
+            source_analysis_id TEXT,
+            version INTEGER NOT NULL,
+            content_json TEXT NOT NULL,
+            analysis_mode TEXT NOT NULL,
+            analysis_provider TEXT,
+            fallback_reason TEXT,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY (saved_job_id) REFERENCES saved_jobs(saved_job_id),
+            FOREIGN KEY (user_id) REFERENCES users(user_id),
+            FOREIGN KEY (resume_profile_id) REFERENCES resume_profiles(resume_profile_id),
+            FOREIGN KEY (source_analysis_id) REFERENCES saved_job_analyses(saved_job_analysis_id),
+            UNIQUE (user_id, saved_job_id, version)
+        );
+
+        CREATE TABLE IF NOT EXISTS interview_preparations (
+            preparation_id TEXT PRIMARY KEY,
+            saved_job_id TEXT NOT NULL,
+            user_id TEXT NOT NULL,
+            resume_profile_id TEXT,
+            source_analysis_id TEXT,
+            status TEXT NOT NULL,
+            skill_gaps_json TEXT NOT NULL DEFAULT '[]',
+            questions_json TEXT NOT NULL DEFAULT '[]',
+            answers_json TEXT NOT NULL DEFAULT '[]',
+            learning_resources_json TEXT NOT NULL DEFAULT '[]',
+            recommendations_json TEXT NOT NULL DEFAULT '[]',
+            analysis_mode TEXT NOT NULL,
+            analysis_provider TEXT,
+            fallback_reason TEXT,
+            resource_mode TEXT NOT NULL DEFAULT 'none',
+            resource_warning TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY (saved_job_id) REFERENCES saved_jobs(saved_job_id),
+            FOREIGN KEY (user_id) REFERENCES users(user_id),
+            FOREIGN KEY (resume_profile_id) REFERENCES resume_profiles(resume_profile_id),
+            FOREIGN KEY (source_analysis_id) REFERENCES saved_job_analyses(saved_job_analysis_id),
+            UNIQUE (user_id, saved_job_id)
+        );
+
         CREATE TABLE IF NOT EXISTS search_missions (
             search_mission_id TEXT PRIMARY KEY,
             user_id TEXT NOT NULL,
@@ -451,6 +501,11 @@ def init_database(connection: sqlite3.Connection) -> None:
     _ensure_column(connection, "job_search_runs", "llm_enabled", "INTEGER DEFAULT 0")
     _ensure_column(connection, "job_search_runs", "search_provider", "TEXT")
     _ensure_column(connection, "job_search_runs", "error_message", "TEXT")
+    _ensure_column(connection, "job_search_runs", "search_mission_id", "TEXT")
+    _ensure_column(connection, "job_search_runs", "search_mission_revision", "INTEGER")
+    _ensure_column(connection, "job_search_runs", "mission_constraints_json", "TEXT DEFAULT '[]'")
+    _ensure_column(connection, "job_search_runs", "mission_excluded_roles_json", "TEXT DEFAULT '[]'")
+    _ensure_column(connection, "job_search_runs", "mission_ranking_priorities_json", "TEXT DEFAULT '[]'")
     _ensure_column(connection, "job_search_trace_steps", "details_json", "TEXT DEFAULT '{}'")
     _ensure_column(connection, "parsed_resume_reviews", "analysis_mode", "TEXT DEFAULT 'deterministic'")
     _ensure_column(connection, "parsed_resume_reviews", "analysis_provider", "TEXT")
@@ -607,6 +662,10 @@ def _ensure_indexes(connection: sqlite3.Connection) -> None:
             ON job_search_result_feedback(user_id, job_search_run_id, updated_at);
         CREATE INDEX IF NOT EXISTS idx_saved_job_status_events_job_id
             ON saved_job_status_events(user_id, saved_job_id, changed_at);
+        CREATE INDEX IF NOT EXISTS idx_job_briefs_job_id
+            ON job_briefs(user_id, saved_job_id, version);
+        CREATE INDEX IF NOT EXISTS idx_interview_preparations_job_id
+            ON interview_preparations(user_id, saved_job_id, updated_at);
         CREATE INDEX IF NOT EXISTS idx_search_missions_user_session
             ON search_missions(user_id, session_id, status);
         """

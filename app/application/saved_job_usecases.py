@@ -1,8 +1,18 @@
 from __future__ import annotations
 
+import asyncio
+
 from app.repositories.job_search_repository import (
     JobSearchRepository,
     job_search_repository,
+)
+from app.repositories.job_brief_repository import (
+    JobBriefRepository,
+    job_brief_repository,
+)
+from app.repositories.interview_preparation_repository import (
+    InterviewPreparationRepository,
+    interview_preparation_repository,
 )
 from app.repositories.resume_profile_repository import (
     ResumeProfileRepository,
@@ -13,6 +23,12 @@ from app.repositories.saved_job_repository import (
     saved_job_repository,
 )
 from app.schemas.job_search import JobSearchResult
+from app.schemas.job_brief import JobBrief, JobBriefGenerateRequest
+from app.schemas.interview_preparation import (
+    InterviewPreparationWorkspace,
+    PreparationAnswerRequest,
+    PreparationGenerateRequest,
+)
 from app.schemas.saved_job import (
     SavedJob,
     SavedJobAnalysis,
@@ -23,6 +39,17 @@ from app.schemas.saved_job import (
     SavedJobStatusEvent,
 )
 from app.services.errors import JobAgentError
+from app.services.job_brief_generator import generate_job_brief_content
+from app.services.interview_preparation_generator import (
+    build_external_prompt,
+    generate_preparation_questions,
+    generate_recommendations,
+)
+from app.services.learning_resource_search import (
+    OfficialCatalogResourceSearch,
+    resolve_learning_resource_search,
+)
+from app.services.llm_provider import resolve_llm_provider
 
 
 def list_saved_jobs(
@@ -77,6 +104,187 @@ def list_saved_job_status_events(
     return repository.list_status_events(user_id=user_id, saved_job_id=saved_job_id)
 
 
+def list_job_briefs(
+    saved_job_id: str,
+    *,
+    user_id: str,
+    saved_jobs: SavedJobRepository = saved_job_repository,
+    briefs: JobBriefRepository = job_brief_repository,
+) -> list[JobBrief]:
+    if saved_jobs.get(user_id=user_id, saved_job_id=saved_job_id) is None:
+        raise _not_found()
+    return briefs.list_by_job(user_id=user_id, saved_job_id=saved_job_id)
+
+
+def generate_job_brief(
+    saved_job_id: str,
+    payload: JobBriefGenerateRequest,
+    *,
+    user_id: str,
+    saved_jobs: SavedJobRepository = saved_job_repository,
+    resume_profiles: ResumeProfileRepository = resume_profile_repository,
+    briefs: JobBriefRepository = job_brief_repository,
+) -> JobBrief:
+    job = saved_jobs.get(user_id=user_id, saved_job_id=saved_job_id)
+    if job is None:
+        raise _not_found()
+    analysis = saved_jobs.latest_analysis(user_id=user_id, saved_job_id=saved_job_id)
+    profile_id = payload.resume_profile_id or (analysis.resume_profile_id if analysis else None)
+    profile = None
+    if profile_id is not None:
+        profile = resume_profiles.get(user_id=user_id, resume_profile_id=profile_id)
+        if profile is None or profile.archived_at is not None:
+            raise JobAgentError(
+                message="Resume profile not found or archived.",
+                error_code="resume_profile_not_found",
+                status_code=404,
+            )
+    else:
+        profile = next(
+            (item for item in resume_profiles.list_by_user(user_id) if item.is_default),
+            None,
+        )
+    resolution = resolve_llm_provider(payload.llm_provider)
+    content, mode, fallback_reason = generate_job_brief_content(
+        job, profile, analysis, llm_service=resolution.service
+    )
+    return briefs.create(
+        user_id=user_id,
+        saved_job_id=saved_job_id,
+        resume_profile_id=profile.resume_profile_id if profile else None,
+        source_analysis_id=analysis.saved_job_analysis_id if analysis else None,
+        content=content,
+        analysis_mode=mode,
+        analysis_provider=resolution.provider,
+        fallback_reason=fallback_reason,
+    )
+
+
+async def generate_interview_preparation(
+    saved_job_id: str,
+    payload: PreparationGenerateRequest,
+    *,
+    user_id: str,
+    saved_jobs: SavedJobRepository = saved_job_repository,
+    resume_profiles: ResumeProfileRepository = resume_profile_repository,
+    preparations: InterviewPreparationRepository = interview_preparation_repository,
+) -> InterviewPreparationWorkspace:
+    job = saved_jobs.get(user_id=user_id, saved_job_id=saved_job_id)
+    if job is None:
+        raise _not_found()
+    analysis = saved_jobs.latest_analysis(user_id=user_id, saved_job_id=saved_job_id)
+    profile = _resolve_preparation_profile(
+        user_id=user_id, requested_id=payload.resume_profile_id,
+        analysis=analysis, resume_profiles=resume_profiles,
+    )
+    resolution = resolve_llm_provider(payload.llm_provider)
+    gaps, questions, mode, fallback_reason = generate_preparation_questions(
+        job, profile, analysis, llm_service=resolution.service
+    )
+    resource_search, resource_mode = resolve_learning_resource_search()
+    topics = [
+        gap.skill for gap in gaps
+        if gap.skill_type == "knowledge"
+        and gap.importance in {"high", "medium"}
+        and gap.evidence_status in {"partial", "unknown", "missing"}
+    ][:3]
+    results = await asyncio.gather(
+        *(resource_search.search(topic, limit=2) for topic in topics),
+        return_exceptions=True,
+    )
+    resources = []
+    warnings = []
+    catalog = OfficialCatalogResourceSearch()
+    for topic, result in zip(topics, results):
+        if isinstance(result, Exception):
+            warnings.append(f"{topic}: {type(result).__name__}")
+            resources.extend(await catalog.search(topic, limit=2))
+        else:
+            resources.extend(result or await catalog.search(topic, limit=2))
+    if warnings and resource_mode == "mcp":
+        resource_mode = "mcp_fallback"
+    return preparations.create(
+        user_id=user_id, saved_job_id=saved_job_id,
+        resume_profile_id=profile.resume_profile_id if profile else None,
+        source_analysis_id=analysis.saved_job_analysis_id if analysis else None,
+        skill_gaps=gaps, questions=questions, learning_resources=resources[:6],
+        analysis_mode=mode, analysis_provider=resolution.provider,
+        fallback_reason=fallback_reason, resource_mode=resource_mode,
+        resource_warning="; ".join(warnings) or None,
+    )
+
+
+def get_interview_preparation(
+    saved_job_id: str, *, user_id: str,
+    saved_jobs: SavedJobRepository = saved_job_repository,
+    preparations: InterviewPreparationRepository = interview_preparation_repository,
+) -> InterviewPreparationWorkspace:
+    if saved_jobs.get(user_id=user_id, saved_job_id=saved_job_id) is None:
+        raise _not_found()
+    item = preparations.get(user_id=user_id, saved_job_id=saved_job_id)
+    if item is None:
+        raise JobAgentError(
+            message="Interview preparation workspace not found.",
+            error_code="interview_preparation_not_found", status_code=404,
+        )
+    return item
+
+
+def complete_interview_preparation(
+    saved_job_id: str, payload: PreparationAnswerRequest, *, user_id: str,
+    preparations: InterviewPreparationRepository = interview_preparation_repository,
+) -> InterviewPreparationWorkspace:
+    item = get_interview_preparation(saved_job_id, user_id=user_id, preparations=preparations)
+    valid_ids = {question.question_id for question in item.questions}
+    if not payload.answers or any(answer.question_id not in valid_ids for answer in payload.answers):
+        raise JobAgentError(
+            message="Answers must reference questions in this preparation workspace.",
+            error_code="preparation_answer_invalid", status_code=400,
+        )
+    resolution = resolve_llm_provider(payload.llm_provider)
+    recommendations, mode, fallback_reason = generate_recommendations(
+        item.skill_gaps, item.questions, payload.answers, llm_service=resolution.service
+    )
+    return preparations.complete(
+        item, answers=payload.answers, recommendations=recommendations,
+        analysis_mode=mode, analysis_provider=resolution.provider,
+        fallback_reason=fallback_reason,
+    )
+
+
+def export_interview_preparation_prompt(
+    saved_job_id: str, *, user_id: str,
+    saved_jobs: SavedJobRepository = saved_job_repository,
+    resume_profiles: ResumeProfileRepository = resume_profile_repository,
+    preparations: InterviewPreparationRepository = interview_preparation_repository,
+) -> str:
+    item = get_interview_preparation(
+        saved_job_id, user_id=user_id, saved_jobs=saved_jobs, preparations=preparations
+    )
+    job = get_saved_job(saved_job_id, user_id=user_id, repository=saved_jobs)
+    profile = (
+        resume_profiles.get(user_id=user_id, resume_profile_id=item.resume_profile_id)
+        if item.resume_profile_id else None
+    )
+    return build_external_prompt(job, profile, item.skill_gaps, item.questions)
+
+
+def _resolve_preparation_profile(
+    *, user_id: str, requested_id: str | None, analysis: SavedJobAnalysis | None,
+    resume_profiles: ResumeProfileRepository,
+):
+    profile_id = requested_id or (analysis.resume_profile_id if analysis else None)
+    if profile_id:
+        profile = resume_profiles.get(user_id=user_id, resume_profile_id=profile_id)
+        if profile is None or profile.archived_at is not None:
+            raise JobAgentError(
+                message="Resume profile not found or archived.",
+                error_code="resume_profile_not_found", status_code=404,
+            )
+        return profile
+    return next((item for item in resume_profiles.list_by_user(user_id) if item.is_default), None)
+
+
 def update_saved_job(
     saved_job_id: str,
     payload: SavedJobUpdateRequest,
@@ -100,6 +308,16 @@ def archive_saved_job(
     if job is None:
         raise _not_found()
     return job
+
+
+def delete_saved_job(
+    saved_job_id: str,
+    *,
+    user_id: str,
+    repository: SavedJobRepository = saved_job_repository,
+) -> None:
+    if not repository.delete(user_id=user_id, saved_job_id=saved_job_id):
+        raise _not_found()
 
 
 def save_job_from_search_result(

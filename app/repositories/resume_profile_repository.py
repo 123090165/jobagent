@@ -261,8 +261,86 @@ class ResumeProfileRepository:
                 """,
                 (now, now, user_id, resume_profile_id),
             )
+            if existing.is_default:
+                replacement = connection.execute(
+                    """
+                    SELECT resume_profile_id FROM resume_profiles
+                    WHERE user_id = ? AND resume_profile_id != ? AND archived_at IS NULL
+                    ORDER BY updated_at DESC LIMIT 1
+                    """,
+                    (user_id, resume_profile_id),
+                ).fetchone()
+                if replacement is not None:
+                    connection.execute(
+                        "UPDATE resume_profiles SET is_default = 1 WHERE user_id = ? AND resume_profile_id = ?",
+                        (user_id, replacement["resume_profile_id"]),
+                    )
             connection.commit()
         return self.get(user_id=user_id, resume_profile_id=resume_profile_id)
+
+    def restore(self, *, user_id: str, resume_profile_id: str) -> ResumeProfile | None:
+        existing = self.get(user_id=user_id, resume_profile_id=resume_profile_id)
+        if existing is None:
+            return None
+        now = _utc_now().isoformat()
+        with get_connection() as connection:
+            init_database(connection)
+            connection.execute(
+                """
+                UPDATE resume_profiles
+                SET archived_at = NULL, updated_at = ?
+                WHERE user_id = ? AND resume_profile_id = ?
+                """,
+                (now, user_id, resume_profile_id),
+            )
+            connection.commit()
+        restored = self.get(user_id=user_id, resume_profile_id=resume_profile_id)
+        if restored is not None and not self._has_active_default(user_id):
+            return self.set_default(user_id=user_id, resume_profile_id=resume_profile_id)
+        return restored
+
+    def delete(self, *, user_id: str, resume_profile_id: str) -> bool:
+        existing = self.get(user_id=user_id, resume_profile_id=resume_profile_id)
+        if existing is None:
+            return False
+        with get_connection() as connection:
+            init_database(connection)
+            connection.execute(
+                "UPDATE interview_preparations SET resume_profile_id = NULL WHERE user_id = ? AND resume_profile_id = ?",
+                (user_id, resume_profile_id),
+            )
+            connection.execute(
+                "UPDATE job_briefs SET resume_profile_id = NULL WHERE user_id = ? AND resume_profile_id = ?",
+                (user_id, resume_profile_id),
+            )
+            connection.execute(
+                "UPDATE saved_job_analyses SET resume_profile_id = NULL WHERE user_id = ? AND resume_profile_id = ?",
+                (user_id, resume_profile_id),
+            )
+            connection.execute(
+                "UPDATE job_search_result_feedback SET resume_profile_id = NULL WHERE user_id = ? AND resume_profile_id = ?",
+                (user_id, resume_profile_id),
+            )
+            cursor = connection.execute(
+                "DELETE FROM resume_profiles WHERE user_id = ? AND resume_profile_id = ?",
+                (user_id, resume_profile_id),
+            )
+            if existing.is_default:
+                replacement = connection.execute(
+                    """
+                    SELECT resume_profile_id FROM resume_profiles
+                    WHERE user_id = ? AND archived_at IS NULL
+                    ORDER BY updated_at DESC LIMIT 1
+                    """,
+                    (user_id,),
+                ).fetchone()
+                if replacement is not None:
+                    connection.execute(
+                        "UPDATE resume_profiles SET is_default = 1 WHERE user_id = ? AND resume_profile_id = ?",
+                        (user_id, replacement["resume_profile_id"]),
+                    )
+            connection.commit()
+        return cursor.rowcount > 0
 
     def _update_from_confirmed(
         self,
