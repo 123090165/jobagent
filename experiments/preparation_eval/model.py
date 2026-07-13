@@ -3,13 +3,22 @@ from __future__ import annotations
 import os
 from typing import Protocol
 
+from app.services.llm_observability import llm_observation_context
 from app.services.llm_service import LLMConfig, LLMService
 
 
 class EvaluationModel(Protocol):
     model_name: str
 
-    def generate_json(self, *, system_prompt: str, user_prompt: str) -> dict[str, object]: ...
+    def generate_json(
+        self,
+        *,
+        system_prompt: str,
+        user_prompt: str,
+        observation_name: str = "evaluation.generate",
+        observation_metadata: dict[str, object] | None = None,
+        context_parts: dict[str, object] | None = None,
+    ) -> dict[str, object]: ...
 
 
 class OpenAICompatibleEvaluationModel:
@@ -30,11 +39,24 @@ class OpenAICompatibleEvaluationModel:
             temperature=_float_env("JOBAGENT_EVAL_TEMPERATURE", 0.2),
         ))
 
-    def generate_json(self, *, system_prompt: str, user_prompt: str) -> dict[str, object]:
-        return self._service.chat_completion_json(
-            system_prompt=system_prompt,
-            user_prompt=user_prompt,
-        )
+    def generate_json(
+        self,
+        *,
+        system_prompt: str,
+        user_prompt: str,
+        observation_name: str = "evaluation.generate",
+        observation_metadata: dict[str, object] | None = None,
+        context_parts: dict[str, object] | None = None,
+    ) -> dict[str, object]:
+        with llm_observation_context(
+            observation_name,
+            metadata=observation_metadata,
+            context_parts=context_parts,
+        ):
+            return self._service.chat_completion_json(
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+            )
 
 
 def _float_env(name: str, default: float) -> float:

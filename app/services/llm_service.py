@@ -7,6 +7,11 @@ import urllib.request
 from dataclasses import dataclass
 from typing import Any
 
+from app.services.llm_observability import (
+    langfuse_generation,
+    update_langfuse_generation,
+)
+
 
 class LLMServiceError(RuntimeError):
     """Raised when the LLM service cannot return a usable response."""
@@ -66,9 +71,20 @@ class LLMService:
             "temperature": self.config.temperature,
             "response_format": {"type": "json_object"},
         }
-        raw_response = self._post_chat_completions(payload)
-        content = _extract_message_content(raw_response)
-        return parse_json_object(content, expected_root_key=expected_root_key)
+        with langfuse_generation(
+            model=self.config.model,
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+        ) as generation:
+            raw_response = self._post_chat_completions(payload)
+            content = _extract_message_content(raw_response)
+            parsed = parse_json_object(content, expected_root_key=expected_root_key)
+            update_langfuse_generation(
+                generation,
+                output=parsed,
+                usage=raw_response.get("usage"),
+            )
+            return parsed
 
     def _post_chat_completions(self, payload: dict[str, Any]) -> dict[str, Any]:
         endpoint = f"{self.config.base_url.rstrip('/')}/chat/completions"

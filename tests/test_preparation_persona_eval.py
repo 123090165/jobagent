@@ -10,6 +10,8 @@ from app.repositories.resume_profile_repository import resume_profile_repository
 from app.repositories.saved_job_repository import saved_job_repository
 from experiments.preparation_eval.agent import (
     PreparationEvaluationAgent,
+    _candidate_context,
+    _check_specific_fact_grounding,
     _normalize_persona_response,
 )
 from experiments.preparation_eval.schemas import CandidateSelfAssessment
@@ -38,10 +40,83 @@ def test_persona_confidence_normalizes_compound_label() -> None:
     assert response["skill_calibrations"][0]["confidence"] == "medium"
 
 
+def test_candidate_context_excludes_private_notes_and_unrelated_profile_memory() -> None:
+    state = {
+        "evidence_memory": [
+            {"evidence_id": "profile.core_skills.0", "content": "PPG signal processing"},
+            {"evidence_id": "profile.supporting_skills.0", "content": "SQL"},
+        ],
+        "persona_memory": {
+            "archetype": "calibrated",
+            "confidence_style": "calibrated",
+            "communication_style": "balanced",
+            "disclosure_style": "honest",
+            "skill_calibrations": [{
+                "skill": "PPG signal processing",
+                "actual_level": "project_experience",
+                "confidence": "medium",
+                "private_notes": ["Used an unsupported private dataset"],
+                "evidence_refs": ["profile.core_skills.0"],
+                "scenario_fact_refs": ["scenario.ppg.1"],
+            }],
+            "synthetic_scenario_memory": [{
+                "fact_id": "scenario.ppg.1",
+                "statement": "Offline PPG project only",
+                "allowed_in_candidate_answer": True,
+                "evidence_refs": ["profile.core_skills.0"],
+            }],
+        },
+        "episodic_memory": [],
+        "job_context": {"saved_job_id": "j1", "title": "Engineer", "raw_jd_text": "long"},
+    }
+    question = {"question_id": "q1", "skill": "PPG signal processing"}
+
+    context = _candidate_context(state, question)  # type: ignore[arg-type]
+
+    serialized = json.dumps(context)
+    assert '"private_notes":' not in serialized
+    assert "unsupported private dataset" not in serialized
+    assert "profile.supporting_skills.0" not in serialized
+    assert "scenario.ppg.1" in serialized
+
+
+def test_grounding_checks_claims_against_direct_fact_content() -> None:
+    state = {
+        "evidence_memory": [{
+            "evidence_id": "profile.core_skills.0",
+            "content": "ECG signal processing",
+        }],
+        "persona_memory": {"synthetic_scenario_memory": []},
+        "episodic_memory": [{
+            "skill": "ECG signal processing",
+            "detail": "I used MIT-BIH for QRS detection.",
+            "fact_refs": ["profile.core_skills.0"],
+            "claims": [{
+                "claim": "Used MIT-BIH for QRS detection",
+                "fact_refs": ["profile.core_skills.0"],
+            }],
+        }],
+    }
+
+    passed, detail = _check_specific_fact_grounding(state)  # type: ignore[arg-type]
+
+    assert passed is False
+    assert "mit-bih" in detail
+    assert "qrs" in detail
+
+
 class FakeEvaluationModel:
     model_name = "fake-evaluator"
 
-    def generate_json(self, *, system_prompt: str, user_prompt: str) -> dict[str, object]:
+    def generate_json(
+        self,
+        *,
+        system_prompt: str,
+        user_prompt: str,
+        observation_name: str = "evaluation.generate",
+        observation_metadata: dict[str, object] | None = None,
+        context_parts: dict[str, object] | None = None,
+    ) -> dict[str, object]:
         context = json.loads(user_prompt.split("\n", 1)[1])
         if "stable hidden persona" in system_prompt:
             return {
@@ -139,4 +214,4 @@ def test_persona_agent_uses_profile_memory_and_self_reflects(monkeypatch, tmp_pa
     assert report.episodic_memory
     assert report.preparation_result["status"] == "completed"
     assert report.self_assessment.truthfulness == 5
-    assert report.passed is True
+    assert report.passed is True, report.rule_checks

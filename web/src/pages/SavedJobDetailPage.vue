@@ -219,6 +219,10 @@ function formatValue(value: unknown): string {
   if (value && typeof value === "object") return JSON.stringify(value);
   return String(value ?? "Not set");
 }
+
+function preparationResource(url: string) {
+  return preparation.value?.learning_resources.find((item) => item.url === url);
+}
 </script>
 
 <template>
@@ -350,6 +354,12 @@ function formatValue(value: unknown): string {
                   <article v-for="item in preparation.recommendations" :key="item.title">
                     <div class="job-card-header"><strong>{{ item.title }}</strong><n-tag size="small">{{ item.action_type.replace(/_/g, ' ') }}</n-tag></div>
                     <p>{{ item.action }}</p>
+                    <div v-if="item.resource_urls.length" class="learning-resource-list">
+                      <a v-for="url in item.resource_urls" :key="url" :href="url" target="_blank" rel="noreferrer">
+                        <strong>{{ preparationResource(url)?.title || 'Linked learning resource' }}</strong>
+                        <span>{{ preparationResource(url)?.source || url }}</span>
+                      </a>
+                    </div>
                   </article>
                 </div>
               </section>

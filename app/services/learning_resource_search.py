@@ -108,7 +108,9 @@ class CatalogFirstResourceSearch:
 
     async def search(self, topic: str, *, limit: int = 2) -> list[LearningResource]:
         curated = await self.catalog.search(topic, limit=limit)
-        if len(curated) >= limit or self.remote is None:
+        # A curated hit is already sufficient. Remote search is discovery for
+        # uncovered topics, not a requirement that can invalidate local results.
+        if curated or self.remote is None:
             return curated
         discovered = await self.remote.search(topic, limit=limit - len(curated))
         seen = {item.url for item in curated}

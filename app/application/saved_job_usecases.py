@@ -54,6 +54,7 @@ from app.services.learning_resource_search import (
     resolve_learning_resource_search,
 )
 from app.services.llm_provider import resolve_llm_provider
+from app.services.llm_observability import langfuse_span
 from app.services.preparation_agent import preparation_agent
 
 
@@ -301,6 +302,7 @@ async def complete_interview_preparation(
         recommendation_generation,
     )
     resources, resource_mode, resource_warning = resource_result
+    recommendations = _bind_resources_to_recommendations(recommendations, resources)
     return preparations.complete(
         item.model_copy(update={"skill_gaps": updated_gaps}),
         answers=normalized_answers, recommendations=recommendations,
@@ -362,6 +364,7 @@ def _apply_preparation_answers(skill_gaps, questions, answers):
         updated.append(gap.model_copy(update={
             "evidence_status": evidence_status,
             "evidence_origin": "user_reported",
+            "skill_type": "knowledge" if answer.route == "learning" else gap.skill_type,
         }))
     return updated
 
@@ -392,23 +395,53 @@ async def _resources_for_preparation_answers(gaps, questions, answers):
         gap.skill for gap in gaps
         if gap.skill in skills and gap.skill_type == "knowledge"
     ][:3]
-    search, mode = resolve_learning_resource_search()
-    results = await asyncio.gather(
-        *(search.search(topic, limit=2) for topic in topics),
-        return_exceptions=True,
-    )
-    resources = []
-    warnings = []
-    catalog = OfficialCatalogResourceSearch()
-    for topic, result in zip(topics, results):
-        if isinstance(result, Exception):
-            warnings.append(f"{topic}: {resource_error_summary(result)}")
-            resources.extend(await catalog.search(topic, limit=2))
-        else:
-            resources.extend(result or await catalog.search(topic, limit=2))
-    if warnings and mode == "catalog_mcp":
-        mode = "catalog_mcp_fallback"
-    return resources[:6], mode if topics else "not_needed", "; ".join(warnings) or None
+    with langfuse_span(
+        "preparation.search_learning_resources",
+        as_type="retriever",
+        metadata={"topics": topics, "topic_count": len(topics)},
+    ) as span:
+        search, mode = resolve_learning_resource_search()
+        results = await asyncio.gather(
+            *(search.search(topic, limit=2) for topic in topics),
+            return_exceptions=True,
+        )
+        resources = []
+        warnings = []
+        catalog = OfficialCatalogResourceSearch()
+        for topic, result in zip(topics, results):
+            if isinstance(result, Exception):
+                warnings.append(f"{topic}: {resource_error_summary(result)}")
+                resources.extend(await catalog.search(topic, limit=2))
+            else:
+                resources.extend(result or await catalog.search(topic, limit=2))
+        if warnings and mode == "catalog_mcp":
+            mode = "catalog_mcp_fallback"
+        if span is not None:
+            span.update(output={
+                "resource_count": len(resources[:6]),
+                "mode": mode if topics else "not_needed",
+                "warning_count": len(warnings),
+            })
+        return resources[:6], mode if topics else "not_needed", "; ".join(warnings) or None
+
+
+def _bind_resources_to_recommendations(recommendations, resources):
+    resources_by_topic = {}
+    for resource in resources:
+        resources_by_topic.setdefault(resource.topic.casefold(), []).append(resource)
+    bound = []
+    for item in recommendations:
+        matches = resources_by_topic.get((item.skill or "").casefold(), [])
+        if item.action_type != "learning" or not matches:
+            bound.append(item)
+            continue
+        urls = [resource.url for resource in matches]
+        titles = ", ".join(f'"{resource.title}"' for resource in matches)
+        bound.append(item.model_copy(update={
+            "resource_urls": urls,
+            "action": f"{item.action.rstrip()} Start with the linked resource(s): {titles}.",
+        }))
+    return bound
 
 
 def export_interview_preparation_prompt(

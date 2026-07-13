@@ -117,6 +117,7 @@ export interface PreparationAnswerOption {
   route: "ask_evidence" | "learning" | "capability_gap" | "clarify" | "next_skill";
   detail_policy: "required" | "optional" | "not_needed";
   follow_up_prompt: string | null;
+  decision_dimension: string;
 }
 
 export interface PreparationQuestion {
@@ -157,6 +158,7 @@ export interface PreparationRecommendation {
   action_type: "learning" | "experience_inventory" | "interview_story" | "capability_gap";
   skill: string | null;
   evidence_basis: string[];
+  resource_urls: string[];
 }
 
 export interface PreparationGenerationStage {

@@ -12,6 +12,7 @@ Judge whether the result helped this specific imperfect candidate:
 7. Distinguish internal consistency with tagged synthetic scenario facts from grounding in resume evidence. Do not call a synthetic fact resume-supported.
 
 Be critical. Do not increase a score merely because you generated the earlier answers. Cite concrete output items in helpful_items, unhelpful_items, misunderstandings, and missing_support. Return JSON only.
+The deterministic rule checks are authoritative for grounding and workflow invariants. If a grounding or required-resource check failed, do not award a perfect truthfulness or actionability score.
 
 Every score must be an integer from 0 through 5. Use 0 when the result provided no value at all for that dimension and 5 only when it was exceptionally useful.
 

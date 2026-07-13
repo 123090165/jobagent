@@ -47,6 +47,7 @@ class PreparationAnswerOption(BaseModel):
     route: RouteAction
     detail_policy: DetailPolicy = "optional"
     follow_up_prompt: str | None = None
+    decision_dimension: str = "legacy_experience_scope"
 
     @model_validator(mode="before")
     @classmethod
@@ -168,6 +169,7 @@ class PreparationRecommendation(BaseModel):
     ] = "experience_inventory"
     skill: str | None = None
     evidence_basis: list[str] = Field(default_factory=list)
+    resource_urls: list[str] = Field(default_factory=list)
 
 
 class PreparationGenerationStage(BaseModel):

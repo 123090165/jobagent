@@ -18,6 +18,8 @@ Question rules:
 - Ask questions only for partial, unknown, or missing evidence that could materially change preparation advice.
 - Ask one bounded calibration question first. Its options should let the candidate locate their real situation without having to compose a polished narrative.
 - Generate 2-6 options specifically for that skill and JD requirement. Do not repeat a generic experience scale verbatim across every question.
+- Every option must contain `decision_dimension`, naming the skill-specific boundary it tests. Each question must use at least two distinct dimensions. Generic values such as `experience_level`, `experience_scope`, and `current_level` are invalid.
+- Examples of useful dimensions: PPG `motion_artifact_handling` and `signal_quality_evaluation`; ECG `qrs_detection` and `lead_or_noise_scope`; multimodal fusion `time_alignment` and `fusion_architecture`; blood pressure `calibration_and_validation`; data pipelines `automation_and_reproducibility`.
 - Each option must state its expected evidence transition and route. The backend owns and validates the transition vocabulary; you only propose a valid route.
 - Use `ask_evidence` only when a concrete example could support the claim. Supply a focused `follow_up_prompt` and set `detail_policy` to `required` or `optional`.
 - Use `learning` for a knowledge gap, `capability_gap` for an explicitly absent current capability, `clarify` when the option means the situation is ambiguous, and `next_skill` when no further detail is useful.
@@ -66,7 +68,8 @@ Example JSON output shape:
           "evidence_transition": "supported",
           "route": "ask_evidence",
           "detail_policy": "required",
-          "follow_up_prompt": "Which stage did you own, what signal-quality problem did you address, and how did you evaluate it?"
+          "follow_up_prompt": "Which stage did you own, what signal-quality problem did you address, and how did you evaluate it?",
+          "decision_dimension": "signal_quality_implementation"
         },
         {
           "option_id": "understand_ppg_methods",
@@ -76,7 +79,8 @@ Example JSON output shape:
           "evidence_transition": "partial",
           "route": "learning",
           "detail_policy": "not_needed",
-          "follow_up_prompt": null
+          "follow_up_prompt": null,
+          "decision_dimension": "conceptual_vs_hands_on"
         },
         {
           "option_id": "need_ppg_clarification",
@@ -86,7 +90,8 @@ Example JSON output shape:
           "evidence_transition": "unknown",
           "route": "clarify",
           "detail_policy": "optional",
-          "follow_up_prompt": "Which adjacent signal-processing work have you done, and which PPG-specific part is uncertain?"
+          "follow_up_prompt": "Which adjacent signal-processing work have you done, and which PPG-specific part is uncertain?",
+          "decision_dimension": "adjacent_signal_boundary"
         }
       ]
     }

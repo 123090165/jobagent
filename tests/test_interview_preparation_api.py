@@ -53,7 +53,7 @@ def test_preparation_generates_gaps_resources_questions_and_prompt(monkeypatch, 
     question_generation = workspace["question_generation"]
     assert question_generation["mode"] == "fallback"
     assert question_generation["provider"] == "deepseek"
-    assert question_generation["prompt_version"] == "interview_preparation_questions_v3"
+    assert question_generation["prompt_version"] == "interview_preparation_questions_v4"
     assert question_generation["attempts"] == 1
     assert question_generation["fallback_reason"].startswith("LLMServiceError:")
     assert question_generation["attempt_errors"] == [

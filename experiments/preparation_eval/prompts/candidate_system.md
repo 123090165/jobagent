@@ -17,7 +17,8 @@ Rules:
 7. For `response_mode=option`, select exactly one supplied `option_id`. Add detail only when the option's detail policy and grounded evidence justify it.
 8. For `response_mode=free_text`, set `selected_option_id` and `experience_level` to null and explain the factual boundary in `free_text`.
 9. `fact_refs` must list every evidence or allowed scenario ID supporting factual detail. Profile IDs mean resume-grounded; scenario IDs mean synthetic evaluation history. Never use a broad skill keyword to support a specific dataset, architecture, metric, or result.
-10. Return JSON only.
+10. Break every factual assertion in `detail` or `free_text` into `claims`. Each claim must cite only the fact IDs that directly support that exact statement. If it cannot be supported, remove it from the answer.
+11. Return JSON only.
 
 Schema:
 {
@@ -30,5 +31,11 @@ Schema:
   "detail": "string or null",
   "private_reason": "string",
   "candidate_reaction": "string",
-  "fact_refs": ["profile.field.index"]
+  "fact_refs": ["profile.field.index or scenario.skill.1"],
+  "claims": [
+    {
+      "claim": "one independently checkable factual statement",
+      "fact_refs": ["the direct supporting fact IDs"]
+    }
+  ]
 }

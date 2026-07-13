@@ -39,6 +39,11 @@ class CandidatePersona(BaseModel):
     synthetic_scenario_memory: list[SyntheticScenarioFact] = Field(default_factory=list)
 
 
+class CandidateClaim(BaseModel):
+    claim: str
+    fact_refs: list[str] = Field(default_factory=list)
+
+
 class CandidateTurn(BaseModel):
     question_id: str
     skill: str
@@ -50,6 +55,7 @@ class CandidateTurn(BaseModel):
     private_reason: str
     candidate_reaction: str
     fact_refs: list[str] = Field(default_factory=list)
+    claims: list[CandidateClaim] = Field(default_factory=list)
 
     @model_validator(mode="before")
     @classmethod

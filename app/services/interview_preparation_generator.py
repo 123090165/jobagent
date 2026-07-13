@@ -16,10 +16,11 @@ from app.schemas.interview_preparation import (
 from app.schemas.resume_profile import ResumeProfile
 from app.schemas.saved_job import SavedJob, SavedJobAnalysis
 from app.services.llm_provider import JSONChatLLM
+from app.services.llm_observability import llm_observation_context
 from app.services.llm_service import LLMServiceError
 
 
-QUESTIONS_PROMPT_VERSION = "interview_preparation_questions_v3"
+QUESTIONS_PROMPT_VERSION = "interview_preparation_questions_v4"
 RECOMMENDATIONS_PROMPT_VERSION = "interview_preparation_recommendations_v2"
 ANSWER_CLASSIFICATION_PROMPT_VERSION = "interview_preparation_answer_classification_v1"
 QUESTIONS_SYSTEM_PROMPT = load_prompt("interview_preparation/questions_system.md")
@@ -56,20 +57,31 @@ def generate_preparation_questions(
             attempts=0,
         )
 
-    user_prompt = json.dumps(_question_generation_memory(
+    generation_memory = _question_generation_memory(
         job, profile, analysis, fallback_gaps, fallback_questions
-    ), ensure_ascii=False)
+    )
+    user_prompt = json.dumps(generation_memory, ensure_ascii=False)
     errors: list[str] = []
     for attempt in range(1, 3):
         try:
-            response = llm_service.chat_completion_json(
-                system_prompt=_prompt_for_attempt(
-                    QUESTIONS_SYSTEM_PROMPT,
-                    attempt=attempt,
-                    expected_shape='{ "skill_gaps": [...], "questions": [...] }',
-                ),
-                user_prompt=user_prompt,
-            )
+            with llm_observation_context(
+                "preparation.generate_questions",
+                metadata={
+                    "stage": "question_generation",
+                    "attempt": attempt,
+                    "prompt_version": QUESTIONS_PROMPT_VERSION,
+                    "saved_job_id": job.saved_job_id,
+                },
+                context_parts=generation_memory,
+            ):
+                response = llm_service.chat_completion_json(
+                    system_prompt=_prompt_for_attempt(
+                        QUESTIONS_SYSTEM_PROMPT,
+                        attempt=attempt,
+                        expected_shape='{ "skill_gaps": [...], "questions": [...] }',
+                    ),
+                    user_prompt=user_prompt,
+                )
             raw_gaps = response.get("skill_gaps")
             raw_questions = response.get("questions")
             if not isinstance(raw_gaps, list) or not isinstance(raw_questions, list):
@@ -114,27 +126,34 @@ def generate_recommendations(
             attempts=0,
         )
 
-    user_prompt = json.dumps(
-        {
+    recommendation_memory = {
             "skill_gaps": [item.model_dump() for item in gaps],
             "questions": [item.model_dump() for item in questions],
             "user_answers": [item.model_dump() for item in answers],
             "deterministic_baseline": [item.model_dump() for item in fallback],
-        },
-        ensure_ascii=False,
-    )
+    }
+    user_prompt = json.dumps(recommendation_memory, ensure_ascii=False)
     errors: list[str] = []
     for attempt in range(1, 3):
         try:
-            response = llm_service.chat_completion_json(
-                system_prompt=_prompt_for_attempt(
-                    RECOMMENDATIONS_SYSTEM_PROMPT,
-                    attempt=attempt,
-                    expected_shape='{ "recommendations": [...] }',
-                ),
-                user_prompt=user_prompt,
-                expected_root_key="recommendations",
-            )
+            with llm_observation_context(
+                "preparation.generate_recommendations",
+                metadata={
+                    "stage": "recommendation_generation",
+                    "attempt": attempt,
+                    "prompt_version": RECOMMENDATIONS_PROMPT_VERSION,
+                },
+                context_parts=recommendation_memory,
+            ):
+                response = llm_service.chat_completion_json(
+                    system_prompt=_prompt_for_attempt(
+                        RECOMMENDATIONS_SYSTEM_PROMPT,
+                        attempt=attempt,
+                        expected_shape='{ "recommendations": [...] }',
+                    ),
+                    user_prompt=user_prompt,
+                    expected_root_key="recommendations",
+                )
             raw_items = response.get("recommendations")
             if not isinstance(raw_items, list):
                 raise TypeError("recommendations must be a JSON array")
@@ -218,11 +237,20 @@ def resolve_preparation_answers(
             ],
         }
         try:
-            response = llm_service.chat_completion_json(
-                system_prompt=ANSWER_CLASSIFICATION_SYSTEM_PROMPT,
-                user_prompt=json.dumps(payload, ensure_ascii=False),
-                expected_root_key="classifications",
-            )
+            with llm_observation_context(
+                "preparation.classify_free_text",
+                metadata={
+                    "stage": "answer_classification",
+                    "prompt_version": ANSWER_CLASSIFICATION_PROMPT_VERSION,
+                    "answer_count": len(free_text_answers),
+                },
+                context_parts=payload,
+            ):
+                response = llm_service.chat_completion_json(
+                    system_prompt=ANSWER_CLASSIFICATION_SYSTEM_PROMPT,
+                    user_prompt=json.dumps(payload, ensure_ascii=False),
+                    expected_root_key="classifications",
+                )
             for item in response.get("classifications", []):
                 if isinstance(item, dict):
                     classified[str(item.get("question_id") or "")] = str(
@@ -418,11 +446,22 @@ def _questions_with_ids(
             if not isinstance(item, dict):
                 raise TypeError(f"Question option {index} for {skill} must be an object")
             option = {**item}
+            if require_model_options and not str(item.get("decision_dimension") or "").strip():
+                raise ValueError(
+                    f"Question option {index} for {skill} needs a decision_dimension"
+                )
             option.setdefault(
                 "option_id",
                 str(uuid5(NAMESPACE_URL, f"{skill}:{prompt}:{index}:{item.get('value', '')}")),
             )
             options.append(PreparationAnswerOption.model_validate(option))
+        if require_model_options:
+            dimensions = {item.decision_dimension.casefold() for item in options}
+            generic = {"experience_level", "experience_scope", "current_level"}
+            if len(dimensions) < 2 or dimensions.issubset(generic):
+                raise ValueError(
+                    f"Question for {skill} uses generic rather than skill-specific dimensions"
+                )
         questions.append(PreparationQuestion(
             question_id=str(uuid5(NAMESPACE_URL, f"{skill}:{prompt}")),
             skill=skill, prompt=prompt,
@@ -448,6 +487,7 @@ def _fallback_options(gap: PreparationSkillGap) -> list[PreparationAnswerOption]
             route="ask_evidence",
             detail_policy="required",
             follow_up_prompt="What did you personally own, and how was the result evaluated?",
+            decision_dimension="delivery_ownership",
         ),
         PreparationAnswerOption(
             option_id="substantial_project",
@@ -458,6 +498,7 @@ def _fallback_options(gap: PreparationSkillGap) -> list[PreparationAnswerOption]
             route="ask_evidence",
             detail_policy="required",
             follow_up_prompt="What did you implement personally, and what evidence shows how it worked?",
+            decision_dimension="hands_on_implementation",
         ),
         PreparationAnswerOption(
             option_id="guided_practice",
@@ -468,6 +509,7 @@ def _fallback_options(gap: PreparationSkillGap) -> list[PreparationAnswerOption]
             route="learning",
             detail_policy="optional",
             follow_up_prompt="Which parts have you practised, and which still need hands-on work?",
+            decision_dimension="guided_practice_boundary",
         ),
         PreparationAnswerOption(
             option_id="concept_only",
@@ -477,6 +519,7 @@ def _fallback_options(gap: PreparationSkillGap) -> list[PreparationAnswerOption]
             evidence_transition="partial",
             route="learning",
             detail_policy="not_needed",
+            decision_dimension="conceptual_depth",
         ),
         PreparationAnswerOption(
             option_id="no_current_experience",
@@ -486,6 +529,7 @@ def _fallback_options(gap: PreparationSkillGap) -> list[PreparationAnswerOption]
             evidence_transition="missing",
             route="capability_gap",
             detail_policy="not_needed",
+            decision_dimension="current_capability_absence",
         ),
         PreparationAnswerOption(
             option_id="needs_context",
@@ -496,6 +540,7 @@ def _fallback_options(gap: PreparationSkillGap) -> list[PreparationAnswerOption]
             route="clarify",
             detail_policy="optional",
             follow_up_prompt="What part of the choices does not fit your actual situation?",
+            decision_dimension="unclassified_boundary",
         ),
     ]
 

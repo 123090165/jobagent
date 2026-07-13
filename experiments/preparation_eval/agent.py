@@ -19,6 +19,7 @@ from app.schemas.interview_preparation import (
     PreparationGenerateRequest,
 )
 from experiments.preparation_eval.model import EvaluationModel
+from app.services.llm_observability import langfuse_agent_trace, langfuse_span
 from experiments.preparation_eval.schemas import (
     CandidatePersona,
     CandidateSelfAssessment,
@@ -75,18 +76,24 @@ class PreparationEvaluationAgent:
         saved_job_origin_id: str | None = None,
         association_method: str = "explicit_profile",
     ) -> PreparationEvaluationReport:
-        state = await self._graph.ainvoke({
-            "user_id": user_id,
-            "profile_id": profile_id,
+        with langfuse_agent_trace("preparation-evaluation", metadata={
             "saved_job_id": saved_job_id,
-            "profile_memory": profile_memory,
-            "evidence_memory": _build_evidence_memory(profile_memory),
-            "job_context": job_context,
-            "question_index": 0,
-            "answers": [],
-            "episodic_memory": [],
-            "paused_once": False,
-        })
+            "profile_id": profile_id,
+            "preparation_provider": self.preparation_provider,
+            "evaluation_model": self.model.model_name,
+        }):
+            state = await self._graph.ainvoke({
+                "user_id": user_id,
+                "profile_id": profile_id,
+                "saved_job_id": saved_job_id,
+                "profile_memory": profile_memory,
+                "evidence_memory": _build_evidence_memory(profile_memory),
+                "job_context": job_context,
+                "question_index": 0,
+                "answers": [],
+                "episodic_memory": [],
+                "paused_once": False,
+            })
         checks = [RuleCheck.model_validate(item) for item in state["rule_checks"]]
         return PreparationEvaluationReport(
             evaluation_id=str(uuid4()),
@@ -129,20 +136,24 @@ class PreparationEvaluationAgent:
             },
         )
         builder.add_edge("pause_preparation", "answer_question")
-        builder.add_edge("finish_preparation", "self_reflect")
-        builder.add_edge("self_reflect", "rule_checks")
-        builder.add_edge("rule_checks", END)
+        builder.add_edge("finish_preparation", "rule_checks")
+        builder.add_edge("rule_checks", "self_reflect")
+        builder.add_edge("self_reflect", END)
         return builder.compile()
 
     def _build_persona(self, state: EvaluationState) -> EvaluationState:
+        context = {
+            "requested_archetype": self.persona_archetype,
+            "profile_memory": state["profile_memory"],
+            "evidence_memory": state["evidence_memory"],
+            "job_context": state["job_context"],
+        }
         response = self.model.generate_json(
             system_prompt=_prompt("persona_system.md"),
-            user_prompt=_json_prompt({
-                "requested_archetype": self.persona_archetype,
-                "profile_memory": state["profile_memory"],
-                "evidence_memory": state["evidence_memory"],
-                "job_context": state["job_context"],
-            }),
+            user_prompt=_json_prompt(context),
+            observation_name="evaluation.build_persona",
+            observation_metadata={"stage": "persona_generation"},
+            context_parts=context,
         )
         persona = CandidatePersona.model_validate(_normalize_persona_response(response))
         _validate_persona_memory(persona, state["evidence_memory"])
@@ -163,16 +174,18 @@ class PreparationEvaluationAgent:
         questions = state["preparation"]["questions"]
         index = state.get("question_index", 0)
         question = questions[index]
+        candidate_context = _candidate_context(state, question)
         response = self.model.generate_json(
             system_prompt=_prompt("candidate_system.md"),
-            user_prompt=_json_prompt({
-                "profile_memory": state["profile_memory"],
-                "evidence_memory": state["evidence_memory"],
-                "persona_memory": state["persona_memory"],
-                "episodic_memory": state.get("episodic_memory", []),
-                "job_context": state["job_context"],
-                "current_question": question,
-            }),
+            user_prompt=_json_prompt(candidate_context),
+            observation_name="evaluation.answer_question",
+            observation_metadata={
+                "stage": "candidate_answer",
+                "question_id": question["question_id"],
+                "question_index": index,
+                "skill": question["skill"],
+            },
+            context_parts=candidate_context,
         )
         turn = CandidateTurn.model_validate({
             **response,
@@ -211,7 +224,11 @@ class PreparationEvaluationAgent:
                 response_mode="free_text",
                 free_text=turn.free_text,
             )
-        _validate_turn_refs(turn.fact_refs, state["evidence_memory"], state["persona_memory"])
+        _validate_turn_refs(
+            [*turn.fact_refs, *(ref for claim in turn.claims for ref in claim.fact_refs)],
+            state["evidence_memory"],
+            state["persona_memory"],
+        )
         return {
             "answers": [*state.get("answers", []), answer.model_dump(mode="json")],
             "episodic_memory": [
@@ -258,16 +275,20 @@ class PreparationEvaluationAgent:
         return {"preparation": workspace.model_dump(mode="json")}
 
     def _self_reflect(self, state: EvaluationState) -> EvaluationState:
+        reflection_context = {
+            "evidence_memory": state["evidence_memory"],
+            "persona_memory": state["persona_memory"],
+            "episodic_memory": _compact_episodic_memory(state["episodic_memory"]),
+            "job_context": _compact_job_context(state["job_context"]),
+            "preparation_result": _reflection_preparation_view(state["preparation"]),
+            "deterministic_rule_checks": state["rule_checks"],
+        }
         response = self.model.generate_json(
             system_prompt=_prompt("reflection_system.md"),
-            user_prompt=_json_prompt({
-                "profile_memory": state["profile_memory"],
-                "evidence_memory": state["evidence_memory"],
-                "persona_memory": state["persona_memory"],
-                "episodic_memory": state["episodic_memory"],
-                "job_context": state["job_context"],
-                "preparation_result": state["preparation"],
-            }),
+            user_prompt=_json_prompt(reflection_context),
+            observation_name="evaluation.self_reflection",
+            observation_metadata={"stage": "candidate_judge"},
+            context_parts=reflection_context,
         )
         assessment = CandidateSelfAssessment.model_validate(response)
         return {"self_assessment": assessment.model_dump(mode="json")}
@@ -290,13 +311,34 @@ class PreparationEvaluationAgent:
         resource_topics_valid = all(
             str(item.get("topic", "")).casefold() in learning_skills for item in resources
         )
+        gap_by_skill = {
+            str(item.get("skill", "")).casefold(): item
+            for item in result.get("skill_gaps", [])
+        }
         required_learning_skills = {
             question_by_id[item["question_id"]]["skill"].casefold()
             for item in result.get("answers", [])
             if item.get("route") == "learning"
             and item.get("question_id") in question_by_id
+            and gap_by_skill.get(
+                str(question_by_id[item["question_id"]]["skill"]).casefold(), {}
+            ).get("skill_type") == "knowledge"
         }
-        grounded, grounding_detail = _check_specific_fact_grounding(state)
+        covered_learning_skills = {
+            str(item.get("topic", "")).casefold() for item in resources
+        }
+        missing_learning_resources = required_learning_skills - covered_learning_skills
+        with langfuse_span(
+            "evaluation.grounding_check",
+            as_type="guardrail",
+            metadata={"turn_count": len(state.get("episodic_memory", []))},
+        ) as grounding_span:
+            grounded, grounding_detail = _check_specific_fact_grounding(state)
+            if grounding_span is not None:
+                grounding_span.update(output={
+                    "passed": grounded,
+                    "detail": grounding_detail,
+                })
         checks = [
             RuleCheck(
                 name="terminal_status",
@@ -325,11 +367,15 @@ class PreparationEvaluationAgent:
             ),
             RuleCheck(
                 name="required_learning_resources_present",
-                passed=not required_learning_skills or bool(resources),
+                passed=not missing_learning_resources,
                 detail=(
                     "No answer routed to learning."
                     if not required_learning_skills
-                    else f"Learning routes={sorted(required_learning_skills)}; resources={len(resources)}."
+                    else (
+                        f"Required={sorted(required_learning_skills)}; "
+                        f"covered={sorted(covered_learning_skills)}; "
+                        f"missing={sorted(missing_learning_resources)}."
+                    )
                 ),
             ),
             RuleCheck(
@@ -406,6 +452,118 @@ def _build_evidence_memory(profile: dict[str, object]) -> list[dict[str, object]
     return memory
 
 
+def _candidate_context(
+    state: EvaluationState, question: dict[str, object]
+) -> dict[str, object]:
+    persona = state["persona_memory"]
+    skill = str(question.get("skill") or "")
+    calibrations = [
+        item for item in persona.get("skill_calibrations", [])
+        if isinstance(item, dict) and _skill_matches(skill, str(item.get("skill") or ""))
+    ]
+    referenced_ids = {
+        str(ref)
+        for item in calibrations
+        for ref in [*item.get("evidence_refs", []), *item.get("scenario_fact_refs", [])]
+    }
+    skill_terms = _skill_terms(skill)
+    scenarios = [
+        item for item in persona.get("synthetic_scenario_memory", [])
+        if isinstance(item, dict)
+        and item.get("allowed_in_candidate_answer") is True
+        and (
+            str(item.get("fact_id")) in referenced_ids
+            or skill_terms.intersection(_skill_terms(str(item.get("statement") or "")))
+        )
+    ]
+    referenced_ids.update(
+        str(ref) for item in scenarios for ref in item.get("evidence_refs", [])
+    )
+    evidence = [
+        item for item in state["evidence_memory"]
+        if str(item.get("evidence_id")) in referenced_ids
+        or skill_terms.intersection(_skill_terms(str(item.get("content") or "")))
+    ][:24]
+    persona_view = {
+        key: persona.get(key)
+        for key in (
+            "archetype", "confidence_style", "communication_style", "disclosure_style"
+        )
+    }
+    persona_view.update({
+        "skill_calibrations": [
+            {
+                key: item.get(key)
+                for key in (
+                    "skill", "actual_level", "confidence", "evidence_refs",
+                    "scenario_fact_refs",
+                )
+            }
+            for item in calibrations
+        ],
+        "synthetic_scenario_memory": scenarios,
+        "memory_rule": "private_notes are intentionally unavailable; use only supplied fact IDs.",
+    })
+    return {
+        "evidence_memory": evidence,
+        "persona_memory": persona_view,
+        "episodic_memory": _compact_episodic_memory(state.get("episodic_memory", [])),
+        "job_context": _compact_job_context(state["job_context"]),
+        "current_question": question,
+    }
+
+
+def _compact_episodic_memory(items: list[dict[str, object]]) -> list[dict[str, object]]:
+    keys = (
+        "question_id", "skill", "response_mode", "selected_option_id",
+        "experience_level", "detail", "free_text", "fact_refs",
+        "claims",
+    )
+    return [{key: item.get(key) for key in keys} for item in items]
+
+
+def _compact_job_context(job: dict[str, object]) -> dict[str, object]:
+    return {
+        key: job.get(key)
+        for key in ("saved_job_id", "title", "company", "location")
+    }
+
+
+def _reflection_preparation_view(result: dict[str, object]) -> dict[str, object]:
+    return {
+        key: result.get(key)
+        for key in (
+            "status", "skill_gaps", "answers", "learning_resources",
+            "recommendations", "question_generation", "recommendation_generation",
+            "resource_mode", "resource_warning",
+        )
+    }
+
+
+def _skill_matches(left: str, right: str) -> bool:
+    left_terms = _skill_terms(left)
+    right_terms = _skill_terms(right)
+    if left_terms and right_terms and left_terms.intersection(right_terms):
+        return True
+    synonym_groups = (
+        {"preprocessing", "cleaning", "annotation", "pipeline"},
+        {"multimodal", "fusion"},
+        {"deployment", "iteration", "mlops"},
+    )
+    return any(left_terms.intersection(group) and right_terms.intersection(group) for group in synonym_groups)
+
+
+def _skill_terms(value: str) -> set[str]:
+    ignored = {
+        "and", "from", "with", "signal", "signals", "processing", "analysis",
+        "design", "the", "for", "data",
+    }
+    return {
+        item for item in re.findall(r"[a-z0-9]+", value.casefold())
+        if len(item) > 2 and item not in ignored
+    }
+
+
 def _validate_memory_refs(
     refs: list[str], evidence_memory: list[dict[str, object]]
 ) -> None:
@@ -469,15 +627,30 @@ def _check_specific_fact_grounding(state: EvaluationState) -> tuple[bool, str]:
         text = str(turn.get("detail") or turn.get("free_text") or "")
         if not text:
             continue
-        refs = [str(item) for item in turn.get("fact_refs", [])]
-        if not refs:
-            problems.append(f"{turn.get('skill')}: factual response has no fact_refs")
+        claims = turn.get("claims", [])
+        if not claims:
+            problems.append(f"{turn.get('skill')}: factual response has no structured claims")
             continue
-        support = " ".join(evidence.get(ref, scenario.get(ref, "")) for ref in refs)
-        unsupported = _specific_terms(text) - _specific_terms(support)
-        if unsupported:
+        claim_terms: set[str] = set()
+        for claim in claims:
+            if not isinstance(claim, dict):
+                continue
+            claim_text = str(claim.get("claim") or "")
+            refs = [str(item) for item in claim.get("fact_refs", [])]
+            if not refs:
+                problems.append(f"{turn.get('skill')}: claim has no fact_refs")
+                continue
+            support = " ".join(evidence.get(ref, scenario.get(ref, "")) for ref in refs)
+            unsupported = _specific_terms(claim_text) - _specific_terms(support)
+            if unsupported:
+                problems.append(
+                    f"{turn.get('skill')}: unsupported claim terms {sorted(unsupported)}"
+                )
+            claim_terms.update(_specific_terms(claim_text))
+        uncovered = _specific_terms(text) - claim_terms
+        if uncovered:
             problems.append(
-                f"{turn.get('skill')}: unsupported specific terms {sorted(unsupported)}"
+                f"{turn.get('skill')}: response terms missing from claims {sorted(uncovered)}"
             )
     return (
         not problems,

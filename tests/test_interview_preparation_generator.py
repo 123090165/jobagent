@@ -80,6 +80,7 @@ def test_question_generation_retries_schema_output_and_records_attempts() -> Non
                         "route": "ask_evidence",
                         "detail_policy": "required",
                         "follow_up_prompt": "What did you implement and how did you evaluate it?",
+                        "decision_dimension": "signal_quality_implementation",
                     },
                     {
                         "option_id": "concept_only",
@@ -89,6 +90,7 @@ def test_question_generation_retries_schema_output_and_records_attempts() -> Non
                         "evidence_transition": "partial",
                         "route": "learning",
                         "detail_policy": "not_needed",
+                        "decision_dimension": "conceptual_vs_hands_on",
                     },
                 ],
             }],
