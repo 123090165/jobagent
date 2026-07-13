@@ -140,3 +140,18 @@ Optional values follow the existing project conventions:
 - `JOBAGENT_LLM_TEMPERATURE`
 
 Secrets are not printed in reports or terminal output.
+
+## Persona-Centered Preparation Evaluation
+
+Run an evaluation agent that reads an existing Profile and Saved Job from the
+local database, simulates the imperfect candidate behind the resume, completes
+Preparation in a temporary shadow database, and self-assesses the result using
+the same explicit persona memory:
+
+```powershell
+.venv\Scripts\python.exe -m experiments.preparation_eval.runner `
+  --list-context
+```
+
+See [preparation_eval/README.md](preparation_eval/README.md) for model
+configuration, prompts, memory boundaries, and the full command.
