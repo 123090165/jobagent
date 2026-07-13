@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import re
 from datetime import datetime, timezone
+from hashlib import sha256
 from pathlib import Path
 from typing import TypedDict
 from uuid import uuid4
@@ -33,6 +34,9 @@ from experiments.preparation_eval.schemas import (
 )
 
 PROMPT_DIR = Path(__file__).resolve().parent / "prompts"
+PERSONA_PROMPT_VERSION = "evaluation_persona_v2"
+CANDIDATE_PROMPT_VERSION = "evaluation_candidate_v2_cacheable"
+REFLECTION_PROMPT_VERSION = "evaluation_reflection_v1"
 
 
 class EvaluationState(TypedDict, total=False):
@@ -96,7 +100,7 @@ class PreparationEvaluationAgent:
             user_id=user_id,
             session_id=evaluation_id,
             tags=["preparation", "evaluation", f"provider:{self.preparation_provider}"],
-            version="preparation-eval-v1",
+            version="preparation-eval-v2",
         ) as evaluation_trace:
             state = await self._graph.ainvoke({
                 "evaluation_id": evaluation_id,
@@ -170,7 +174,7 @@ class PreparationEvaluationAgent:
     def _build_persona(self, state: EvaluationState) -> EvaluationState:
         context = {
             "requested_archetype": self.persona_archetype,
-            "profile_memory": state["profile_memory"],
+            "profile_overview": _persona_profile_overview(state["profile_memory"]),
             "evidence_memory": state["evidence_memory"],
             "job_context": state["job_context"],
         }
@@ -178,7 +182,10 @@ class PreparationEvaluationAgent:
             system_prompt=_prompt("persona_system.md"),
             user_prompt=_json_prompt(context),
             observation_name="evaluation.build_persona",
-            observation_metadata={"stage": "persona_generation"},
+            observation_metadata={
+                "stage": "persona_generation",
+                "prompt_version": PERSONA_PROMPT_VERSION,
+            },
             context_parts=context,
         )
         persona = CandidatePersona.model_validate(_normalize_persona_response(response))
@@ -201,6 +208,8 @@ class PreparationEvaluationAgent:
         index = state.get("question_index", 0)
         question = questions[index]
         candidate_context = _candidate_context(state, question)
+        cacheable_context = candidate_context["cacheable_decision_context"]
+        turn_context = candidate_context["turn_context"]
         response = self.model.generate_json(
             system_prompt=_prompt("candidate_system.md"),
             user_prompt=_json_prompt(candidate_context),
@@ -210,8 +219,17 @@ class PreparationEvaluationAgent:
                 "question_id": question["question_id"],
                 "question_index": index,
                 "skill": question["skill"],
+                "cache_strategy": "stable_prefix_v1",
+                "prompt_version": CANDIDATE_PROMPT_VERSION,
+                "cache_prefix_id": _cache_prefix_id(cacheable_context),
+                "cache_prefix_chars": len(
+                    json.dumps(cacheable_context, ensure_ascii=False, default=str)
+                ),
             },
-            context_parts=candidate_context,
+            context_parts={
+                "cacheable_decision_context": cacheable_context,
+                "turn_context": turn_context,
+            },
         )
         turn = CandidateTurn.model_validate({
             **response,
@@ -302,7 +320,7 @@ class PreparationEvaluationAgent:
 
     def _self_reflect(self, state: EvaluationState) -> EvaluationState:
         reflection_context = {
-            "evidence_memory": state["evidence_memory"],
+            "evidence_memory": _reflection_evidence_memory(state),
             "persona_memory": state["persona_memory"],
             "episodic_memory": _compact_episodic_memory(state["episodic_memory"]),
             "job_context": _compact_job_context(state["job_context"]),
@@ -313,7 +331,10 @@ class PreparationEvaluationAgent:
             system_prompt=_prompt("reflection_system.md"),
             user_prompt=_json_prompt(reflection_context),
             observation_name="evaluation.self_reflection",
-            observation_metadata={"stage": "candidate_judge"},
+            observation_metadata={
+                "stage": "candidate_judge",
+                "prompt_version": REFLECTION_PROMPT_VERSION,
+            },
             context_parts=reflection_context,
         )
         assessment = CandidateSelfAssessment.model_validate(response)
@@ -453,6 +474,11 @@ def _build_evidence_memory(profile: dict[str, object]) -> list[dict[str, object]
     def visit(value: object, path: list[str]) -> None:
         if isinstance(value, dict):
             for key, child in value.items():
+                # ResumeProfile embeds the same confirmed profile fields under
+                # `profile`; keep the top-level copy so prompt caching is not
+                # diluted by duplicate evidence with different IDs.
+                if not path and key == "profile":
+                    continue
                 if key not in {
                     "resume_profile_id", "user_id", "source_session_id",
                     "source_confirmed_profile_id", "created_at", "updated_at",
@@ -482,24 +508,35 @@ def _candidate_context(
     state: EvaluationState, question: dict[str, object]
 ) -> dict[str, object]:
     persona = state["persona_memory"]
-    skill = str(question.get("skill") or "")
+    questions = state.get("preparation", {}).get("questions", [question])
+    if not isinstance(questions, list) or not questions:
+        questions = [question]
+    question_skills = [
+        str(item.get("skill") or "") for item in questions if isinstance(item, dict)
+    ]
     calibrations = [
         item for item in persona.get("skill_calibrations", [])
-        if isinstance(item, dict) and _skill_matches(skill, str(item.get("skill") or ""))
+        if isinstance(item, dict) and any(
+            _skill_matches(skill, str(item.get("skill") or ""))
+            for skill in question_skills
+        )
     ]
     referenced_ids = {
         str(ref)
         for item in calibrations
         for ref in [*item.get("evidence_refs", []), *item.get("scenario_fact_refs", [])]
     }
-    skill_terms = _skill_terms(skill)
     scenarios = [
         item for item in persona.get("synthetic_scenario_memory", [])
         if isinstance(item, dict)
-        and item.get("allowed_in_candidate_answer") is True
         and (
             str(item.get("fact_id")) in referenced_ids
-            or skill_terms.intersection(_skill_terms(str(item.get("statement") or "")))
+            or any(
+                _skill_terms(skill).intersection(
+                    _skill_terms(str(item.get("statement") or ""))
+                )
+                for skill in question_skills
+            )
         )
     ]
     referenced_ids.update(
@@ -508,8 +545,13 @@ def _candidate_context(
     evidence = [
         item for item in state["evidence_memory"]
         if str(item.get("evidence_id")) in referenced_ids
-        or skill_terms.intersection(_skill_terms(str(item.get("content") or "")))
-    ][:24]
+        or any(
+            _skill_terms(skill).intersection(
+                _skill_terms(str(item.get("content") or ""))
+            )
+            for skill in question_skills
+        )
+    ][:36]
     persona_view = {
         key: persona.get(key)
         for key in (
@@ -522,21 +564,88 @@ def _candidate_context(
                 key: item.get(key)
                 for key in (
                     "skill", "actual_level", "confidence", "evidence_refs",
-                    "scenario_fact_refs",
+                    "scenario_fact_refs", "private_notes",
                 )
             }
             for item in calibrations
         ],
         "synthetic_scenario_memory": scenarios,
-        "memory_rule": "private_notes are intentionally unavailable; use only supplied fact IDs.",
+        "memory_rules": {
+            "decision": (
+                "All private_notes and synthetic scenario facts are authoritative "
+                "for choosing the truthful option, including facts whose "
+                "allowed_in_candidate_answer flag is false."
+            ),
+            "disclosure": (
+                "Only profile evidence and scenario facts with "
+                "allowed_in_candidate_answer=true may appear in public detail, "
+                "free_text, fact_refs, or claims. Private-only facts may force a "
+                "lower option but must not be disclosed."
+            ),
+        },
     })
     return {
-        "evidence_memory": evidence,
-        "persona_memory": persona_view,
-        "episodic_memory": _compact_episodic_memory(state.get("episodic_memory", [])),
-        "job_context": _compact_job_context(state["job_context"]),
-        "current_question": question,
+        # Keep this first and byte-for-byte stable across turns. Providers with
+        # prefix caching can reuse it while only the short turn suffix changes.
+        "cacheable_decision_context": {
+            "evidence_memory": evidence,
+            "persona_memory": persona_view,
+            "job_context": _compact_job_context(state["job_context"]),
+        },
+        "turn_context": {
+            "episodic_memory": _compact_episodic_memory(
+                state.get("episodic_memory", [])
+            ),
+            "current_question": question,
+        },
     }
+
+
+def _persona_profile_overview(profile: dict[str, object]) -> dict[str, object]:
+    """Keep only navigation fields; detailed facts live in evidence_memory."""
+    return {
+        key: profile.get(key)
+        for key in ("summary", "target_roles", "target_directions", "risks")
+    }
+
+
+def _cache_prefix_id(context: dict[str, object]) -> str:
+    serialized = json.dumps(
+        context,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        default=str,
+    )
+    return sha256(serialized.encode("utf-8")).hexdigest()[:16]
+
+
+def _reflection_evidence_memory(
+    state: EvaluationState,
+) -> list[dict[str, object]]:
+    """Send the judge only evidence referenced during persona construction/turns."""
+    persona = state["persona_memory"]
+    refs = {
+        str(ref)
+        for item in persona.get("skill_calibrations", [])
+        if isinstance(item, dict)
+        for ref in item.get("evidence_refs", [])
+    }
+    refs.update(
+        str(ref)
+        for item in persona.get("synthetic_scenario_memory", [])
+        if isinstance(item, dict)
+        for ref in item.get("evidence_refs", [])
+    )
+    for turn in state.get("episodic_memory", []):
+        refs.update(str(ref) for ref in turn.get("fact_refs", []))
+        for claim in turn.get("claims", []):
+            if isinstance(claim, dict):
+                refs.update(str(ref) for ref in claim.get("fact_refs", []))
+    return [
+        item for item in state["evidence_memory"]
+        if str(item.get("evidence_id")) in refs
+    ]
 
 
 def _compact_episodic_memory(items: list[dict[str, object]]) -> list[dict[str, object]]:

@@ -15,9 +15,18 @@ reflections. Treat them as sensitive local files.
 
 - Profile memory is loaded from `resume_profiles` and remains immutable.
 - Persona memory contains private capability calibration, confidence,
-  communication style, disclosure behavior, concerns, and goals.
+  communication style, disclosure behavior, concerns, and goals. Private
+  decision facts influence option selection even when they are forbidden from
+  appearing in the submitted answer.
 - Episodic memory records every selected answer, optional detail, private
   reason, and candidate reaction.
+
+Candidate calls are serialized as a stable `cacheable_decision_context` prefix
+followed by a changing `turn_context` suffix. This keeps private calibration,
+relevant evidence, and the compact job context byte-stable across questions so
+providers with prefix caching can reuse them. Langfuse records the prefix ID,
+prefix size, prompt version, and provider-reported cached token count for every
+candidate turn.
 
 The Candidate and reflection phases use the same evaluation model but separate
 prompts. The reflection call receives all three memory layers explicitly. This

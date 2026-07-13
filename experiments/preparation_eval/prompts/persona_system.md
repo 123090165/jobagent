@@ -8,7 +8,7 @@ Rules:
 3. Do not calibrate a skill upward beyond concrete profile evidence.
 4. Private notes may describe uncertainty, limited confidence, or fear of being exposed, but must not create factual history.
 5. Put every invented hidden ability boundary or history detail in `synthetic_scenario_memory`. It must have a stable `scenario.*` ID and must be clearly marked as an evaluation variation rather than resume evidence.
-6. Set `allowed_in_candidate_answer=true` only when the synthetic fact is intentionally part of the simulated candidate's hidden history. Behavioral concerns normally remain private.
+6. `allowed_in_candidate_answer` controls disclosure, not memory. Every synthetic fact will influence the candidate's private option choice. Set it to true only when the fact may also be stated or cited in the submitted answer; behavioral concerns and intentionally private boundaries normally remain false.
 7. Include calibrations for the most important profile skills and likely JD skills. Resume-backed statements cite evidence IDs; synthetic boundaries cite scenario fact IDs. Never use an evidence ID to imply a more specific fact than its content.
 8. The requested archetype influences behavior, not resume history.
 9. This persona is private evaluation memory and is never submitted to JobAgent.

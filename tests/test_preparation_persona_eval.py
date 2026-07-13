@@ -10,9 +10,13 @@ from app.repositories.resume_profile_repository import resume_profile_repository
 from app.repositories.saved_job_repository import saved_job_repository
 from experiments.preparation_eval.agent import (
     PreparationEvaluationAgent,
+    _build_evidence_memory,
+    _cache_prefix_id,
     _candidate_context,
     _check_specific_fact_grounding,
+    _json_prompt,
     _normalize_persona_response,
+    _reflection_evidence_memory,
 )
 from experiments.preparation_eval.schemas import CandidateSelfAssessment
 
@@ -40,7 +44,7 @@ def test_persona_confidence_normalizes_compound_label() -> None:
     assert response["skill_calibrations"][0]["confidence"] == "medium"
 
 
-def test_candidate_context_excludes_private_notes_and_unrelated_profile_memory() -> None:
+def test_candidate_context_keeps_private_decision_memory_but_limits_evidence() -> None:
     state = {
         "evidence_memory": [
             {"evidence_id": "profile.core_skills.0", "content": "PPG signal processing"},
@@ -64,6 +68,11 @@ def test_candidate_context_excludes_private_notes_and_unrelated_profile_memory()
                 "statement": "Offline PPG project only",
                 "allowed_in_candidate_answer": True,
                 "evidence_refs": ["profile.core_skills.0"],
+            }, {
+                "fact_id": "scenario.ppg.private",
+                "statement": "Has never processed high-motion wearable PPG",
+                "allowed_in_candidate_answer": False,
+                "evidence_refs": ["profile.core_skills.0"],
             }],
         },
         "episodic_memory": [],
@@ -74,10 +83,75 @@ def test_candidate_context_excludes_private_notes_and_unrelated_profile_memory()
     context = _candidate_context(state, question)  # type: ignore[arg-type]
 
     serialized = json.dumps(context)
-    assert '"private_notes":' not in serialized
-    assert "unsupported private dataset" not in serialized
+    assert '"private_notes":' in serialized
+    assert "unsupported private dataset" in serialized
+    assert "Has never processed high-motion wearable PPG" in serialized
     assert "profile.supporting_skills.0" not in serialized
     assert "scenario.ppg.1" in serialized
+    rules = context["cacheable_decision_context"]["persona_memory"]["memory_rules"]
+    assert "must not be disclosed" in rules["disclosure"]
+
+
+def test_candidate_context_has_stable_cache_prefix_across_turns() -> None:
+    question_one = {"question_id": "q1", "skill": "PPG signal processing"}
+    question_two = {"question_id": "q2", "skill": "ECG signal processing"}
+    state = {
+        "evidence_memory": [],
+        "persona_memory": {
+            "archetype": "calibrated",
+            "confidence_style": "calibrated",
+            "communication_style": "balanced",
+            "disclosure_style": "honest",
+            "skill_calibrations": [],
+            "synthetic_scenario_memory": [],
+        },
+        "preparation": {"questions": [question_one, question_two]},
+        "episodic_memory": [],
+        "job_context": {"saved_job_id": "j1", "title": "Engineer"},
+    }
+
+    first = _candidate_context(state, question_one)  # type: ignore[arg-type]
+    state["episodic_memory"] = [{"question_id": "q1", "selected_option_id": "o1"}]
+    second = _candidate_context(state, question_two)  # type: ignore[arg-type]
+
+    assert first["cacheable_decision_context"] == second["cacheable_decision_context"]
+    assert first["turn_context"] != second["turn_context"]
+    first_prefix = _json_prompt(first).split('  "turn_context":', 1)[0]
+    second_prefix = _json_prompt(second).split('  "turn_context":', 1)[0]
+    assert first_prefix == second_prefix
+    assert _cache_prefix_id(first["cacheable_decision_context"]) == _cache_prefix_id(
+        second["cacheable_decision_context"]
+    )
+
+
+def test_evidence_memory_skips_duplicate_embedded_profile() -> None:
+    memory = _build_evidence_memory({
+        "summary": "Top-level summary",
+        "core_skills": ["PPG"],
+        "profile": {"summary": "Top-level summary", "core_skills": ["PPG"]},
+    })
+
+    ids = {item["evidence_id"] for item in memory}
+    assert "profile.core_skills.0" in ids
+    assert not any(item.startswith("profile.profile.") for item in ids)
+
+
+def test_reflection_memory_only_keeps_referenced_evidence() -> None:
+    state = {
+        "evidence_memory": [
+            {"evidence_id": "profile.core_skills.0", "content": "PPG"},
+            {"evidence_id": "profile.core_skills.1", "content": "SQL"},
+        ],
+        "persona_memory": {
+            "skill_calibrations": [{"evidence_refs": ["profile.core_skills.0"]}],
+            "synthetic_scenario_memory": [],
+        },
+        "episodic_memory": [],
+    }
+
+    result = _reflection_evidence_memory(state)  # type: ignore[arg-type]
+
+    assert [item["evidence_id"] for item in result] == ["profile.core_skills.0"]
 
 
 def test_grounding_checks_claims_against_direct_fact_content() -> None:
@@ -138,7 +212,7 @@ class FakeEvaluationModel:
                 ],
             }
         if "acting as the same imperfect candidate" in system_prompt:
-            question = context["current_question"]
+            question = context["turn_context"]["current_question"]
             skill = question["skill"]
             level = "conceptual_only" if skill in {"Linux", "SQL"} else "project_experience"
             return {
