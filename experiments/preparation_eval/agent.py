@@ -19,7 +19,11 @@ from app.schemas.interview_preparation import (
     PreparationGenerateRequest,
 )
 from experiments.preparation_eval.model import EvaluationModel
-from app.services.llm_observability import langfuse_agent_trace, langfuse_span
+from app.services.llm_observability import (
+    anonymous_trace_id,
+    langfuse_agent_trace,
+    langfuse_span,
+)
 from experiments.preparation_eval.schemas import (
     CandidatePersona,
     CandidateSelfAssessment,
@@ -32,6 +36,7 @@ PROMPT_DIR = Path(__file__).resolve().parent / "prompts"
 
 
 class EvaluationState(TypedDict, total=False):
+    evaluation_id: str
     user_id: str
     profile_id: str
     saved_job_id: str
@@ -76,13 +81,25 @@ class PreparationEvaluationAgent:
         saved_job_origin_id: str | None = None,
         association_method: str = "explicit_profile",
     ) -> PreparationEvaluationReport:
-        with langfuse_agent_trace("preparation-evaluation", metadata={
-            "saved_job_id": saved_job_id,
-            "profile_id": profile_id,
+        evaluation_id = str(uuid4())
+        trace_metadata = {
+            "evaluation_id": evaluation_id,
+            "saved_job_ref": anonymous_trace_id("job", saved_job_id),
+            "profile_ref": anonymous_trace_id("profile", profile_id),
             "preparation_provider": self.preparation_provider,
             "evaluation_model": self.model.model_name,
-        }):
+            "association_method": association_method,
+        }
+        with langfuse_agent_trace(
+            "preparation-evaluation",
+            metadata=trace_metadata,
+            user_id=user_id,
+            session_id=evaluation_id,
+            tags=["preparation", "evaluation", f"provider:{self.preparation_provider}"],
+            version="preparation-eval-v1",
+        ) as evaluation_trace:
             state = await self._graph.ainvoke({
+                "evaluation_id": evaluation_id,
                 "user_id": user_id,
                 "profile_id": profile_id,
                 "saved_job_id": saved_job_id,
@@ -94,9 +111,18 @@ class PreparationEvaluationAgent:
                 "episodic_memory": [],
                 "paused_once": False,
             })
+            if evaluation_trace is not None:
+                evaluation_trace.update(output={
+                    "content_redacted": True,
+                    "status": state["preparation"].get("status"),
+                    "question_count": len(state["preparation"].get("questions", [])),
+                    "answer_count": len(state.get("answers", [])),
+                    "rule_check_count": len(state.get("rule_checks", [])),
+                    "passed": all(item.get("passed") for item in state.get("rule_checks", [])),
+                })
         checks = [RuleCheck.model_validate(item) for item in state["rule_checks"]]
         return PreparationEvaluationReport(
-            evaluation_id=str(uuid4()),
+            evaluation_id=evaluation_id,
             generated_at=datetime.now(timezone.utc),
             profile_id=profile_id,
             saved_job_id=saved_job_id,

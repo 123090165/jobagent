@@ -41,6 +41,7 @@ from app.schemas.saved_job import (
     SavedJobUpdateRequest,
     SavedJobStatusEventListResponse,
 )
+from app.services.llm_observability import anonymous_trace_id, langfuse_agent_trace
 
 router = APIRouter(prefix="/api/v1/saved-jobs", tags=["v4-saved-jobs"])
 
@@ -151,7 +152,33 @@ async def generate_interview_preparation_endpoint(
     payload: PreparationGenerateRequest,
     current_user: UserAccount = Depends(get_current_user),
 ) -> InterviewPreparationWorkspace:
-    return await generate_interview_preparation(saved_job_id, payload, user_id=current_user.user_id)
+    session_id = anonymous_trace_id(
+        "preparation", f"{current_user.user_id}:{saved_job_id}"
+    )
+    with langfuse_agent_trace(
+        "preparation-start",
+        metadata={
+            "feature": "preparation",
+            "operation": "start",
+            "saved_job_ref": anonymous_trace_id("job", saved_job_id),
+            "requested_provider": payload.llm_provider or "default",
+        },
+        user_id=current_user.user_id,
+        session_id=session_id,
+        tags=["preparation", "api"],
+        version="preparation-v1",
+    ) as trace:
+        workspace = await generate_interview_preparation(
+            saved_job_id, payload, user_id=current_user.user_id
+        )
+        if trace is not None:
+            trace.update(output={
+                "content_redacted": True,
+                "status": workspace.status,
+                "question_count": len(workspace.questions),
+                "analysis_mode": workspace.analysis_mode,
+            })
+        return workspace
 
 
 @router.put("/{saved_job_id}/preparation/answers", response_model=InterviewPreparationWorkspace)
@@ -160,7 +187,36 @@ async def complete_interview_preparation_endpoint(
     payload: PreparationAnswerRequest,
     current_user: UserAccount = Depends(get_current_user),
 ) -> InterviewPreparationWorkspace:
-    return await complete_interview_preparation(saved_job_id, payload, user_id=current_user.user_id)
+    session_id = anonymous_trace_id(
+        "preparation", f"{current_user.user_id}:{saved_job_id}"
+    )
+    with langfuse_agent_trace(
+        "preparation-answer",
+        metadata={
+            "feature": "preparation",
+            "operation": payload.action,
+            "saved_job_ref": anonymous_trace_id("job", saved_job_id),
+            "requested_provider": payload.llm_provider or "default",
+            "answer_count": len(payload.answers),
+        },
+        user_id=current_user.user_id,
+        session_id=session_id,
+        tags=["preparation", "api", f"action:{payload.action}"],
+        version="preparation-v1",
+    ) as trace:
+        workspace = await complete_interview_preparation(
+            saved_job_id, payload, user_id=current_user.user_id
+        )
+        if trace is not None:
+            trace.update(output={
+                "content_redacted": True,
+                "status": workspace.status,
+                "answer_count": len(workspace.answers),
+                "recommendation_count": len(workspace.recommendations),
+                "resource_count": len(workspace.learning_resources),
+                "resource_mode": workspace.resource_mode,
+            })
+        return workspace
 
 
 @router.get("/{saved_job_id}/preparation/prompt.txt", response_class=PlainTextResponse)

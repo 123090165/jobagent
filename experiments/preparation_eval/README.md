@@ -69,6 +69,27 @@ Use `--stop-without-summary` to evaluate voluntary early termination. Raw resume
 text is excluded from the evaluation model context unless
 `--include-raw-resume` is explicitly provided.
 
+## Langfuse Tracing
+
+Set `JOBAGENT_LANGFUSE_ENABLED=true` plus `LANGFUSE_PUBLIC_KEY`,
+`LANGFUSE_SECRET_KEY`, and `LANGFUSE_BASE_URL` to trace the evaluation. The
+integration uses Langfuse Python SDK 4 and records:
+
+- one `preparation-evaluation` Agent observation for the complete graph;
+- nested Generation observations for persona, candidate-answer, Preparation,
+  and self-reflection model calls, including provider token usage;
+- Retriever and Guardrail observations for learning-resource search and
+  deterministic grounding checks;
+- the evaluation ID as the Langfuse session ID so the local report and remote
+  trace can be correlated.
+
+Profile, job, and user IDs are pseudonymized with HMAC before export, using
+`JOBAGENT_LANGFUSE_HASH_SALT` when configured and otherwise the Langfuse secret
+key. Prompt, resume, JD, answer, and model-output content is redacted by default. Set
+`JOBAGENT_LANGFUSE_CAPTURE_CONTENT=true` only for an intentional debugging run
+whose data is approved for the configured Langfuse project. The short-lived
+runner flushes observations before exit.
+
 ## Prompt Responsibilities
 
 - `persona_system.md` converts resume evidence into a stable, bounded hidden

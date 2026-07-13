@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import hmac
 import json
 import os
 from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass, field
+from hashlib import sha256
 from typing import Any, Iterator
 
 
@@ -102,8 +104,9 @@ def update_langfuse_generation(
     update: dict[str, object] = {
         "output": output if capture_content else _output_summary(output),
     }
-    if isinstance(usage, dict):
-        update["usage_details"] = usage
+    normalized_usage = _openai_usage_details(usage)
+    if normalized_usage:
+        update["usage_details"] = normalized_usage
     generation.update(**update)
 
 
@@ -112,24 +115,37 @@ def langfuse_agent_trace(
     name: str,
     *,
     metadata: dict[str, object],
-) -> Iterator[None]:
+    user_id: str | None = None,
+    session_id: str | None = None,
+    tags: list[str] | None = None,
+    version: str | None = None,
+) -> Iterator[Any | None]:
     if not _enabled():
-        yield
+        yield None
         return
     try:
-        from langfuse import get_client
+        from langfuse import get_client, propagate_attributes
     except ImportError:
-        yield
+        yield None
         return
     client = get_client()
     try:
-        with client.start_as_current_observation(
-            as_type="agent",
-            name=name,
-            input={"content_redacted": True},
-            metadata=metadata,
+        with propagate_attributes(
+            trace_name=name,
+            user_id=anonymous_trace_id("user", user_id) if user_id else None,
+            session_id=session_id,
+            tags=tags,
+            version=version,
+            metadata=_propagation_metadata(metadata),
         ):
-            yield
+            with client.start_as_current_observation(
+                as_type="agent",
+                name=name,
+                input={"content_redacted": True, "workflow": name},
+                metadata=metadata,
+                version=version,
+            ) as agent:
+                yield agent
     finally:
         client.flush()
 
@@ -174,6 +190,50 @@ def _output_summary(output: object) -> dict[str, object]:
     if isinstance(output, dict):
         return {"content_redacted": True, "keys": sorted(map(str, output.keys()))}
     return {"content_redacted": True, "type": type(output).__name__}
+
+
+def anonymous_trace_id(namespace: str, value: str) -> str:
+    """Return a stable pseudonymous identifier suitable for external telemetry."""
+    key = (
+        os.getenv("JOBAGENT_LANGFUSE_HASH_SALT")
+        or os.getenv("LANGFUSE_SECRET_KEY")
+        or "jobagent-local-telemetry"
+    ).encode("utf-8")
+    digest = hmac.new(
+        key,
+        f"{namespace}:{value}".encode("utf-8"),
+        sha256,
+    ).hexdigest()[:24]
+    return f"{namespace}-{digest}"
+
+
+def _propagation_metadata(metadata: dict[str, object]) -> dict[str, str]:
+    """Keep v4 propagated metadata queryable and within its 200-char limit."""
+    result: dict[str, str] = {}
+    for key, value in metadata.items():
+        if value is None:
+            continue
+        rendered = str(value)
+        result[str(key)] = rendered[:200]
+    return result
+
+
+def _openai_usage_details(usage: object) -> dict[str, object]:
+    """Strip gateway-specific fields so Langfuse recognizes OpenAI token usage."""
+    if not isinstance(usage, dict):
+        return {}
+    allowed = {
+        "prompt_tokens",
+        "completion_tokens",
+        "total_tokens",
+        "prompt_tokens_details",
+        "completion_tokens_details",
+    }
+    return {
+        key: value
+        for key, value in usage.items()
+        if key in allowed and isinstance(value, (int, dict))
+    }
 
 
 def _enabled() -> bool:
