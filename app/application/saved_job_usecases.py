@@ -50,6 +50,7 @@ from app.services.interview_preparation_generator import (
 )
 from app.services.learning_resource_search import (
     OfficialCatalogResourceSearch,
+    resource_error_summary,
     resolve_learning_resource_search,
 )
 from app.services.llm_provider import resolve_llm_provider
@@ -254,7 +255,10 @@ async def complete_interview_preparation(
     resolution = resolve_llm_provider(payload.llm_provider)
     try:
         routed_answers = resolve_preparation_answers(
-            item.questions, payload.answers, llm_service=resolution.service
+            item.questions,
+            payload.answers,
+            llm_service=resolution.service,
+            classify_free_text=payload.action == "complete",
         )
     except ValueError as exc:
         raise JobAgentError(
@@ -276,8 +280,18 @@ async def complete_interview_preparation(
             answers=normalized_answers,
             status=transition["status"],
         )
-    recommendations, recommendation_generation = generate_recommendations(
-        updated_gaps, item.questions, normalized_answers, llm_service=resolution.service
+    recommendation_task = asyncio.to_thread(
+        generate_recommendations,
+        updated_gaps,
+        item.questions,
+        normalized_answers,
+        llm_service=resolution.service,
+    )
+    resource_task = _resources_for_preparation_answers(
+        updated_gaps, item.questions, normalized_answers
+    )
+    (recommendations, recommendation_generation), resource_result = await asyncio.gather(
+        recommendation_task, resource_task
     )
     recommendation_generation = recommendation_generation.model_copy(
         update={"provider": resolution.provider}
@@ -286,9 +300,7 @@ async def complete_interview_preparation(
         item.question_generation,
         recommendation_generation,
     )
-    resources, resource_mode, resource_warning = await _resources_for_preparation_answers(
-        updated_gaps, item.questions, normalized_answers
-    )
+    resources, resource_mode, resource_warning = resource_result
     return preparations.complete(
         item.model_copy(update={"skill_gaps": updated_gaps}),
         answers=normalized_answers, recommendations=recommendations,
@@ -390,7 +402,7 @@ async def _resources_for_preparation_answers(gaps, questions, answers):
     catalog = OfficialCatalogResourceSearch()
     for topic, result in zip(topics, results):
         if isinstance(result, Exception):
-            warnings.append(f"{topic}: {type(result).__name__}")
+            warnings.append(f"{topic}: {resource_error_summary(result)}")
             resources.extend(await catalog.search(topic, limit=2))
         else:
             resources.extend(result or await catalog.search(topic, limit=2))

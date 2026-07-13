@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import TypedDict
@@ -116,8 +117,8 @@ class PreparationEvaluationAgent:
         builder.add_node("self_reflect", self._self_reflect)
         builder.add_node("rule_checks", self._rule_checks)
         builder.add_edge(START, "build_persona")
-        builder.add_edge("build_persona", "start_preparation")
-        builder.add_edge("start_preparation", "answer_question")
+        builder.add_edge(START, "start_preparation")
+        builder.add_edge(["build_persona", "start_preparation"], "answer_question")
         builder.add_conditional_edges(
             "answer_question",
             self._route_after_answer,
@@ -144,10 +145,7 @@ class PreparationEvaluationAgent:
             }),
         )
         persona = CandidatePersona.model_validate(_normalize_persona_response(response))
-        _validate_memory_refs(
-            [ref for item in persona.skill_calibrations for ref in item.evidence_refs],
-            state["evidence_memory"],
-        )
+        _validate_persona_memory(persona, state["evidence_memory"])
         return {"persona_memory": persona.model_dump(mode="json")}
 
     async def _start_preparation(self, state: EvaluationState) -> EvaluationState:
@@ -213,7 +211,7 @@ class PreparationEvaluationAgent:
                 response_mode="free_text",
                 free_text=turn.free_text,
             )
-        _validate_memory_refs(turn.fact_refs, state["evidence_memory"])
+        _validate_turn_refs(turn.fact_refs, state["evidence_memory"], state["persona_memory"])
         return {
             "answers": [*state.get("answers", []), answer.model_dump(mode="json")],
             "episodic_memory": [
@@ -292,6 +290,13 @@ class PreparationEvaluationAgent:
         resource_topics_valid = all(
             str(item.get("topic", "")).casefold() in learning_skills for item in resources
         )
+        required_learning_skills = {
+            question_by_id[item["question_id"]]["skill"].casefold()
+            for item in result.get("answers", [])
+            if item.get("route") == "learning"
+            and item.get("question_id") in question_by_id
+        }
+        grounded, grounding_detail = _check_specific_fact_grounding(state)
         checks = [
             RuleCheck(
                 name="terminal_status",
@@ -317,6 +322,20 @@ class PreparationEvaluationAgent:
                 name="resource_answer_alignment",
                 passed=resource_topics_valid,
                 detail="Learning resources must align with answers indicating a learning gap.",
+            ),
+            RuleCheck(
+                name="required_learning_resources_present",
+                passed=not required_learning_skills or bool(resources),
+                detail=(
+                    "No answer routed to learning."
+                    if not required_learning_skills
+                    else f"Learning routes={sorted(required_learning_skills)}; resources={len(resources)}."
+                ),
+            ),
+            RuleCheck(
+                name="specific_fact_grounding",
+                passed=grounded,
+                detail=grounding_detail,
             ),
         ]
         return {"rule_checks": [item.model_dump(mode="json") for item in checks]}
@@ -394,6 +413,85 @@ def _validate_memory_refs(
     unknown = sorted(set(refs) - allowed)
     if unknown:
         raise ValueError(f"Evaluation model cited unknown evidence IDs: {unknown}")
+
+
+def _validate_persona_memory(
+    persona: CandidatePersona, evidence_memory: list[dict[str, object]]
+) -> None:
+    _validate_memory_refs(
+        [ref for item in persona.skill_calibrations for ref in item.evidence_refs]
+        + [ref for item in persona.synthetic_scenario_memory for ref in item.evidence_refs],
+        evidence_memory,
+    )
+    fact_ids = [item.fact_id for item in persona.synthetic_scenario_memory]
+    if len(fact_ids) != len(set(fact_ids)) or any(
+        not item.startswith("scenario.") for item in fact_ids
+    ):
+        raise ValueError("Synthetic scenario fact IDs must be unique and start with scenario.")
+    known = set(fact_ids)
+    unknown = sorted({
+        ref for item in persona.skill_calibrations for ref in item.scenario_fact_refs
+        if ref not in known
+    })
+    if unknown:
+        raise ValueError(f"Persona calibration cited unknown scenario facts: {unknown}")
+
+
+def _validate_turn_refs(
+    refs: list[str],
+    evidence_memory: list[dict[str, object]],
+    persona_memory: dict[str, object],
+) -> None:
+    evidence_ids = {str(item["evidence_id"]) for item in evidence_memory}
+    scenario_items = persona_memory.get("synthetic_scenario_memory", [])
+    scenario_ids = {
+        str(item.get("fact_id"))
+        for item in scenario_items
+        if isinstance(item, dict) and item.get("allowed_in_candidate_answer") is True
+    }
+    unknown = sorted(set(refs) - evidence_ids - scenario_ids)
+    if unknown:
+        raise ValueError(f"Candidate cited unavailable or private fact IDs: {unknown}")
+
+
+def _check_specific_fact_grounding(state: EvaluationState) -> tuple[bool, str]:
+    evidence = {
+        str(item["evidence_id"]): str(item.get("content") or "")
+        for item in state["evidence_memory"]
+    }
+    scenario = {
+        str(item.get("fact_id")): str(item.get("statement") or "")
+        for item in state["persona_memory"].get("synthetic_scenario_memory", [])
+        if isinstance(item, dict) and item.get("allowed_in_candidate_answer") is True
+    }
+    problems = []
+    for turn in state.get("episodic_memory", []):
+        text = str(turn.get("detail") or turn.get("free_text") or "")
+        if not text:
+            continue
+        refs = [str(item) for item in turn.get("fact_refs", [])]
+        if not refs:
+            problems.append(f"{turn.get('skill')}: factual response has no fact_refs")
+            continue
+        support = " ".join(evidence.get(ref, scenario.get(ref, "")) for ref in refs)
+        unsupported = _specific_terms(text) - _specific_terms(support)
+        if unsupported:
+            problems.append(
+                f"{turn.get('skill')}: unsupported specific terms {sorted(unsupported)}"
+            )
+    return (
+        not problems,
+        "All specific response terms are present in cited memories."
+        if not problems else "; ".join(problems),
+    )
+
+
+def _specific_terms(text: str) -> set[str]:
+    terms = re.findall(
+        r"\b(?:[A-Z]{2,}(?:-[A-Z0-9]+)*|[A-Z][a-z]+[A-Z][A-Za-z0-9]*|[A-Za-z]*\d+[A-Za-z0-9%.-]*)\b",
+        text,
+    )
+    return {item.casefold() for item in terms if item.casefold() not in {"ai", "jd"}}
 
 
 def _prompt(name: str) -> str:

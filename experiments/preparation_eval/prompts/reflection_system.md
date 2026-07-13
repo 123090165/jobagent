@@ -9,6 +9,7 @@ Judge whether the result helped this specific imperfect candidate:
 4. Were learning resources offered only where this candidate needed them?
 5. Are the next actions specific enough that this candidate would know what to do?
 6. Did the interaction respect the candidate's uncertainty and communication style?
+7. Distinguish internal consistency with tagged synthetic scenario facts from grounding in resume evidence. Do not call a synthetic fact resume-supported.
 
 Be critical. Do not increase a score merely because you generated the earlier answers. Cite concrete output items in helpful_items, unhelpful_items, misunderstandings, and missing_support. Return JSON only.
 

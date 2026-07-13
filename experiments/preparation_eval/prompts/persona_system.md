@@ -6,12 +6,14 @@ Rules:
 1. Never invent an employer, project, qualification, responsibility, or result.
 2. A resume skill may be calibrated downward when evidence is only a keyword or vague statement.
 3. Do not calibrate a skill upward beyond concrete profile evidence.
-4. Private notes may describe uncertainty, limited confidence, or fear of being exposed, but must not create a project, dataset, metric, tool usage, result, or other factual history.
-5. Include calibrations for the most important profile skills and likely JD skills. Every factual calibration must cite supplied evidence IDs; an unmentioned JD skill remains `uncertain` or `no_experience` without invented explanation.
-6. The requested archetype influences behavior, not factual history.
-7. This persona is private evaluation memory and is never submitted to JobAgent.
-8. Return JSON only matching the requested schema.
-9. Enum values must be copied exactly. Never combine adjacent values such as `medium-high` or `project-to-work`.
+4. Private notes may describe uncertainty, limited confidence, or fear of being exposed, but must not create factual history.
+5. Put every invented hidden ability boundary or history detail in `synthetic_scenario_memory`. It must have a stable `scenario.*` ID and must be clearly marked as an evaluation variation rather than resume evidence.
+6. Set `allowed_in_candidate_answer=true` only when the synthetic fact is intentionally part of the simulated candidate's hidden history. Behavioral concerns normally remain private.
+7. Include calibrations for the most important profile skills and likely JD skills. Resume-backed statements cite evidence IDs; synthetic boundaries cite scenario fact IDs. Never use an evidence ID to imply a more specific fact than its content.
+8. The requested archetype influences behavior, not resume history.
+9. This persona is private evaluation memory and is never submitted to JobAgent.
+10. Return JSON only matching the requested schema.
+11. Enum values must be copied exactly. Never combine adjacent values such as `medium-high` or `project-to-work`.
 
 Schema:
 {
@@ -22,12 +24,21 @@ Schema:
   "disclosure_style": "guarded | honest | self_promoting",
   "concerns": ["string"],
   "goals": ["string"],
+  "synthetic_scenario_memory": [{
+    "fact_id": "scenario.skill.1",
+    "statement": "one explicit synthetic fact",
+    "kind": "ability_calibration | hidden_history | behavioral_constraint",
+    "basis": "resume_inference | evaluation_variation",
+    "evidence_refs": ["profile.field.index"],
+    "allowed_in_candidate_answer": false
+  }],
   "skill_calibrations": [{
     "skill": "string",
     "resume_signal": "string grounded in the profile",
     "actual_level": "work_experience | project_experience | practice_only | conceptual_only | no_experience | uncertain",
     "confidence": "low | medium | high",
     "private_notes": ["string"],
-    "evidence_refs": ["profile.field.index"]
+    "evidence_refs": ["profile.field.index"],
+    "scenario_fact_refs": ["scenario.skill.1"]
   }]
 }

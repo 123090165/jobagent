@@ -18,6 +18,10 @@ class LearningResourceSearch(Protocol):
     async def search(self, topic: str, *, limit: int = 2) -> list[LearningResource]: ...
 
 
+class LearningResourceSearchError(RuntimeError):
+    pass
+
+
 class MCPStreamableHTTPResourceSearch:
     def __init__(self, url: str, tool_name: str, query_argument: str) -> None:
         self.url = url
@@ -28,7 +32,9 @@ class MCPStreamableHTTPResourceSearch:
         from mcp import ClientSession, types
         from mcp.client.streamable_http import streamable_http_client
 
-        async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as http_client:
+        await self._preflight()
+        timeout = float(os.getenv("JOBAGENT_LEARNING_MCP_TIMEOUT", "15"))
+        async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as http_client:
             async with streamable_http_client(self.url, http_client=http_client) as (read, write, _):
                 async with ClientSession(read, write) as session:
                     await session.initialize()
@@ -46,6 +52,20 @@ class MCPStreamableHTTPResourceSearch:
                 except json.JSONDecodeError:
                     continue
         return _resources_from_payloads(topic, payloads, limit=limit)
+
+    async def _preflight(self) -> None:
+        timeout = httpx.Timeout(2.0, connect=1.0)
+        try:
+            async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
+                response = await client.options(self.url)
+        except (httpx.ConnectError, httpx.ConnectTimeout) as exc:
+            raise LearningResourceSearchError(
+                f"mcp_server_unavailable: {urlparse(self.url).netloc}"
+            ) from exc
+        except httpx.TimeoutException as exc:
+            raise LearningResourceSearchError("mcp_preflight_timeout") from exc
+        if response.status_code == 404:
+            raise LearningResourceSearchError("mcp_endpoint_not_found")
 
 
 class OfficialCatalogResourceSearch:
@@ -134,3 +154,11 @@ def _resources_from_payloads(topic: str, payloads: list[object], *, limit: int) 
         if len(resources) >= limit:
             break
     return resources
+
+
+def resource_error_summary(error: BaseException) -> str:
+    if isinstance(error, BaseExceptionGroup):
+        parts = [resource_error_summary(item) for item in error.exceptions]
+        return " | ".join(dict.fromkeys(parts))[:500]
+    message = (str(error) or type(error).__name__).strip().replace("\n", " ")
+    return f"{type(error).__name__}: {message}"[:500]

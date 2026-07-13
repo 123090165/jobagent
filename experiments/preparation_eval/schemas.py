@@ -15,6 +15,16 @@ class SkillCalibration(BaseModel):
     confidence: Literal["low", "medium", "high"]
     private_notes: list[str] = Field(default_factory=list)
     evidence_refs: list[str] = Field(default_factory=list)
+    scenario_fact_refs: list[str] = Field(default_factory=list)
+
+
+class SyntheticScenarioFact(BaseModel):
+    fact_id: str
+    statement: str
+    kind: Literal["ability_calibration", "hidden_history", "behavioral_constraint"]
+    basis: Literal["resume_inference", "evaluation_variation"]
+    evidence_refs: list[str] = Field(default_factory=list)
+    allowed_in_candidate_answer: bool = False
 
 
 class CandidatePersona(BaseModel):
@@ -26,6 +36,7 @@ class CandidatePersona(BaseModel):
     concerns: list[str] = Field(default_factory=list)
     goals: list[str] = Field(default_factory=list)
     skill_calibrations: list[SkillCalibration] = Field(default_factory=list)
+    synthetic_scenario_memory: list[SyntheticScenarioFact] = Field(default_factory=list)
 
 
 class CandidateTurn(BaseModel):

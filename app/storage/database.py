@@ -598,6 +598,9 @@ def _seed_learning_catalog(connection: sqlite3.Connection) -> None:
         ("kubernetes", "Kubernetes", '["k8s"]'),
         ("typescript", "TypeScript", '["ts"]'),
         ("microsoft-office", "Microsoft Office", '["excel", "word", "powerpoint", "microsoft 365"]'),
+        ("physiological-signals", "Physiological signal processing", '["biosignal", "ppg", "ecg", "acc", "multimodal physiological signal"]'),
+        ("ppg-blood-pressure", "PPG blood pressure estimation", '["blood pressure estimation from ppg", "cuffless blood pressure", "pulse transit time", "ptt"]'),
+        ("mlflow", "MLflow", '["model iteration", "experiment tracking", "mlops"]'),
     ]
     connection.executemany(
         "INSERT OR IGNORE INTO learning_topics (topic_id, canonical_name, aliases_json) VALUES (?, ?, ?)",
@@ -612,6 +615,11 @@ def _seed_learning_catalog(connection: sqlite3.Connection) -> None:
         ("kubernetes-basics", "kubernetes", "Learn Kubernetes Basics", "https://kubernetes.io/docs/tutorials/kubernetes-basics/", "Kubernetes Documentation", "beginner", "Official interactive overview of deploying and managing containerized applications.", 3),
         ("typescript-handbook", "typescript", "The TypeScript Handbook", "https://www.typescriptlang.org/docs/handbook/intro.html", "TypeScript Documentation", "beginner", "Official guide to TypeScript's type system and common development patterns.", 3),
         ("office-training", "microsoft-office", "Microsoft 365 training", "https://support.microsoft.com/en-us/training", "Microsoft Support", "beginner", "Official training hub for Excel, Word, PowerPoint, and Microsoft 365.", 3),
+        ("physionet-tutorials", "physiological-signals", "PhysioNet Tutorials", "https://physionet.org/about/tutorial/", "PhysioNet", "beginner", "Official hands-on entry point for finding, downloading, and analysing physiological signal datasets.", 3),
+        ("physionet-ppg-index", "physiological-signals", "PhysioNet PPG Resources", "https://physionet.org/content/?topic=ppg", "PhysioNet", "review", "Official index of PPG datasets, software, challenges, and tutorials.", 3),
+        ("physionet-ptt-ppg", "ppg-blood-pressure", "Pulse Transit Time PPG Dataset", "https://physionet.org/content/pulse-transit-time-ppg/1.0.0/", "PhysioNet", "practice", "Open official dataset with synchronized PPG, ECG, inertial signals, blood pressure, and SpO2 for a bounded hands-on exercise.", 3),
+        ("physionet-ppg-databases", "ppg-blood-pressure", "PhysioNet Databases", "https://physionet.org/about/database/", "PhysioNet", "beginner", "Official catalog for selecting physiological waveform datasets before building a PPG baseline.", 3),
+        ("mlflow-tracking", "mlflow", "MLflow Tracking Quickstart", "https://mlflow.org/docs/latest/ml/tracking/", "MLflow Documentation", "beginner", "Official quickstart for recording parameters, metrics, artifacts, and repeated model runs.", 3),
     ]
     connection.executemany(
         """

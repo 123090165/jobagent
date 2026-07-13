@@ -168,6 +168,7 @@ def resolve_preparation_answers(
     answers: list[PreparationAnswer],
     *,
     llm_service: JSONChatLLM | None,
+    classify_free_text: bool = True,
 ) -> list[PreparationAnswer]:
     """Resolve UI answers into the small, backend-owned transition vocabulary."""
     question_by_id = {item.question_id: item for item in questions}
@@ -178,6 +179,18 @@ def resolve_preparation_answers(
         if question is None:
             continue
         if answer.response_mode == "free_text":
+            if answer.selected_option_id and answer.resolution_source in {
+                "llm_classified", "fallback_uncertain"
+            }:
+                option = _selected_option(question, answer)
+                if option is not None:
+                    resolved.append(_answer_from_option(
+                        answer, option, source=answer.resolution_source
+                    ))
+                    continue
+            if not classify_free_text:
+                resolved.append(answer)
+                continue
             free_text_answers.append(answer)
             continue
         option = _selected_option(question, answer)

@@ -159,6 +159,36 @@ def test_free_text_is_classified_to_a_question_option_without_rewriting_it() -> 
     assert answers[0].resolution_source == "llm_classified"
 
 
+def test_free_text_is_not_classified_when_session_is_only_saved() -> None:
+    question = PreparationQuestion(
+        question_id="q1",
+        skill="PPG",
+        prompt="Choose the closest description.",
+        why_asked="Clarifies evidence.",
+        options=[PreparationAnswerOption(
+            option_id="needs_context",
+            value="uncertain",
+            label="Needs context",
+            description="The choices do not fit.",
+            evidence_transition="unknown",
+            route="clarify",
+            detail_policy="optional",
+        )],
+    )
+    llm = SequenceLLM([])
+
+    answers = resolve_preparation_answers(
+        [question],
+        [PreparationAnswer(question_id="q1", response_mode="free_text", free_text="A boundary")],
+        llm_service=llm,
+        classify_free_text=False,
+    )
+
+    assert answers[0].selected_option_id is None
+    assert answers[0].resolution_source is None
+    assert llm.responses == []
+
+
 def test_legacy_option_is_upgraded_with_safe_transition_defaults() -> None:
     option = PreparationAnswerOption.model_validate({
         "value": "no_experience",

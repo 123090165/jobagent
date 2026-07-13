@@ -6,6 +6,7 @@ from app.services.learning_resource_search import (
     DatabaseCatalogResourceSearch,
     OfficialCatalogResourceSearch,
     _resources_from_payloads,
+    resource_error_summary,
     resolve_learning_resource_search,
 )
 
@@ -55,3 +56,20 @@ def test_database_catalog_uses_aliases_and_curated_priority(monkeypatch, tmp_pat
 
     assert resources
     assert resources[0].source == "Docker Documentation"
+
+
+def test_database_catalog_covers_ppg_blood_pressure_without_remote_search(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("JOBAGENT_DB_PATH", str(tmp_path / "learning-catalog.sqlite3"))
+
+    resources = asyncio.run(DatabaseCatalogResourceSearch().search(
+        "Blood pressure estimation from PPG signals", limit=2
+    ))
+
+    assert len(resources) == 2
+    assert all(item.source == "PhysioNet" for item in resources)
+
+
+def test_nested_resource_error_is_unwrapped() -> None:
+    error = ExceptionGroup("connection failed", [RuntimeError("mcp_server_unavailable")])
+
+    assert resource_error_summary(error) == "RuntimeError: mcp_server_unavailable"
