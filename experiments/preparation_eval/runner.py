@@ -256,7 +256,9 @@ def render_markdown(report: PreparationEvaluationReport) -> str:
     )
     lines.extend(["", "## Episodic Memory", ""])
     lines.extend(
-        f"- **{turn.skill}** → `{turn.experience_level}`: {turn.private_reason}"
+        f"- **{turn.skill}** → `{turn.response_mode}` / "
+        f"`{turn.selected_option_id or turn.experience_level or 'unclassified'}`: "
+        f"{turn.private_reason}"
         for turn in report.episodic_memory
     )
     return "\n".join(lines) + "\n"

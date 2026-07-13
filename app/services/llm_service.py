@@ -47,7 +47,13 @@ class LLMService:
     def __init__(self, config: LLMConfig | None = None) -> None:
         self.config = config or LLMConfig.from_env()
 
-    def chat_completion_json(self, *, system_prompt: str, user_prompt: str) -> dict[str, Any]:
+    def chat_completion_json(
+        self,
+        *,
+        system_prompt: str,
+        user_prompt: str,
+        expected_root_key: str | None = None,
+    ) -> dict[str, Any]:
         if not self.config.is_configured:
             raise LLMServiceError("LLM is not configured. Set JOBAGENT_LLM_API_KEY first.")
 
@@ -62,7 +68,7 @@ class LLMService:
         }
         raw_response = self._post_chat_completions(payload)
         content = _extract_message_content(raw_response)
-        return parse_json_object(content)
+        return parse_json_object(content, expected_root_key=expected_root_key)
 
     def _post_chat_completions(self, payload: dict[str, Any]) -> dict[str, Any]:
         endpoint = f"{self.config.base_url.rstrip('/')}/chat/completions"
@@ -99,7 +105,11 @@ def is_llm_configured() -> bool:
     return LLMConfig.from_env().is_configured
 
 
-def parse_json_object(text: str) -> dict[str, Any]:
+def parse_json_object(
+    text: str,
+    *,
+    expected_root_key: str | None = None,
+) -> dict[str, Any]:
     cleaned = _strip_code_fence(text.strip())
     try:
         decoded = json.loads(cleaned)
@@ -110,6 +120,8 @@ def parse_json_object(text: str) -> dict[str, Any]:
             raise LLMServiceError("LLM message does not contain a JSON object")
         decoded = json.loads(cleaned[start : end + 1])
 
+    if isinstance(decoded, list) and expected_root_key:
+        return {expected_root_key: decoded}
     if not isinstance(decoded, dict):
         raise LLMServiceError("LLM JSON output must be an object")
     return decoded

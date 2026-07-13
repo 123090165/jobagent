@@ -109,9 +109,14 @@ export type PreparationExperienceLevel =
   | "uncertain";
 
 export interface PreparationAnswerOption {
+  option_id: string;
   value: PreparationExperienceLevel;
   label: string;
   description: string;
+  evidence_transition: "supported" | "partial" | "unknown" | "missing";
+  route: "ask_evidence" | "learning" | "capability_gap" | "clarify" | "next_skill";
+  detail_policy: "required" | "optional" | "not_needed";
+  follow_up_prompt: string | null;
 }
 
 export interface PreparationQuestion {
@@ -120,13 +125,21 @@ export interface PreparationQuestion {
   prompt: string;
   why_asked: string;
   options: PreparationAnswerOption[];
+  free_text_allowed: boolean;
+  free_text_prompt: string;
 }
 
 export interface PreparationAnswer {
   question_id: string;
-  experience_level: PreparationExperienceLevel;
+  response_mode: "option" | "free_text";
+  selected_option_id?: string | null;
+  free_text?: string | null;
+  experience_level?: PreparationExperienceLevel | null;
   detail?: string | null;
   detail_quality?: "not_provided" | "specific" | "vague";
+  evidence_transition?: "supported" | "partial" | "unknown" | "missing" | null;
+  route?: "ask_evidence" | "learning" | "capability_gap" | "clarify" | "next_skill" | null;
+  resolution_source?: "option" | "llm_classified" | "fallback_uncertain" | "legacy" | null;
 }
 
 export interface LearningResource {
@@ -146,6 +159,15 @@ export interface PreparationRecommendation {
   evidence_basis: string[];
 }
 
+export interface PreparationGenerationStage {
+  mode: "deterministic" | "llm" | "fallback";
+  provider: string | null;
+  prompt_version: string;
+  attempts: number;
+  fallback_reason: string | null;
+  attempt_errors: string[];
+}
+
 export interface InterviewPreparationWorkspace {
   preparation_id: string;
   saved_job_id: string;
@@ -161,6 +183,8 @@ export interface InterviewPreparationWorkspace {
   analysis_mode: string;
   analysis_provider: string | null;
   fallback_reason: string | null;
+  question_generation: PreparationGenerationStage | null;
+  recommendation_generation: PreparationGenerationStage | null;
   resource_mode: string;
   resource_warning: string | null;
   created_at: string;

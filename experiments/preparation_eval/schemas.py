@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from app.schemas.interview_preparation import ExperienceLevel
 
@@ -14,6 +14,7 @@ class SkillCalibration(BaseModel):
     actual_level: ExperienceLevel
     confidence: Literal["low", "medium", "high"]
     private_notes: list[str] = Field(default_factory=list)
+    evidence_refs: list[str] = Field(default_factory=list)
 
 
 class CandidatePersona(BaseModel):
@@ -30,10 +31,21 @@ class CandidatePersona(BaseModel):
 class CandidateTurn(BaseModel):
     question_id: str
     skill: str
-    experience_level: ExperienceLevel
+    response_mode: Literal["option", "free_text"]
+    selected_option_id: str | None = None
+    free_text: str | None = None
+    experience_level: ExperienceLevel | None = None
     detail: str | None = None
     private_reason: str
     candidate_reaction: str
+    fact_refs: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="before")
+    @classmethod
+    def upgrade_legacy_turn(cls, data: object) -> object:
+        if isinstance(data, dict) and "response_mode" not in data:
+            return {**data, "response_mode": "option"}
+        return data
 
 
 class CandidateSelfAssessment(BaseModel):

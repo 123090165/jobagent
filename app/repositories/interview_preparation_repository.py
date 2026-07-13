@@ -8,6 +8,7 @@ from app.schemas.interview_preparation import (
     InterviewPreparationWorkspace,
     LearningResource,
     PreparationAnswer,
+    PreparationGenerationStage,
     PreparationQuestion,
     PreparationRecommendation,
     PreparationSkillGap,
@@ -25,9 +26,10 @@ class InterviewPreparationRepository:
                     preparation_id, saved_job_id, user_id, resume_profile_id,
                     source_analysis_id, status, skill_gaps_json, questions_json,
                     answers_json, learning_resources_json, recommendations_json,
-                    analysis_mode, analysis_provider, fallback_reason, resource_mode,
-                    resource_warning, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    analysis_mode, analysis_provider, fallback_reason,
+                    question_generation_json, recommendation_generation_json,
+                    resource_mode, resource_warning, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(user_id, saved_job_id) DO UPDATE SET
                     resume_profile_id = excluded.resume_profile_id,
                     source_analysis_id = excluded.source_analysis_id,
@@ -40,6 +42,8 @@ class InterviewPreparationRepository:
                     analysis_mode = excluded.analysis_mode,
                     analysis_provider = excluded.analysis_provider,
                     fallback_reason = excluded.fallback_reason,
+                    question_generation_json = excluded.question_generation_json,
+                    recommendation_generation_json = excluded.recommendation_generation_json,
                     resource_mode = excluded.resource_mode,
                     resource_warning = excluded.resource_warning,
                     updated_at = excluded.updated_at
@@ -54,6 +58,7 @@ class InterviewPreparationRepository:
         source_analysis_id: str | None, skill_gaps: list[PreparationSkillGap],
         questions: list[PreparationQuestion], learning_resources: list[LearningResource],
         analysis_mode: str, analysis_provider: str | None, fallback_reason: str | None,
+        question_generation: PreparationGenerationStage,
         resource_mode: str, resource_warning: str | None,
     ) -> InterviewPreparationWorkspace:
         existing = self.get(user_id=user_id, saved_job_id=saved_job_id)
@@ -65,7 +70,10 @@ class InterviewPreparationRepository:
             status="questions_ready", skill_gaps=skill_gaps, questions=questions,
             answers=[], learning_resources=learning_resources, recommendations=[],
             analysis_mode=analysis_mode, analysis_provider=analysis_provider,
-            fallback_reason=fallback_reason, resource_mode=resource_mode,
+            fallback_reason=fallback_reason,
+            question_generation=question_generation,
+            recommendation_generation=None,
+            resource_mode=resource_mode,
             resource_warning=resource_warning,
             created_at=existing.created_at if existing else now, updated_at=now,
         ))
@@ -74,6 +82,7 @@ class InterviewPreparationRepository:
         self, item: InterviewPreparationWorkspace, *, answers: list[PreparationAnswer],
         recommendations: list[PreparationRecommendation], analysis_mode: str,
         analysis_provider: str | None, fallback_reason: str | None,
+        recommendation_generation: PreparationGenerationStage,
         learning_resources: list[LearningResource] | None = None,
         resource_mode: str | None = None, resource_warning: str | None = None,
     ) -> InterviewPreparationWorkspace:
@@ -81,6 +90,7 @@ class InterviewPreparationRepository:
             "status": "completed", "answers": answers,
             "recommendations": recommendations, "analysis_mode": analysis_mode,
             "analysis_provider": analysis_provider, "fallback_reason": fallback_reason,
+            "recommendation_generation": recommendation_generation,
             "learning_resources": learning_resources if learning_resources is not None else item.learning_resources,
             "resource_mode": resource_mode or item.resource_mode,
             "resource_warning": resource_warning,
@@ -115,6 +125,8 @@ class InterviewPreparationRepository:
             item.source_analysis_id, item.status, dump(item.skill_gaps), dump(item.questions),
             dump(item.answers), dump(item.learning_resources), dump(item.recommendations),
             item.analysis_mode, item.analysis_provider, item.fallback_reason,
+            _dump_stage(item.question_generation),
+            _dump_stage(item.recommendation_generation),
             item.resource_mode, item.resource_warning, item.created_at.isoformat(),
             item.updated_at.isoformat(),
         )
@@ -132,11 +144,23 @@ class InterviewPreparationRepository:
             learning_resources=load("learning_resources_json", LearningResource),
             recommendations=load("recommendations_json", PreparationRecommendation),
             analysis_mode=row["analysis_mode"], analysis_provider=row["analysis_provider"],
-            fallback_reason=row["fallback_reason"], resource_mode=row["resource_mode"],
+            fallback_reason=row["fallback_reason"],
+            question_generation=_load_stage(row, "question_generation_json"),
+            recommendation_generation=_load_stage(row, "recommendation_generation_json"),
+            resource_mode=row["resource_mode"],
             resource_warning=row["resource_warning"],
             created_at=datetime.fromisoformat(row["created_at"]),
             updated_at=datetime.fromisoformat(row["updated_at"]),
         )
+
+
+def _dump_stage(stage: PreparationGenerationStage | None) -> str | None:
+    return json.dumps(stage.model_dump(mode="json")) if stage else None
+
+
+def _load_stage(row: object, key: str) -> PreparationGenerationStage | None:
+    raw = row[key]
+    return PreparationGenerationStage.model_validate(json.loads(raw)) if raw else None
 
 
 interview_preparation_repository = InterviewPreparationRepository()

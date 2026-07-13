@@ -34,6 +34,7 @@ class EvaluationState(TypedDict, total=False):
     profile_id: str
     saved_job_id: str
     profile_memory: dict[str, object]
+    evidence_memory: list[dict[str, object]]
     job_context: dict[str, object]
     persona_memory: dict[str, object]
     preparation: dict[str, object]
@@ -78,6 +79,7 @@ class PreparationEvaluationAgent:
             "profile_id": profile_id,
             "saved_job_id": saved_job_id,
             "profile_memory": profile_memory,
+            "evidence_memory": _build_evidence_memory(profile_memory),
             "job_context": job_context,
             "question_index": 0,
             "answers": [],
@@ -137,10 +139,15 @@ class PreparationEvaluationAgent:
             user_prompt=_json_prompt({
                 "requested_archetype": self.persona_archetype,
                 "profile_memory": state["profile_memory"],
+                "evidence_memory": state["evidence_memory"],
                 "job_context": state["job_context"],
             }),
         )
         persona = CandidatePersona.model_validate(_normalize_persona_response(response))
+        _validate_memory_refs(
+            [ref for item in persona.skill_calibrations for ref in item.evidence_refs],
+            state["evidence_memory"],
+        )
         return {"persona_memory": persona.model_dump(mode="json")}
 
     async def _start_preparation(self, state: EvaluationState) -> EvaluationState:
@@ -162,6 +169,7 @@ class PreparationEvaluationAgent:
             system_prompt=_prompt("candidate_system.md"),
             user_prompt=_json_prompt({
                 "profile_memory": state["profile_memory"],
+                "evidence_memory": state["evidence_memory"],
                 "persona_memory": state["persona_memory"],
                 "episodic_memory": state.get("episodic_memory", []),
                 "job_context": state["job_context"],
@@ -173,14 +181,39 @@ class PreparationEvaluationAgent:
             "question_id": question["question_id"],
             "skill": question["skill"],
         })
-        valid_options = {item["value"] for item in question.get("options", [])}
-        if turn.experience_level not in valid_options:
-            raise ValueError(f"Evaluation model selected an unavailable option: {turn.experience_level}")
-        answer = PreparationAnswer(
-            question_id=turn.question_id,
-            experience_level=turn.experience_level,
-            detail=turn.detail,
-        )
+        options = {item["option_id"]: item for item in question.get("options", [])}
+        if turn.response_mode == "option":
+            option = options.get(turn.selected_option_id or "") or next(
+                (
+                    item for item in options.values()
+                    if item.get("value") == turn.experience_level
+                ),
+                None,
+            )
+            if option is None:
+                raise ValueError(
+                    f"Evaluation model selected an unavailable option: {turn.selected_option_id}"
+                )
+            turn = turn.model_copy(update={
+                "selected_option_id": option["option_id"],
+                "experience_level": option["value"],
+            })
+            answer = PreparationAnswer(
+                question_id=turn.question_id,
+                response_mode="option",
+                selected_option_id=turn.selected_option_id,
+                experience_level=turn.experience_level,
+                detail=turn.detail,
+            )
+        else:
+            if not question.get("free_text_allowed", True):
+                raise ValueError("Evaluation model used free text when it was unavailable")
+            answer = PreparationAnswer(
+                question_id=turn.question_id,
+                response_mode="free_text",
+                free_text=turn.free_text,
+            )
+        _validate_memory_refs(turn.fact_refs, state["evidence_memory"])
         return {
             "answers": [*state.get("answers", []), answer.model_dump(mode="json")],
             "episodic_memory": [
@@ -231,6 +264,7 @@ class PreparationEvaluationAgent:
             system_prompt=_prompt("reflection_system.md"),
             user_prompt=_json_prompt({
                 "profile_memory": state["profile_memory"],
+                "evidence_memory": state["evidence_memory"],
                 "persona_memory": state["persona_memory"],
                 "episodic_memory": state["episodic_memory"],
                 "job_context": state["job_context"],
@@ -246,10 +280,14 @@ class PreparationEvaluationAgent:
         recommendations = result.get("recommendations", [])
         resources = result.get("learning_resources", [])
         learning_levels = {"practice_only", "conceptual_only", "no_experience"}
+        question_by_id = {
+            item["question_id"]: item for item in result.get("questions", [])
+        }
         learning_skills = {
-            item["skill"].casefold()
-            for item in state["episodic_memory"]
-            if item["experience_level"] in learning_levels
+            question_by_id[item["question_id"]]["skill"].casefold()
+            for item in result.get("answers", [])
+            if item.get("experience_level") in learning_levels
+            and item.get("question_id") in question_by_id
         }
         resource_topics_valid = all(
             str(item.get("topic", "")).casefold() in learning_skills for item in resources
@@ -315,6 +353,47 @@ def _normalize_confidence_label(value: object) -> object:
     if "low" in parts:
         return "low"
     return value
+
+
+def _build_evidence_memory(profile: dict[str, object]) -> list[dict[str, object]]:
+    """Create stable references so later candidate turns can cite, not elaborate, facts."""
+    memory: list[dict[str, object]] = []
+
+    def visit(value: object, path: list[str]) -> None:
+        if isinstance(value, dict):
+            for key, child in value.items():
+                if key not in {
+                    "resume_profile_id", "user_id", "source_session_id",
+                    "source_confirmed_profile_id", "created_at", "updated_at",
+                    "archived_at", "raw_resume_text",
+                }:
+                    visit(child, [*path, str(key)])
+            return
+        if isinstance(value, list):
+            for index, child in enumerate(value):
+                visit(child, [*path, str(index)])
+            return
+        if value in (None, "", False):
+            return
+        field = ".".join(path)
+        memory.append({
+            "evidence_id": f"profile.{field}",
+            "field": field,
+            "content": value,
+            "provenance": "resume_profile",
+        })
+
+    visit(profile, [])
+    return memory
+
+
+def _validate_memory_refs(
+    refs: list[str], evidence_memory: list[dict[str, object]]
+) -> None:
+    allowed = {str(item["evidence_id"]) for item in evidence_memory}
+    unknown = sorted(set(refs) - allowed)
+    if unknown:
+        raise ValueError(f"Evaluation model cited unknown evidence IDs: {unknown}")
 
 
 def _prompt(name: str) -> str:

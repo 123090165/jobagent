@@ -50,6 +50,16 @@ def test_preparation_generates_gaps_resources_questions_and_prompt(monkeypatch, 
     workspace = response.json()
     assert workspace["status"] == "questions_ready"
     assert workspace["analysis_mode"] == "fallback"
+    question_generation = workspace["question_generation"]
+    assert question_generation["mode"] == "fallback"
+    assert question_generation["provider"] == "deepseek"
+    assert question_generation["prompt_version"] == "interview_preparation_questions_v3"
+    assert question_generation["attempts"] == 1
+    assert question_generation["fallback_reason"].startswith("LLMServiceError:")
+    assert question_generation["attempt_errors"] == [
+        question_generation["fallback_reason"]
+    ]
+    assert workspace["recommendation_generation"] is None
     assert {item["skill"] for item in workspace["skill_gaps"]} >= {"Microsoft Office", "Linux"}
     assert len(workspace["questions"]) <= 5
     assert all("Do you know" not in item["prompt"] for item in workspace["questions"])
@@ -98,6 +108,10 @@ def test_preparation_accepts_answers_and_preserves_saved_job(monkeypatch, tmp_pa
     assert completed["status"] == "completed"
     assert completed["answers"][0]["question_id"] == question["question_id"]
     assert completed["recommendations"]
+    assert completed["question_generation"] is not None
+    assert completed["recommendation_generation"] is not None
+    assert "questions:" in completed["fallback_reason"]
+    assert "recommendations:" in completed["fallback_reason"]
     assert client.get(
         f"/api/v1/saved-jobs/{job['saved_job_id']}", headers=headers
     ).status_code == 200

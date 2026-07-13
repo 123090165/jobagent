@@ -4,7 +4,7 @@ import { useRoute, useRouter } from "vue-router";
 import { NButton, NCollapse, NCollapseItem, NInput, NModal, NRadio, NRadioGroup, NSelect, NTabPane, NTabs, NTag } from "naive-ui";
 
 import { useSavedJobsStore } from "../stores/savedJobs";
-import type { PreparationAnswer, PreparationExperienceLevel, SavedJobStatus } from "../types/savedJob";
+import type { PreparationAnswer, PreparationQuestion, SavedJobStatus } from "../types/savedJob";
 
 const route = useRoute();
 const router = useRouter();
@@ -36,8 +36,15 @@ const activeQuestion = computed(() => preparation.value?.questions[currentPrepar
 const answeredQuestionCount = computed(() => Object.keys(preparationAnswers.value).length);
 const canCompletePreparation = computed(() =>
   Boolean(preparation.value?.questions.length) &&
-  preparation.value!.questions.every((question) => preparationAnswers.value[question.question_id]?.experience_level)
+  preparation.value!.questions.every((question) => isAnswerComplete(question))
 );
+const activeAnswer = computed(() => activeQuestion.value
+  ? preparationAnswers.value[activeQuestion.value.question_id]
+  : undefined
+);
+const activeOption = computed(() => activeQuestion.value?.options.find(
+  (item) => item.option_id === activeAnswer.value?.selected_option_id
+) ?? null);
 
 onMounted(async () => {
   try {
@@ -69,8 +76,17 @@ async function saveTracking() {
 function syncPreparationAnswers() {
   preparationAnswers.value = Object.fromEntries(
     (store.selectedPreparation?.answers ?? [])
-      .filter((item) => item.experience_level)
-      .map((item) => [item.question_id, item])
+      .filter((item) => item.experience_level || item.free_text)
+      .map((item) => {
+        if (item.response_mode === "option" && !item.selected_option_id && item.experience_level) {
+          const question = store.selectedPreparation?.questions.find(
+            (candidate) => candidate.question_id === item.question_id
+          );
+          const option = question?.options.find((candidate) => candidate.value === item.experience_level);
+          return [item.question_id, { ...item, selected_option_id: option?.option_id ?? null }];
+        }
+        return [item.question_id, item];
+      })
   );
 }
 
@@ -99,15 +115,50 @@ async function generatePreparation() {
   }
 }
 
-function updateExperienceLevel(value: PreparationExperienceLevel) {
+function updateSelectedOption(optionId: string) {
+  if (!activeQuestion.value) return;
+  const option = activeQuestion.value.options.find((item) => item.option_id === optionId);
+  if (!option) return;
+  const existing = preparationAnswers.value[activeQuestion.value.question_id];
+  preparationAnswers.value[activeQuestion.value.question_id] = {
+    question_id: activeQuestion.value.question_id,
+    response_mode: "option",
+    selected_option_id: option.option_id,
+    experience_level: option.value,
+    free_text: null,
+    detail: option.detail_policy === "not_needed" ? null : existing?.detail ?? null,
+    detail_quality: "not_provided"
+  };
+}
+
+function useFreeText() {
   if (!activeQuestion.value) return;
   const existing = preparationAnswers.value[activeQuestion.value.question_id];
   preparationAnswers.value[activeQuestion.value.question_id] = {
     question_id: activeQuestion.value.question_id,
-    experience_level: value,
-    detail: existing?.detail ?? null,
+    response_mode: "free_text",
+    selected_option_id: null,
+    experience_level: null,
+    free_text: existing?.free_text ?? "",
+    detail: null,
     detail_quality: "not_provided"
   };
+}
+
+function updateFreeText(value: string) {
+  if (!activeQuestion.value) return;
+  const existing = preparationAnswers.value[activeQuestion.value.question_id];
+  if (!existing) return;
+  preparationAnswers.value[activeQuestion.value.question_id] = { ...existing, free_text: value };
+}
+
+function isAnswerComplete(question: PreparationQuestion): boolean {
+  const answer = preparationAnswers.value[question.question_id];
+  if (!answer) return false;
+  if (answer.response_mode === "free_text") return Boolean(answer.free_text?.trim());
+  if (!answer.selected_option_id) return false;
+  const option = question.options.find((item) => item.option_id === answer.selected_option_id);
+  return option?.detail_policy !== "required" || Boolean(answer.detail?.trim());
 }
 
 function updateAnswerDetail(value: string) {
@@ -124,7 +175,8 @@ async function submitPreparation(action: "save" | "complete" | "stop") {
   if (!job.value || !preparation.value) return;
   const answers = Object.values(preparationAnswers.value).map((answer) => ({
     ...answer,
-    detail: answer.detail?.trim() || null
+    detail: answer.detail?.trim() || null,
+    free_text: answer.free_text?.trim() || null
   }));
   if (!answers.length) {
     if (action !== "stop") {
@@ -379,23 +431,41 @@ function formatValue(value: unknown): string {
           <small class="flow-meta">{{ activeQuestion.why_asked }}</small>
 
           <n-radio-group
-            :value="preparationAnswers[activeQuestion.question_id]?.experience_level"
+            :value="preparationAnswers[activeQuestion.question_id]?.selected_option_id"
             class="preparation-option-list"
-            @update:value="updateExperienceLevel"
+            @update:value="updateSelectedOption"
           >
-            <n-radio v-for="option in activeQuestion.options" :key="option.value" :value="option.value">
+            <n-radio v-for="option in activeQuestion.options" :key="option.option_id" :value="option.option_id">
               <span class="preparation-option-copy"><strong>{{ option.label }}</strong><small>{{ option.description }}</small></span>
             </n-radio>
           </n-radio-group>
 
-          <label v-if="preparationAnswers[activeQuestion.question_id]" class="draft-field">
-            <span>Optional detail</span>
-            <small class="flow-meta">Add a truthful example, your role, or an outcome. The selected option still controls the workflow.</small>
+          <n-button
+            v-if="activeQuestion.free_text_allowed && activeAnswer?.response_mode !== 'free_text'"
+            text
+            @click="useFreeText"
+          >None of these fits — explain in my own words</n-button>
+
+          <label v-if="activeAnswer?.response_mode === 'free_text'" class="draft-field">
+            <span>Your situation</span>
+            <small class="flow-meta">{{ activeQuestion.free_text_prompt }}</small>
             <n-input
-              :value="preparationAnswers[activeQuestion.question_id]?.detail || ''"
+              :value="activeAnswer.free_text || ''"
               type="textarea"
               :rows="3"
-              placeholder="Optional context..."
+              placeholder="Explain only what the options missed..."
+              @update:value="updateFreeText"
+            />
+          </label>
+
+          <label v-else-if="activeOption && activeOption.detail_policy !== 'not_needed'" class="draft-field">
+            <span>{{ activeOption.detail_policy === 'required' ? 'One focused follow-up' : 'Optional clarification' }}</span>
+            <small class="flow-meta">{{ activeOption.follow_up_prompt }}</small>
+            <n-input
+              :value="activeAnswer?.detail || ''"
+              type="textarea"
+              :rows="3"
+              placeholder="Use a truthful, concrete example..."
               @update:value="updateAnswerDetail"
             />
           </label>
@@ -405,7 +475,7 @@ function formatValue(value: unknown): string {
             <n-button
               v-if="currentPreparationQuestion < preparation.questions.length - 1"
               type="primary"
-              :disabled="!preparationAnswers[activeQuestion.question_id]"
+              :disabled="!isAnswerComplete(activeQuestion)"
               @click="currentPreparationQuestion++"
             >Next</n-button>
             <n-button v-else type="primary" :disabled="!canCompletePreparation" :loading="store.isSaving" @click="submitPreparation('complete')">

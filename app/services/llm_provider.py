@@ -15,7 +15,13 @@ DEFAULT_DEEPSEEK_BASE_URL = "https://api.deepseek.com"
 
 
 class JSONChatLLM(Protocol):
-    def chat_completion_json(self, *, system_prompt: str, user_prompt: str) -> dict:
+    def chat_completion_json(
+        self,
+        *,
+        system_prompt: str,
+        user_prompt: str,
+        expected_root_key: str | None = None,
+    ) -> dict:
         ...
 
 
@@ -33,7 +39,13 @@ class UnavailableLLMService:
     def __init__(self, reason: str) -> None:
         self.reason = reason
 
-    def chat_completion_json(self, *, system_prompt: str, user_prompt: str) -> dict:
+    def chat_completion_json(
+        self,
+        *,
+        system_prompt: str,
+        user_prompt: str,
+        expected_root_key: str | None = None,
+    ) -> dict:
         raise LLMServiceError(self.reason)
 
 

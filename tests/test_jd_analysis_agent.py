@@ -118,3 +118,12 @@ def test_parse_json_object_accepts_markdown_fenced_json() -> None:
     payload = parse_json_object('```json\n{"job_title": "Backend Engineer"}\n```')
 
     assert payload == {"job_title": "Backend Engineer"}
+
+
+def test_parse_json_object_wraps_top_level_array_only_for_expected_root() -> None:
+    payload = parse_json_object(
+        '[{"title": "Review PPG"}]',
+        expected_root_key="recommendations",
+    )
+
+    assert payload == {"recommendations": [{"title": "Review PPG"}]}

@@ -15,6 +15,7 @@ class PreparationAgentState(TypedDict, total=False):
     preparation_id: str
     questions: list[dict[str, object]]
     answers: list[dict[str, object]]
+    transitions: list[dict[str, object]]
     action: Literal["save", "complete", "stop"]
     status: Literal["questions_ready", "paused", "completed", "stopped"]
 
@@ -29,6 +30,7 @@ class PreparationAgent:
                     "preparation_id": preparation_id,
                     "questions": [item.model_dump(mode="json") for item in questions],
                     "answers": [],
+                    "transitions": [],
                     "status": "questions_ready",
                 },
                 self._config(preparation_id),
@@ -51,6 +53,7 @@ class PreparationAgent:
                         "preparation_id": preparation_id,
                         "questions": [item.model_dump(mode="json") for item in questions],
                         "answers": [],
+                        "transitions": [],
                         "status": "questions_ready",
                     },
                     config,
@@ -88,6 +91,36 @@ def _route_action(state: PreparationAgentState) -> str:
     return state.get("action", "save")
 
 
+def _reduce_answer_state(state: PreparationAgentState) -> PreparationAgentState:
+    """Record validated semantic transitions without letting model text mutate graph state."""
+    question_by_id = {
+        str(item.get("question_id")): item for item in state.get("questions", [])
+    }
+    transitions = []
+    for answer in state.get("answers", []):
+        question_id = str(answer.get("question_id") or "")
+        question = question_by_id.get(question_id, {})
+        options = {
+            str(item.get("option_id")): item for item in question.get("options", [])
+        }
+        option = options.get(str(answer.get("selected_option_id") or "")) or next(
+            (
+                item for item in options.values()
+                if item.get("value") == answer.get("experience_level")
+            ),
+            {},
+        )
+        transitions.append({
+            "question_id": question_id,
+            "skill": question.get("skill"),
+            "response_mode": answer.get("response_mode", "option"),
+            "selected_option_id": answer.get("selected_option_id"),
+            "evidence_transition": answer.get("evidence_transition") or option.get("evidence_transition"),
+            "route": answer.get("route") or option.get("route") or "clarify",
+        })
+    return {"transitions": transitions}
+
+
 def _pause(state: PreparationAgentState) -> PreparationAgentState:
     return {"status": "paused"}
 
@@ -106,12 +139,14 @@ def _compiled_graph(path: str):
     saver.setup()
     builder = StateGraph(PreparationAgentState)
     builder.add_node("wait_for_user", _wait_for_user)
+    builder.add_node("reduce_answer_state", _reduce_answer_state)
     builder.add_node("pause", _pause)
     builder.add_node("complete", _complete)
     builder.add_node("stop", _stop)
     builder.add_edge(START, "wait_for_user")
+    builder.add_edge("wait_for_user", "reduce_answer_state")
     builder.add_conditional_edges(
-        "wait_for_user",
+        "reduce_answer_state",
         _route_action,
         {"save": "pause", "complete": "complete", "stop": "stop"},
     )

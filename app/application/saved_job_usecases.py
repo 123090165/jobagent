@@ -26,6 +26,7 @@ from app.schemas.job_search import JobSearchResult
 from app.schemas.job_brief import JobBrief, JobBriefGenerateRequest
 from app.schemas.interview_preparation import (
     InterviewPreparationWorkspace,
+    PreparationGenerationStage,
     PreparationAnswerRequest,
     PreparationGenerateRequest,
 )
@@ -45,6 +46,7 @@ from app.services.interview_preparation_generator import (
     build_external_prompt,
     generate_preparation_questions,
     generate_recommendations,
+    resolve_preparation_answers,
 )
 from app.services.learning_resource_search import (
     OfficialCatalogResourceSearch,
@@ -199,16 +201,21 @@ async def generate_interview_preparation(
         analysis=analysis, resume_profiles=resume_profiles,
     )
     resolution = resolve_llm_provider(payload.llm_provider)
-    gaps, questions, mode, fallback_reason = generate_preparation_questions(
+    gaps, questions, question_generation = generate_preparation_questions(
         job, profile, analysis, llm_service=resolution.service
+    )
+    question_generation = question_generation.model_copy(
+        update={"provider": resolution.provider}
     )
     workspace = preparations.create(
         user_id=user_id, saved_job_id=saved_job_id,
         resume_profile_id=profile.resume_profile_id if profile else None,
         source_analysis_id=analysis.saved_job_analysis_id if analysis else None,
         skill_gaps=gaps, questions=questions, learning_resources=[],
-        analysis_mode=mode, analysis_provider=resolution.provider,
-        fallback_reason=fallback_reason, resource_mode="pending_answers",
+        analysis_mode=question_generation.mode, analysis_provider=resolution.provider,
+        fallback_reason=question_generation.fallback_reason,
+        question_generation=question_generation,
+        resource_mode="pending_answers",
         resource_warning=None,
     )
     preparation_agent.start(workspace.preparation_id, workspace.questions)
@@ -244,7 +251,18 @@ async def complete_interview_preparation(
             message="Answers must reference questions in this preparation workspace.",
             error_code="preparation_answer_invalid", status_code=400,
         )
-    normalized_answers = _classify_answer_details(payload.answers)
+    resolution = resolve_llm_provider(payload.llm_provider)
+    try:
+        routed_answers = resolve_preparation_answers(
+            item.questions, payload.answers, llm_service=resolution.service
+        )
+    except ValueError as exc:
+        raise JobAgentError(
+            message=str(exc),
+            error_code="preparation_answer_invalid",
+            status_code=400,
+        ) from exc
+    normalized_answers = _classify_answer_details(routed_answers)
     transition = preparation_agent.resume(
         item.preparation_id,
         normalized_answers,
@@ -258,9 +276,15 @@ async def complete_interview_preparation(
             answers=normalized_answers,
             status=transition["status"],
         )
-    resolution = resolve_llm_provider(payload.llm_provider)
-    recommendations, mode, fallback_reason = generate_recommendations(
+    recommendations, recommendation_generation = generate_recommendations(
         updated_gaps, item.questions, normalized_answers, llm_service=resolution.service
+    )
+    recommendation_generation = recommendation_generation.model_copy(
+        update={"provider": resolution.provider}
+    )
+    mode, fallback_reason = _summarize_generation_stages(
+        item.question_generation,
+        recommendation_generation,
     )
     resources, resource_mode, resource_warning = await _resources_for_preparation_answers(
         updated_gaps, item.questions, normalized_answers
@@ -270,9 +294,35 @@ async def complete_interview_preparation(
         answers=normalized_answers, recommendations=recommendations,
         analysis_mode=mode, analysis_provider=resolution.provider,
         fallback_reason=fallback_reason,
+        recommendation_generation=recommendation_generation,
         learning_resources=resources, resource_mode=resource_mode,
         resource_warning=resource_warning,
     )
+
+
+def _summarize_generation_stages(
+    question_generation: PreparationGenerationStage | None,
+    recommendation_generation: PreparationGenerationStage | None,
+) -> tuple[str, str | None]:
+    stages = [
+        ("questions", question_generation),
+        ("recommendations", recommendation_generation),
+    ]
+    available = [(name, stage) for name, stage in stages if stage is not None]
+    if not available:
+        return "deterministic", None
+    if any(stage.mode == "fallback" for _, stage in available):
+        mode = "fallback"
+    elif any(stage.mode == "llm" for _, stage in available):
+        mode = "llm"
+    else:
+        mode = "deterministic"
+    reasons = [
+        f"{name}: {stage.fallback_reason}"
+        for name, stage in available
+        if stage.fallback_reason
+    ]
+    return mode, "; ".join(reasons) or None
 
 
 def _apply_preparation_answers(skill_gaps, questions, answers):
@@ -288,14 +338,15 @@ def _apply_preparation_answers(skill_gaps, questions, answers):
             updated.append(gap)
             continue
         level = answer.experience_level
-        if level in {"work_experience", "project_experience"}:
-            evidence_status = "supported" if (answer.detail or answer.answer) else "partial"
-        elif level in {"practice_only", "conceptual_only", "uncertain"}:
+        evidence_status = answer.evidence_transition
+        if evidence_status is None and level in {"work_experience", "project_experience"}:
+            evidence_status = "supported" if (answer.detail or answer.free_text or answer.answer) else "partial"
+        elif evidence_status is None and level in {"practice_only", "conceptual_only"}:
             evidence_status = "partial"
-        elif level == "no_experience":
+        elif evidence_status is None and level == "no_experience":
             evidence_status = "missing"
-        else:
-            evidence_status = "partial"
+        elif evidence_status is None:
+            evidence_status = "unknown"
         updated.append(gap.model_copy(update={
             "evidence_status": evidence_status,
             "evidence_origin": "user_reported",
@@ -307,7 +358,7 @@ def _classify_answer_details(answers):
     specific_markers = ("built", "created", "implemented", "used", "reduced", "increased", "result", "team")
     normalized = []
     for answer in answers:
-        detail = (answer.detail or answer.answer or "").strip()
+        detail = (answer.detail or answer.free_text or answer.answer or "").strip()
         quality = "not_provided"
         if detail:
             quality = "specific" if len(detail) >= 40 and any(

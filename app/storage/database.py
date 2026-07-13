@@ -483,6 +483,8 @@ def init_database(connection: sqlite3.Connection) -> None:
             analysis_mode TEXT NOT NULL,
             analysis_provider TEXT,
             fallback_reason TEXT,
+            question_generation_json TEXT,
+            recommendation_generation_json TEXT,
             resource_mode TEXT NOT NULL DEFAULT 'none',
             resource_warning TEXT,
             created_at TEXT NOT NULL,
@@ -556,6 +558,8 @@ def init_database(connection: sqlite3.Connection) -> None:
     _ensure_column(connection, "parsed_resume_reviews", "analysis_mode", "TEXT DEFAULT 'deterministic'")
     _ensure_column(connection, "parsed_resume_reviews", "analysis_provider", "TEXT")
     _ensure_column(connection, "parsed_resume_reviews", "analysis_warnings_json", "TEXT DEFAULT '[]'")
+    _ensure_column(connection, "interview_preparations", "question_generation_json", "TEXT")
+    _ensure_column(connection, "interview_preparations", "recommendation_generation_json", "TEXT")
     _ensure_user_columns(connection)
     _backfill_user_ownership(connection)
     _backfill_saved_job_status_events(connection)
@@ -577,6 +581,9 @@ def init_database(connection: sqlite3.Connection) -> None:
         connection.execute(
             "INSERT INTO schema_migrations (version, name) VALUES (3, 'saved_job_origin_lineage')"
         )
+    connection.execute(
+        "INSERT OR IGNORE INTO schema_migrations (version, name) VALUES (4, 'preparation_generation_stages')"
+    )
     _seed_learning_catalog(connection)
     connection.commit()
 
