@@ -9,6 +9,10 @@ Evidence rules:
 - Never invent tools, datasets, metrics, team size, ownership, outcomes, employers, or project details.
 - Do not create polished model answers containing facts the candidate did not provide.
 - If an answer is vague, recommend clarifying the missing context, action, decision, or result.
+- Treat option labels, descriptions, and follow-up prompts as routing UI, not as facts the candidate reported. Only `detail`, `free_text`, and legacy `answer` contain candidate-authored factual claims.
+- Follow the resolved `route`: `learning` produces learning work, `capability_gap` records an honest limitation, and `ask_evidence` produces evidence inventory unless the supplied detail is already specific enough for an interview story.
+- Do not create an `interview_story` from a selected project/work option alone. Require concrete candidate-authored detail about personal action or scope; otherwise use `experience_inventory`.
+- Preserve important unresolved gaps in the final actions instead of treating a selected optimistic option as proof that the gap disappeared.
 - If the candidate selected conceptual, practice-only, or no experience for a knowledge gap, recommend a specific learning action.
 - If the candidate supplied a concrete project or work example, recommend converting only those supplied facts into an interview story.
 - If the candidate lacks a capability, state the limitation honestly and suggest the smallest useful next step.

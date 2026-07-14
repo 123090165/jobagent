@@ -53,47 +53,69 @@ def _job() -> SavedJob:
     )
 
 
+def _gap(skill: str) -> dict[str, object]:
+    return {
+        "skill": skill,
+        "importance": "high",
+        "evidence_status": "unknown",
+        "skill_type": "knowledge",
+        "jd_evidence": f"The JD requires {skill}.",
+        "profile_evidence": [],
+        "rationale": "No concrete profile evidence.",
+    }
+
+
+def _question(skill: str) -> dict[str, object]:
+    return {
+        "skill": skill,
+        "prompt": f"Which description best matches your {skill} experience?",
+        "why_asked": "The current level is unknown.",
+        "options": [
+            {
+                "option_id": f"implemented_{skill}",
+                "value": "project_experience",
+                "label": f"Implemented {skill}",
+                "description": "I implemented and evaluated relevant processing.",
+                "evidence_transition": "supported",
+                "route": "ask_evidence",
+                "detail_policy": "required",
+                "follow_up_prompt": "What did you implement and how did you evaluate it?",
+                "decision_dimension": "hands_on_implementation",
+            },
+            {
+                "option_id": f"concept_{skill}",
+                "value": "conceptual_only",
+                "label": "Conceptual understanding only",
+                "description": "I understand it but have not implemented it.",
+                "evidence_transition": "partial",
+                "route": "learning",
+                "detail_policy": "not_needed",
+                "decision_dimension": "conceptual_vs_hands_on",
+            },
+        ],
+    }
+
+
 def test_question_generation_retries_schema_output_and_records_attempts() -> None:
     llm = SequenceLLM([
         LLMServiceError("LLM JSON output must be an object"),
         {
-            "skill_gaps": [{
-                "skill": "PPG signal processing",
-                "importance": "high",
-                "evidence_status": "unknown",
-                "skill_type": "knowledge",
-                "jd_evidence": "Process PPG signals.",
-                "profile_evidence": [],
-                "rationale": "No concrete profile evidence.",
-            }],
-            "questions": [{
-                "skill": "PPG signal processing",
-                "prompt": "Which description best matches your PPG experience?",
-                "why_asked": "The current level is unknown.",
-                "options": [
-                    {
-                        "option_id": "implemented_pipeline",
-                        "value": "project_experience",
-                        "label": "Implemented a PPG pipeline",
-                        "description": "I implemented and evaluated relevant processing.",
-                        "evidence_transition": "supported",
-                        "route": "ask_evidence",
-                        "detail_policy": "required",
-                        "follow_up_prompt": "What did you implement and how did you evaluate it?",
-                        "decision_dimension": "signal_quality_implementation",
-                    },
-                    {
-                        "option_id": "concept_only",
-                        "value": "conceptual_only",
-                        "label": "Conceptual understanding only",
-                        "description": "I understand it but have not implemented it.",
-                        "evidence_transition": "partial",
-                        "route": "learning",
-                        "detail_policy": "not_needed",
-                        "decision_dimension": "conceptual_vs_hands_on",
-                    },
-                ],
-            }],
+            "skill_gaps": [
+                _gap(skill)
+                for skill in (
+                    "blood pressure estimation",
+                    "multimodal physiological signal fusion",
+                    "PPG signal processing",
+                )
+            ],
+            "questions": [
+                _question(skill)
+                for skill in (
+                    "blood pressure estimation",
+                    "multimodal physiological signal fusion",
+                    "PPG signal processing",
+                )
+            ],
         },
     ])
 
@@ -101,8 +123,8 @@ def test_question_generation_retries_schema_output_and_records_attempts() -> Non
         _job(), None, None, llm_service=llm
     )
 
-    assert gaps[0].skill == "PPG signal processing"
-    assert questions[0].skill == "PPG signal processing"
+    assert {item.skill for item in gaps} >= {"PPG signal processing"}
+    assert {item.skill for item in questions} >= {"PPG signal processing"}
     assert stage.mode == "llm"
     assert stage.attempts == 2
     assert stage.attempt_errors == [
@@ -110,6 +132,69 @@ def test_question_generation_retries_schema_output_and_records_attempts() -> Non
     ]
     assert "root MUST be one object" in llm.system_prompts[0]
     assert "FORMAT CORRECTION" in llm.system_prompts[1]
+
+
+def test_question_generation_retries_when_required_jd_coverage_is_missing() -> None:
+    complete = {
+        "skill_gaps": [
+            _gap(skill)
+            for skill in (
+                "blood pressure estimation",
+                "multimodal physiological signal fusion",
+                "PPG signal processing",
+            )
+        ],
+        "questions": [
+            _question(skill)
+            for skill in (
+                "blood pressure estimation",
+                "multimodal physiological signal fusion",
+                "PPG signal processing",
+            )
+        ],
+    }
+    llm = SequenceLLM([
+        {
+            "skill_gaps": [_gap("PPG signal processing")],
+            "questions": [_question("PPG signal processing")],
+        },
+        complete,
+    ])
+
+    _, questions, stage = generate_preparation_questions(
+        _job(), None, None, llm_service=llm
+    )
+
+    assert len(questions) == 3
+    assert stage.mode == "llm"
+    assert stage.attempts == 2
+    assert "Question coverage is too small" in stage.attempt_errors[0]
+    assert "Question coverage is too small" in llm.system_prompts[1]
+
+
+def test_deterministic_coverage_uses_structured_jd_evidence_quotes() -> None:
+    job = _job().model_copy(update={
+        "raw_jd_text": "Develop physiological-signal algorithms.",
+        "structured_jd": {
+            "evidence_quotes": [
+                "Fuse PPG, ECG, and ACC signals for blood-pressure estimation."
+            ]
+        },
+    })
+
+    gaps, questions, stage = generate_preparation_questions(
+        job, None, None, llm_service=None
+    )
+
+    skills = {item.skill for item in gaps}
+    assert {
+        "PPG signal processing",
+        "ECG signal processing",
+        "ACC motion signal analysis",
+        "blood pressure estimation",
+    } <= skills
+    assert len(questions) >= 3
+    assert stage.mode == "deterministic"
 
 
 def test_free_text_is_classified_to_a_question_option_without_rewriting_it() -> None:

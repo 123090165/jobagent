@@ -53,7 +53,7 @@ def test_preparation_generates_gaps_resources_questions_and_prompt(monkeypatch, 
     question_generation = workspace["question_generation"]
     assert question_generation["mode"] == "fallback"
     assert question_generation["provider"] == "deepseek"
-    assert question_generation["prompt_version"] == "interview_preparation_questions_v4"
+    assert question_generation["prompt_version"] == "interview_preparation_questions_v5"
     assert question_generation["attempts"] == 1
     assert question_generation["fallback_reason"].startswith("LLMServiceError:")
     assert question_generation["attempt_errors"] == [
@@ -92,7 +92,7 @@ def test_preparation_accepts_answers_and_preserves_saved_job(monkeypatch, tmp_pa
     ).json()
     question = workspace["questions"][0]
 
-    response = client.put(
+    incomplete = client.put(
         f"/api/v1/saved-jobs/{job['saved_job_id']}/preparation/answers",
         headers=headers,
         json={
@@ -100,6 +100,22 @@ def test_preparation_accepts_answers_and_preserves_saved_job(monkeypatch, tmp_pa
                 "question_id": question["question_id"],
                 "answer": "I diagnosed a Linux permission failure using ls -l and chmod, then reran the service check.",
             }]
+        },
+    )
+    assert incomplete.status_code == 400
+    assert incomplete.json()["error_code"] == "preparation_answers_incomplete"
+
+    response = client.put(
+        f"/api/v1/saved-jobs/{job['saved_job_id']}/preparation/answers",
+        headers=headers,
+        json={
+            "answers": [
+                {
+                    "question_id": item["question_id"],
+                    "answer": "I used this capability in a bounded exercise and need to clarify the exact scope.",
+                }
+                for item in workspace["questions"]
+            ]
         },
     )
 
@@ -161,6 +177,41 @@ def test_preparation_structured_answers_control_state_and_recommendation(monkeyp
     assert {item["source"] for item in completed.json()["learning_resources"]} >= {
         "Ubuntu Documentation", "Microsoft Support"
     }
+
+
+def test_preparation_requires_focused_detail_before_completion(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("JOBAGENT_DB_PATH", str(tmp_path / "preparation-detail.sqlite3"))
+    headers = _headers("preparation-detail")
+    job = _job(headers)
+    workspace = client.post(
+        f"/api/v1/saved-jobs/{job['saved_job_id']}/preparation",
+        headers=headers,
+        json={},
+    ).json()
+    first = workspace["questions"][0]
+    required = next(
+        item for item in first["options"] if item["detail_policy"] == "required"
+    )
+    answers = [
+        {
+            "question_id": question["question_id"],
+            "experience_level": "no_experience",
+        }
+        for question in workspace["questions"]
+    ]
+    answers[0] = {
+        "question_id": first["question_id"],
+        "selected_option_id": required["option_id"],
+    }
+
+    response = client.put(
+        f"/api/v1/saved-jobs/{job['saved_job_id']}/preparation/answers",
+        headers=headers,
+        json={"answers": answers, "action": "complete"},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["error_code"] == "preparation_answer_detail_required"
 
 
 def test_preparation_can_stop_without_answers_or_summary(monkeypatch, tmp_path) -> None:

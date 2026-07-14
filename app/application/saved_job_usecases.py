@@ -268,6 +268,8 @@ async def complete_interview_preparation(
             status_code=400,
         ) from exc
     normalized_answers = _classify_answer_details(routed_answers)
+    if payload.action == "complete":
+        _validate_complete_preparation_answers(item.questions, normalized_answers)
     transition = preparation_agent.resume(
         item.preparation_id,
         normalized_answers,
@@ -381,6 +383,39 @@ def _classify_answer_details(answers):
             ) else "vague"
         normalized.append(answer.model_copy(update={"detail_quality": quality}))
     return normalized
+
+
+def _validate_complete_preparation_answers(questions, answers) -> None:
+    answer_by_id = {item.question_id: item for item in answers}
+    missing = [
+        item.question_id for item in questions if item.question_id not in answer_by_id
+    ]
+    if missing:
+        raise JobAgentError(
+            message="Complete every preparation question before generating the summary.",
+            error_code="preparation_answers_incomplete",
+            status_code=400,
+        )
+    for question in questions:
+        answer = answer_by_id[question.question_id]
+        if answer.response_mode == "free_text":
+            continue
+        option = next(
+            (
+                item
+                for item in question.options
+                if item.option_id == answer.selected_option_id
+            ),
+            None,
+        )
+        if option is not None and option.detail_policy == "required" and not (
+            answer.detail or ""
+        ).strip():
+            raise JobAgentError(
+                message=f"A focused follow-up is required for {question.skill}.",
+                error_code="preparation_answer_detail_required",
+                status_code=400,
+            )
 
 
 async def _resources_for_preparation_answers(gaps, questions, answers):

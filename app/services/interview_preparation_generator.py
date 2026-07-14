@@ -20,8 +20,8 @@ from app.services.llm_observability import llm_observation_context
 from app.services.llm_service import LLMServiceError
 
 
-QUESTIONS_PROMPT_VERSION = "interview_preparation_questions_v4"
-RECOMMENDATIONS_PROMPT_VERSION = "interview_preparation_recommendations_v2"
+QUESTIONS_PROMPT_VERSION = "interview_preparation_questions_v5"
+RECOMMENDATIONS_PROMPT_VERSION = "interview_preparation_recommendations_v3"
 ANSWER_CLASSIFICATION_PROMPT_VERSION = "interview_preparation_answer_classification_v1"
 QUESTIONS_SYSTEM_PROMPT = load_prompt("interview_preparation/questions_system.md")
 RECOMMENDATIONS_SYSTEM_PROMPT = load_prompt(
@@ -34,7 +34,51 @@ ANSWER_CLASSIFICATION_SYSTEM_PROMPT = load_prompt(
 KNOWN_SKILLS = (
     "Microsoft Office", "Excel", "PowerPoint", "Word", "Linux", "SQL",
     "Python", "Java", "C++", "Git", "Docker", "Kubernetes", "FastAPI",
+    "PyTorch", "TensorFlow",
     "communication", "project management", "data analysis", "machine learning",
+)
+
+# Deterministic coverage anchors keep a valid-looking model response from
+# silently collapsing a multi-skill JD into one or two generic gaps. The model
+# still owns the job-specific wording, options, and routing semantics.
+JD_REQUIREMENT_PATTERNS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
+    (
+        "blood pressure estimation",
+        "knowledge",
+        (r"blood[ -]?pressure", r"血压", r"cuffless\s+BP"),
+    ),
+    (
+        "multimodal physiological signal fusion",
+        "knowledge",
+        (r"multimodal.{0,40}fusion", r"多模态.{0,20}融合", r"多源.{0,20}融合"),
+    ),
+    ("PPG signal processing", "knowledge", (r"\bPPG\b", r"光电容积")),
+    ("ECG signal processing", "knowledge", (r"\bECG\b", r"心电")),
+    (
+        "ACC motion signal analysis",
+        "knowledge",
+        (r"\bACC\b", r"acceleromet", r"加速度", r"运动信号"),
+    ),
+    (
+        "motion-artifact handling",
+        "knowledge",
+        (r"motion artifact", r"运动伪影", r"运动干扰"),
+    ),
+    (
+        "data annotation and quality assurance",
+        "experience",
+        (r"data annotation", r"数据标注", r"质量标准", r"quality assurance"),
+    ),
+    (
+        "edge deployment and real-time optimization",
+        "knowledge",
+        (r"edge deploy", r"real[ -]?time", r"端侧", r"边缘部署", r"实时处理"),
+    ),
+    (
+        "cross-team technical collaboration",
+        "experience",
+        (r"cross[ -]?functional", r"cross[ -]?team", r"跨团队", r"协同.{0,12}团队"),
+    ),
 )
 
 def generate_preparation_questions(
@@ -79,6 +123,7 @@ def generate_preparation_questions(
                         QUESTIONS_SYSTEM_PROMPT,
                         attempt=attempt,
                         expected_shape='{ "skill_gaps": [...], "questions": [...] }',
+                        correction=errors[-1] if errors else None,
                     ),
                     user_prompt=user_prompt,
                 )
@@ -91,6 +136,7 @@ def generate_preparation_questions(
                 raise ValueError("No skill gaps returned")
             questions = _questions_with_ids(raw_questions, require_model_options=True)[:5]
             questions = questions or _deterministic_questions(gaps) or fallback_questions
+            _validate_question_coverage(fallback_gaps, gaps, questions)
             return gaps, questions, PreparationGenerationStage(
                 mode="llm",
                 prompt_version=QUESTIONS_PROMPT_VERSION,
@@ -150,6 +196,7 @@ def generate_recommendations(
                         RECOMMENDATIONS_SYSTEM_PROMPT,
                         attempt=attempt,
                         expected_shape='{ "recommendations": [...] }',
+                        correction=errors[-1] if errors else None,
                     ),
                     user_prompt=user_prompt,
                     expected_root_key="recommendations",
@@ -323,15 +370,23 @@ def _restore_answer_order(
     return [by_id[item.question_id] for item in original if item.question_id in by_id]
 
 
-def _prompt_for_attempt(base_prompt: str, *, attempt: int, expected_shape: str) -> str:
+def _prompt_for_attempt(
+    base_prompt: str,
+    *,
+    attempt: int,
+    expected_shape: str,
+    correction: str | None = None,
+) -> str:
     if attempt == 1:
         return base_prompt
     return (
         f"{base_prompt}\n\n"
         "FORMAT CORRECTION: The previous response was rejected by the local JSON/schema "
-        "validator. Re-evaluate the supplied context, but correct only the output contract. "
+        "validator. Re-evaluate the supplied context and correct the specific contract or "
+        "coverage issue reported below. Do not change grounded facts merely to pass validation. "
         f"Return exactly one JSON object shaped like {expected_shape}. Do not return a "
-        "top-level array, prose, markdown, or an empty result."
+        "top-level array, prose, markdown, or an empty result. "
+        f"Previous validator error: {correction or 'output contract rejected'}."
     )
 
 
@@ -377,25 +432,53 @@ def build_external_prompt(
 def _deterministic_gaps(
     job: SavedJob, profile: ResumeProfile | None, analysis: SavedJobAnalysis | None
 ) -> list[PreparationSkillGap]:
-    jd_text = job.raw_jd_text
+    jd_text = _job_requirement_text(job)
     profile_text = " ".join(
         (profile.core_skills + profile.supporting_skills + profile.strengths + [profile.summary])
         if profile else []
     )
-    skills = [skill for skill in KNOWN_SKILLS if re.search(rf"\b{re.escape(skill)}\b", jd_text, re.I)]
+    detected: list[tuple[str, str, str]] = []
+    for skill, skill_type, patterns in JD_REQUIREMENT_PATTERNS:
+        match = _first_pattern_match(patterns, jd_text)
+        if match is not None:
+            detected.append((skill, skill_type, match.group(0)))
+    for skill in KNOWN_SKILLS:
+        match = re.search(rf"\b{re.escape(skill)}\b", jd_text, re.I)
+        if match is not None and not any(
+            item[0].casefold() == skill.casefold() for item in detected
+        ):
+            skill_type = (
+                "experience"
+                if skill.casefold() in {"communication", "project management"}
+                else "knowledge"
+            )
+            detected.append((skill, skill_type, match.group(0)))
     for item in (analysis.critical_gaps if analysis else []):
         for skill in KNOWN_SKILLS:
-            if skill.casefold() in item.casefold() and skill not in skills:
-                skills.append(skill)
+            if skill.casefold() in item.casefold() and not any(
+                detected_skill.casefold() == skill.casefold()
+                for detected_skill, _, _ in detected
+            ):
+                detected.append((skill, "knowledge", skill))
     gaps: list[PreparationSkillGap] = []
-    for index, skill in enumerate(skills[:8]):
-        supported = re.search(rf"\b{re.escape(skill)}\b", profile_text, re.I) is not None
+    for index, (skill, skill_type, matched_term) in enumerate(detected[:8]):
+        patterns = next(
+            (
+                item_patterns
+                for pattern_skill, _, item_patterns in JD_REQUIREMENT_PATTERNS
+                if pattern_skill == skill
+            ),
+            (),
+        )
+        supported = _first_pattern_match(patterns, profile_text) is not None or (
+            re.search(rf"\b{re.escape(skill)}\b", profile_text, re.I) is not None
+        )
         gaps.append(PreparationSkillGap(
             skill=skill,
-            importance="high" if index < 3 else "medium",
+            importance="high" if index < 5 else "medium",
             evidence_status="partial" if supported else "unknown",
-            skill_type="experience" if skill.casefold() in {"communication", "project management"} else "knowledge",
-            jd_evidence=_sentence_containing(jd_text, skill),
+            skill_type=skill_type,
+            jd_evidence=_sentence_containing(jd_text, matched_term),
             profile_evidence=[skill] if supported else [],
             rationale=(
                 "The profile mentions this skill but lacks a concrete example."
@@ -410,6 +493,36 @@ def _deterministic_gaps(
             rationale="The JD should be validated against a concrete example from the user.",
         ))
     return gaps
+
+
+def _job_requirement_text(job: SavedJob) -> str:
+    parts = [job.raw_jd_text]
+    structured = job.structured_jd or {}
+    for key in (
+        "raw_snippet",
+        "evidence_quotes",
+        "responsibilities",
+        "requirements",
+        "required_skills",
+        "must_have_skills",
+        "preferred_skills",
+    ):
+        value = structured.get(key)
+        if isinstance(value, str):
+            parts.append(value)
+        elif isinstance(value, list):
+            parts.extend(str(item) for item in value if isinstance(item, str))
+    return "\n".join(dict.fromkeys(item for item in parts if item))
+
+
+def _first_pattern_match(
+    patterns: tuple[str, ...], text: str
+) -> re.Match[str] | None:
+    for pattern in patterns:
+        match = re.search(pattern, text, re.I)
+        if match is not None:
+            return match
+    return None
 
 
 def _deterministic_questions(gaps: list[PreparationSkillGap]) -> list[PreparationQuestion]:
@@ -462,6 +575,15 @@ def _questions_with_ids(
                 raise ValueError(
                     f"Question for {skill} uses generic rather than skill-specific dimensions"
                 )
+            for option in options:
+                if option.route in {"ask_evidence", "clarify"} and (
+                    option.detail_policy != "required"
+                    or not (option.follow_up_prompt or "").strip()
+                ):
+                    raise ValueError(
+                        f"Option {option.option_id} for {skill} routes to "
+                        f"{option.route} but does not require a focused follow-up"
+                    )
         questions.append(PreparationQuestion(
             question_id=str(uuid5(NAMESPACE_URL, f"{skill}:{prompt}")),
             skill=skill, prompt=prompt,
@@ -538,7 +660,7 @@ def _fallback_options(gap: PreparationSkillGap) -> list[PreparationAnswerOption]
             description="My situation overlaps multiple choices or the question is too broad.",
             evidence_transition="unknown",
             route="clarify",
-            detail_policy="optional",
+            detail_policy="required",
             follow_up_prompt="What part of the choices does not fit your actual situation?",
             decision_dimension="unclassified_boundary",
         ),
@@ -553,6 +675,11 @@ def _question_generation_memory(
     fallback_questions: list[PreparationQuestion],
 ) -> dict[str, object]:
     profile_dump = profile.model_dump(mode="json") if profile else None
+    coverage = [
+        item.model_dump(mode="json")
+        for item in fallback_gaps
+        if item.evidence_status in {"partial", "unknown", "missing"}
+    ][:5]
     return {
         "job_requirement_memory": {
             "saved_job_id": job.saved_job_id,
@@ -568,6 +695,16 @@ def _question_generation_memory(
         },
         "analysis_memory": analysis.model_dump(mode="json") if analysis else None,
         "gap_state_memory": [item.model_dump(mode="json") for item in fallback_gaps],
+        "required_coverage_memory": {
+            "skills": coverage[: min(3, len(coverage))],
+            "additional_candidates": coverage[min(3, len(coverage)) :],
+            "minimum_question_count": min(3, len(coverage)),
+            "rule": (
+                "Cover every skill in skills before lower-priority gaps. Preserve each "
+                "required anchor's skill name exactly in skill_gaps and questions. "
+                "Use additional_candidates to fill remaining question capacity when useful."
+            ),
+        },
         "routing_policy": {
             "model_proposes_semantics": True,
             "backend_validates_transitions": True,
@@ -582,6 +719,63 @@ def _question_generation_memory(
             "questions": [item.model_dump(mode="json") for item in fallback_questions],
         },
     }
+
+
+def _validate_question_coverage(
+    seed_gaps: list[PreparationSkillGap],
+    model_gaps: list[PreparationSkillGap],
+    questions: list[PreparationQuestion],
+) -> None:
+    unresolved = {"partial", "unknown", "missing"}
+    coverage_seeds = [
+        item for item in seed_gaps if item.evidence_status in unresolved
+    ][:5]
+    minimum = min(3, len(coverage_seeds))
+    if len(questions) < minimum:
+        raise ValueError(
+            f"Question coverage is too small: expected at least {minimum}, "
+            f"got {len(questions)}"
+        )
+
+    question_skills = [_normalized_skill(item.skill) for item in questions]
+    if len(question_skills) != len(set(question_skills)):
+        raise ValueError("Questions must cover distinct skills")
+
+    model_gap_skills = {_normalized_skill(item.skill) for item in model_gaps}
+    orphaned = [
+        item.skill
+        for item in questions
+        if _normalized_skill(item.skill) not in model_gap_skills
+    ]
+    if orphaned:
+        raise ValueError(f"Questions without matching skill gaps: {orphaned}")
+
+    missing = [
+        item.skill
+        for item in coverage_seeds[:minimum]
+        if _normalized_skill(item.skill) not in question_skills
+    ]
+    if missing:
+        raise ValueError(f"Missing required JD coverage: {missing}")
+
+    high_priority = [
+        item
+        for item in model_gaps
+        if item.importance == "high" and item.evidence_status in unresolved
+    ][:5]
+    missing_high = [
+        item.skill
+        for item in high_priority
+        if _normalized_skill(item.skill) not in question_skills
+    ]
+    if missing_high:
+        raise ValueError(f"High-priority gaps lack questions: {missing_high}")
+
+
+def _normalized_skill(value: str) -> str:
+    return " ".join(
+        re.findall(r"[a-z0-9]+|[\u4e00-\u9fff]+", value.casefold())
+    )
 
 
 def _deterministic_recommendations(
