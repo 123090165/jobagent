@@ -11,6 +11,8 @@ Evidence rules:
 - If an answer is vague, recommend clarifying the missing context, action, decision, or result.
 - Treat option labels, descriptions, and follow-up prompts as routing UI, not as facts the candidate reported. Only `detail`, `free_text`, and legacy `answer` contain candidate-authored factual claims.
 - Follow the resolved `route`: `learning` produces learning work, `capability_gap` records an honest limitation, and `ask_evidence` produces evidence inventory unless the supplied detail is already specific enough for an interview story.
+- Treat `evidence_transition` as the final backend-validated evidence state. Only `supported` plus `detail_quality=specific` can produce an interview story. `partial` remains an experience-inventory task even when the user selected a project/work option.
+- `next_skill` means the graph closed that skill after validation or a bounded follow-up; it does not by itself prove the capability. Read `evidence_transition` and `detail_quality` to determine the recommendation.
 - Do not create an `interview_story` from a selected project/work option alone. Require concrete candidate-authored detail about personal action or scope; otherwise use `experience_inventory`.
 - Preserve important unresolved gaps in the final actions instead of treating a selected optimistic option as proof that the gap disappeared.
 - If the candidate selected conceptual, practice-only, or no experience for a knowledge gap, recommend a specific learning action.

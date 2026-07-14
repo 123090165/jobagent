@@ -26,6 +26,7 @@ from app.schemas.job_search import JobSearchResult
 from app.schemas.job_brief import JobBrief, JobBriefGenerateRequest
 from app.schemas.interview_preparation import (
     InterviewPreparationWorkspace,
+    PreparationAnswer,
     PreparationGenerationStage,
     PreparationAnswerRequest,
     PreparationGenerateRequest,
@@ -55,7 +56,7 @@ from app.services.learning_resource_search import (
 )
 from app.services.llm_provider import resolve_llm_provider
 from app.services.llm_observability import langfuse_span
-from app.services.preparation_agent import preparation_agent
+from app.services.preparation_agent import classify_answer_detail, preparation_agent
 
 
 def list_saved_jobs(
@@ -253,11 +254,12 @@ async def complete_interview_preparation(
             message="Answers must reference questions in this preparation workspace.",
             error_code="preparation_answer_invalid", status_code=400,
         )
+    submitted_answers = _merge_preparation_answers(item.answers, payload.answers)
     resolution = resolve_llm_provider(payload.llm_provider)
     try:
         routed_answers = resolve_preparation_answers(
             item.questions,
-            payload.answers,
+            submitted_answers,
             llm_service=resolution.service,
             classify_free_text=payload.action == "complete",
         )
@@ -276,8 +278,12 @@ async def complete_interview_preparation(
         payload.action,
         questions=item.questions,
     )
+    normalized_answers = [
+        PreparationAnswer.model_validate(answer)
+        for answer in transition.get("answers", [])
+    ]
     updated_gaps = _apply_preparation_answers(item.skill_gaps, item.questions, normalized_answers)
-    if payload.action in {"save", "stop"}:
+    if transition["status"] != "completed":
         return preparations.save_answers(
             item.model_copy(update={"skill_gaps": updated_gaps}),
             answers=normalized_answers,
@@ -372,17 +378,30 @@ def _apply_preparation_answers(skill_gaps, questions, answers):
 
 
 def _classify_answer_details(answers):
-    specific_markers = ("built", "created", "implemented", "used", "reduced", "increased", "result", "team")
     normalized = []
     for answer in answers:
-        detail = (answer.detail or answer.free_text or answer.answer or "").strip()
-        quality = "not_provided"
-        if detail:
-            quality = "specific" if len(detail) >= 40 and any(
-                marker in detail.casefold() for marker in specific_markers
-            ) else "vague"
+        quality = classify_answer_detail(answer)
         normalized.append(answer.model_copy(update={"detail_quality": quality}))
     return normalized
+
+
+def _merge_preparation_answers(existing, submitted):
+    """Accept incremental follow-up submissions while preserving prior answers."""
+    submitted_by_id = {item.question_id: item for item in submitted}
+    merged = []
+    for previous in existing:
+        replacement = submitted_by_id.pop(previous.question_id, None)
+        if replacement is None:
+            merged.append(previous)
+            continue
+        backend_state = {}
+        if "follow_up_count" not in replacement.model_fields_set:
+            backend_state["follow_up_count"] = previous.follow_up_count
+        if "pending_prompt" not in replacement.model_fields_set:
+            backend_state["pending_prompt"] = previous.pending_prompt
+        merged.append(replacement.model_copy(update=backend_state))
+    merged.extend(submitted_by_id.values())
+    return merged
 
 
 def _validate_complete_preparation_answers(questions, answers) -> None:
@@ -396,26 +415,6 @@ def _validate_complete_preparation_answers(questions, answers) -> None:
             error_code="preparation_answers_incomplete",
             status_code=400,
         )
-    for question in questions:
-        answer = answer_by_id[question.question_id]
-        if answer.response_mode == "free_text":
-            continue
-        option = next(
-            (
-                item
-                for item in question.options
-                if item.option_id == answer.selected_option_id
-            ),
-            None,
-        )
-        if option is not None and option.detail_policy == "required" and not (
-            answer.detail or ""
-        ).strip():
-            raise JobAgentError(
-                message=f"A focused follow-up is required for {question.skill}.",
-                error_code="preparation_answer_detail_required",
-                status_code=400,
-            )
 
 
 async def _resources_for_preparation_answers(gaps, questions, answers):

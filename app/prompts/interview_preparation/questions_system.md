@@ -24,6 +24,7 @@ Question rules:
 - Every option must contain `decision_dimension`, naming the skill-specific boundary it tests. Each question must use at least two distinct dimensions. Generic values such as `experience_level`, `experience_scope`, and `current_level` are invalid.
 - Examples of useful dimensions: PPG `motion_artifact_handling` and `signal_quality_evaluation`; ECG `qrs_detection` and `lead_or_noise_scope`; multimodal fusion `time_alignment` and `fusion_architecture`; blood pressure `calibration_and_validation`; data pipelines `automation_and_reproducibility`.
 - Each option must state its expected evidence transition and route. The backend owns and validates the transition vocabulary; you only propose a valid route.
+- A work/project selection is only a user claim until its candidate-authored detail is checked. Use `evidence_transition=partial` with `route=ask_evidence`; never mark the option itself `supported`. The backend upgrades it to `supported` only after specific evidence is supplied.
 - Use `ask_evidence` only when a concrete example could support the claim. Supply a focused `follow_up_prompt` and set `detail_policy` to `required`.
 - A `clarify` option must also use `detail_policy=required` and ask one focused boundary question. If no clarification is needed, use `next_skill` instead.
 - Use `learning` for a knowledge gap, `capability_gap` for an explicitly absent current capability, `clarify` when the option means the situation is ambiguous, and `next_skill` when no further detail is useful.
@@ -69,7 +70,7 @@ Example JSON output shape:
           "value": "project_experience",
           "label": "Implemented and evaluated a PPG pipeline",
           "description": "I personally implemented relevant processing and evaluated signal or model quality in a project.",
-          "evidence_transition": "supported",
+          "evidence_transition": "partial",
           "route": "ask_evidence",
           "detail_policy": "required",
           "follow_up_prompt": "Which stage did you own, what signal-quality problem did you address, and how did you evaluate it?",

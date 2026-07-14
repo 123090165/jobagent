@@ -20,8 +20,8 @@ from app.services.llm_observability import llm_observation_context
 from app.services.llm_service import LLMServiceError
 
 
-QUESTIONS_PROMPT_VERSION = "interview_preparation_questions_v5"
-RECOMMENDATIONS_PROMPT_VERSION = "interview_preparation_recommendations_v3"
+QUESTIONS_PROMPT_VERSION = "interview_preparation_questions_v6"
+RECOMMENDATIONS_PROMPT_VERSION = "interview_preparation_recommendations_v4"
 ANSWER_CLASSIFICATION_PROMPT_VERSION = "interview_preparation_answer_classification_v1"
 QUESTIONS_SYSTEM_PROMPT = load_prompt("interview_preparation/questions_system.md")
 RECOMMENDATIONS_SYSTEM_PROMPT = load_prompt(
@@ -247,7 +247,7 @@ def resolve_preparation_answers(
         if answer.response_mode == "free_text":
             if answer.selected_option_id and answer.resolution_source in {
                 "llm_classified", "fallback_uncertain"
-            }:
+            } and answer.follow_up_count == 0:
                 option = _selected_option(question, answer)
                 if option is not None:
                     resolved.append(_answer_from_option(
@@ -576,6 +576,14 @@ def _questions_with_ids(
                     f"Question for {skill} uses generic rather than skill-specific dimensions"
                 )
             for option in options:
+                if option.value in {"work_experience", "project_experience"} and (
+                    option.evidence_transition != "partial"
+                    or option.route != "ask_evidence"
+                ):
+                    raise ValueError(
+                        f"Option {option.option_id} for {skill} must keep a work/project "
+                        "claim partial until candidate-authored evidence is checked"
+                    )
                 if option.route in {"ask_evidence", "clarify"} and (
                     option.detail_policy != "required"
                     or not (option.follow_up_prompt or "").strip()
@@ -605,7 +613,7 @@ def _fallback_options(gap: PreparationSkillGap) -> list[PreparationAnswerOption]
             value="work_experience",
             label=f"Delivered {skill} in professional work",
             description="I owned a relevant task or deliverable in a real work setting.",
-            evidence_transition="supported",
+            evidence_transition="partial",
             route="ask_evidence",
             detail_policy="required",
             follow_up_prompt="What did you personally own, and how was the result evaluated?",
@@ -616,7 +624,7 @@ def _fallback_options(gap: PreparationSkillGap) -> list[PreparationAnswerOption]
             value="project_experience",
             label=f"Applied {skill} in a substantial project",
             description="I implemented or evaluated it in an academic, personal, or team project.",
-            evidence_transition="supported",
+            evidence_transition="partial",
             route="ask_evidence",
             detail_policy="required",
             follow_up_prompt="What did you implement personally, and what evidence shows how it worked?",
@@ -790,9 +798,14 @@ def _deterministic_recommendations(
         detail = (answer.detail or answer.free_text or answer.answer or "") if answer else ""
         level = answer.experience_level if answer else None
         if level in {"work_experience", "project_experience"}:
-            action = f"Turn the user-reported {gap.skill} example into a concise context-action-result story."
+            has_specific_evidence = answer is not None and answer.detail_quality == "specific"
+            action = (
+                f"Turn the supported {gap.skill} example into a concise context-action-result story."
+                if has_specific_evidence
+                else f"Inventory the missing method, personal contribution, and result for the user-reported {gap.skill} example."
+            )
             basis = [detail[:300]] if detail else [f"User selected {level.replace('_', ' ')}."]
-            action_type = "interview_story" if detail else "experience_inventory"
+            action_type = "interview_story" if has_specific_evidence else "experience_inventory"
         elif level in {"practice_only", "conceptual_only"}:
             action = f"Build hands-on confidence in {gap.skill} with a focused exercise before preparing an interview explanation."
             basis = [gap.jd_evidence]

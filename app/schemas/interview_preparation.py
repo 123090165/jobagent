@@ -19,6 +19,7 @@ EvidenceOrigin = Literal["resume", "user_reported", "none"]
 DetailQuality = Literal["not_provided", "specific", "vague"]
 GenerationMode = Literal["deterministic", "llm", "fallback"]
 AnswerMode = Literal["option", "free_text"]
+AnswerInputMode = Literal["option_only", "option_with_detail", "free_text"]
 EvidenceTransition = Literal["supported", "partial", "unknown", "missing"]
 RouteAction = Literal[
     "ask_evidence", "learning", "capability_gap", "clarify", "next_skill"
@@ -56,8 +57,8 @@ class PreparationAnswerOption(BaseModel):
             return data
         value = data.get("value")
         defaults = {
-            "work_experience": ("supported", "ask_evidence", "required"),
-            "project_experience": ("supported", "ask_evidence", "required"),
+            "work_experience": ("partial", "ask_evidence", "required"),
+            "project_experience": ("partial", "ask_evidence", "required"),
             "practice_only": ("partial", "learning", "optional"),
             "conceptual_only": ("partial", "learning", "not_needed"),
             "no_experience": ("missing", "capability_gap", "not_needed"),
@@ -140,6 +141,9 @@ class PreparationAnswer(BaseModel):
     evidence_transition: EvidenceTransition | None = None
     route: RouteAction | None = None
     resolution_source: ResolutionSource | None = None
+    input_mode: AnswerInputMode | None = None
+    follow_up_count: int = Field(default=0, ge=0, le=2)
+    pending_prompt: str | None = Field(default=None, max_length=1000)
 
     @model_validator(mode="after")
     def require_structured_or_legacy_answer(self) -> "PreparationAnswer":
@@ -158,6 +162,14 @@ class PreparationAnswer(BaseModel):
             self.free_text = self.free_text.strip() or None
         if self.answer is not None:
             self.answer = self.answer.strip() or None
+        if self.input_mode is None:
+            self.input_mode = (
+                "free_text"
+                if self.response_mode == "free_text"
+                else "option_with_detail"
+                if self.detail
+                else "option_only"
+            )
         return self
 
 

@@ -141,6 +141,9 @@ export interface PreparationAnswer {
   evidence_transition?: "supported" | "partial" | "unknown" | "missing" | null;
   route?: "ask_evidence" | "learning" | "capability_gap" | "clarify" | "next_skill" | null;
   resolution_source?: "option" | "llm_classified" | "fallback_uncertain" | "legacy" | null;
+  input_mode?: "option_only" | "option_with_detail" | "free_text" | null;
+  follow_up_count?: number;
+  pending_prompt?: string | null;
 }
 
 export interface LearningResource {

@@ -53,7 +53,7 @@ def test_preparation_generates_gaps_resources_questions_and_prompt(monkeypatch, 
     question_generation = workspace["question_generation"]
     assert question_generation["mode"] == "fallback"
     assert question_generation["provider"] == "deepseek"
-    assert question_generation["prompt_version"] == "interview_preparation_questions_v5"
+    assert question_generation["prompt_version"] == "interview_preparation_questions_v6"
     assert question_generation["attempts"] == 1
     assert question_generation["fallback_reason"].startswith("LLMServiceError:")
     assert question_generation["attempt_errors"] == [
@@ -120,6 +120,24 @@ def test_preparation_accepts_answers_and_preserves_saved_job(monkeypatch, tmp_pa
     )
 
     assert response.status_code == 200
+    paused = response.json()
+    assert paused["status"] == "paused"
+    assert any(answer["route"] == "clarify" for answer in paused["answers"])
+
+    response = client.put(
+        f"/api/v1/saved-jobs/{job['saved_job_id']}/preparation/answers",
+        headers=headers,
+        json={
+            "answers": [
+                {
+                    "question_id": item["question_id"],
+                    "answer": "I used this capability in a bounded exercise and need to clarify the exact scope.",
+                }
+                for item in workspace["questions"]
+            ]
+        },
+    )
+    assert response.status_code == 200
     completed = response.json()
     assert completed["status"] == "completed"
     assert completed["answers"][0]["question_id"] == question["question_id"]
@@ -179,7 +197,7 @@ def test_preparation_structured_answers_control_state_and_recommendation(monkeyp
     }
 
 
-def test_preparation_requires_focused_detail_before_completion(monkeypatch, tmp_path) -> None:
+def test_preparation_pauses_for_focused_detail_then_resumes(monkeypatch, tmp_path) -> None:
     monkeypatch.setenv("JOBAGENT_DB_PATH", str(tmp_path / "preparation-detail.sqlite3"))
     headers = _headers("preparation-detail")
     job = _job(headers)
@@ -210,8 +228,38 @@ def test_preparation_requires_focused_detail_before_completion(monkeypatch, tmp_
         json={"answers": answers, "action": "complete"},
     )
 
-    assert response.status_code == 400
-    assert response.json()["error_code"] == "preparation_answer_detail_required"
+    assert response.status_code == 200
+    paused = response.json()
+    assert paused["status"] == "paused"
+    first_answer = next(
+        item for item in paused["answers"] if item["question_id"] == first["question_id"]
+    )
+    assert first_answer["route"] == "ask_evidence"
+    assert first_answer["evidence_transition"] == "partial"
+    assert first_answer["pending_prompt"]
+
+    completed = client.put(
+        f"/api/v1/saved-jobs/{job['saved_job_id']}/preparation/answers",
+        headers=headers,
+        json={
+            "answers": [{
+                "question_id": first["question_id"],
+                "selected_option_id": required["option_id"],
+                "detail": (
+                    "I implemented the workflow personally, used a bounded dataset, "
+                    "and evaluated the result on 200 samples."
+                ),
+            }],
+            "action": "complete",
+        },
+    )
+    assert completed.status_code == 200
+    assert completed.json()["status"] == "completed"
+    resolved = next(
+        item for item in completed.json()["answers"]
+        if item["question_id"] == first["question_id"]
+    )
+    assert resolved["evidence_transition"] == "supported"
 
 
 def test_preparation_can_stop_without_answers_or_summary(monkeypatch, tmp_path) -> None:

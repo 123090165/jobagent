@@ -76,7 +76,7 @@ def _question(skill: str) -> dict[str, object]:
                 "value": "project_experience",
                 "label": f"Implemented {skill}",
                 "description": "I implemented and evaluated relevant processing.",
-                "evidence_transition": "supported",
+                "evidence_transition": "partial",
                 "route": "ask_evidence",
                 "detail_policy": "required",
                 "follow_up_prompt": "What did you implement and how did you evaluate it?",
@@ -287,6 +287,14 @@ def test_legacy_option_is_upgraded_with_safe_transition_defaults() -> None:
     assert option.evidence_transition == "missing"
     assert option.route == "capability_gap"
 
+    project = PreparationAnswerOption.model_validate({
+        "value": "project_experience",
+        "label": "Project experience",
+        "description": "I used it in a project.",
+    })
+    assert project.evidence_transition == "partial"
+    assert project.route == "ask_evidence"
+
 
 def test_recommendation_prompt_requires_object_root_and_complete_schema() -> None:
     llm = SequenceLLM([{
@@ -326,3 +334,36 @@ def test_recommendation_prompt_requires_object_root_and_complete_schema() -> Non
     assert stage.attempts == 1
     assert '"recommendations"' in llm.system_prompts[0]
     assert "Never return a top-level array" in llm.system_prompts[0]
+
+
+def test_deterministic_recommendation_does_not_turn_vague_claim_into_story() -> None:
+    gap = PreparationSkillGap(
+        skill="ECG signal processing",
+        importance="high",
+        evidence_status="partial",
+        skill_type="experience",
+        jd_evidence="Process ECG signals.",
+        rationale="Concrete evidence is incomplete.",
+    )
+    question = PreparationQuestion(
+        question_id="q1",
+        skill=gap.skill,
+        prompt="Choose your current level.",
+        why_asked="Clarifies the evidence.",
+    )
+    answer = PreparationAnswer(
+        question_id="q1",
+        experience_level="project_experience",
+        detail="I have some ECG project experience.",
+        detail_quality="vague",
+        evidence_transition="partial",
+        route="next_skill",
+    )
+
+    recommendations, stage = generate_recommendations(
+        [gap], [question], [answer], llm_service=None
+    )
+
+    assert stage.mode == "deterministic"
+    assert recommendations[0].action_type == "experience_inventory"
+    assert "missing method" in recommendations[0].action
