@@ -200,7 +200,7 @@ export const useSavedJobsStore = defineStore("savedJobs", {
     async savePreparationAnswers(
       savedJobId: string,
       answers: PreparationAnswer[],
-      action: "save" | "complete" | "stop" = "complete"
+      action: "advance" | "save" | "complete" | "stop" = "complete"
     ): Promise<InterviewPreparationWorkspace> {
       this.isSaving = true;
       this.error = null;

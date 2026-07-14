@@ -89,7 +89,7 @@ export async function generateInterviewPreparation(
 export async function submitPreparationAnswers(
   savedJobId: string,
   answers: PreparationAnswer[],
-  action: "save" | "complete" | "stop" = "complete"
+  action: "advance" | "save" | "complete" | "stop" = "complete"
 ): Promise<InterviewPreparationWorkspace> {
   const response = await client.put<InterviewPreparationWorkspace>(
     `/api/v1/saved-jobs/${savedJobId}/preparation/answers`,

@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { NButton, NCollapse, NCollapseItem, NInput, NModal, NRadio, NRadioGroup, NSelect, NTabPane, NTabs, NTag } from "naive-ui";
 
+import AppIcon from "../components/AppIcon.vue";
 import { useSavedJobsStore } from "../stores/savedJobs";
 import type { PreparationAnswer, PreparationQuestion, SavedJobStatus } from "../types/savedJob";
 
@@ -32,6 +33,13 @@ const latestAnalysis = computed(() => store.selectedJobAnalyses[0] ?? job.value?
 const latestBrief = computed(() => store.selectedJobBriefs[0] ?? null);
 const preparation = computed(() => store.selectedPreparation);
 const structuredEntries = computed(() => Object.entries(job.value?.structured_jd ?? {}));
+const skillTags = computed(() => {
+  const structured = job.value?.structured_jd ?? {};
+  const sources = [structured.skills, structured.skill_tags, structured.technologies, structured.tech_stack];
+  const values = sources.flatMap((value) => Array.isArray(value) ? value : typeof value === "string" ? value.split(/,|\n/) : []);
+  return [...new Set([...(job.value?.tags ?? []), ...values.map(String)])].map((item) => item.trim()).filter(Boolean);
+});
+const interviewChecklist = computed(() => latestBrief.value?.content.interview_focus || latestAnalysis.value?.interview_questions || []);
 const activeQuestion = computed(() => preparation.value?.questions[currentPreparationQuestion.value] ?? null);
 const answeredQuestionCount = computed(() => Object.keys(preparationAnswers.value).length);
 const canCompletePreparation = computed(() =>
@@ -45,6 +53,9 @@ const activeAnswer = computed(() => activeQuestion.value
 const activeOption = computed(() => activeQuestion.value?.options.find(
   (item) => item.option_id === activeAnswer.value?.selected_option_id
 ) ?? null);
+const hasPendingFollowUp = computed(() => Object.values(preparationAnswers.value).some(
+  (answer) => Boolean(answer.pending_prompt) && ["ask_evidence", "clarify"].includes(answer.route ?? "")
+));
 
 onMounted(async () => {
   try {
@@ -127,7 +138,9 @@ function updateSelectedOption(optionId: string) {
     experience_level: option.value,
     free_text: null,
     detail: option.detail_policy === "not_needed" ? null : existing?.detail ?? null,
-    detail_quality: "not_provided"
+    detail_quality: "not_provided",
+    follow_up_count: existing?.selected_option_id === option.option_id ? existing?.follow_up_count ?? 0 : 0,
+    pending_prompt: null
   };
 }
 
@@ -141,7 +154,9 @@ function useFreeText() {
     experience_level: null,
     free_text: existing?.free_text ?? "",
     detail: null,
-    detail_quality: "not_provided"
+    detail_quality: "not_provided",
+    follow_up_count: existing?.response_mode === "free_text" ? existing?.follow_up_count ?? 0 : 0,
+    pending_prompt: null
   };
 }
 
@@ -149,7 +164,16 @@ function updateFreeText(value: string) {
   if (!activeQuestion.value) return;
   const existing = preparationAnswers.value[activeQuestion.value.question_id];
   if (!existing) return;
-  preparationAnswers.value[activeQuestion.value.question_id] = { ...existing, free_text: value };
+  preparationAnswers.value[activeQuestion.value.question_id] = {
+    ...existing,
+    free_text: value,
+    selected_option_id: null,
+    experience_level: null,
+    evidence_transition: null,
+    route: null,
+    resolution_source: null,
+    detail_quality: "not_provided"
+  };
 }
 
 function isAnswerComplete(question: PreparationQuestion): boolean {
@@ -157,8 +181,8 @@ function isAnswerComplete(question: PreparationQuestion): boolean {
   if (!answer) return false;
   if (answer.response_mode === "free_text") return Boolean(answer.free_text?.trim());
   if (!answer.selected_option_id) return false;
-  const option = question.options.find((item) => item.option_id === answer.selected_option_id);
-  return option?.detail_policy !== "required" || Boolean(answer.detail?.trim());
+  if (answer.follow_up_count && answer.route === "ask_evidence") return Boolean(answer.detail?.trim());
+  return true;
 }
 
 function updateAnswerDetail(value: string) {
@@ -185,12 +209,53 @@ async function submitPreparation(action: "save" | "complete" | "stop") {
     }
   }
   try {
-    await store.savePreparationAnswers(job.value.saved_job_id, answers, action);
+    const updated = await store.savePreparationAnswers(job.value.saved_job_id, answers, action);
+    if (action === "complete" && updated.status === "paused") {
+      syncPreparationAnswers();
+      const pendingIndex = updated.questions.findIndex((question) => {
+        const answer = updated.answers.find((item) => item.question_id === question.question_id);
+        return Boolean(answer?.pending_prompt) && ["ask_evidence", "clarify"].includes(answer?.route ?? "");
+      });
+      currentPreparationQuestion.value = pendingIndex >= 0 ? pendingIndex : 0;
+      preparationDialogOpen.value = true;
+      actionMessage.value = "One or more answers need a focused follow-up before the summary can be created.";
+      return;
+    }
     preparationDialogOpen.value = false;
     activeTab.value = "preparation";
     actionMessage.value = action === "complete"
       ? "Preparation completed and summary created."
       : action === "save" ? "Preparation paused. You can continue later." : "Preparation ended without a summary.";
+  } catch {
+    // Store error is rendered above.
+  }
+}
+
+async function advancePreparation() {
+  if (!job.value || !activeQuestion.value || !activeAnswer.value) return;
+  const questionId = activeQuestion.value.question_id;
+  const answer = {
+    ...activeAnswer.value,
+    detail: activeAnswer.value.detail?.trim() || null,
+    free_text: activeAnswer.value.free_text?.trim() || null
+  };
+  try {
+    const updated = await store.savePreparationAnswers(
+      job.value.saved_job_id,
+      [answer],
+      "advance"
+    );
+    syncPreparationAnswers();
+    const resolved = updated.answers.find((item) => item.question_id === questionId);
+    if (updated.status === "paused" && resolved?.pending_prompt) {
+      actionMessage.value = "Add the focused detail requested for this answer before continuing.";
+      return;
+    }
+    currentPreparationQuestion.value = Math.min(
+      currentPreparationQuestion.value + 1,
+      updated.questions.length - 1
+    );
+    actionMessage.value = null;
   } catch {
     // Store error is rendered above.
   }
@@ -237,7 +302,7 @@ function preparationResource(url: string) {
     </div>
 
     <template v-else>
-      <header class="saved-job-workspace-header">
+      <header class="saved-job-workspace-header detail-hero">
         <n-button text @click="router.push({ name: 'saved-jobs' })">← Saved Jobs</n-button>
         <div class="saved-job-workspace-title">
           <div>
@@ -246,6 +311,7 @@ function preparationResource(url: string) {
             <p>{{ job.company || "Unknown company" }} · {{ job.location || "Location not set" }}</p>
           </div>
           <div class="saved-job-header-actions">
+            <span class="status-pill">{{ job.status }}</span>
             <n-select v-model:value="status" :options="statusOptions" @update:value="saveTracking" />
             <n-button v-if="job.source_url" tag="a" :href="job.source_url" target="_blank" secondary>
               Open Listing
@@ -257,10 +323,10 @@ function preparationResource(url: string) {
 
       <n-tabs v-model:value="activeTab" type="line" animated class="saved-job-tabs">
         <n-tab-pane name="overview" tab="Overview">
-          <div class="saved-job-overview-grid">
-            <section class="workspace-panel decision-snapshot">
+          <div class="saved-job-overview-grid job-bento-grid">
+            <section class="workspace-panel decision-snapshot bento-decision">
               <div class="panel-heading">
-                <div><h2>Decision Snapshot</h2><p>Latest fit assessment and recommended action.</p></div>
+                <div><p class="card-kicker"><AppIcon name="sparkles" /> Application decision</p><h2>Is this role worth your time?</h2><p>Recommendation first, match score as supporting evidence.</p></div>
                 <n-button size="small" secondary :loading="store.isSaving" @click="refreshSnapshot">
                   {{ latestBrief ? "Refresh Snapshot" : "Create Snapshot" }}
                 </n-button>
@@ -297,19 +363,35 @@ function preparationResource(url: string) {
               </div>
             </section>
 
-            <aside class="workspace-panel saved-job-tracking-panel">
-              <div class="panel-heading"><div><h2>Tracking</h2><p>Private notes and organization.</p></div></div>
+            <aside class="workspace-panel saved-job-tracking-panel bento-tracking">
+              <div class="panel-heading"><div><p class="card-kicker"><AppIcon name="bookmark" /> Progress</p><h2>Tracking & Notes</h2><p>Private notes and organization.</p></div></div>
+              <label class="draft-field"><span>Application status</span><n-select v-model:value="status" :options="statusOptions" /></label>
               <label class="draft-field"><span>Notes</span><n-input v-model:value="notes" type="textarea" :rows="5" /></label>
               <label class="draft-field"><span>Tags</span><n-input v-model:value="tagsText" placeholder="priority, remote" /></label>
               <n-button type="primary" :loading="store.isSaving" @click="saveTracking">Save Notes</n-button>
             </aside>
           </div>
 
-          <section class="saved-job-primary-next-step workspace-panel">
+          <section class="workspace-panel bento-requirements">
+            <div class="panel-heading"><div><p class="card-kicker"><AppIcon name="note" /> Role requirements</p><h2>What the role asks for</h2></div><n-button size="small" text @click="activeTab = 'details'">View all details</n-button></div>
+            <dl v-if="structuredEntries.length" class="requirement-preview">
+              <template v-for="[key, value] in structuredEntries.slice(0, 4)" :key="key"><dt>{{ key.replace(/_/g, " ") }}</dt><dd>{{ formatValue(value) }}</dd></template>
+            </dl>
+            <p v-else class="empty-copy">No structured requirements are available. The original description remains under Job Details.</p>
+            <div class="skill-section"><h3>Skills & tags</h3><div v-if="skillTags.length" class="job-chip-row"><n-tag v-for="tag in skillTags" :key="tag" size="small">{{ tag }}</n-tag></div><p v-else class="empty-copy">No skill tags available.</p></div>
+          </section>
+
+          <section class="saved-job-primary-next-step workspace-panel bento-next-action">
             <div><h2>Continue with this opportunity</h2><p>Turn the current evidence gaps into a focused preparation plan.</p></div>
             <n-button type="primary" :loading="store.isSaving" @click="openPreparation">
               {{ preparation ? "Continue Preparation" : "Start Preparation" }}
             </n-button>
+          </section>
+
+          <section class="workspace-panel bento-interview">
+            <div class="panel-heading"><div><p class="card-kicker"><AppIcon name="check" /> Interview checklist</p><h2>Prepare the evidence</h2></div><n-tag v-if="preparation" size="small">{{ preparation.status }}</n-tag></div>
+            <ul v-if="interviewChecklist.length" class="checklist"><li v-for="item in interviewChecklist" :key="item"><span><AppIcon name="check" /></span>{{ item }}</li></ul>
+            <p v-else class="empty-copy">No interview checklist is available yet. Start preparation to build one from real evidence.</p>
           </section>
         </n-tab-pane>
 
@@ -441,11 +523,12 @@ function preparationResource(url: string) {
           <small class="flow-meta">{{ activeQuestion.why_asked }}</small>
 
           <n-radio-group
+            :key="activeQuestion.question_id"
             :value="preparationAnswers[activeQuestion.question_id]?.selected_option_id"
             class="preparation-option-list"
             @update:value="updateSelectedOption"
           >
-            <n-radio v-for="option in activeQuestion.options" :key="option.option_id" :value="option.option_id">
+            <n-radio v-for="option in activeQuestion.options" :key="`${activeQuestion.question_id}:${option.option_id}`" :value="option.option_id">
               <span class="preparation-option-copy"><strong>{{ option.label }}</strong><small>{{ option.description }}</small></span>
             </n-radio>
           </n-radio-group>
@@ -458,7 +541,7 @@ function preparationResource(url: string) {
 
           <label v-if="activeAnswer?.response_mode === 'free_text'" class="draft-field">
             <span>Your situation</span>
-            <small class="flow-meta">{{ activeQuestion.free_text_prompt }}</small>
+            <small class="flow-meta">{{ activeAnswer.pending_prompt || activeQuestion.free_text_prompt }}</small>
             <n-input
               :value="activeAnswer.free_text || ''"
               type="textarea"
@@ -470,7 +553,7 @@ function preparationResource(url: string) {
 
           <label v-else-if="activeOption && activeOption.detail_policy !== 'not_needed'" class="draft-field">
             <span>{{ activeOption.detail_policy === 'required' ? 'One focused follow-up' : 'Optional clarification' }}</span>
-            <small class="flow-meta">{{ activeOption.follow_up_prompt }}</small>
+            <small class="flow-meta">{{ activeAnswer?.pending_prompt || activeOption.follow_up_prompt }}</small>
             <n-input
               :value="activeAnswer?.detail || ''"
               type="textarea"
@@ -486,10 +569,11 @@ function preparationResource(url: string) {
               v-if="currentPreparationQuestion < preparation.questions.length - 1"
               type="primary"
               :disabled="!isAnswerComplete(activeQuestion)"
-              @click="currentPreparationQuestion++"
+              :loading="store.isSaving"
+              @click="advancePreparation"
             >Next</n-button>
             <n-button v-else type="primary" :disabled="!canCompletePreparation" :loading="store.isSaving" @click="submitPreparation('complete')">
-              Finish & Create Summary
+              {{ hasPendingFollowUp ? "Recheck & Create Summary" : "Finish & Create Summary" }}
             </n-button>
           </div>
         </template>

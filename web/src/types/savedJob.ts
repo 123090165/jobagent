@@ -98,6 +98,12 @@ export interface PreparationSkillGap {
   profile_evidence: string[];
   rationale: string;
   evidence_origin: "resume" | "user_reported" | "none";
+  dimensions: Array<{
+    dimension_id: string;
+    label: string;
+    state: "unresolved" | "supported" | "demonstrated" | "partial" | "knowledge_gap" | "missing" | "unknown";
+    evidence: string[];
+  }>;
 }
 
 export type PreparationExperienceLevel =
@@ -110,6 +116,7 @@ export type PreparationExperienceLevel =
 
 export interface PreparationAnswerOption {
   option_id: string;
+  answer_kind?: "evidence_claim" | "partial_practice" | "knowledge_gap" | "explicit_absence" | "unclear" | null;
   value: PreparationExperienceLevel;
   label: string;
   description: string;
@@ -118,6 +125,11 @@ export interface PreparationAnswerOption {
   detail_policy: "required" | "optional" | "not_needed";
   follow_up_prompt: string | null;
   decision_dimension: string;
+  state_effects: Array<{
+    dimension_id: string;
+    state: "unresolved" | "supported" | "demonstrated" | "partial" | "knowledge_gap" | "missing" | "unknown";
+  }>;
+  next_question_signal: string;
 }
 
 export interface PreparationQuestion {
@@ -128,6 +140,11 @@ export interface PreparationQuestion {
   options: PreparationAnswerOption[];
   free_text_allowed: boolean;
   free_text_prompt: string;
+  decision_objective: {
+    dimension_id: string;
+    uncertainty: string;
+    why_now: string;
+  } | null;
 }
 
 export interface PreparationAnswer {
@@ -144,6 +161,7 @@ export interface PreparationAnswer {
   input_mode?: "option_only" | "option_with_detail" | "free_text" | null;
   follow_up_count?: number;
   pending_prompt?: string | null;
+  committed?: boolean;
 }
 
 export interface LearningResource {
