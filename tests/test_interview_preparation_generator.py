@@ -10,7 +10,9 @@ from app.schemas.interview_preparation import (
 )
 from app.schemas.saved_job import SavedJob
 from app.services.interview_preparation_generator import (
+    _next_question_memory,
     generate_preparation_questions,
+    generate_next_preparation_question,
     generate_recommendations,
     resolve_preparation_answers,
 )
@@ -21,6 +23,7 @@ class SequenceLLM:
     def __init__(self, responses: list[object]) -> None:
         self.responses = responses
         self.system_prompts: list[str] = []
+        self.user_prompts: list[str] = []
 
     def chat_completion_json(
         self,
@@ -30,6 +33,7 @@ class SequenceLLM:
         expected_root_key: str | None = None,
     ) -> dict:
         self.system_prompts.append(system_prompt)
+        self.user_prompts.append(user_prompt)
         response = self.responses.pop(0)
         if isinstance(response, Exception):
             raise response
@@ -54,6 +58,7 @@ def _job() -> SavedJob:
 
 
 def _gap(skill: str) -> dict[str, object]:
+    dimension = f"{skill.lower().replace(' ', '_')}_boundary"
     return {
         "skill": skill,
         "importance": "high",
@@ -62,35 +67,44 @@ def _gap(skill: str) -> dict[str, object]:
         "jd_evidence": f"The JD requires {skill}.",
         "profile_evidence": [],
         "rationale": "No concrete profile evidence.",
+        "dimensions": [{
+            "dimension_id": dimension,
+            "label": f"{skill} technical boundary",
+            "state": "unresolved",
+            "evidence": [],
+        }],
     }
 
 
 def _question(skill: str) -> dict[str, object]:
+    dimension = f"{skill.lower().replace(' ', '_')}_boundary"
     return {
         "skill": skill,
         "prompt": f"Which description best matches your {skill} experience?",
         "why_asked": "The current level is unknown.",
+        "decision_objective": {
+            "dimension_id": dimension,
+            "uncertainty": "The technical boundary is unresolved.",
+            "why_now": "It changes preparation advice.",
+        },
         "options": [
             {
                 "option_id": f"implemented_{skill}",
-                "value": "project_experience",
+                "answer_kind": "evidence_claim",
                 "label": f"Implemented {skill}",
                 "description": "I implemented and evaluated relevant processing.",
-                "evidence_transition": "partial",
-                "route": "ask_evidence",
-                "detail_policy": "required",
                 "follow_up_prompt": "What did you implement and how did you evaluate it?",
-                "decision_dimension": "hands_on_implementation",
+                "state_effects": [{"dimension_id": dimension, "state": "partial"}],
+                "next_question_signal": "verify_evaluation_method",
             },
             {
                 "option_id": f"concept_{skill}",
-                "value": "conceptual_only",
+                "answer_kind": "knowledge_gap",
                 "label": "Conceptual understanding only",
                 "description": "I understand it but have not implemented it.",
-                "evidence_transition": "partial",
-                "route": "learning",
-                "detail_policy": "not_needed",
-                "decision_dimension": "conceptual_vs_hands_on",
+                "follow_up_prompt": None,
+                "state_effects": [{"dimension_id": dimension, "state": "knowledge_gap"}],
+                "next_question_signal": "close_with_learning_task",
             },
         ],
     }
@@ -124,14 +138,49 @@ def test_question_generation_retries_schema_output_and_records_attempts() -> Non
     )
 
     assert {item.skill for item in gaps} >= {"PPG signal processing"}
-    assert {item.skill for item in questions} >= {"PPG signal processing"}
+    assert len(questions) == 2
     assert stage.mode == "llm"
     assert stage.attempts == 2
     assert stage.attempt_errors == [
         "LLMServiceError: LLM JSON output must be an object"
     ]
-    assert "root MUST be one object" in llm.system_prompts[0]
+    assert "exactly one JSON object" in llm.system_prompts[0]
     assert "FORMAT CORRECTION" in llm.system_prompts[1]
+    initial_memory = __import__("json").loads(llm.user_prompts[0])
+    assert list(initial_memory) == [
+        "cache_context",
+        "stage_contract",
+        "analysis_summary",
+        "gap_anchors",
+        "required_coverage_memory",
+    ]
+    assert "jd_anchor_memory" not in initial_memory
+    assert "gap_state_memory" not in initial_memory
+
+
+def test_model_business_semantics_are_mapped_to_backend_protocol_once() -> None:
+    question_payload = _question("PPG signal processing")
+    llm = SequenceLLM([{
+        "skill_gaps": [_gap("PPG signal processing")],
+        "questions": [question_payload],
+    }])
+    job = _job().model_copy(update={"raw_jd_text": "Process PPG signals."})
+
+    _, questions, stage = generate_preparation_questions(
+        job, None, None, llm_service=llm
+    )
+
+    assert stage.mode == "llm"
+    assert stage.attempts == 1
+    claim, learning = questions[0].options
+    assert (claim.value, claim.evidence_transition, claim.route) == (
+        "project_experience", "partial", "ask_evidence"
+    )
+    assert claim.detail_policy == "required"
+    assert (learning.value, learning.evidence_transition, learning.route) == (
+        "conceptual_only", "partial", "learning"
+    )
+    assert learning.detail_policy == "not_needed"
 
 
 def test_question_generation_retries_when_required_jd_coverage_is_missing() -> None:
@@ -165,7 +214,7 @@ def test_question_generation_retries_when_required_jd_coverage_is_missing() -> N
         _job(), None, None, llm_service=llm
     )
 
-    assert len(questions) == 3
+    assert len(questions) == 2
     assert stage.mode == "llm"
     assert stage.attempts == 2
     assert "Question coverage is too small" in stage.attempt_errors[0]
@@ -193,8 +242,87 @@ def test_deterministic_coverage_uses_structured_jd_evidence_quotes() -> None:
         "ACC motion signal analysis",
         "blood pressure estimation",
     } <= skills
-    assert len(questions) >= 3
+    assert len(questions) == 2
     assert stage.mode == "deterministic"
+
+
+def test_next_question_uses_committed_memory_and_does_not_rewrite_locked_questions() -> None:
+    gaps = [
+        PreparationSkillGap.model_validate(_gap(skill))
+        for skill in ("PPG signal processing", "ECG signal processing")
+    ]
+    locked = PreparationQuestion.model_validate({
+        **_question("PPG signal processing"), "question_id": "q1"
+    })
+    next_question = _question("ECG signal processing")
+    next_question["options"] = list(reversed(next_question["options"]))
+    llm = SequenceLLM([{"question": next_question}])
+
+    question, stage = generate_next_preparation_question(
+        gaps,
+        [locked],
+        [PreparationAnswer(
+            question_id="q1", selected_option_id=locked.options[1].option_id,
+            committed=True,
+        )],
+        llm_service=llm,
+    )
+
+    assert question is not None
+    assert question.skill == "ECG signal processing"
+    assert stage.mode == "llm"
+    memory = __import__("json").loads(llm.user_prompts[0])
+    assert list(memory) == ["cache_context", "stage_contract", "dynamic_state"]
+    assert "locked_questions" not in memory["dynamic_state"]
+
+
+def test_next_question_can_revisit_a_skill_for_another_unresolved_dimension() -> None:
+    gap_payload = _gap("PPG signal processing")
+    gap_payload["dimensions"] = [
+        {"dimension_id": "artifact_handling", "label": "Artifact handling", "state": "partial", "evidence": []},
+        {"dimension_id": "quality_evaluation", "label": "Quality evaluation", "state": "unresolved", "evidence": []},
+    ]
+    gap = PreparationSkillGap.model_validate(gap_payload)
+    locked_payload = _question("PPG signal processing")
+    locked_payload["question_id"] = "q1"
+    locked_payload["decision_objective"]["dimension_id"] = "artifact_handling"
+    for index, option in enumerate(locked_payload["options"]):
+        option["state_effects"] = [{"dimension_id": "artifact_handling", "state": "partial" if index == 0 else "knowledge_gap"}]
+    locked = PreparationQuestion.model_validate(locked_payload)
+    next_payload = _question("PPG signal processing")
+    next_payload["decision_objective"]["dimension_id"] = "quality_evaluation"
+    for index, option in enumerate(next_payload["options"]):
+        option["state_effects"] = [{"dimension_id": "quality_evaluation", "state": "partial" if index == 0 else "knowledge_gap"}]
+    llm = SequenceLLM([{"question": next_payload}])
+
+    question, stage = generate_next_preparation_question(
+        [gap], [locked], [], llm_service=llm
+    )
+
+    assert stage.mode == "llm"
+    assert question is not None
+    assert question.skill == "PPG signal processing"
+    assert question.decision_objective.dimension_id == "quality_evaluation"
+
+
+def test_next_question_cache_prefix_excludes_mutable_gap_state() -> None:
+    gap = PreparationSkillGap.model_validate(_gap("PPG signal processing"))
+    changed = gap.model_copy(update={
+        "skill_type": "experience",
+        "dimensions": [
+            item.model_copy(update={"state": "knowledge_gap", "evidence": ["answer"]})
+            for item in gap.dimensions
+        ],
+    })
+    question = PreparationQuestion.model_validate({
+        **_question("PPG signal processing"), "question_id": "q1"
+    })
+
+    before = _next_question_memory([gap], [gap], [question], [])
+    after = _next_question_memory([changed], [changed], [question], [])
+
+    assert before["cache_context"] == after["cache_context"]
+    assert before["dynamic_state"] != after["dynamic_state"]
 
 
 def test_free_text_is_classified_to_a_question_option_without_rewriting_it() -> None:
@@ -295,6 +423,17 @@ def test_legacy_option_is_upgraded_with_safe_transition_defaults() -> None:
     assert project.evidence_transition == "partial"
     assert project.route == "ask_evidence"
 
+    legacy_gap = PreparationSkillGap.model_validate({
+        **_gap("PPG signal processing"),
+        "dimensions": [{
+            "dimension_id": "motion_artifact_handling",
+            "label": "Motion artifact handling",
+            "state": "demonstrated",
+            "evidence": ["legacy"],
+        }],
+    })
+    assert legacy_gap.dimensions[0].state == "supported"
+
 
 def test_recommendation_prompt_requires_object_root_and_complete_schema() -> None:
     llm = SequenceLLM([{
@@ -334,6 +473,9 @@ def test_recommendation_prompt_requires_object_root_and_complete_schema() -> Non
     assert stage.attempts == 1
     assert '"recommendations"' in llm.system_prompts[0]
     assert "Never return a top-level array" in llm.system_prompts[0]
+    recommendation_memory = __import__("json").loads(llm.user_prompts[0])
+    assert "questions" not in recommendation_memory
+    assert "deterministic_baseline" not in recommendation_memory
 
 
 def test_deterministic_recommendation_does_not_turn_vague_claim_into_story() -> None:

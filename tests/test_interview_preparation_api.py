@@ -53,7 +53,7 @@ def test_preparation_generates_gaps_resources_questions_and_prompt(monkeypatch, 
     question_generation = workspace["question_generation"]
     assert question_generation["mode"] == "fallback"
     assert question_generation["provider"] == "deepseek"
-    assert question_generation["prompt_version"] == "interview_preparation_questions_v6"
+    assert question_generation["prompt_version"] == "interview_preparation_questions_v8"
     assert question_generation["attempts"] == 1
     assert question_generation["fallback_reason"].startswith("LLMServiceError:")
     assert question_generation["attempt_errors"] == [
@@ -190,8 +190,15 @@ def test_preparation_structured_answers_control_state_and_recommendation(monkeyp
     )
     assert completed.status_code == 200
     assert completed.json()["status"] == "completed"
-    assert all(gap["evidence_origin"] == "user_reported" for gap in completed.json()["skill_gaps"])
-    assert {item["action_type"] for item in completed.json()["recommendations"]} == {"capability_gap"}
+    answered_skills = {question["skill"] for question in questions}
+    assert all(
+        gap["evidence_origin"] == "user_reported"
+        for gap in completed.json()["skill_gaps"]
+        if gap["skill"] in answered_skills
+    )
+    assert "capability_gap" in {
+        item["action_type"] for item in completed.json()["recommendations"]
+    }
     assert {item["source"] for item in completed.json()["learning_resources"]} >= {
         "Ubuntu Documentation", "Microsoft Support"
     }
@@ -281,3 +288,50 @@ def test_preparation_can_stop_without_answers_or_summary(monkeypatch, tmp_path) 
     assert stopped.status_code == 200
     assert stopped.json()["status"] == "stopped"
     assert stopped.json()["recommendations"] == []
+
+
+def test_preparation_advance_commits_one_answer_and_locks_one_new_question(
+    monkeypatch, tmp_path
+) -> None:
+    monkeypatch.setenv("JOBAGENT_DB_PATH", str(tmp_path / "preparation-advance.sqlite3"))
+    headers = _headers("preparation-advance")
+    job = _job(headers)
+    workspace = client.post(
+        f"/api/v1/saved-jobs/{job['saved_job_id']}/preparation",
+        headers=headers,
+        json={},
+    ).json()
+    assert len(workspace["questions"]) == 2
+    first = workspace["questions"][0]
+    answer = {
+        "question_id": first["question_id"],
+        "experience_level": "no_experience",
+    }
+
+    advanced = client.put(
+        f"/api/v1/saved-jobs/{job['saved_job_id']}/preparation/answers",
+        headers=headers,
+        json={"answers": [answer], "action": "advance"},
+    )
+    assert advanced.status_code == 200
+    body = advanced.json()
+    assert body["status"] == "questions_ready"
+    assert len(body["questions"]) == 3
+    assert body["answers"][0]["committed"] is True
+    first_gap = next(item for item in body["skill_gaps"] if item["skill"] == first["skill"])
+    objective_id = first["decision_objective"]["dimension_id"]
+    objective_state = next(
+        item["state"] for item in first_gap["dimensions"]
+        if item["dimension_id"] == objective_id
+    )
+    assert objective_state == "missing"
+    locked_third_id = body["questions"][2]["question_id"]
+
+    revisited = client.put(
+        f"/api/v1/saved-jobs/{job['saved_job_id']}/preparation/answers",
+        headers=headers,
+        json={"answers": [answer], "action": "advance"},
+    )
+    assert revisited.status_code == 200
+    assert len(revisited.json()["questions"]) == 3
+    assert revisited.json()["questions"][2]["question_id"] == locked_third_id

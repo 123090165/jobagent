@@ -6,12 +6,15 @@ from uuid import NAMESPACE_URL, uuid5
 
 from app.prompts.loader import load_prompt
 from app.schemas.interview_preparation import (
+    CapabilityDimension,
+    OptionStateEffect,
     PreparationAnswer,
     PreparationAnswerOption,
     PreparationGenerationStage,
     PreparationQuestion,
     PreparationRecommendation,
     PreparationSkillGap,
+    QuestionDecisionObjective,
 )
 from app.schemas.resume_profile import ResumeProfile
 from app.schemas.saved_job import SavedJob, SavedJobAnalysis
@@ -20,10 +23,12 @@ from app.services.llm_observability import llm_observation_context
 from app.services.llm_service import LLMServiceError
 
 
-QUESTIONS_PROMPT_VERSION = "interview_preparation_questions_v6"
+QUESTIONS_PROMPT_VERSION = "interview_preparation_questions_v8"
+NEXT_QUESTION_PROMPT_VERSION = "interview_preparation_next_question_v3"
 RECOMMENDATIONS_PROMPT_VERSION = "interview_preparation_recommendations_v4"
 ANSWER_CLASSIFICATION_PROMPT_VERSION = "interview_preparation_answer_classification_v1"
 QUESTIONS_SYSTEM_PROMPT = load_prompt("interview_preparation/questions_system.md")
+NEXT_QUESTION_SYSTEM_PROMPT = load_prompt("interview_preparation/next_question_system.md")
 RECOMMENDATIONS_SYSTEM_PROMPT = load_prompt(
     "interview_preparation/recommendations_system.md"
 )
@@ -95,16 +100,16 @@ def generate_preparation_questions(
     fallback_gaps = _deterministic_gaps(job, profile, analysis)
     fallback_questions = _deterministic_questions(fallback_gaps)
     if llm_service is None:
-        return fallback_gaps, fallback_questions, PreparationGenerationStage(
+        return fallback_gaps, fallback_questions[:2], PreparationGenerationStage(
             mode="deterministic",
             prompt_version=QUESTIONS_PROMPT_VERSION,
             attempts=0,
         )
 
     generation_memory = _question_generation_memory(
-        job, profile, analysis, fallback_gaps, fallback_questions
+        job, profile, analysis, fallback_gaps
     )
-    user_prompt = json.dumps(generation_memory, ensure_ascii=False)
+    user_prompt = _json_prompt(generation_memory)
     errors: list[str] = []
     for attempt in range(1, 3):
         try:
@@ -132,9 +137,12 @@ def generate_preparation_questions(
             if not isinstance(raw_gaps, list) or not isinstance(raw_questions, list):
                 raise TypeError("skill_gaps and questions must both be JSON arrays")
             gaps = [PreparationSkillGap.model_validate(item) for item in raw_gaps][:8]
+            gaps = [item if item.dimensions else item.model_copy(update={
+                "dimensions": _default_capability_dimensions(item.skill)
+            }) for item in gaps]
             if not gaps:
                 raise ValueError("No skill gaps returned")
-            questions = _questions_with_ids(raw_questions, require_model_options=True)[:5]
+            questions = _questions_with_ids(raw_questions, require_model_options=True)[:2]
             questions = questions or _deterministic_questions(gaps) or fallback_questions
             _validate_question_coverage(fallback_gaps, gaps, questions)
             return gaps, questions, PreparationGenerationStage(
@@ -148,12 +156,106 @@ def generate_preparation_questions(
             if attempt == 1 and _is_retryable_generation_error(exc):
                 continue
             break
-    return fallback_gaps, fallback_questions, PreparationGenerationStage(
+    return fallback_gaps, fallback_questions[:2], PreparationGenerationStage(
         mode="fallback",
         prompt_version=QUESTIONS_PROMPT_VERSION,
         attempts=len(errors),
         fallback_reason=errors[-1],
         attempt_errors=errors,
+    )
+
+
+def generate_next_preparation_question(
+    gaps: list[PreparationSkillGap],
+    questions: list[PreparationQuestion],
+    answers: list[PreparationAnswer],
+    *,
+    llm_service: JSONChatLLM | None,
+) -> tuple[PreparationQuestion | None, PreparationGenerationStage]:
+    locked_dimensions = {
+        item.decision_objective.dimension_id
+        for item in questions if item.decision_objective is not None
+    }
+    remaining = []
+    for gap in gaps:
+        dimensions = [
+            item for item in (gap.dimensions or _default_capability_dimensions(gap.skill))
+            if item.state in {"unresolved", "partial", "unknown"}
+            and item.dimension_id not in locked_dimensions
+        ]
+        if dimensions:
+            remaining.append(gap.model_copy(update={"dimensions": dimensions}))
+    fallback = (_deterministic_questions(remaining) or [None])[0]
+    if not remaining or len(questions) >= 5:
+        return None, PreparationGenerationStage(
+            mode="deterministic", prompt_version=NEXT_QUESTION_PROMPT_VERSION, attempts=0
+        )
+    if llm_service is None:
+        return fallback, PreparationGenerationStage(
+            mode="deterministic", prompt_version=NEXT_QUESTION_PROMPT_VERSION, attempts=0
+        )
+
+    memory = _next_question_memory(gaps, remaining, questions, answers)
+    errors: list[str] = []
+    for attempt in range(1, 3):
+        try:
+            with llm_observation_context(
+                "preparation.generate_next_question",
+                metadata={
+                    "stage": "next_question_generation",
+                    "attempt": attempt,
+                    "prompt_version": NEXT_QUESTION_PROMPT_VERSION,
+                    "question_index": len(questions) + 1,
+                    "locked_question_count": len(questions),
+                    "committed_answer_count": len(
+                        [item for item in answers if item.committed]
+                    ),
+                },
+                context_parts=memory,
+            ):
+                response = llm_service.chat_completion_json(
+                    system_prompt=_prompt_for_attempt(
+                        NEXT_QUESTION_SYSTEM_PROMPT,
+                        attempt=attempt,
+                        expected_shape='{ "question": { ... } }',
+                        correction=errors[-1] if errors else None,
+                    ),
+                    user_prompt=_json_prompt(memory),
+                )
+            raw = response.get("question")
+            if not isinstance(raw, dict):
+                raise TypeError("question must be a JSON object")
+            generated = _questions_with_ids([raw], require_model_options=True)
+            if not generated:
+                raise ValueError("No usable next question returned")
+            question = generated[0]
+            if _normalized_skill(question.skill) not in {
+                _normalized_skill(item.skill) for item in remaining
+            }:
+                raise ValueError("Next question must target a remaining skill gap")
+            target_gap = next(
+                item for item in remaining
+                if _normalized_skill(item.skill) == _normalized_skill(question.skill)
+            )
+            remaining_dimensions = {item.dimension_id for item in target_gap.dimensions}
+            if (
+                question.decision_objective is None
+                or question.decision_objective.dimension_id not in remaining_dimensions
+            ):
+                raise ValueError("Next question must target an unresolved capability dimension")
+            _validate_question_not_generic(question, questions)
+            return question, PreparationGenerationStage(
+                mode="llm", prompt_version=NEXT_QUESTION_PROMPT_VERSION,
+                attempts=attempt, attempt_errors=errors,
+            )
+        except Exception as exc:
+            errors.append(_error_summary(exc))
+            if attempt == 1 and _is_retryable_generation_error(exc):
+                continue
+            break
+    return fallback, PreparationGenerationStage(
+        mode="fallback", prompt_version=NEXT_QUESTION_PROMPT_VERSION,
+        attempts=len(errors), fallback_reason=errors[-1], attempt_errors=errors,
     )
 
 
@@ -172,13 +274,10 @@ def generate_recommendations(
             attempts=0,
         )
 
-    recommendation_memory = {
-            "skill_gaps": [item.model_dump() for item in gaps],
-            "questions": [item.model_dump() for item in questions],
-            "user_answers": [item.model_dump() for item in answers],
-            "deterministic_baseline": [item.model_dump() for item in fallback],
-    }
-    user_prompt = json.dumps(recommendation_memory, ensure_ascii=False)
+    recommendation_memory = _recommendation_memory(
+        gaps, questions, answers, fallback
+    )
+    user_prompt = _json_prompt(recommendation_memory)
     errors: list[str] = []
     for attempt in range(1, 3):
         try:
@@ -484,6 +583,7 @@ def _deterministic_gaps(
                 "The profile mentions this skill but lacks a concrete example."
                 if supported else "The JD mentions this skill and the profile has no explicit evidence."
             ),
+            dimensions=_default_capability_dimensions(skill),
         ))
     if not gaps:
         gaps.append(PreparationSkillGap(
@@ -491,6 +591,7 @@ def _deterministic_gaps(
             importance="high", evidence_status="unknown", skill_type="experience",
             jd_evidence=jd_text[:300], profile_evidence=[],
             rationale="The JD should be validated against a concrete example from the user.",
+            dimensions=_default_capability_dimensions("role-specific execution"),
         ))
     return gaps
 
@@ -530,10 +631,16 @@ def _deterministic_questions(gaps: list[PreparationSkillGap]) -> list[Preparatio
     for gap in [item for item in gaps if item.evidence_status in {"partial", "unknown", "missing"}][:5]:
         prompt = f"Which description is closest to your current experience with {gap.skill}?"
         question_id = str(uuid5(NAMESPACE_URL, f"{gap.skill}:{prompt}"))
+        dimension = (gap.dimensions or _default_capability_dimensions(gap.skill))[0]
         items.append(PreparationQuestion(
             question_id=question_id, skill=gap.skill, prompt=prompt,
             why_asked=f"The JD treats {gap.skill} as important, but current evidence is {gap.evidence_status}.",
             options=_fallback_options(gap),
+            decision_objective=QuestionDecisionObjective(
+                dimension_id=dimension.dimension_id,
+                uncertainty=f"The candidate's current boundary for {dimension.label} is unresolved.",
+                why_now=f"This dimension is required by {gap.skill} and lacks concrete evidence.",
+            ),
         ))
     return items
 
@@ -554,43 +661,66 @@ def _questions_with_ids(
             not isinstance(raw_options, list) or not 2 <= len(raw_options) <= 6
         ):
             raise ValueError(f"Question for {skill} must contain 2-6 tailored options")
+        objective = raw.get("decision_objective")
+        if require_model_options and (
+            not isinstance(objective, dict)
+            or not str(objective.get("dimension_id") or "").strip()
+        ):
+            raise ValueError(f"Question for {skill} needs a decision_objective")
         options = []
         for index, item in enumerate(raw_options or []):
             if not isinstance(item, dict):
                 raise TypeError(f"Question option {index} for {skill} must be an object")
             option = {**item}
-            if require_model_options and not str(item.get("decision_dimension") or "").strip():
+            if require_model_options and not str(item.get("answer_kind") or "").strip():
                 raise ValueError(
-                    f"Question option {index} for {skill} needs a decision_dimension"
+                    f"Question option {index} for {skill} needs an answer_kind"
                 )
             option.setdefault(
                 "option_id",
-                str(uuid5(NAMESPACE_URL, f"{skill}:{prompt}:{index}:{item.get('value', '')}")),
+                str(
+                    uuid5(
+                        NAMESPACE_URL,
+                        f"{skill}:{prompt}:{index}:{item.get('answer_kind', '')}",
+                    )
+                ),
+            )
+            option.setdefault(
+                "decision_dimension",
+                str(objective.get("dimension_id") or "model_semantic")
+                if isinstance(objective, dict)
+                else "model_semantic",
             )
             options.append(PreparationAnswerOption.model_validate(option))
         if require_model_options:
-            dimensions = {item.decision_dimension.casefold() for item in options}
-            generic = {"experience_level", "experience_scope", "current_level"}
-            if len(dimensions) < 2 or dimensions.issubset(generic):
-                raise ValueError(
-                    f"Question for {skill} uses generic rather than skill-specific dimensions"
-                )
+            objective_id = str(objective.get("dimension_id"))
             for option in options:
-                if option.value in {"work_experience", "project_experience"} and (
-                    option.evidence_transition != "partial"
-                    or option.route != "ask_evidence"
-                ):
+                if not option.state_effects:
                     raise ValueError(
-                        f"Option {option.option_id} for {skill} must keep a work/project "
-                        "claim partial until candidate-authored evidence is checked"
+                        f"Option {option.option_id} for {skill} needs state_effects"
                     )
-                if option.route in {"ask_evidence", "clarify"} and (
-                    option.detail_policy != "required"
-                    or not (option.follow_up_prompt or "").strip()
-                ):
+                if not option.next_question_signal.strip():
                     raise ValueError(
-                        f"Option {option.option_id} for {skill} routes to "
-                        f"{option.route} but does not require a focused follow-up"
+                        f"Option {option.option_id} for {skill} needs next_question_signal"
+                    )
+                primary_effect = next(
+                    (
+                        effect for effect in option.state_effects
+                        if effect.dimension_id == objective_id
+                    ),
+                    None,
+                )
+                expected_state = {
+                    "evidence_claim": "partial",
+                    "partial_practice": "partial",
+                    "knowledge_gap": "knowledge_gap",
+                    "explicit_absence": "missing",
+                    "unclear": "unknown",
+                }[option.answer_kind]
+                if primary_effect is None or primary_effect.state != expected_state:
+                    raise ValueError(
+                        f"Option {option.option_id} for {skill} must update its primary "
+                        f"objective to {expected_state}"
                     )
         questions.append(PreparationQuestion(
             question_id=str(uuid5(NAMESPACE_URL, f"{skill}:{prompt}")),
@@ -601,13 +731,15 @@ def _questions_with_ids(
             free_text_prompt=str(raw.get("free_text_prompt") or (
                 "If none of these options describes your situation accurately, explain what is different."
             )),
+            decision_objective=raw.get("decision_objective"),
         ))
     return questions
 
 
 def _fallback_options(gap: PreparationSkillGap) -> list[PreparationAnswerOption]:
     skill = gap.skill
-    return [
+    dimension = (gap.dimensions or _default_capability_dimensions(skill))[0].dimension_id
+    options = [
         PreparationAnswerOption(
             option_id="delivered_result",
             value="work_experience",
@@ -673,6 +805,33 @@ def _fallback_options(gap: PreparationSkillGap) -> list[PreparationAnswerOption]
             decision_dimension="unclassified_boundary",
         ),
     ]
+    state_by_value = {
+        "work_experience": "partial", "project_experience": "partial",
+        "practice_only": "knowledge_gap", "conceptual_only": "knowledge_gap",
+        "no_experience": "missing", "uncertain": "unknown",
+    }
+    return [item.model_copy(update={
+        "state_effects": [OptionStateEffect(
+            dimension_id=dimension, state=state_by_value[item.value]
+        )],
+        "next_question_signal": (
+            "request_concrete_evidence" if item.route == "ask_evidence"
+            else "replan_from_updated_state"
+        ),
+    }) for item in options]
+
+
+def _default_capability_dimensions(skill: str) -> list[CapabilityDimension]:
+    normalized = _normalized_skill(skill)
+    catalog = {
+        "ppg signal processing": ("motion_artifact_handling", "Motion artifact handling"),
+        "ecg signal processing": ("qrs_and_noise_processing", "QRS detection and noise handling"),
+        "acc motion signal analysis": ("motion_context_analysis", "Motion context and artifact analysis"),
+        "blood pressure estimation": ("calibration_and_validation", "Calibration and subject-independent validation"),
+        "multimodal physiological signal fusion": ("alignment_and_fusion", "Time alignment and fusion architecture"),
+    }
+    key, label = catalog.get(normalized, (f"{normalized.replace(' ', '_')}_boundary", f"{skill} decision boundary"))
+    return [CapabilityDimension(dimension_id=key, label=label)]
 
 
 def _question_generation_memory(
@@ -680,53 +839,222 @@ def _question_generation_memory(
     profile: ResumeProfile | None,
     analysis: SavedJobAnalysis | None,
     fallback_gaps: list[PreparationSkillGap],
-    fallback_questions: list[PreparationQuestion],
 ) -> dict[str, object]:
-    profile_dump = profile.model_dump(mode="json") if profile else None
-    coverage = [
-        item.model_dump(mode="json")
-        for item in fallback_gaps
-        if item.evidence_status in {"partial", "unknown", "missing"}
-    ][:5]
+    coverage = [item for item in fallback_gaps if item.evidence_status != "supported"][:5]
     return {
-        "job_requirement_memory": {
-            "saved_job_id": job.saved_job_id,
-            "title": job.title,
-            "company": job.company,
-            "raw_jd_text": job.raw_jd_text,
-            "structured_jd": job.structured_jd,
+        "cache_context": {
+            "job": {
+                "title": job.title,
+                "company": job.company,
+                "raw_jd_text": job.raw_jd_text,
+            },
+            "candidate_profile": _compact_profile_context(profile),
         },
-        "profile_evidence_memory": {
-            "resume_profile_id": profile.resume_profile_id if profile else None,
-            "immutable_profile": profile_dump,
-            "rule": "Absence of profile evidence means unknown, never missing or negative experience.",
-        },
-        "analysis_memory": analysis.model_dump(mode="json") if analysis else None,
-        "gap_state_memory": [item.model_dump(mode="json") for item in fallback_gaps],
-        "required_coverage_memory": {
-            "skills": coverage[: min(3, len(coverage))],
-            "additional_candidates": coverage[min(3, len(coverage)) :],
-            "minimum_question_count": min(3, len(coverage)),
-            "rule": (
-                "Cover every skill in skills before lower-priority gaps. Preserve each "
-                "required anchor's skill name exactly in skill_gaps and questions. "
-                "Use additional_candidates to fill remaining question capacity when useful."
+        "stage_contract": {
+            "stage": "initial_capability_map_and_two_questions",
+            "absence_rule": (
+                "Missing profile evidence means unresolved, never explicit absence."
+            ),
+            "model_output": (
+                "Return business semantics only. The backend derives execution routes."
             ),
         },
-        "routing_policy": {
-            "model_proposes_semantics": True,
-            "backend_validates_transitions": True,
-            "option_count": "2-6 per question",
-            "free_text_is_escape_hatch": True,
-            "ask_evidence_only_when_an_example_can_change_the_state": True,
-            "knowledge_gap_routes_to_learning": True,
-            "explicit_absence_routes_to_capability_gap": True,
-        },
-        "deterministic_baseline": {
-            "skill_gaps": [item.model_dump(mode="json") for item in fallback_gaps],
-            "questions": [item.model_dump(mode="json") for item in fallback_questions],
+        "analysis_summary": _compact_analysis_context(analysis),
+        "gap_anchors": [_compact_gap_context(item) for item in fallback_gaps],
+        "required_coverage_memory": {
+            "skills": [item.skill for item in coverage[:2]],
+            "additional_candidates": [item.skill for item in coverage[2:]],
+            "minimum_question_count": min(2, len(coverage)),
+            "rule": "Cover skills first; use additional_candidates only when useful.",
         },
     }
+
+
+def _next_question_memory(
+    all_gaps: list[PreparationSkillGap],
+    remaining_gaps: list[PreparationSkillGap],
+    questions: list[PreparationQuestion],
+    answers: list[PreparationAnswer],
+) -> dict[str, object]:
+    return {
+        "cache_context": {
+            "capability_contract": [
+                {
+                    "skill": gap.skill,
+                    "importance": gap.importance,
+                    "jd_evidence": gap.jd_evidence,
+                    "profile_evidence": gap.profile_evidence,
+                    "dimensions": [
+                        {"dimension_id": item.dimension_id, "label": item.label}
+                        for item in gap.dimensions
+                    ],
+                }
+                for gap in all_gaps
+            ],
+            "initial_locked_questions": [
+                _compact_question_context(item, include_options=True)
+                for item in questions[:2]
+            ],
+        },
+        "stage_contract": {
+            "stage": "generate_exactly_one_next_question",
+            "rule": "Never rewrite a locked question or repeat its decision objective.",
+        },
+        "dynamic_state": {
+            "remaining_gap_state": [
+                {
+                    "skill": gap.skill,
+                    "dimensions": [item.model_dump(mode="json") for item in gap.dimensions],
+                }
+                for gap in remaining_gaps
+            ],
+            "locked_objectives": [
+                _compact_question_context(item, include_options=False)
+                for item in questions
+            ],
+            "committed_answers": _compact_answer_context(
+                questions, [item for item in answers if item.committed]
+            ),
+        },
+    }
+
+
+def _recommendation_memory(
+    gaps: list[PreparationSkillGap],
+    questions: list[PreparationQuestion],
+    answers: list[PreparationAnswer],
+    fallback: list[PreparationRecommendation],
+) -> dict[str, object]:
+    return {
+        "final_capability_state": [
+            {
+                "skill": gap.skill,
+                "importance": gap.importance,
+                "skill_type": gap.skill_type,
+                "evidence_status": gap.evidence_status,
+                "evidence_origin": gap.evidence_origin,
+                "dimensions": [item.model_dump(mode="json") for item in gap.dimensions],
+            }
+            for gap in gaps
+        ],
+        "candidate_answer_evidence": _compact_answer_context(questions, answers),
+        "output_limits": {
+            "maximum_recommendations": min(6, max(1, len(fallback))),
+            "allowed_action_types": [
+                "learning", "experience_inventory", "interview_story", "capability_gap"
+            ],
+        },
+    }
+
+
+def _compact_profile_context(profile: ResumeProfile | None) -> dict[str, object] | None:
+    if profile is None:
+        return None
+    return {
+        "summary": profile.summary,
+        "target_roles": profile.target_roles,
+        "target_directions": profile.target_directions,
+        "core_skills": profile.core_skills,
+        "supporting_skills": profile.supporting_skills,
+        "strengths": profile.strengths,
+        "risks": profile.risks,
+        "evidence_detail": profile.profile or profile.raw_resume_text,
+    }
+
+
+def _compact_analysis_context(
+    analysis: SavedJobAnalysis | None,
+) -> dict[str, object] | None:
+    if analysis is None:
+        return None
+    return {
+        "match_score": analysis.match_score,
+        "confidence_label": analysis.confidence_label,
+        "recommendation": analysis.recommendation,
+        "matched_strengths": analysis.matched_strengths,
+        "critical_gaps": analysis.critical_gaps,
+        "resume_actions": analysis.resume_actions,
+    }
+
+
+def _compact_gap_context(gap: PreparationSkillGap) -> dict[str, object]:
+    return {
+        "skill": gap.skill,
+        "importance": gap.importance,
+        "evidence_status": gap.evidence_status,
+        "skill_type": gap.skill_type,
+        "jd_evidence": gap.jd_evidence,
+        "profile_evidence": gap.profile_evidence,
+        "rationale": gap.rationale,
+        "dimensions": [item.model_dump(mode="json") for item in gap.dimensions],
+    }
+
+
+def _compact_question_context(
+    question: PreparationQuestion, *, include_options: bool
+) -> dict[str, object]:
+    result: dict[str, object] = {
+        "question_id": question.question_id,
+        "skill": question.skill,
+        "prompt": question.prompt,
+        "decision_objective": (
+            question.decision_objective.model_dump(mode="json")
+            if question.decision_objective else None
+        ),
+    }
+    if include_options:
+        result["options"] = [
+            {
+                "option_id": option.option_id,
+                "answer_kind": option.answer_kind,
+                "label": option.label,
+                "description": option.description,
+                "state_effects": [
+                    item.model_dump(mode="json") for item in option.state_effects
+                ],
+                "next_question_signal": option.next_question_signal,
+            }
+            for option in question.options
+        ]
+    return result
+
+
+def _compact_answer_context(
+    questions: list[PreparationQuestion], answers: list[PreparationAnswer]
+) -> list[dict[str, object]]:
+    question_by_id = {item.question_id: item for item in questions}
+    result = []
+    for answer in answers:
+        question = question_by_id.get(answer.question_id)
+        option = next(
+            (
+                item for item in question.options
+                if item.option_id == answer.selected_option_id
+            ),
+            None,
+        ) if question else None
+        result.append({
+            "question_id": answer.question_id,
+            "skill": question.skill if question else None,
+            "dimension_id": (
+                question.decision_objective.dimension_id
+                if question and question.decision_objective else None
+            ),
+            "selected_option_id": answer.selected_option_id,
+            "selected_option_label": option.label if option else None,
+            "answer_kind": option.answer_kind if option else None,
+            "detail": answer.detail,
+            "free_text": answer.free_text or answer.answer,
+            "detail_quality": answer.detail_quality,
+            "evidence_transition": answer.evidence_transition,
+            "route": answer.route,
+            "committed": answer.committed,
+        })
+    return result
+
+
+def _json_prompt(value: object) -> str:
+    return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
 
 
 def _validate_question_coverage(
@@ -738,7 +1066,7 @@ def _validate_question_coverage(
     coverage_seeds = [
         item for item in seed_gaps if item.evidence_status in unresolved
     ][:5]
-    minimum = min(3, len(coverage_seeds))
+    minimum = min(2, len(coverage_seeds))
     if len(questions) < minimum:
         raise ValueError(
             f"Question coverage is too small: expected at least {minimum}, "
@@ -758,6 +1086,27 @@ def _validate_question_coverage(
     if orphaned:
         raise ValueError(f"Questions without matching skill gaps: {orphaned}")
 
+    gaps_by_skill = {_normalized_skill(item.skill): item for item in model_gaps}
+    objective_ids = []
+    for question in questions:
+        gap = gaps_by_skill[_normalized_skill(question.skill)]
+        valid_dimensions = {item.dimension_id for item in gap.dimensions}
+        objective = question.decision_objective
+        if objective is None or objective.dimension_id not in valid_dimensions:
+            raise ValueError(
+                f"Question for {question.skill} must target one declared capability dimension"
+            )
+        objective_ids.append(objective.dimension_id)
+        if any(
+            effect.dimension_id not in valid_dimensions
+            for option in question.options for effect in option.state_effects
+        ):
+            raise ValueError(
+                f"Question for {question.skill} updates an undeclared capability dimension"
+            )
+    if len(objective_ids) != len(set(objective_ids)):
+        raise ValueError("Initial questions must target distinct decision objectives")
+
     missing = [
         item.skill
         for item in coverage_seeds[:minimum]
@@ -770,7 +1119,7 @@ def _validate_question_coverage(
         item
         for item in model_gaps
         if item.importance == "high" and item.evidence_status in unresolved
-    ][:5]
+    ][:minimum]
     missing_high = [
         item.skill
         for item in high_priority
@@ -778,6 +1127,32 @@ def _validate_question_coverage(
     ]
     if missing_high:
         raise ValueError(f"High-priority gaps lack questions: {missing_high}")
+
+    for question in questions:
+        _validate_question_not_generic(question, [])
+
+
+def _validate_question_not_generic(
+    question: PreparationQuestion,
+    locked_questions: list[PreparationQuestion],
+) -> None:
+    if question.decision_objective is None:
+        raise ValueError(f"Question for {question.skill} lacks a decision objective")
+    effect_signatures = {
+        tuple(sorted((effect.dimension_id, effect.state) for effect in option.state_effects))
+        for option in question.options
+    }
+    if len(effect_signatures) < 2:
+        raise ValueError(
+            f"Question for {question.skill} does not produce contrasting state updates"
+        )
+    for locked in locked_questions:
+        if (
+            locked.decision_objective is not None
+            and locked.decision_objective.dimension_id
+            == question.decision_objective.dimension_id
+        ):
+            raise ValueError("Next question repeats a locked decision objective")
 
 
 def _normalized_skill(value: str) -> str:

@@ -79,7 +79,34 @@ def test_agent_uses_learning_and_capability_routes(monkeypatch, tmp_path) -> Non
         questions=[question],
     )
     assert completed["status"] == "completed"
-    assert completed["transitions"][0]["route"] == "capability_gap"
+    assert completed["transitions"][-1]["route"] == "capability_gap"
+
+
+def test_agent_advance_commits_or_pauses_one_answer(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("JOBAGENT_LANGGRAPH_DB_PATH", str(tmp_path / "graph.sqlite3"))
+    agent = PreparationAgent()
+    question = _question()
+    agent.start("prep-advance", [question])
+
+    advanced = agent.resume(
+        "prep-advance",
+        [PreparationAnswer(question_id="q1", selected_option_id="python_practice")],
+        "advance",
+        questions=[question],
+    )
+    assert advanced["status"] == "questions_ready"
+    assert advanced["answers"][0]["committed"] is True
+
+    agent.start("prep-advance-follow-up", [question])
+    paused = agent.resume(
+        "prep-advance-follow-up",
+        [PreparationAnswer(question_id="q1", selected_option_id="python_project")],
+        "advance",
+        questions=[question],
+    )
+    assert paused["status"] == "paused"
+    assert paused["answers"][0]["pending_prompt"]
+    assert paused["answers"][0]["committed"] is False
 
 
 def test_agent_reasks_vague_evidence_then_closes_partial(monkeypatch, tmp_path) -> None:

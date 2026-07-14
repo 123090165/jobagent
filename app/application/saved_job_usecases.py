@@ -45,6 +45,7 @@ from app.services.errors import JobAgentError
 from app.services.job_brief_generator import generate_job_brief_content
 from app.services.interview_preparation_generator import (
     build_external_prompt,
+    generate_next_preparation_question,
     generate_preparation_questions,
     generate_recommendations,
     resolve_preparation_answers,
@@ -256,6 +257,59 @@ async def complete_interview_preparation(
         )
     submitted_answers = _merge_preparation_answers(item.answers, payload.answers)
     resolution = resolve_llm_provider(payload.llm_provider)
+    if payload.action == "advance":
+        if len(payload.answers) != 1:
+            raise JobAgentError(
+                message="Advance exactly one preparation question at a time.",
+                error_code="preparation_advance_invalid", status_code=400,
+            )
+        question_id = payload.answers[0].question_id
+        was_committed = any(
+            answer.question_id == question_id and answer.committed for answer in item.answers
+        )
+        current = [answer for answer in submitted_answers if answer.question_id == question_id]
+        try:
+            routed = resolve_preparation_answers(
+                item.questions, current, llm_service=resolution.service,
+                classify_free_text=True,
+            )
+        except ValueError as exc:
+            raise JobAgentError(
+                message=str(exc), error_code="preparation_answer_invalid", status_code=400,
+            ) from exc
+        normalized = _classify_answer_details(routed)
+        transition = preparation_agent.resume(
+            item.preparation_id, normalized, "advance", questions=item.questions,
+        )
+        transitioned = [
+            PreparationAnswer.model_validate(answer)
+            for answer in transition.get("answers", [])
+        ]
+        merged_answers = _merge_preparation_answers(item.answers, transitioned)
+        updated_gaps = _apply_preparation_answers(
+            item.skill_gaps, item.questions, merged_answers
+        )
+        if transition["status"] == "paused":
+            return preparations.save_answers(
+                item.model_copy(update={"skill_gaps": updated_gaps}),
+                answers=merged_answers, status="paused",
+            )
+        questions = list(item.questions)
+        if not was_committed and len(questions) < 5:
+            next_question, _ = await asyncio.to_thread(
+                generate_next_preparation_question,
+                updated_gaps, questions, merged_answers,
+                llm_service=resolution.service,
+            )
+            if next_question is not None:
+                questions.append(next_question)
+        return preparations.save_answers(
+            item.model_copy(update={
+                "skill_gaps": updated_gaps,
+                "questions": questions,
+            }),
+            answers=merged_answers, status="questions_ready",
+        )
     try:
         routed_answers = resolve_preparation_answers(
             item.questions,
@@ -349,30 +403,51 @@ def _summarize_generation_stages(
 
 def _apply_preparation_answers(skill_gaps, questions, answers):
     question_by_id = {question.question_id: question for question in questions}
-    answer_by_skill = {
-        question_by_id[answer.question_id].skill: answer
-        for answer in answers if answer.question_id in question_by_id
-    }
+    answers_by_skill = {}
+    for answer in answers:
+        question = question_by_id.get(answer.question_id)
+        if question is not None:
+            answers_by_skill.setdefault(question.skill, []).append((question, answer))
     updated = []
     for gap in skill_gaps:
-        answer = answer_by_skill.get(gap.skill)
-        if answer is None:
+        skill_answers = answers_by_skill.get(gap.skill, [])
+        if not skill_answers:
             updated.append(gap)
             continue
-        level = answer.experience_level
-        evidence_status = answer.evidence_transition
-        if evidence_status is None and level in {"work_experience", "project_experience"}:
-            evidence_status = "supported" if (answer.detail or answer.free_text or answer.answer) else "partial"
-        elif evidence_status is None and level in {"practice_only", "conceptual_only"}:
-            evidence_status = "partial"
-        elif evidence_status is None and level == "no_experience":
-            evidence_status = "missing"
-        elif evidence_status is None:
-            evidence_status = "unknown"
+        dimensions = {item.dimension_id: item for item in gap.dimensions}
+        evidence_status = gap.evidence_status
+        skill_type = gap.skill_type
+        for question, answer in skill_answers:
+            level = answer.experience_level
+            evidence_status = answer.evidence_transition
+            if evidence_status is None and level in {"work_experience", "project_experience"}:
+                evidence_status = "supported" if (answer.detail or answer.free_text or answer.answer) else "partial"
+            elif evidence_status is None and level in {"practice_only", "conceptual_only"}:
+                evidence_status = "partial"
+            elif evidence_status is None and level == "no_experience":
+                evidence_status = "missing"
+            elif evidence_status is None:
+                evidence_status = "unknown"
+            option = next(
+                (item for item in question.options if item.option_id == answer.selected_option_id),
+                None,
+            )
+            for effect in option.state_effects if option is not None else []:
+                current = dimensions.get(effect.dimension_id)
+                if current is not None:
+                    state = "supported" if answer.evidence_transition == "supported" else effect.state
+                    evidence = list(current.evidence)
+                    evidence.append(f"User selected: {option.label}")
+                    dimensions[effect.dimension_id] = current.model_copy(update={
+                        "state": state, "evidence": list(dict.fromkeys(evidence)),
+                    })
+            if answer.route == "learning":
+                skill_type = "knowledge"
         updated.append(gap.model_copy(update={
             "evidence_status": evidence_status,
             "evidence_origin": "user_reported",
-            "skill_type": "knowledge" if answer.route == "learning" else gap.skill_type,
+            "skill_type": skill_type,
+            "dimensions": list(dimensions.values()),
         }))
     return updated
 
@@ -399,6 +474,8 @@ def _merge_preparation_answers(existing, submitted):
             backend_state["follow_up_count"] = previous.follow_up_count
         if "pending_prompt" not in replacement.model_fields_set:
             backend_state["pending_prompt"] = previous.pending_prompt
+        if "committed" not in replacement.model_fields_set:
+            backend_state["committed"] = previous.committed
         merged.append(replacement.model_copy(update=backend_state))
     merged.extend(submitted_by_id.values())
     return merged

@@ -26,6 +26,48 @@ RouteAction = Literal[
 ]
 DetailPolicy = Literal["required", "optional", "not_needed"]
 ResolutionSource = Literal["option", "llm_classified", "fallback_uncertain", "legacy"]
+CapabilityDimensionState = Literal[
+    "unresolved", "supported", "partial", "knowledge_gap", "missing", "unknown"
+]
+OptionAnswerKind = Literal[
+    "evidence_claim",
+    "partial_practice",
+    "knowledge_gap",
+    "explicit_absence",
+    "unclear",
+]
+
+
+class CapabilityDimension(BaseModel):
+    dimension_id: str
+    label: str
+    state: CapabilityDimensionState = "unresolved"
+    evidence: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="before")
+    @classmethod
+    def upgrade_demonstrated_state(cls, data: object) -> object:
+        if isinstance(data, dict) and data.get("state") == "demonstrated":
+            return {**data, "state": "supported"}
+        return data
+
+
+class OptionStateEffect(BaseModel):
+    dimension_id: str
+    state: CapabilityDimensionState
+
+    @model_validator(mode="before")
+    @classmethod
+    def upgrade_demonstrated_state(cls, data: object) -> object:
+        if isinstance(data, dict) and data.get("state") == "demonstrated":
+            return {**data, "state": "supported"}
+        return data
+
+
+class QuestionDecisionObjective(BaseModel):
+    dimension_id: str
+    uncertainty: str
+    why_now: str
 
 
 class PreparationSkillGap(BaseModel):
@@ -37,10 +79,23 @@ class PreparationSkillGap(BaseModel):
     profile_evidence: list[str] = Field(default_factory=list)
     rationale: str
     evidence_origin: EvidenceOrigin = "none"
+    dimensions: list[CapabilityDimension] = Field(default_factory=list)
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_model_lists(cls, data: object) -> object:
+        if not isinstance(data, dict):
+            return data
+        normalized = {**data}
+        evidence = normalized.get("profile_evidence")
+        if isinstance(evidence, str):
+            normalized["profile_evidence"] = [evidence] if evidence.strip() else []
+        return normalized
 
 
 class PreparationAnswerOption(BaseModel):
     option_id: str
+    answer_kind: OptionAnswerKind | None = None
     value: ExperienceLevel
     label: str
     description: str
@@ -49,12 +104,42 @@ class PreparationAnswerOption(BaseModel):
     detail_policy: DetailPolicy = "optional"
     follow_up_prompt: str | None = None
     decision_dimension: str = "legacy_experience_scope"
+    state_effects: list[OptionStateEffect] = Field(default_factory=list)
+    next_question_signal: str = "replan_from_updated_state"
 
     @model_validator(mode="before")
     @classmethod
     def upgrade_legacy_option(cls, data: object) -> object:
         if not isinstance(data, dict):
             return data
+        answer_kind = data.get("answer_kind")
+        semantic_defaults = {
+            "evidence_claim": (
+                "project_experience", "partial", "ask_evidence", "required"
+            ),
+            "partial_practice": (
+                "practice_only", "partial", "learning", "not_needed"
+            ),
+            "knowledge_gap": (
+                "conceptual_only", "partial", "learning", "not_needed"
+            ),
+            "explicit_absence": (
+                "no_experience", "missing", "capability_gap", "not_needed"
+            ),
+            "unclear": ("uncertain", "unknown", "clarify", "required"),
+        }
+        if answer_kind in semantic_defaults:
+            value, evidence, route, detail_policy = semantic_defaults[answer_kind]
+            upgraded = {
+                **data,
+                "value": value,
+                "evidence_transition": evidence,
+                "route": route,
+                "detail_policy": detail_policy,
+            }
+            if detail_policy != "required":
+                upgraded["follow_up_prompt"] = None
+            return upgraded
         value = data.get("value")
         defaults = {
             "work_experience": ("partial", "ask_evidence", "required"),
@@ -97,6 +182,19 @@ class PreparationAnswerOption(BaseModel):
             )
         if self.detail_policy == "required" and not (self.follow_up_prompt or "").strip():
             raise ValueError("A required detail option needs a follow-up prompt")
+        if self.answer_kind is not None and self.state_effects:
+            expected_primary_state = {
+                "evidence_claim": "partial",
+                "partial_practice": "partial",
+                "knowledge_gap": "knowledge_gap",
+                "explicit_absence": "missing",
+                "unclear": "unknown",
+            }[self.answer_kind]
+            if all(effect.state != expected_primary_state for effect in self.state_effects):
+                raise ValueError(
+                    f"Option {self.option_id} with answer_kind={self.answer_kind} "
+                    f"needs a {expected_primary_state} state effect"
+                )
         return self
 
 
@@ -110,6 +208,7 @@ class PreparationQuestion(BaseModel):
     free_text_prompt: str = (
         "If none of these options describes your situation accurately, explain what is different."
     )
+    decision_objective: QuestionDecisionObjective | None = None
 
     @model_validator(mode="after")
     def require_distinct_options(self) -> "PreparationQuestion":
@@ -144,6 +243,7 @@ class PreparationAnswer(BaseModel):
     input_mode: AnswerInputMode | None = None
     follow_up_count: int = Field(default=0, ge=0, le=2)
     pending_prompt: str | None = Field(default=None, max_length=1000)
+    committed: bool = False
 
     @model_validator(mode="after")
     def require_structured_or_legacy_answer(self) -> "PreparationAnswer":
@@ -224,4 +324,4 @@ class PreparationGenerateRequest(BaseModel):
 class PreparationAnswerRequest(BaseModel):
     answers: list[PreparationAnswer] = Field(default_factory=list, max_length=5)
     llm_provider: str | None = None
-    action: Literal["save", "complete", "stop"] = "complete"
+    action: Literal["advance", "save", "complete", "stop"] = "complete"

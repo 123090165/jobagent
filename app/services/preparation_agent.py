@@ -26,7 +26,7 @@ class PreparationAgentState(TypedDict, total=False):
     transitions: list[dict[str, object]]
     pending_question_ids: list[str]
     answer_index: int
-    action: Literal["save", "complete", "stop"]
+    action: Literal["advance", "save", "complete", "stop"]
     status: Literal["questions_ready", "paused", "completed", "stopped"]
 
 
@@ -52,7 +52,7 @@ class PreparationAgent:
         self,
         preparation_id: str,
         answers: list[PreparationAnswer],
-        action: Literal["save", "complete", "stop"],
+        action: Literal["advance", "save", "complete", "stop"],
         *,
         questions: list[PreparationQuestion],
     ) -> PreparationAgentState:
@@ -76,6 +76,7 @@ class PreparationAgent:
                 Command(resume={
                     "answers": [item.model_dump(mode="json") for item in answers],
                     "action": action,
+                    "questions": [item.model_dump(mode="json") for item in questions],
                 }),
                 config,
             )
@@ -115,6 +116,7 @@ def _wait_for_user(state: PreparationAgentState) -> PreparationAgentState:
     return {
         "answers": response.get("answers", []),
         "action": response.get("action", "save"),
+        "questions": response.get("questions", state.get("questions", [])),
     }
 
 
@@ -191,7 +193,7 @@ def _normalize_answers(state: PreparationAgentState) -> PreparationAgentState:
         normalized_answers.append(answer)
     return {
         "answers": normalized_answers,
-        "transitions": [],
+        "transitions": state.get("transitions", []),
         "pending_question_ids": [],
         "answer_index": 0,
     }
@@ -222,7 +224,7 @@ def _record_current_route(
     question_id = str(answer.get("question_id") or "")
     question = question_by_id.get(question_id, {})
     pending_ids = list(state.get("pending_question_ids", []))
-    is_completion_attempt = state.get("action") == "complete"
+    is_completion_attempt = state.get("action") in {"advance", "complete"}
     if pending and is_completion_attempt:
         answer["follow_up_count"] = min(
             int(answer.get("follow_up_count") or 0) + 1,
@@ -283,7 +285,11 @@ def _route_session_action(state: PreparationAgentState) -> str:
     action = state.get("action", "save")
     if action == "stop":
         return "stop"
-    if action == "save" or state.get("pending_question_ids"):
+    if state.get("pending_question_ids"):
+        return "pause"
+    if action == "advance":
+        return "advance"
+    if action == "save":
         return "pause"
     return "complete"
 
@@ -294,6 +300,13 @@ def _pause(state: PreparationAgentState) -> PreparationAgentState:
 
 def _complete(state: PreparationAgentState) -> PreparationAgentState:
     return {"status": "completed"}
+
+
+def _advance_session(state: PreparationAgentState) -> PreparationAgentState:
+    answers = [dict(item) for item in state.get("answers", [])]
+    for answer in answers:
+        answer["committed"] = True
+    return {"status": "questions_ready", "answers": answers}
 
 
 def _stop(state: PreparationAgentState) -> PreparationAgentState:
@@ -316,6 +329,7 @@ def _compiled_graph(path: str):
     builder.add_node("finish_answers", _finish_answers)
     builder.add_node("pause", _pause)
     builder.add_node("complete", _complete)
+    builder.add_node("advance_session", _advance_session)
     builder.add_node("stop", _stop)
     builder.add_edge(START, "wait_for_user")
     builder.add_edge("wait_for_user", "normalize_answers")
@@ -334,9 +348,10 @@ def _compiled_graph(path: str):
     builder.add_conditional_edges(
         "finish_answers",
         _route_session_action,
-        {"pause": "pause", "complete": "complete", "stop": "stop"},
+        {"pause": "pause", "advance": "advance_session", "complete": "complete", "stop": "stop"},
     )
     builder.add_edge("pause", "wait_for_user")
+    builder.add_edge("advance_session", "wait_for_user")
     builder.add_edge("complete", END)
     builder.add_edge("stop", END)
     graph = builder.compile(checkpointer=saver)
