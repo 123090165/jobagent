@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import asdict, dataclass
 import json
 import time
 from typing import Literal
@@ -8,12 +9,24 @@ from pydantic import BaseModel, Field
 
 from app.schemas.confirmed_profile import ConfirmedProfile
 from app.services.job_search_intent import is_generic_tool_term
-from app.services.job_search_planner import JobSearchPlan
+from app.services.job_search_planner import (
+    JobSearchPlan,
+    SearchConstraint,
+    build_structured_constraints,
+)
 from app.services.job_search_providers.base import RawJobCandidate
 from app.services.llm_provider import JSONChatLLM
 from app.services.llm_service import LLMServiceError
 
 CandidateConfidenceLabel = Literal["strong", "medium", "limited", "weak"]
+HardFilterStatus = Literal["accepted", "rejected", "unknown"]
+HardFilterRejectionCode = Literal[
+    "excluded_role",
+    "seniority_mismatch",
+    "work_type_mismatch",
+    "location_mismatch",
+    "stale_listing",
+]
 
 SCORE_BREAKDOWN_KEYS = [
     "role_alignment",
@@ -131,6 +144,24 @@ class CandidateFilterResult(BaseModel):
     diagnostics: dict[str, object] = Field(default_factory=dict)
 
 
+@dataclass(frozen=True)
+class HardFilterDecision:
+    candidate_index: int
+    status: HardFilterStatus
+    rejection_code: HardFilterRejectionCode | None = None
+    evidence: str | None = None
+    unknown_fields: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class _HardFilterPolicy:
+    excluded_roles: tuple[str, ...]
+    reject_senior: bool
+    required_employment_types: tuple[str, ...]
+    constrained_locations: tuple[str, ...]
+    required_work_arrangements: tuple[str, ...]
+
+
 def filter_candidates(
     confirmed_profile: ConfirmedProfile,
     search_plan: JobSearchPlan,
@@ -142,8 +173,37 @@ def filter_candidates(
 ) -> CandidateFilterResult:
     total_start = time.perf_counter()
     deterministic_start = time.perf_counter()
-    deterministic = _deterministic_filter(confirmed_profile, search_plan, candidates, limit=limit)
+    hard_filter_policy = _build_hard_filter_policy(search_plan)
+    decisions = [
+        _hard_filter_candidate(index, candidate, hard_filter_policy)
+        for index, candidate in enumerate(candidates)
+    ]
+    accepted_indexes = [
+        decision.candidate_index
+        for decision in decisions
+        if decision.status != "rejected"
+    ]
+    deterministic = _deterministic_filter(
+        confirmed_profile,
+        search_plan,
+        candidates,
+        limit=limit,
+        allowed_indexes=set(accepted_indexes),
+    )
     base_diagnostics = {
+        "hard_filter": {
+            "input_count": len(candidates),
+            "accepted_count": sum(decision.status == "accepted" for decision in decisions),
+            "unknown_count": sum(decision.status == "unknown" for decision in decisions),
+            "eligible_count": len(accepted_indexes),
+            "rejected_count": sum(decision.status == "rejected" for decision in decisions),
+            "rejections": [
+                asdict(decision) for decision in decisions if decision.status == "rejected"
+            ],
+            "unknowns": [
+                asdict(decision) for decision in decisions if decision.status == "unknown"
+            ],
+        },
         "timings_ms": {
             "deterministic_ranking": _elapsed_ms(deterministic_start),
         },
@@ -152,6 +212,14 @@ def filter_candidates(
             "requested_limit": limit or len(candidates),
         },
     }
+    if not accepted_indexes:
+        return deterministic.model_copy(
+            update={
+                "quality_warnings": deterministic.quality_warnings
+                + ["All recalled candidates were rejected by explicit hard constraints."],
+                "diagnostics": _with_total_timing(base_diagnostics, total_start),
+            }
+        )
     if not use_llm:
         return deterministic.model_copy(
             update={
@@ -177,6 +245,20 @@ def filter_candidates(
             }
         )
 
+    pre_rank_limit = min(len(accepted_indexes), max(20, (limit or 10) * 3))
+    if len(accepted_indexes) > pre_rank_limit:
+        pre_ranked = _deterministic_filter(
+            confirmed_profile,
+            search_plan,
+            candidates,
+            limit=pre_rank_limit,
+            allowed_indexes=set(accepted_indexes),
+        )
+        llm_candidates = pre_ranked.selected_candidates
+        original_indexes = pre_ranked.selected_indexes
+    else:
+        original_indexes = accepted_indexes
+        llm_candidates = [candidates[index] for index in original_indexes]
     llm_timings: dict[str, float] = {}
     llm_payload_stats: dict[str, object] = {}
     request_start: float | None = None
@@ -186,7 +268,7 @@ def filter_candidates(
         candidates_json = json.dumps(
             [
                 {**candidate.model_dump(mode="json"), "index": index}
-                for index, candidate in enumerate(candidates)
+                for index, candidate in enumerate(llm_candidates)
             ],
             ensure_ascii=False,
         )
@@ -216,7 +298,17 @@ def filter_candidates(
         llm_request_ms = _elapsed_ms(request_start)
         llm_timings["llm_request"] = llm_request_ms
         validation_start = time.perf_counter()
-        scorecards = _validate_llm_scorecards(payload, candidate_count=len(candidates), limit=limit)
+        scorecards = _validate_llm_scorecards(
+            payload,
+            candidate_count=len(llm_candidates),
+            limit=limit,
+        )
+        scorecards = [
+            scorecard.model_copy(
+                update={"candidate_index": original_indexes[scorecard.candidate_index]}
+            )
+            for scorecard in scorecards
+        ]
         scorecards = _apply_mission_penalties(scorecards, candidates, search_plan.avoid_signals)
         validation_ms = _elapsed_ms(validation_start)
         llm_timings["response_validation"] = validation_ms
@@ -244,6 +336,7 @@ def filter_candidates(
                         **base_diagnostics["payload_stats"],
                         **llm_payload_stats,
                         "returned_scorecard_count": len(scorecards),
+                        "pre_rank_candidate_count": len(llm_candidates),
                         "quality_warning_count": len(quality_warnings),
                     },
                 },
@@ -287,11 +380,14 @@ def _deterministic_filter(
     candidates: list[RawJobCandidate],
     *,
     limit: int | None = None,
+    allowed_indexes: set[int] | None = None,
 ) -> CandidateFilterResult:
     signals = _ranking_signals(confirmed_profile, search_plan)
     avoid_signals = [item.lower() for item in search_plan.avoid_signals]
     scored: list[tuple[int, int, int, int, CandidateScorecard]] = []
     for index, candidate in enumerate(candidates):
+        if allowed_indexes is not None and index not in allowed_indexes:
+            continue
         scorecard = _deterministic_scorecard(
             index,
             candidate,
@@ -325,6 +421,226 @@ def _deterministic_filter(
         fallback_reason=None,
         quality_warnings=warnings,
     )
+
+
+def build_candidate_scorecard(
+    candidate_index: int,
+    candidate: RawJobCandidate,
+    *,
+    confirmed_profile: ConfirmedProfile,
+    search_plan: JobSearchPlan,
+) -> CandidateScorecard:
+    return _deterministic_scorecard(
+        candidate_index,
+        candidate,
+        confirmed_profile=confirmed_profile,
+        search_plan=search_plan,
+        signals=_ranking_signals(confirmed_profile, search_plan),
+        avoid_signals=[item.lower() for item in search_plan.avoid_signals],
+    )
+
+
+def _build_hard_filter_policy(search_plan: JobSearchPlan) -> _HardFilterPolicy:
+    constraints = search_plan.structured_constraints or _legacy_structured_constraints(search_plan)
+    return _HardFilterPolicy(
+        excluded_roles=tuple(
+            value
+            for constraint in constraints
+            if constraint.kind == "role_exclusion" and constraint.operator == "excluded"
+            for value in constraint.values
+        ),
+        reject_senior=_excludes(constraints, "seniority", "senior"),
+        required_employment_types=_required_values(constraints, "employment_type"),
+        constrained_locations=tuple(
+            value.lower()
+            for constraint in constraints
+            if constraint.kind == "location" and constraint.operator == "required"
+            for value in constraint.values
+        ),
+        required_work_arrangements=_required_values(constraints, "work_arrangement"),
+    )
+
+
+def _legacy_structured_constraints(search_plan: JobSearchPlan) -> list[SearchConstraint]:
+    """Keep older stored runs working while new runs use typed mission constraints."""
+    return build_structured_constraints(
+        search_plan.hard_constraints,
+        search_plan.excluded_roles,
+        [
+            location
+            for location in search_plan.locations
+            if any(
+                _location_matches(constraint.lower(), location.lower())
+                for constraint in search_plan.hard_constraints
+            )
+        ],
+        search_plan.target_roles,
+    )
+
+
+def _required_values(constraints: list[SearchConstraint], kind: str) -> tuple[str, ...]:
+    return tuple(
+        value.casefold()
+        for constraint in constraints
+        if constraint.kind == kind and constraint.operator == "required"
+        for value in constraint.values
+    )
+
+
+def _excludes(constraints: list[SearchConstraint], kind: str, value: str) -> bool:
+    return any(
+        constraint.kind == kind
+        and constraint.operator == "excluded"
+        and value in {item.casefold() for item in constraint.values}
+        for constraint in constraints
+    )
+
+
+def _hard_filter_candidate(
+    candidate_index: int,
+    candidate: RawJobCandidate,
+    policy: _HardFilterPolicy,
+) -> HardFilterDecision:
+    title = (candidate.title or "").strip()
+    title_key = title.lower()
+    text = _candidate_text(candidate)
+    unknown_fields: list[str] = []
+
+    if any(_title_contains_term(title_key, role) for role in policy.excluded_roles):
+        return _hard_rejection(candidate_index, "excluded_role", title)
+    if not title and policy.excluded_roles:
+        unknown_fields.append("role")
+
+    is_senior = _contains_any(
+        title_key,
+        (
+            "senior",
+            "staff",
+            "principal",
+            "lead",
+            "manager",
+            "director",
+            "资深",
+            "高级",
+            "负责人",
+            "经理",
+            "总监",
+        ),
+    )
+    requires_internship = "internship" in policy.required_employment_types
+    if is_senior and (policy.reject_senior or requires_internship):
+        return _hard_rejection(candidate_index, "seniority_mismatch", title)
+    if not title and (policy.reject_senior or requires_internship):
+        unknown_fields.append("seniority")
+
+    candidate_employment_types = _candidate_employment_types(text)
+    if policy.required_employment_types:
+        if candidate_employment_types and candidate_employment_types.isdisjoint(
+            policy.required_employment_types
+        ):
+            return _hard_rejection(
+                candidate_index,
+                "work_type_mismatch",
+                "Candidate employment type: " + ", ".join(sorted(candidate_employment_types)),
+            )
+        if not candidate_employment_types:
+            unknown_fields.append("employment_type")
+
+    candidate_location = (candidate.location or "").lower()
+    if candidate_location and policy.constrained_locations and not any(
+        _location_matches(candidate_location, location)
+        for location in policy.constrained_locations
+    ):
+        return _hard_rejection(candidate_index, "location_mismatch", candidate.location)
+    if not candidate_location and policy.constrained_locations:
+        unknown_fields.append("location")
+
+    candidate_work_arrangements = _candidate_work_arrangements(text)
+    if policy.required_work_arrangements:
+        if candidate_work_arrangements and candidate_work_arrangements.isdisjoint(
+            policy.required_work_arrangements
+        ):
+            return _hard_rejection(
+                candidate_index,
+                "work_type_mismatch",
+                "Candidate work arrangement: "
+                + ", ".join(sorted(candidate_work_arrangements)),
+            )
+        if not candidate_work_arrangements:
+            unknown_fields.append("work_arrangement")
+
+    if _contains_any(
+        text,
+        (
+            "job expired",
+            "listing expired",
+            "position closed",
+            "no longer accepting",
+            "职位已过期",
+            "停止招聘",
+        ),
+    ):
+        return _hard_rejection(
+            candidate_index,
+            "stale_listing",
+            "Listing explicitly indicates that it is closed or expired.",
+        )
+
+    return HardFilterDecision(
+        candidate_index=candidate_index,
+        status="unknown" if unknown_fields else "accepted",
+        unknown_fields=tuple(dict.fromkeys(unknown_fields)),
+    )
+
+
+def _hard_rejection(
+    candidate_index: int,
+    rejection_code: HardFilterRejectionCode,
+    evidence: str | None,
+) -> HardFilterDecision:
+    return HardFilterDecision(
+        candidate_index=candidate_index,
+        status="rejected",
+        rejection_code=rejection_code,
+        evidence=evidence,
+    )
+
+
+def _contains_any(text: str, terms: tuple[str, ...]) -> bool:
+    return any(term in text for term in terms)
+
+
+def _candidate_employment_types(text: str) -> set[str]:
+    types: set[str] = set()
+    if _contains_any(text, ("intern", "internship", "实习")):
+        types.add("internship")
+    if _contains_any(text, ("full-time", "full time", "permanent role", "全职", "正式员工")):
+        types.add("full_time")
+    if _contains_any(text, ("part-time", "part time", "兼职")):
+        types.add("part_time")
+    if _contains_any(text, ("contract role", "contract position", "合同制")):
+        types.add("contract")
+    return types
+
+
+def _candidate_work_arrangements(text: str) -> set[str]:
+    arrangements: set[str] = set()
+    if _contains_any(text, ("remote", "远程")):
+        arrangements.add("remote")
+    if _contains_any(text, ("onsite", "on-site", "daily office", "现场办公", "坐班")):
+        arrangements.add("onsite")
+    if _contains_any(text, ("hybrid", "混合办公")):
+        arrangements.add("hybrid")
+    return arrangements
+
+
+def _title_contains_term(title: str, term: str) -> bool:
+    normalized = term.strip().lower()
+    if not title or not normalized:
+        return False
+    if normalized.isascii() and normalized.replace(" ", "").isalnum():
+        return normalized in title.split() if " " not in normalized else normalized in title
+    return normalized in title
 
 
 def _deterministic_scorecard(

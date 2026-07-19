@@ -5,6 +5,7 @@ import json
 import os
 import sys
 import tempfile
+import time
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
@@ -34,7 +35,9 @@ from app.services.job_search_providers import (
 )
 from app.services.job_search_recall_metrics import (
     build_source_recall_stats,
+    candidate_recall_key,
     dedupe_recall_candidates,
+    has_missing_detail,
 )
 from app.services.llm_service import LLMServiceError
 from tests.fixtures.resumes.multidomain_flow_cases import (
@@ -90,6 +93,8 @@ def main() -> int:
             client.close()
 
     payload = {
+        "schema_version": "provider-recall-calibration-v2",
+        "execution_mode": "live_calibration",
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "provider": provider_name,
         "selected_sources": selected_sources,
@@ -98,6 +103,12 @@ def main() -> int:
         "limit_per_query": args.limit_per_query,
         "max_results": args.max_results,
         "include_location": not args.no_location,
+        "measurement_notes": {
+            "unique_yield_rule": "first-seen candidate_recall_key across query execution order",
+            "logical_source_attempts": "provider adapter attempts; not HTTP request counts",
+            "external_http_requests": None,
+            "errors": "exception class only; messages are not persisted",
+        },
         "results": results,
     }
     json_path = output_dir / f"{timestamp}_provider_recall_calibration.json"
@@ -188,10 +199,13 @@ def run_case(
     provider_queries = select_provider_queries(preview, queries_per_case)
     location = (preview["locations"] or confirmed["preferred_locations"] or [None])[0] if include_location else None
 
+    attempts_before = len(getattr(provider, "source_attempts", []))
     query_runs = [
         run_provider_query(provider, query=query, location=location, limit=limit_per_query)
         for query in provider_queries
     ]
+    source_attempts = list(getattr(provider, "source_attempts", []))[attempts_before:]
+    query_recall = summarize_query_recall(query_runs)
     raw_candidates = [candidate for result in query_runs for candidate in result["candidates"]]
     deduped, duplicate_count, truncated_count = dedupe_recall_candidates(
         raw_candidates,
@@ -217,12 +231,22 @@ def run_case(
         "query_results": [
             {
                 "query": result["query"],
+                "query_type": "legacy_unclassified",
                 "location": result["location"],
                 "returned_count": result["returned_count"],
+                "new_candidate_count": query_recall[index]["new_candidate_count"],
+                "duplicate_candidate_count": query_recall[index]["duplicate_candidate_count"],
+                "detail_coverage_rate": query_recall[index]["detail_coverage_rate"],
+                "source_candidate_counts": query_recall[index]["source_candidate_counts"],
+                "duration_ms": result["duration_ms"],
+                "error_code": result["error_code"],
                 "error": result["error"],
             }
-            for result in query_runs
+            for index, result in enumerate(query_runs)
         ],
+        "logical_source_attempt_count": len(source_attempts) or len(query_runs),
+        "source_attempts": [sanitize_source_attempt(item) for item in source_attempts],
+        "external_http_request_count": None,
         "raw_candidate_count": len(raw_candidates),
         "deduped_candidate_count": len(deduped),
         "duplicate_count": duplicate_count,
@@ -278,18 +302,64 @@ def run_provider_query(
     location: str | None,
     limit: int,
 ) -> dict[str, Any]:
+    started = time.perf_counter()
     try:
         candidates = provider.search_jobs(query=query, location=location, limit=limit)
         error = None
+        error_code = None
     except JobSearchProviderError as exc:
         candidates = []
-        error = f"{type(exc).__name__}: {exc}"
+        error_code = type(exc).__name__
+        error = error_code
     return {
         "query": query,
         "location": location,
         "returned_count": len(candidates),
         "error": error,
+        "error_code": error_code,
+        "duration_ms": round((time.perf_counter() - started) * 1000, 3),
         "candidates": candidates,
+    }
+
+
+def summarize_query_recall(query_runs: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Attribute exact-key yield to the first query that returned each candidate."""
+    seen: set[str] = set()
+    summaries: list[dict[str, Any]] = []
+    for result in query_runs:
+        candidates = result["candidates"]
+        new_count = 0
+        duplicate_count = 0
+        for candidate in candidates:
+            key = candidate_recall_key(candidate)
+            if key in seen:
+                duplicate_count += 1
+            else:
+                seen.add(key)
+                new_count += 1
+        detailed_count = sum(1 for candidate in candidates if not has_missing_detail(candidate))
+        summaries.append(
+            {
+                "new_candidate_count": new_count,
+                "duplicate_candidate_count": duplicate_count,
+                "detail_coverage_rate": round(detailed_count / len(candidates), 4) if candidates else 0.0,
+                "source_candidate_counts": dict(
+                    Counter(candidate.source_provider for candidate in candidates)
+                ),
+            }
+        )
+    return summaries
+
+
+def sanitize_source_attempt(item: dict[str, object]) -> dict[str, object]:
+    error = item.get("error")
+    return {
+        "source": item.get("source"),
+        "query": item.get("query"),
+        "location": item.get("location"),
+        "requested_limit": item.get("requested_limit"),
+        "returned_count": item.get("returned_count", 0),
+        "error_code": str(error).split(":", 1)[0] if error else None,
     }
 
 
@@ -346,6 +416,7 @@ def render_markdown(payload: dict[str, Any]) -> str:
     lines = [
         "# Provider Recall Calibration",
         "",
+        f"Execution mode: `{payload.get('execution_mode', 'live_calibration')}`",
         f"Generated: {payload['generated_at']}",
         f"Provider: `{payload['provider']}`",
         f"Selected sources: {fmt(payload['selected_sources'])}",

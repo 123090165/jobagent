@@ -6,11 +6,16 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 from app.services.job_search_providers.base import RawJobCandidate
+from app.services.job_search_providers.base import JobSearchProviderError
+from app.services.job_search_providers.multi_source_provider import MultiSourceJobSearchProvider
 from experiments.provider_recall_calibration import (
     matched_signals,
     render_markdown,
     resolve_provider_selection,
     run_case,
+    run_provider_query,
+    sanitize_source_attempt,
+    summarize_query_recall,
 )
 from tests.fixtures.resumes.multidomain_flow_cases import MULTIDOMAIN_FLOW_CASES
 
@@ -99,12 +104,70 @@ def test_provider_recall_case_is_json_serializable(monkeypatch, tmp_path) -> Non
     assert result["deduped_candidate_count"] >= 3
     assert result["duplicate_count"] >= 1
     assert result["source_stats"]
+    assert result["logical_source_attempt_count"] == 2
+    assert result["external_http_request_count"] is None
+    assert result["query_results"][0]["new_candidate_count"] == 2
+    assert result["query_results"][1]["new_candidate_count"] == 1
+    assert result["query_results"][1]["duplicate_candidate_count"] == 2
     assert {item["source_provider"] for item in result["source_stats"]} == {
         "cuhksz_career",
         "remoteok",
     }
     assert result["top_candidates"]
     json.dumps(result, ensure_ascii=False)
+
+
+def test_query_recall_credits_each_exact_candidate_to_first_seen_query() -> None:
+    candidate = RawJobCandidate(
+        title="AI Intern",
+        company="Example",
+        location="Remote",
+        snippet="AI internship.",
+        source_url="https://example.com/jobs/1",
+        source_provider="linkedin",
+        raw_description="Complete job description.",
+    )
+
+    summaries = summarize_query_recall(
+        [{"candidates": [candidate]}, {"candidates": [candidate]}]
+    )
+
+    assert summaries[0]["new_candidate_count"] == 1
+    assert summaries[1]["new_candidate_count"] == 0
+    assert summaries[1]["duplicate_candidate_count"] == 1
+
+
+def test_multi_source_partial_failure_is_counted_and_error_is_sanitized() -> None:
+    class SuccessfulProvider:
+        provider_name = "remoteok"
+
+        def search_jobs(self, *, query: str, location: str | None, limit: int):
+            return [
+                RawJobCandidate(
+                    title="Remote Intern",
+                    company="Example",
+                    location="Remote",
+                    source_url="https://remote.example/jobs/1",
+                    source_provider="remoteok",
+                    snippet=query,
+                )
+            ]
+
+    class FailingProvider:
+        provider_name = "linkedin"
+
+        def search_jobs(self, *, query: str, location: str | None, limit: int):
+            raise JobSearchProviderError("private provider detail must not be persisted")
+
+    provider = MultiSourceJobSearchProvider([SuccessfulProvider(), FailingProvider()])
+
+    result = run_provider_query(provider, query="AI Intern", location=None, limit=5)
+    attempts = [sanitize_source_attempt(item) for item in provider.source_attempts]
+
+    assert result["returned_count"] == 1
+    assert result["error_code"] is None
+    assert [item["error_code"] for item in attempts] == [None, "JobSearchProviderError"]
+    assert "private provider detail" not in json.dumps(attempts)
 
 
 def test_provider_recall_markdown_contains_source_breakdown() -> None:

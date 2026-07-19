@@ -1,14 +1,16 @@
 from __future__ import annotations
 
 from app.schemas.confirmed_profile import ConfirmedProfile
-from app.schemas.job_search import JobSearchRun, JobSearchRunCreateRequest
+from app.schemas.job_search import JobSearchRun, JobSearchRunCreateRequest, PlannedQuery
 from app.services.job_search_execution.provider_search import (
     MAX_PROVIDER_QUERIES_PER_RUN,
     _effective_provider_locations,
+    candidate_pool_cap_for,
 )
 from app.services.job_search_planner import (
     JobSearchPlan,
     build_focused_provider_queries,
+    build_structured_constraints,
 )
 from app.services.job_search_providers import (
     encode_selected_sources,
@@ -180,13 +182,13 @@ def _estimate_query_budget(
     per_call_limit = max(1, min(max_results, 5))
     source_count = max(1, len(selected_sources_from_provider_name(provider_name)))
     candidate_pool_size = min(
-        max_results * 2,
+        candidate_pool_cap_for(max_results),
         len(executable_queries) * len(executable_locations) * per_call_limit * source_count,
     )
     list_request_count = len(executable_queries) * len(executable_locations) * source_count
     notes = [
         f"Provider search executes at most {MAX_PROVIDER_QUERIES_PER_RUN} provider query groups.",
-        f"Candidate pool is capped at roughly 2x max_results before filtering.",
+        "Candidate recall pool is capped between 30 and 100 before pre-ranking.",
     ]
     detail_request_count = 0
 
@@ -266,6 +268,14 @@ def _augment_search_plan(plan: JobSearchPlan, run: JobSearchRun) -> JobSearchPla
             "avoid_signals": _clean_list(
                 augmented.avoid_signals + run.mission_excluded_roles
             ),
+            "hard_constraints": _clean_list(run.mission_constraints),
+            "excluded_roles": _clean_list(run.mission_excluded_roles),
+            "structured_constraints": build_structured_constraints(
+                run.mission_constraints,
+                run.mission_excluded_roles,
+                run.locations,
+                run.target_roles,
+            ),
         }
     )
 
@@ -279,18 +289,47 @@ def _augment_search_plan_from_inputs(
     keywords: list[str],
 ) -> JobSearchPlan:
     input_queries = build_focused_provider_queries(target_roles, keywords)
-    queries = _clean_list([query] + input_queries + plan.queries)
+    input_planned = [
+        PlannedQuery(
+            query=query,
+            query_type="user",
+            priority=1.0,
+            rationale="Explicit query for this search run.",
+        )
+    ]
+    input_planned.extend(
+        PlannedQuery(
+            query=item,
+            query_type="role_domain",
+            priority=0.94,
+            rationale="Target role combined with non-generic profile evidence.",
+        )
+        for item in input_queries
+    )
+    planned_queries = _dedupe_planned_queries(input_planned + plan.planned_queries)
     merged_locations = _clean_list(locations + plan.locations)
     merged_roles = _clean_list(target_roles + plan.target_roles)
     must_have = _clean_list(keywords + plan.must_have_signals)
     return plan.model_copy(
         update={
-            "queries": queries,
+            "planned_queries": planned_queries,
             "locations": merged_locations,
             "target_roles": merged_roles,
             "must_have_signals": must_have,
         }
     )
+
+
+def _dedupe_planned_queries(values: list[PlannedQuery]) -> list[PlannedQuery]:
+    result: list[PlannedQuery] = []
+    seen: set[str] = set()
+    for value in values:
+        key = value.query.strip().lower()
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        result.append(value)
+    return result
 
 
 def _recall_queries_from_plan(search_plan: JobSearchPlan) -> list[str]:

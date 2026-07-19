@@ -61,9 +61,9 @@ from app.services.job_search_execution.preview import (
     _search_source_notes,
 )
 from app.services.job_search_execution.provider_search import (
-    MAX_PROVIDER_QUERIES_PER_RUN,
     _provider_source_kind,
     _run_provider_search,
+    select_provider_queries,
 )
 from app.services.job_search_execution.trace import (
     ASSEMBLY_GUARDRAILS,
@@ -181,7 +181,7 @@ def create_job_search_run(
             user_id=user_id or LOCAL_USER_ID,
             search_mission_id=mission.search_mission_id if mission else None,
             search_mission_revision=mission.revision if mission else None,
-            mission_constraints=mission.mission.hard_constraints if mission else [],
+            mission_constraints=_mission_hard_constraints(mission),
             mission_excluded_roles=mission.mission.excluded_roles if mission else [],
             mission_ranking_priorities=mission.mission.ranking_priorities if mission else [],
         )
@@ -213,7 +213,7 @@ def create_job_search_run(
         user_id=user_id or LOCAL_USER_ID,
         search_mission_id=mission.search_mission_id if mission else None,
         search_mission_revision=mission.revision if mission else None,
-        mission_constraints=mission.mission.hard_constraints if mission else [],
+        mission_constraints=_mission_hard_constraints(mission),
         mission_excluded_roles=mission.mission.excluded_roles if mission else [],
         mission_ranking_priorities=mission.mission.ranking_priorities if mission else [],
     )
@@ -445,6 +445,9 @@ def execute_job_search_run(
             llm_service=effective_llm_service,
         )
         search_plan = _augment_search_plan(search_plan, run)
+        selected_queries = select_provider_queries(search_plan)
+        if getattr(provider, "provider_name", "").startswith("browser_helper"):
+            selected_queries = selected_queries[:1]
         search_repository.complete_trace_step(
             planning_step.step_id,
             mode=search_plan.mode,
@@ -453,11 +456,15 @@ def execute_job_search_run(
             guardrails=PLANNING_GUARDRAILS,
             quality_warnings=search_plan.quality_warnings,
             details={
-                "provider_queries": search_plan.queries,
+                "provider_queries": [item.query for item in selected_queries],
+                "planned_queries": [item.model_dump(mode="json") for item in selected_queries],
                 "recall_queries": _recall_queries_from_plan(search_plan),
                 "ranking_signals": _ranking_signals_from_plan(search_plan),
                 "target_roles": search_plan.target_roles,
                 "locations": search_plan.locations,
+                "structured_constraints": [
+                    item.model_dump(mode="json") for item in search_plan.structured_constraints
+                ],
                 "planning_mode": search_plan.mode,
                 "analysis_mode": "llm" if use_llm_analysis else "deterministic",
                 "llm_provider": requested_llm_provider,
@@ -524,6 +531,7 @@ def execute_job_search_run(
                 "llm_provider": requested_llm_provider,
                 "timings_ms": filtered.diagnostics.get("timings_ms", {}),
                 "payload_stats": filtered.diagnostics.get("payload_stats", {}),
+                "hard_filter": filtered.diagnostics.get("hard_filter", {}),
                 "fallback_diagnostics": filtered.diagnostics.get("fallback_diagnostics", {}),
             },
         )
@@ -565,7 +573,7 @@ def execute_job_search_run(
         search_repository.mark_trace_step_running(
             matching_step.step_id,
             mode=matching_mode,
-            summary="Applying candidate scorecards against analyzed candidates.",
+            summary="Re-scoring candidates from analyzed JD evidence.",
             guardrails=ASSEMBLY_GUARDRAILS,
         )
         matched_items = _match_candidates(
@@ -581,6 +589,16 @@ def execute_job_search_run(
             details={
                 "scored_candidate_count": len(matched_items),
                 "top_scores": [int(item["match_score"]) for item in matched_items[:5]],
+                "score_changes": [
+                    {
+                        "recall_score": item.get("recall_score"),
+                        "final_match_score": item["match_score"],
+                    }
+                    for item in matched_items[:5]
+                ],
+                "diversity_adjustment_count": sum(
+                    bool(item.get("diversity_adjusted")) for item in matched_items
+                ),
             },
         )
 
@@ -767,6 +785,8 @@ def preview_job_search_run(
         target_roles=target_roles,
         keywords=keywords,
     )
+    selected_queries = select_provider_queries(search_plan)
+    executable_queries = [item.query for item in selected_queries]
 
     selected_sources = _resolve_selected_sources(payload)
     provider_name = (
@@ -776,14 +796,14 @@ def preview_job_search_run(
     )
     provider_search_terms, provider_search_urls = _build_provider_preview_searches(
         provider_name,
-        search_plan.queries,
+        executable_queries,
         selected_sources=selected_sources,
     )
     source_kind = _provider_source_kind(provider_name, payload.search_mode)
     query_budget = _estimate_query_budget(
         provider_name=provider_name,
         search_mode=payload.search_mode,
-        provider_queries=search_plan.queries,
+        provider_queries=executable_queries,
         locations=search_plan.locations,
         max_results=payload.max_results,
         llm_planning_enabled=use_llm_analysis and effective_llm_service is not None,
@@ -804,7 +824,8 @@ def preview_job_search_run(
         locations=search_plan.locations,
         target_roles=search_plan.target_roles,
         keywords=keywords,
-        provider_queries=search_plan.queries,
+        provider_queries=executable_queries,
+        planned_queries=selected_queries,
         search_intent=search_plan.search_intent,
         search_source_kind=source_kind,
         search_source_notes=_search_source_notes(provider_name, source_kind),
@@ -828,7 +849,7 @@ def preview_job_search_run(
         quality_warnings=search_plan.quality_warnings,
         search_mission_id=mission.search_mission_id if mission else None,
         search_mission_revision=mission.revision if mission else None,
-        mission_constraints=mission.mission.hard_constraints if mission else [],
+        mission_constraints=_mission_hard_constraints(mission),
         mission_excluded_roles=mission.mission.excluded_roles if mission else [],
     )
 
@@ -937,3 +958,14 @@ def _clean_list(values: list[str]) -> list[str]:
         seen.add(key)
         cleaned.append(item)
     return cleaned
+
+
+def _mission_hard_constraints(mission: SearchMission | None) -> list[str]:
+    if mission is None:
+        return []
+    return _clean_list(
+        mission.mission.hard_constraints
+        + mission.mission.locations
+        + mission.mission.work_arrangements
+        + mission.mission.employment_types
+    )

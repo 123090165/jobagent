@@ -1,0 +1,2374 @@
+{
+    "corpus_version":  "search-quality-v2.1",
+    "cases":  [
+                  {
+                      "case_id":  "technical_ai_intern",
+                      "fixture_version":  "search-quality-v2.1",
+                      "tags":  {
+                                   "persona":  "technical",
+                                   "scenario":  "technical_ai_intern"
+                               },
+                      "system_input":  {
+                                           "confirmed_profile":  {
+                                                                     "summary":  "Early-career candidate targeting remote AI and machine-learning internships.",
+                                                                     "target_roles":  [
+                                                                                          "AI/ML Intern"
+                                                                                      ],
+                                                                     "target_directions":  [
+                                                                                               "Applied machine learning"
+                                                                                           ],
+                                                                     "core_skills":  [
+                                                                                         "Python",
+                                                                                         "PyTorch",
+                                                                                         "model training"
+                                                                                     ],
+                                                                     "supporting_skills":  [
+                                                                                               "SQL",
+                                                                                               "data analysis"
+                                                                                           ],
+                                                                     "search_keywords":  [
+                                                                                             "machine learning",
+                                                                                             "computer vision",
+                                                                                             "internship"
+                                                                                         ],
+                                                                     "preferred_locations":  [
+                                                                                                 "Remote"
+                                                                                             ],
+                                                                     "work_arrangements":  [
+                                                                                               "remote"
+                                                                                           ],
+                                                                     "strengths":  [
+                                                                                       "Evidence-based analysis"
+                                                                                   ],
+                                                                     "risks":  [
+                                                                                   "Limited senior-level experience"
+                                                                               ],
+                                                                     "missing_info_questions":  [
+                                                                                                    "Confirm work authorization if required."
+                                                                                                ]
+                                                                 },
+                                           "search_mission":  {
+                                                                  "target_roles":  [
+                                                                                       "AI/ML Intern"
+                                                                                   ],
+                                                                  "locations":  [
+                                                                                    "Remote"
+                                                                                ],
+                                                                  "work_arrangements":  [
+                                                                                            "remote"
+                                                                                        ],
+                                                                  "must_have":  [
+                                                                                    "Python"
+                                                                                ],
+                                                                  "nice_to_have":  [
+                                                                                       "SQL"
+                                                                                   ],
+                                                                  "free_text":  "Applied machine learning",
+                                                                  "exploration_level":  "balanced"
+                                                              },
+                                           "search_request":  {
+                                                                  "session_id":  "fixture-session",
+                                                                  "query":  "AI ML internship",
+                                                                  "locations":  [
+                                                                                    "Remote"
+                                                                                ],
+                                                                  "target_roles":  [
+                                                                                       "AI/ML Intern"
+                                                                                   ],
+                                                                  "keywords":  [
+                                                                                   "machine learning",
+                                                                                   "computer vision",
+                                                                                   "internship"
+                                                                               ],
+                                                                  "max_results":  5,
+                                                                  "selected_sources":  [
+                                                                                           "remoteok"
+                                                                                       ],
+                                                                  "search_mode":  "live_search",
+                                                                  "analysis_mode":  "deterministic",
+                                                                  "use_llm":  false
+                                                              }
+                                       },
+                      "selected_sources":  [
+                                               "remoteok"
+                                           ],
+                      "allowed_locations":  [
+                                                "Remote"
+                                            ],
+                      "candidate_judgments":  [
+                                                  {
+                                                      "candidate_id":  "c1-1",
+                                                      "canonical_identity":  "synthetic-1-1",
+                                                      "relevance_grade":  3,
+                                                      "strict_constraint_status":  "satisfied",
+                                                      "strict_violation_codes":  [
+
+                                                                                 ],
+                                                      "strict_violation_evidence":  [
+
+                                                                                    ],
+                                                      "duplicate_cluster_id":  null,
+                                                      "duplicate_status":  "none",
+                                                      "stale_status":  "fresh",
+                                                      "detail_available":  true,
+                                                      "source":  "remoteok",
+                                                      "location":  "Remote",
+                                                      "annotation_rationale":  "Title, internship level, Python, and model-training duties directly match the technical target."
+                                                  },
+                                                  {
+                                                      "candidate_id":  "c1-2",
+                                                      "canonical_identity":  "synthetic-1-2",
+                                                      "relevance_grade":  2,
+                                                      "strict_constraint_status":  "satisfied",
+                                                      "strict_violation_codes":  [
+
+                                                                                 ],
+                                                      "strict_violation_evidence":  [
+
+                                                                                    ],
+                                                      "duplicate_cluster_id":  null,
+                                                      "duplicate_status":  "none",
+                                                      "stale_status":  "fresh",
+                                                      "detail_available":  true,
+                                                      "source":  "remoteok",
+                                                      "location":  "Remote",
+                                                      "annotation_rationale":  "Internship and analytical skills are relevant, but ML evidence is weaker than the top candidate."
+                                                  },
+                                                  {
+                                                      "candidate_id":  "c1-3",
+                                                      "canonical_identity":  "synthetic-1-3",
+                                                      "relevance_grade":  1,
+                                                      "strict_constraint_status":  "violated",
+                                                      "strict_violation_codes":  [
+                                                                                     "seniority_mismatch"
+                                                                                 ],
+                                                      "strict_violation_evidence":  [
+                                                                                        "Senior role exceeds internship seniority"
+                                                                                    ],
+                                                      "duplicate_cluster_id":  null,
+                                                      "duplicate_status":  "none",
+                                                      "stale_status":  "fresh",
+                                                      "detail_available":  false,
+                                                      "source":  "remoteok",
+                                                      "location":  "Remote",
+                                                      "annotation_rationale":  "The ML domain is relevant, but the five-year senior requirement violates the internship constraint."
+                                                  },
+                                                  {
+                                                      "candidate_id":  "c1-4",
+                                                      "canonical_identity":  "synthetic-1-4",
+                                                      "relevance_grade":  0,
+                                                      "strict_constraint_status":  "satisfied",
+                                                      "strict_violation_codes":  [
+
+                                                                                 ],
+                                                      "strict_violation_evidence":  [
+
+                                                                                    ],
+                                                      "duplicate_cluster_id":  null,
+                                                      "duplicate_status":  "none",
+                                                      "stale_status":  "fresh",
+                                                      "detail_available":  false,
+                                                      "source":  "remoteok",
+                                                      "location":  "Remote",
+                                                      "annotation_rationale":  "The role has no technical or ML evidence and is an explicit non-relevant counterexample."
+                                                  },
+                                                  {
+                                                      "candidate_id":  "c1-5",
+                                                      "canonical_identity":  "synthetic-1-5",
+                                                      "relevance_grade":  1,
+                                                      "strict_constraint_status":  "satisfied",
+                                                      "strict_violation_codes":  [
+
+                                                                                 ],
+                                                      "strict_violation_evidence":  [
+
+                                                                                    ],
+                                                      "duplicate_cluster_id":  null,
+                                                      "duplicate_status":  "none",
+                                                      "stale_status":  "fresh",
+                                                      "detail_available":  false,
+                                                      "source":  "remoteok",
+                                                      "location":  "Remote",
+                                                      "annotation_rationale":  "Computer-vision internship evidence is relevant, while the missing full JD limits confidence."
+                                                  }
+                                              ],
+                      "scripted_responses":  [
+                                                 {
+                                                     "source":  "remoteok",
+                                                     "query":  "AI ML internship",
+                                                     "location":  "Remote",
+                                                     "candidate_ids":  [
+                                                                           "c1-1",
+                                                                           "c1-2",
+                                                                           "c1-3",
+                                                                           "c1-4",
+                                                                           "c1-5"
+                                                                       ]
+                                                 }
+                                             ],
+                      "candidate_payloads":  [
+                                                 {
+                                                     "candidate_id":  "c1-1",
+                                                     "title":  "AI/ML Research Intern",
+                                                     "company":  "Example Co 1",
+                                                     "location":  "Remote",
+                                                     "source_url":  "https://synthetic.invalid/jobs/c1-1",
+                                                     "source_provider":  "remoteok",
+                                                     "snippet":  "Remote internship training Python and PyTorch models with labeled data.",
+                                                     "raw_description":  "Remote internship training Python and PyTorch models with labeled data. Full synthetic JD available for offline evaluation.",
+                                                     "discovery_query":  "AI ML internship",
+                                                     "discovery_rank":  1,
+                                                     "detail_status":  "available",
+                                                     "provider_warnings":  [
+
+                                                                           ]
+                                                 },
+                                                 {
+                                                     "candidate_id":  "c1-2",
+                                                     "title":  "Data Science Intern",
+                                                     "company":  "Example Co 1",
+                                                     "location":  "Remote",
+                                                     "source_url":  "https://synthetic.invalid/jobs/c1-2",
+                                                     "source_provider":  "remoteok",
+                                                     "snippet":  "Internship building SQL analyses and experiment dashboards; limited model work.",
+                                                     "raw_description":  "Internship building SQL analyses and experiment dashboards; limited model work. Full synthetic JD available for offline evaluation.",
+                                                     "discovery_query":  "AI ML internship",
+                                                     "discovery_rank":  2,
+                                                     "detail_status":  "available",
+                                                     "provider_warnings":  [
+
+                                                                           ]
+                                                 },
+                                                 {
+                                                     "candidate_id":  "c1-3",
+                                                     "title":  "Senior ML Engineer",
+                                                     "company":  "Example Co 1",
+                                                     "location":  "Remote",
+                                                     "source_url":  "https://synthetic.invalid/jobs/c1-3",
+                                                     "source_provider":  "remoteok",
+                                                     "snippet":  "Requires five years of experience and ownership of an ML platform team.",
+                                                     "raw_description":  null,
+                                                     "discovery_query":  "AI ML internship",
+                                                     "discovery_rank":  3,
+                                                     "detail_status":  "missing",
+                                                     "provider_warnings":  [
+
+                                                                           ]
+                                                 },
+                                                 {
+                                                     "candidate_id":  "c1-4",
+                                                     "title":  "Operations Coordinator",
+                                                     "company":  "Example Co 1",
+                                                     "location":  "Remote",
+                                                     "source_url":  "https://synthetic.invalid/jobs/c1-4",
+                                                     "source_provider":  "remoteok",
+                                                     "snippet":  "Coordinates schedules, vendors, and invoices with no programming or ML duties.",
+                                                     "raw_description":  null,
+                                                     "discovery_query":  "AI ML internship",
+                                                     "discovery_rank":  4,
+                                                     "detail_status":  "missing",
+                                                     "provider_warnings":  [
+
+                                                                           ]
+                                                 },
+                                                 {
+                                                     "candidate_id":  "c1-5",
+                                                     "title":  "Computer Vision Intern",
+                                                     "company":  "Example Co 1",
+                                                     "location":  "Remote",
+                                                     "source_url":  "https://synthetic.invalid/jobs/c1-5",
+                                                     "source_provider":  "remoteok",
+                                                     "snippet":  "Python and OpenCV internship evaluating image models; full JD unavailable.",
+                                                     "raw_description":  null,
+                                                     "discovery_query":  "AI ML internship",
+                                                     "discovery_rank":  5,
+                                                     "detail_status":  "missing",
+                                                     "provider_warnings":  [
+
+                                                                           ]
+                                                 }
+                                             ]
+                  },
+                  {
+                      "case_id":  "bilingual_role_alias",
+                      "fixture_version":  "search-quality-v2.1",
+                      "tags":  {
+                                   "persona":  "bilingual",
+                                   "scenario":  "bilingual_role_alias"
+                               },
+                      "system_input":  {
+                                           "confirmed_profile":  {
+                                                                     "summary":  "Bilingual candidate targeting Chinese-English AI research and ML internships.",
+                                                                     "target_roles":  [
+                                                                                          "Machine Learning Intern",
+                                                                                          "AI Research Assistant"
+                                                                                      ],
+                                                                     "target_directions":  [
+                                                                                               "Bilingual applied AI"
+                                                                                           ],
+                                                                     "core_skills":  [
+                                                                                         "Python",
+                                                                                         "machine learning",
+                                                                                         "Chinese-English communication"
+                                                                                     ],
+                                                                     "supporting_skills":  [
+                                                                                               "research",
+                                                                                               "technical writing"
+                                                                                           ],
+                                                                     "search_keywords":  [
+                                                                                             "machine learning intern",
+                                                                                             "AI research assistant",
+                                                                                             "bilingual"
+                                                                                         ],
+                                                                     "preferred_locations":  [
+                                                                                                 "Remote"
+                                                                                             ],
+                                                                     "work_arrangements":  [
+                                                                                               "remote"
+                                                                                           ],
+                                                                     "strengths":  [
+                                                                                       "Evidence-based analysis"
+                                                                                   ],
+                                                                     "risks":  [
+                                                                                   "Limited senior-level experience"
+                                                                               ],
+                                                                     "missing_info_questions":  [
+                                                                                                    "Confirm work authorization if required."
+                                                                                                ]
+                                                                 },
+                                           "search_mission":  {
+                                                                  "target_roles":  [
+                                                                                       "Machine Learning Intern",
+                                                                                       "AI Research Assistant"
+                                                                                   ],
+                                                                  "locations":  [
+                                                                                    "Remote"
+                                                                                ],
+                                                                  "work_arrangements":  [
+                                                                                            "remote"
+                                                                                        ],
+                                                                  "must_have":  [
+                                                                                    "Python"
+                                                                                ],
+                                                                  "nice_to_have":  [
+                                                                                       "research"
+                                                                                   ],
+                                                                  "free_text":  "Bilingual applied AI",
+                                                                  "exploration_level":  "balanced"
+                                                              },
+                                           "search_request":  {
+                                                                  "session_id":  "fixture-session",
+                                                                  "query":  "bilingual AI ML",
+                                                                  "locations":  [
+                                                                                    "Remote"
+                                                                                ],
+                                                                  "target_roles":  [
+                                                                                       "Machine Learning Intern",
+                                                                                       "AI Research Assistant"
+                                                                                   ],
+                                                                  "keywords":  [
+                                                                                   "machine learning intern",
+                                                                                   "AI research assistant",
+                                                                                   "bilingual"
+                                                                               ],
+                                                                  "max_results":  5,
+                                                                  "selected_sources":  [
+                                                                                           "remoteok"
+                                                                                       ],
+                                                                  "search_mode":  "live_search",
+                                                                  "analysis_mode":  "deterministic",
+                                                                  "use_llm":  false
+                                                              }
+                                       },
+                      "selected_sources":  [
+                                               "remoteok"
+                                           ],
+                      "allowed_locations":  [
+                                                "Remote"
+                                            ],
+                      "candidate_judgments":  [
+                                                  {
+                                                      "candidate_id":  "c2-1",
+                                                      "canonical_identity":  "synthetic-2-1",
+                                                      "relevance_grade":  3,
+                                                      "strict_constraint_status":  "satisfied",
+                                                      "strict_violation_codes":  [
+
+                                                                                 ],
+                                                      "strict_violation_evidence":  [
+
+                                                                                    ],
+                                                      "duplicate_cluster_id":  null,
+                                                      "duplicate_status":  "none",
+                                                      "stale_status":  "fresh",
+                                                      "detail_available":  true,
+                                                      "source":  "remoteok",
+                                                      "location":  "Remote",
+                                                      "annotation_rationale":  "The bilingual title, Chinese-English collaboration, Python, and ML duties all match the target."
+                                                  },
+                                                  {
+                                                      "candidate_id":  "c2-2",
+                                                      "canonical_identity":  "synthetic-2-2",
+                                                      "relevance_grade":  2,
+                                                      "strict_constraint_status":  "satisfied",
+                                                      "strict_violation_codes":  [
+
+                                                                                 ],
+                                                      "strict_violation_evidence":  [
+
+                                                                                    ],
+                                                      "duplicate_cluster_id":  null,
+                                                      "duplicate_status":  "none",
+                                                      "stale_status":  "fresh",
+                                                      "detail_available":  true,
+                                                      "source":  "remoteok",
+                                                      "location":  "Remote",
+                                                      "annotation_rationale":  "Bilingual research and AI experiment evidence strongly align, though this is an assistant role."
+                                                  },
+                                                  {
+                                                      "candidate_id":  "c2-3",
+                                                      "canonical_identity":  "synthetic-2-3",
+                                                      "relevance_grade":  1,
+                                                      "strict_constraint_status":  "satisfied",
+                                                      "strict_violation_codes":  [
+
+                                                                                 ],
+                                                      "strict_violation_evidence":  [
+
+                                                                                    ],
+                                                      "duplicate_cluster_id":  null,
+                                                      "duplicate_status":  "none",
+                                                      "stale_status":  "fresh",
+                                                      "detail_available":  false,
+                                                      "source":  "remoteok",
+                                                      "location":  "Remote",
+                                                      "annotation_rationale":  "Analytics is adjacent, but the requested Chinese communication and ML evidence are absent."
+                                                  },
+                                                  {
+                                                      "candidate_id":  "c2-4",
+                                                      "canonical_identity":  "synthetic-2-4",
+                                                      "relevance_grade":  0,
+                                                      "strict_constraint_status":  "satisfied",
+                                                      "strict_violation_codes":  [
+
+                                                                                 ],
+                                                      "strict_violation_evidence":  [
+
+                                                                                    ],
+                                                      "duplicate_cluster_id":  null,
+                                                      "duplicate_status":  "none",
+                                                      "stale_status":  "fresh",
+                                                      "detail_available":  false,
+                                                      "source":  "remoteok",
+                                                      "location":  "Remote",
+                                                      "annotation_rationale":  "The Chinese title does not make the unrelated finance role relevant; no AI/ML evidence exists."
+                                                  },
+                                                  {
+                                                      "candidate_id":  "c2-5",
+                                                      "canonical_identity":  "synthetic-2-5",
+                                                      "relevance_grade":  1,
+                                                      "strict_constraint_status":  "satisfied",
+                                                      "strict_violation_codes":  [
+
+                                                                                 ],
+                                                      "strict_violation_evidence":  [
+
+                                                                                    ],
+                                                      "duplicate_cluster_id":  null,
+                                                      "duplicate_status":  "none",
+                                                      "stale_status":  "fresh",
+                                                      "detail_available":  false,
+                                                      "source":  "remoteok",
+                                                      "location":  "Remote",
+                                                      "annotation_rationale":  "Bilingual evidence is present, but the work lacks AI/ML responsibilities and is only weakly relevant."
+                                                  }
+                                              ],
+                      "scripted_responses":  [
+                                                 {
+                                                     "source":  "remoteok",
+                                                     "query":  "bilingual AI ML",
+                                                     "location":  "Remote",
+                                                     "candidate_ids":  [
+                                                                           "c2-1",
+                                                                           "c2-2",
+                                                                           "c2-3",
+                                                                           "c2-4",
+                                                                           "c2-5"
+                                                                       ]
+                                                 }
+                                             ],
+                      "candidate_payloads":  [
+                                                 {
+                                                     "candidate_id":  "c2-1",
+                                                     "title":  "机器学习实习生 / ML Intern",
+                                                     "company":  "Example Co 2",
+                                                     "location":  "Remote",
+                                                     "source_url":  "https://synthetic.invalid/jobs/c2-1",
+                                                     "source_provider":  "remoteok",
+                                                     "snippet":  "Chinese-English collaboration using Python to train ML models and write bilingual reports.",
+                                                     "raw_description":  "Chinese-English collaboration using Python to train ML models and write bilingual reports. Full synthetic JD available for offline evaluation.",
+                                                     "discovery_query":  "bilingual AI ML",
+                                                     "discovery_rank":  1,
+                                                     "detail_status":  "available",
+                                                     "provider_warnings":  [
+
+                                                                           ]
+                                                 },
+                                                 {
+                                                     "candidate_id":  "c2-2",
+                                                     "title":  "AI Research Assistant / 人工智能研究助理",
+                                                     "company":  "Example Co 2",
+                                                     "location":  "Remote",
+                                                     "source_url":  "https://synthetic.invalid/jobs/c2-2",
+                                                     "source_provider":  "remoteok",
+                                                     "snippet":  "Supports bilingual literature review and model experiments in Python.",
+                                                     "raw_description":  "Supports bilingual literature review and model experiments in Python. Full synthetic JD available for offline evaluation.",
+                                                     "discovery_query":  "bilingual AI ML",
+                                                     "discovery_rank":  2,
+                                                     "detail_status":  "available",
+                                                     "provider_warnings":  [
+
+                                                                           ]
+                                                 },
+                                                 {
+                                                     "candidate_id":  "c2-3",
+                                                     "title":  "Data Analyst (English Only)",
+                                                     "company":  "Example Co 2",
+                                                     "location":  "Remote",
+                                                     "source_url":  "https://synthetic.invalid/jobs/c2-3",
+                                                     "source_provider":  "remoteok",
+                                                     "snippet":  "English-only reporting role using SQL; no Chinese communication requirement.",
+                                                     "raw_description":  null,
+                                                     "discovery_query":  "bilingual AI ML",
+                                                     "discovery_rank":  3,
+                                                     "detail_status":  "missing",
+                                                     "provider_warnings":  [
+
+                                                                           ]
+                                                 },
+                                                 {
+                                                     "candidate_id":  "c2-4",
+                                                     "title":  "财务专员",
+                                                     "company":  "Example Co 2",
+                                                     "location":  "Remote",
+                                                     "source_url":  "https://synthetic.invalid/jobs/c2-4",
+                                                     "source_provider":  "remoteok",
+                                                     "snippet":  "Handles invoices and monthly finance reconciliation with no AI or modeling duties.",
+                                                     "raw_description":  null,
+                                                     "discovery_query":  "bilingual AI ML",
+                                                     "discovery_rank":  4,
+                                                     "detail_status":  "missing",
+                                                     "provider_warnings":  [
+
+                                                                           ]
+                                                 },
+                                                 {
+                                                     "candidate_id":  "c2-5",
+                                                     "title":  "翻译实习生 / Translation Intern",
+                                                     "company":  "Example Co 2",
+                                                     "location":  "Remote",
+                                                     "source_url":  "https://synthetic.invalid/jobs/c2-5",
+                                                     "source_provider":  "remoteok",
+                                                     "snippet":  "Chinese-English translation internship with no model development duties.",
+                                                     "raw_description":  null,
+                                                     "discovery_query":  "bilingual AI ML",
+                                                     "discovery_rank":  5,
+                                                     "detail_status":  "missing",
+                                                     "provider_warnings":  [
+
+                                                                           ]
+                                                 }
+                                             ]
+                  },
+                  {
+                      "case_id":  "hard_constraint_supply_chain",
+                      "fixture_version":  "search-quality-v2.1",
+                      "tags":  {
+                                   "persona":  "synthetic",
+                                   "scenario":  "hard_constraint_supply_chain"
+                               },
+                      "system_input":  {
+                                           "confirmed_profile":  {
+                                                                     "summary":  "Early-career supply-chain analyst seeking remote internship or analyst work.",
+                                                                     "target_roles":  [
+                                                                                          "Supply Chain Analyst",
+                                                                                          "Procurement Analyst"
+                                                                                      ],
+                                                                     "target_directions":  [
+                                                                                               "Supply chain analytics"
+                                                                                           ],
+                                                                     "core_skills":  [
+                                                                                         "inventory analysis",
+                                                                                         "procurement",
+                                                                                         "Excel"
+                                                                                     ],
+                                                                     "supporting_skills":  [
+                                                                                               "supplier research",
+                                                                                               "logistics"
+                                                                                           ],
+                                                                     "search_keywords":  [
+                                                                                             "supply chain",
+                                                                                             "procurement",
+                                                                                             "remote"
+                                                                                         ],
+                                                                     "preferred_locations":  [
+                                                                                                 "Remote"
+                                                                                             ],
+                                                                     "work_arrangements":  [
+                                                                                               "remote"
+                                                                                           ],
+                                                                     "strengths":  [
+                                                                                       "Evidence-based analysis"
+                                                                                   ],
+                                                                     "risks":  [
+                                                                                   "Limited senior-level experience"
+                                                                               ],
+                                                                     "missing_info_questions":  [
+                                                                                                    "Confirm work authorization if required."
+                                                                                                ]
+                                                                 },
+                                           "search_mission":  {
+                                                                  "target_roles":  [
+                                                                                       "Supply Chain Analyst",
+                                                                                       "Procurement Analyst"
+                                                                                   ],
+                                                                  "locations":  [
+                                                                                    "Remote"
+                                                                                ],
+                                                                  "work_arrangements":  [
+                                                                                            "remote"
+                                                                                        ],
+                                                                  "must_have":  [
+                                                                                    "inventory analysis"
+                                                                                ],
+                                                                  "nice_to_have":  [
+                                                                                       "supplier research"
+                                                                                   ],
+                                                                  "free_text":  "Supply chain analytics",
+                                                                  "exploration_level":  "balanced"
+                                                              },
+                                           "search_request":  {
+                                                                  "session_id":  "fixture-session",
+                                                                  "query":  "supply chain analyst",
+                                                                  "locations":  [
+                                                                                    "Remote"
+                                                                                ],
+                                                                  "target_roles":  [
+                                                                                       "Supply Chain Analyst",
+                                                                                       "Procurement Analyst"
+                                                                                   ],
+                                                                  "keywords":  [
+                                                                                   "supply chain",
+                                                                                   "procurement",
+                                                                                   "remote"
+                                                                               ],
+                                                                  "max_results":  5,
+                                                                  "selected_sources":  [
+                                                                                           "remoteok"
+                                                                                       ],
+                                                                  "search_mode":  "live_search",
+                                                                  "analysis_mode":  "deterministic",
+                                                                  "use_llm":  false
+                                                              }
+                                       },
+                      "selected_sources":  [
+                                               "remoteok"
+                                           ],
+                      "allowed_locations":  [
+                                                "Remote"
+                                            ],
+                      "candidate_judgments":  [
+                                                  {
+                                                      "candidate_id":  "c3-1",
+                                                      "canonical_identity":  "synthetic-3-1",
+                                                      "relevance_grade":  3,
+                                                      "strict_constraint_status":  "satisfied",
+                                                      "strict_violation_codes":  [
+
+                                                                                 ],
+                                                      "strict_violation_evidence":  [
+
+                                                                                    ],
+                                                      "duplicate_cluster_id":  null,
+                                                      "duplicate_status":  "none",
+                                                      "stale_status":  "fresh",
+                                                      "detail_available":  true,
+                                                      "source":  "remoteok",
+                                                      "location":  "Remote",
+                                                      "annotation_rationale":  "Internship level, remote arrangement, and supply-chain analytics directly satisfy the mission."
+                                                  },
+                                                  {
+                                                      "candidate_id":  "c3-2",
+                                                      "canonical_identity":  "synthetic-3-2",
+                                                      "relevance_grade":  2,
+                                                      "strict_constraint_status":  "satisfied",
+                                                      "strict_violation_codes":  [
+
+                                                                                 ],
+                                                      "strict_violation_evidence":  [
+
+                                                                                    ],
+                                                      "duplicate_cluster_id":  null,
+                                                      "duplicate_status":  "none",
+                                                      "stale_status":  "fresh",
+                                                      "detail_available":  true,
+                                                      "source":  "remoteok",
+                                                      "location":  "Remote",
+                                                      "annotation_rationale":  "Procurement analysis matches the domain and location, but is less aligned than the internship target."
+                                                  },
+                                                  {
+                                                      "candidate_id":  "c3-3",
+                                                      "canonical_identity":  "synthetic-3-3",
+                                                      "relevance_grade":  1,
+                                                      "strict_constraint_status":  "satisfied",
+                                                      "strict_violation_codes":  [
+
+                                                                                 ],
+                                                      "strict_violation_evidence":  [
+
+                                                                                    ],
+                                                      "duplicate_cluster_id":  null,
+                                                      "duplicate_status":  "none",
+                                                      "stale_status":  "fresh",
+                                                      "detail_available":  false,
+                                                      "source":  "remoteok",
+                                                      "location":  "Remote",
+                                                      "annotation_rationale":  "Logistics is relevant to the domain, while coordination focus and missing JD lower confidence."
+                                                  },
+                                                  {
+                                                      "candidate_id":  "c3-4",
+                                                      "canonical_identity":  "synthetic-3-4",
+                                                      "relevance_grade":  1,
+                                                      "strict_constraint_status":  "violated",
+                                                      "strict_violation_codes":  [
+                                                                                     "location_mismatch"
+                                                                                 ],
+                                                      "strict_violation_evidence":  [
+                                                                                        "Tokyo onsite is outside the requested Remote location."
+                                                                                    ],
+                                                      "duplicate_cluster_id":  null,
+                                                      "duplicate_status":  "none",
+                                                      "stale_status":  "fresh",
+                                                      "detail_available":  false,
+                                                      "source":  "remoteok",
+                                                      "location":  "Tokyo",
+                                                      "annotation_rationale":  "The supply-chain role is relevant, but Tokyo onsite explicitly violates the Remote hard constraint."
+                                                  },
+                                                  {
+                                                      "candidate_id":  "c3-5",
+                                                      "canonical_identity":  "synthetic-3-5",
+                                                      "relevance_grade":  1,
+                                                      "strict_constraint_status":  "satisfied",
+                                                      "strict_violation_codes":  [
+
+                                                                                 ],
+                                                      "strict_violation_evidence":  [
+
+                                                                                    ],
+                                                      "duplicate_cluster_id":  null,
+                                                      "duplicate_status":  "none",
+                                                      "stale_status":  "fresh",
+                                                      "detail_available":  false,
+                                                      "source":  "remoteok",
+                                                      "location":  "Remote",
+                                                      "annotation_rationale":  "Operations analysis is adjacent, but direct procurement and logistics evidence is weak."
+                                                  }
+                                              ],
+                      "scripted_responses":  [
+                                                 {
+                                                     "source":  "remoteok",
+                                                     "query":  "supply chain analyst",
+                                                     "location":  "Remote",
+                                                     "candidate_ids":  [
+                                                                           "c3-1",
+                                                                           "c3-2",
+                                                                           "c3-3",
+                                                                           "c3-4",
+                                                                           "c3-5"
+                                                                       ]
+                                                 }
+                                             ],
+                      "candidate_payloads":  [
+                                                 {
+                                                     "candidate_id":  "c3-1",
+                                                     "title":  "Supply Chain Analyst Intern",
+                                                     "company":  "Example Co 3",
+                                                     "location":  "Remote",
+                                                     "source_url":  "https://synthetic.invalid/jobs/c3-1",
+                                                     "source_provider":  "remoteok",
+                                                     "snippet":  "Remote internship analyzing inventory, suppliers, and delivery performance.",
+                                                     "raw_description":  "Remote internship analyzing inventory, suppliers, and delivery performance. Full synthetic JD available for offline evaluation.",
+                                                     "discovery_query":  "supply chain analyst",
+                                                     "discovery_rank":  1,
+                                                     "detail_status":  "available",
+                                                     "provider_warnings":  [
+
+                                                                           ]
+                                                 },
+                                                 {
+                                                     "candidate_id":  "c3-2",
+                                                     "title":  "Procurement Analyst",
+                                                     "company":  "Example Co 3",
+                                                     "location":  "Remote",
+                                                     "source_url":  "https://synthetic.invalid/jobs/c3-2",
+                                                     "source_provider":  "remoteok",
+                                                     "snippet":  "Analyzes supplier bids and purchase costs in a remote analyst role.",
+                                                     "raw_description":  "Analyzes supplier bids and purchase costs in a remote analyst role. Full synthetic JD available for offline evaluation.",
+                                                     "discovery_query":  "supply chain analyst",
+                                                     "discovery_rank":  2,
+                                                     "detail_status":  "available",
+                                                     "provider_warnings":  [
+
+                                                                           ]
+                                                 },
+                                                 {
+                                                     "candidate_id":  "c3-3",
+                                                     "title":  "Logistics Coordinator",
+                                                     "company":  "Example Co 3",
+                                                     "location":  "Remote",
+                                                     "source_url":  "https://synthetic.invalid/jobs/c3-3",
+                                                     "source_provider":  "remoteok",
+                                                     "snippet":  "Coordinates shipments and carrier exceptions; full JD is unavailable.",
+                                                     "raw_description":  null,
+                                                     "discovery_query":  "supply chain analyst",
+                                                     "discovery_rank":  3,
+                                                     "detail_status":  "missing",
+                                                     "provider_warnings":  [
+
+                                                                           ]
+                                                 },
+                                                 {
+                                                     "candidate_id":  "c3-4",
+                                                     "title":  "Supply Chain Analyst - Tokyo Onsite",
+                                                     "company":  "Example Co 3",
+                                                     "location":  "Tokyo",
+                                                     "source_url":  "https://synthetic.invalid/jobs/c3-4",
+                                                     "source_provider":  "remoteok",
+                                                     "snippet":  "Tokyo onsite role requiring daily office attendance.",
+                                                     "raw_description":  null,
+                                                     "discovery_query":  "supply chain analyst",
+                                                     "discovery_rank":  4,
+                                                     "detail_status":  "missing",
+                                                     "provider_warnings":  [
+
+                                                                           ]
+                                                 },
+                                                 {
+                                                     "candidate_id":  "c3-5",
+                                                     "title":  "Sales Operations Analyst",
+                                                     "company":  "Example Co 3",
+                                                     "location":  "Remote",
+                                                     "source_url":  "https://synthetic.invalid/jobs/c3-5",
+                                                     "source_provider":  "remoteok",
+                                                     "snippet":  "Maintains sales forecasts and CRM reports with limited supply-chain work.",
+                                                     "raw_description":  null,
+                                                     "discovery_query":  "supply chain analyst",
+                                                     "discovery_rank":  5,
+                                                     "detail_status":  "missing",
+                                                     "provider_warnings":  [
+
+                                                                           ]
+                                                 }
+                                             ]
+                  },
+                  {
+                      "case_id":  "multi_location",
+                      "fixture_version":  "search-quality-v2.1",
+                      "tags":  {
+                                   "persona":  "synthetic",
+                                   "scenario":  "multi_location"
+                               },
+                      "system_input":  {
+                                           "confirmed_profile":  {
+                                                                     "summary":  "Data analyst open to Remote or Tokyo roles.",
+                                                                     "target_roles":  [
+                                                                                          "Data Analyst",
+                                                                                          "BI Analyst"
+                                                                                      ],
+                                                                     "target_directions":  [
+                                                                                               "Business and data analytics"
+                                                                                           ],
+                                                                     "core_skills":  [
+                                                                                         "SQL",
+                                                                                         "dashboards",
+                                                                                         "data analysis"
+                                                                                     ],
+                                                                     "supporting_skills":  [
+                                                                                               "reporting",
+                                                                                               "stakeholder communication"
+                                                                                           ],
+                                                                     "search_keywords":  [
+                                                                                             "data analyst",
+                                                                                             "business intelligence"
+                                                                                         ],
+                                                                     "preferred_locations":  [
+                                                                                                 "Remote",
+                                                                                                 "Tokyo"
+                                                                                             ],
+                                                                     "work_arrangements":  [
+                                                                                               "remote"
+                                                                                           ],
+                                                                     "strengths":  [
+                                                                                       "Evidence-based analysis"
+                                                                                   ],
+                                                                     "risks":  [
+                                                                                   "Limited senior-level experience"
+                                                                               ],
+                                                                     "missing_info_questions":  [
+                                                                                                    "Confirm work authorization if required."
+                                                                                                ]
+                                                                 },
+                                           "search_mission":  {
+                                                                  "target_roles":  [
+                                                                                       "Data Analyst",
+                                                                                       "BI Analyst"
+                                                                                   ],
+                                                                  "locations":  [
+                                                                                    "Remote",
+                                                                                    "Tokyo"
+                                                                                ],
+                                                                  "work_arrangements":  [
+                                                                                            "remote"
+                                                                                        ],
+                                                                  "must_have":  [
+                                                                                    "SQL"
+                                                                                ],
+                                                                  "nice_to_have":  [
+                                                                                       "reporting"
+                                                                                   ],
+                                                                  "free_text":  "Business and data analytics",
+                                                                  "exploration_level":  "balanced"
+                                                              },
+                                           "search_request":  {
+                                                                  "session_id":  "fixture-session",
+                                                                  "query":  "multi-location analyst",
+                                                                  "locations":  [
+                                                                                    "Remote",
+                                                                                    "Tokyo"
+                                                                                ],
+                                                                  "target_roles":  [
+                                                                                       "Data Analyst",
+                                                                                       "BI Analyst"
+                                                                                   ],
+                                                                  "keywords":  [
+                                                                                   "data analyst",
+                                                                                   "business intelligence"
+                                                                               ],
+                                                                  "max_results":  5,
+                                                                  "selected_sources":  [
+                                                                                           "remoteok"
+                                                                                       ],
+                                                                  "search_mode":  "live_search",
+                                                                  "analysis_mode":  "deterministic",
+                                                                  "use_llm":  false
+                                                              }
+                                       },
+                      "selected_sources":  [
+                                               "remoteok"
+                                           ],
+                      "allowed_locations":  [
+                                                "Remote",
+                                                "Tokyo"
+                                            ],
+                      "candidate_judgments":  [
+                                                  {
+                                                      "candidate_id":  "c4-1",
+                                                      "canonical_identity":  "synthetic-4-1",
+                                                      "relevance_grade":  3,
+                                                      "strict_constraint_status":  "satisfied",
+                                                      "strict_violation_codes":  [
+
+                                                                                 ],
+                                                      "strict_violation_evidence":  [
+
+                                                                                    ],
+                                                      "duplicate_cluster_id":  null,
+                                                      "duplicate_status":  "none",
+                                                      "stale_status":  "fresh",
+                                                      "detail_available":  true,
+                                                      "source":  "remoteok",
+                                                      "location":  "Remote",
+                                                      "annotation_rationale":  "The role and Remote location are both within the accepted multi-location scope."
+                                                  },
+                                                  {
+                                                      "candidate_id":  "c4-2",
+                                                      "canonical_identity":  "synthetic-4-2",
+                                                      "relevance_grade":  2,
+                                                      "strict_constraint_status":  "satisfied",
+                                                      "strict_violation_codes":  [
+
+                                                                                 ],
+                                                      "strict_violation_evidence":  [
+
+                                                                                    ],
+                                                      "duplicate_cluster_id":  null,
+                                                      "duplicate_status":  "none",
+                                                      "stale_status":  "fresh",
+                                                      "detail_available":  true,
+                                                      "source":  "remoteok",
+                                                      "location":  "Remote",
+                                                      "annotation_rationale":  "BI analysis is relevant and Remote is allowed, though the role is less targeted."
+                                                  },
+                                                  {
+                                                      "candidate_id":  "c4-3",
+                                                      "canonical_identity":  "synthetic-4-3",
+                                                      "relevance_grade":  1,
+                                                      "strict_constraint_status":  "satisfied",
+                                                      "strict_violation_codes":  [
+
+                                                                                 ],
+                                                      "strict_violation_evidence":  [
+
+                                                                                    ],
+                                                      "duplicate_cluster_id":  null,
+                                                      "duplicate_status":  "none",
+                                                      "stale_status":  "fresh",
+                                                      "detail_available":  false,
+                                                      "source":  "remoteok",
+                                                      "location":  null,
+                                                      "annotation_rationale":  "The role may be relevant, but the unscoped response is excluded from the allowed-location universe."
+                                                  },
+                                                  {
+                                                      "candidate_id":  "c4-4",
+                                                      "canonical_identity":  "synthetic-4-4",
+                                                      "relevance_grade":  1,
+                                                      "strict_constraint_status":  "satisfied",
+                                                      "strict_violation_codes":  [
+
+                                                                                 ],
+                                                      "strict_violation_evidence":  [
+
+                                                                                    ],
+                                                      "duplicate_cluster_id":  null,
+                                                      "duplicate_status":  "none",
+                                                      "stale_status":  "fresh",
+                                                      "detail_available":  false,
+                                                      "source":  "remoteok",
+                                                      "location":  "Tokyo",
+                                                      "annotation_rationale":  "The analyst role is relevant and Tokyo is the second explicitly allowed location."
+                                                  },
+                                                  {
+                                                      "candidate_id":  "c4-5",
+                                                      "canonical_identity":  "synthetic-4-5",
+                                                      "relevance_grade":  1,
+                                                      "strict_constraint_status":  "violated",
+                                                      "strict_violation_codes":  [
+                                                                                     "location_mismatch"
+                                                                                 ],
+                                                      "strict_violation_evidence":  [
+                                                                                        "Osaka is outside requested locations"
+                                                                                    ],
+                                                      "duplicate_cluster_id":  null,
+                                                      "duplicate_status":  "none",
+                                                      "stale_status":  "fresh",
+                                                      "detail_available":  false,
+                                                      "source":  "remoteok",
+                                                      "location":  "Osaka",
+                                                      "annotation_rationale":  "The role is relevant, but Osaka violates the allowed Remote-or-Tokyo location constraint."
+                                                  }
+                                              ],
+                      "scripted_responses":  [
+                                                 {
+                                                     "source":  "remoteok",
+                                                     "query":  "multi-location analyst",
+                                                     "location":  "Remote",
+                                                     "candidate_ids":  [
+                                                                           "c4-1",
+                                                                           "c4-2"
+                                                                       ]
+                                                 },
+                                                 {
+                                                     "source":  "remoteok",
+                                                     "query":  "multi-location analyst",
+                                                     "location":  "Tokyo",
+                                                     "candidate_ids":  [
+                                                                           "c4-4"
+                                                                       ]
+                                                 },
+                                                 {
+                                                     "source":  "remoteok",
+                                                     "query":  "multi-location analyst",
+                                                     "location":  "Osaka",
+                                                     "candidate_ids":  [
+                                                                           "c4-5"
+                                                                       ]
+                                                 },
+                                                 {
+                                                     "source":  "remoteok",
+                                                     "query":  "multi-location analyst",
+                                                     "location":  null,
+                                                     "candidate_ids":  [
+                                                                           "c4-3"
+                                                                       ]
+                                                 }
+                                             ],
+                      "candidate_payloads":  [
+                                                 {
+                                                     "candidate_id":  "c4-1",
+                                                     "title":  "Remote Data Analyst",
+                                                     "company":  "Example Co 4",
+                                                     "location":  "Remote",
+                                                     "source_url":  "https://synthetic.invalid/jobs/c4-1",
+                                                     "source_provider":  "remoteok",
+                                                     "snippet":  "Remote analyst role using SQL and dashboards with a complete JD.",
+                                                     "raw_description":  "Remote analyst role using SQL and dashboards with a complete JD. Full synthetic JD available for offline evaluation.",
+                                                     "discovery_query":  "multi-location analyst",
+                                                     "discovery_rank":  1,
+                                                     "detail_status":  "available",
+                                                     "provider_warnings":  [
+
+                                                                           ]
+                                                 },
+                                                 {
+                                                     "candidate_id":  "c4-2",
+                                                     "title":  "Remote BI Analyst",
+                                                     "company":  "Example Co 4",
+                                                     "location":  "Remote",
+                                                     "source_url":  "https://synthetic.invalid/jobs/c4-2",
+                                                     "source_provider":  "remoteok",
+                                                     "snippet":  "Remote business-intelligence reporting role with a complete JD.",
+                                                     "raw_description":  "Remote business-intelligence reporting role with a complete JD. Full synthetic JD available for offline evaluation.",
+                                                     "discovery_query":  "multi-location analyst",
+                                                     "discovery_rank":  2,
+                                                     "detail_status":  "available",
+                                                     "provider_warnings":  [
+
+                                                                           ]
+                                                 },
+                                                 {
+                                                     "candidate_id":  "c4-3",
+                                                     "title":  "Location Unspecified Analyst",
+                                                     "company":  "Example Co 4",
+                                                     "location":  null,
+                                                     "source_url":  "https://synthetic.invalid/jobs/c4-3",
+                                                     "source_provider":  "remoteok",
+                                                     "snippet":  "Analyst listing with no reliable search-location metadata.",
+                                                     "raw_description":  null,
+                                                     "discovery_query":  "multi-location analyst",
+                                                     "discovery_rank":  3,
+                                                     "detail_status":  "missing",
+                                                     "provider_warnings":  [
+
+                                                                           ]
+                                                 },
+                                                 {
+                                                     "candidate_id":  "c4-4",
+                                                     "title":  "Tokyo Data Analyst",
+                                                     "company":  "Example Co 4",
+                                                     "location":  "Tokyo",
+                                                     "source_url":  "https://synthetic.invalid/jobs/c4-4",
+                                                     "source_provider":  "remoteok",
+                                                     "snippet":  "Tokyo analyst role using SQL; full JD unavailable.",
+                                                     "raw_description":  null,
+                                                     "discovery_query":  "multi-location analyst",
+                                                     "discovery_rank":  4,
+                                                     "detail_status":  "missing",
+                                                     "provider_warnings":  [
+
+                                                                           ]
+                                                 },
+                                                 {
+                                                     "candidate_id":  "c4-5",
+                                                     "title":  "Osaka Data Analyst",
+                                                     "company":  "Example Co 4",
+                                                     "location":  "Osaka",
+                                                     "source_url":  "https://synthetic.invalid/jobs/c4-5",
+                                                     "source_provider":  "remoteok",
+                                                     "snippet":  "Osaka onsite analyst role outside the selected locations.",
+                                                     "raw_description":  null,
+                                                     "discovery_query":  "multi-location analyst",
+                                                     "discovery_rank":  5,
+                                                     "detail_status":  "missing",
+                                                     "provider_warnings":  [
+
+                                                                           ]
+                                                 }
+                                             ]
+                  },
+                  {
+                      "case_id":  "missing_jd_culture",
+                      "fixture_version":  "search-quality-v2.1",
+                      "tags":  {
+                                   "persona":  "bilingual",
+                                   "scenario":  "missing_jd_culture"
+                               },
+                      "system_input":  {
+                                           "confirmed_profile":  {
+                                                                     "summary":  "Cultural-research candidate targeting museums, archives, and public-history work.",
+                                                                     "target_roles":  [
+                                                                                          "Museum Research Assistant",
+                                                                                          "Public History Intern"
+                                                                                      ],
+                                                                     "target_directions":  [
+                                                                                               "Museum and cultural research"
+                                                                                           ],
+                                                                     "core_skills":  [
+                                                                                         "archival research",
+                                                                                         "public history",
+                                                                                         "writing"
+                                                                                     ],
+                                                                     "supporting_skills":  [
+                                                                                               "museum education",
+                                                                                               "exhibition research"
+                                                                                           ],
+                                                                     "search_keywords":  [
+                                                                                             "museum research",
+                                                                                             "cultural heritage",
+                                                                                             "archive"
+                                                                                         ],
+                                                                     "preferred_locations":  [
+                                                                                                 "Remote"
+                                                                                             ],
+                                                                     "work_arrangements":  [
+                                                                                               "remote"
+                                                                                           ],
+                                                                     "strengths":  [
+                                                                                       "Evidence-based analysis"
+                                                                                   ],
+                                                                     "risks":  [
+                                                                                   "Limited senior-level experience"
+                                                                               ],
+                                                                     "missing_info_questions":  [
+                                                                                                    "Confirm work authorization if required."
+                                                                                                ]
+                                                                 },
+                                           "search_mission":  {
+                                                                  "target_roles":  [
+                                                                                       "Museum Research Assistant",
+                                                                                       "Public History Intern"
+                                                                                   ],
+                                                                  "locations":  [
+                                                                                    "Remote"
+                                                                                ],
+                                                                  "work_arrangements":  [
+                                                                                            "remote"
+                                                                                        ],
+                                                                  "must_have":  [
+                                                                                    "archival research"
+                                                                                ],
+                                                                  "nice_to_have":  [
+                                                                                       "museum education"
+                                                                                   ],
+                                                                  "free_text":  "Museum and cultural research",
+                                                                  "exploration_level":  "balanced"
+                                                              },
+                                           "search_request":  {
+                                                                  "session_id":  "fixture-session",
+                                                                  "query":  "culture research",
+                                                                  "locations":  [
+                                                                                    "Remote"
+                                                                                ],
+                                                                  "target_roles":  [
+                                                                                       "Museum Research Assistant",
+                                                                                       "Public History Intern"
+                                                                                   ],
+                                                                  "keywords":  [
+                                                                                   "museum research",
+                                                                                   "cultural heritage",
+                                                                                   "archive"
+                                                                               ],
+                                                                  "max_results":  5,
+                                                                  "selected_sources":  [
+                                                                                           "remoteok"
+                                                                                       ],
+                                                                  "search_mode":  "live_search",
+                                                                  "analysis_mode":  "deterministic",
+                                                                  "use_llm":  false
+                                                              }
+                                       },
+                      "selected_sources":  [
+                                               "remoteok"
+                                           ],
+                      "allowed_locations":  [
+                                                "Remote"
+                                            ],
+                      "candidate_judgments":  [
+                                                  {
+                                                      "candidate_id":  "c5-1",
+                                                      "canonical_identity":  "synthetic-5-1",
+                                                      "relevance_grade":  3,
+                                                      "strict_constraint_status":  "satisfied",
+                                                      "strict_violation_codes":  [
+
+                                                                                 ],
+                                                      "strict_violation_evidence":  [
+
+                                                                                    ],
+                                                      "duplicate_cluster_id":  null,
+                                                      "duplicate_status":  "none",
+                                                      "stale_status":  "fresh",
+                                                      "detail_available":  true,
+                                                      "source":  "remoteok",
+                                                      "location":  "Remote",
+                                                      "annotation_rationale":  "Museum research duties directly match the cultural-research target and include usable detail."
+                                                  },
+                                                  {
+                                                      "candidate_id":  "c5-2",
+                                                      "canonical_identity":  "synthetic-5-2",
+                                                      "relevance_grade":  2,
+                                                      "strict_constraint_status":  "satisfied",
+                                                      "strict_violation_codes":  [
+
+                                                                                 ],
+                                                      "strict_violation_evidence":  [
+
+                                                                                    ],
+                                                      "duplicate_cluster_id":  null,
+                                                      "duplicate_status":  "none",
+                                                      "stale_status":  "fresh",
+                                                      "detail_available":  true,
+                                                      "source":  "remoteok",
+                                                      "location":  "Remote",
+                                                      "annotation_rationale":  "Public-history research and exhibition evidence strongly align with the target domain."
+                                                  },
+                                                  {
+                                                      "candidate_id":  "c5-3",
+                                                      "canonical_identity":  "synthetic-5-3",
+                                                      "relevance_grade":  1,
+                                                      "strict_constraint_status":  "satisfied",
+                                                      "strict_violation_codes":  [
+
+                                                                                 ],
+                                                      "strict_violation_evidence":  [
+
+                                                                                    ],
+                                                      "duplicate_cluster_id":  null,
+                                                      "duplicate_status":  "none",
+                                                      "stale_status":  "fresh",
+                                                      "detail_available":  false,
+                                                      "source":  "remoteok",
+                                                      "location":  "Remote",
+                                                      "annotation_rationale":  "Archive work is relevant, but unavailable JD detail limits evidence quality."
+                                                  },
+                                                  {
+                                                      "candidate_id":  "c5-4",
+                                                      "canonical_identity":  "synthetic-5-4",
+                                                      "relevance_grade":  1,
+                                                      "strict_constraint_status":  "satisfied",
+                                                      "strict_violation_codes":  [
+
+                                                                                 ],
+                                                      "strict_violation_evidence":  [
+
+                                                                                    ],
+                                                      "duplicate_cluster_id":  null,
+                                                      "duplicate_status":  "none",
+                                                      "stale_status":  "fresh",
+                                                      "detail_available":  false,
+                                                      "source":  "remoteok",
+                                                      "location":  "Remote",
+                                                      "annotation_rationale":  "Museum education is relevant, while missing full responsibilities reduce confidence."
+                                                  },
+                                                  {
+                                                      "candidate_id":  "c5-5",
+                                                      "canonical_identity":  "synthetic-5-5",
+                                                      "relevance_grade":  1,
+                                                      "strict_constraint_status":  "unknown",
+                                                      "strict_violation_codes":  [
+
+                                                                                 ],
+                                                      "strict_violation_evidence":  [
+
+                                                                                    ],
+                                                      "duplicate_cluster_id":  null,
+                                                      "duplicate_status":  "none",
+                                                      "stale_status":  "fresh",
+                                                      "detail_available":  false,
+                                                      "source":  "remoteok",
+                                                      "location":  "Remote",
+                                                      "annotation_rationale":  "The title is relevant, but missing JD and constraint metadata require an unknown constraint label."
+                                                  }
+                                              ],
+                      "scripted_responses":  [
+                                                 {
+                                                     "source":  "remoteok",
+                                                     "query":  "culture research",
+                                                     "location":  "Remote",
+                                                     "candidate_ids":  [
+                                                                           "c5-1",
+                                                                           "c5-2",
+                                                                           "c5-3",
+                                                                           "c5-4",
+                                                                           "c5-5"
+                                                                       ]
+                                                 }
+                                             ],
+                      "candidate_payloads":  [
+                                                 {
+                                                     "candidate_id":  "c5-1",
+                                                     "title":  "Museum Research Assistant",
+                                                     "company":  "Example Co 5",
+                                                     "location":  "Remote",
+                                                     "source_url":  "https://synthetic.invalid/jobs/c5-1",
+                                                     "source_provider":  "remoteok",
+                                                     "snippet":  "Researches collections and prepares archival summaries from a complete JD.",
+                                                     "raw_description":  "Researches collections and prepares archival summaries from a complete JD. Full synthetic JD available for offline evaluation.",
+                                                     "discovery_query":  "culture research",
+                                                     "discovery_rank":  1,
+                                                     "detail_status":  "available",
+                                                     "provider_warnings":  [
+
+                                                                           ]
+                                                 },
+                                                 {
+                                                     "candidate_id":  "c5-2",
+                                                     "title":  "Public History Intern",
+                                                     "company":  "Example Co 5",
+                                                     "location":  "Remote",
+                                                     "source_url":  "https://synthetic.invalid/jobs/c5-2",
+                                                     "source_provider":  "remoteok",
+                                                     "snippet":  "Internship researching local history and supporting exhibition interpretation.",
+                                                     "raw_description":  "Internship researching local history and supporting exhibition interpretation. Full synthetic JD available for offline evaluation.",
+                                                     "discovery_query":  "culture research",
+                                                     "discovery_rank":  2,
+                                                     "detail_status":  "available",
+                                                     "provider_warnings":  [
+
+                                                                           ]
+                                                 },
+                                                 {
+                                                     "candidate_id":  "c5-3",
+                                                     "title":  "Archive Assistant",
+                                                     "company":  "Example Co 5",
+                                                     "location":  "Remote",
+                                                     "source_url":  "https://synthetic.invalid/jobs/c5-3",
+                                                     "source_provider":  "remoteok",
+                                                     "snippet":  "Archive support role returned with only a short provider snippet.",
+                                                     "raw_description":  null,
+                                                     "discovery_query":  "culture research",
+                                                     "discovery_rank":  3,
+                                                     "detail_status":  "missing",
+                                                     "provider_warnings":  [
+
+                                                                           ]
+                                                 },
+                                                 {
+                                                     "candidate_id":  "c5-4",
+                                                     "title":  "Museum Education Assistant",
+                                                     "company":  "Example Co 5",
+                                                     "location":  "Remote",
+                                                     "source_url":  "https://synthetic.invalid/jobs/c5-4",
+                                                     "source_provider":  "remoteok",
+                                                     "snippet":  "Supports museum learning programs; responsibilities are only partially described.",
+                                                     "raw_description":  null,
+                                                     "discovery_query":  "culture research",
+                                                     "discovery_rank":  4,
+                                                     "detail_status":  "missing",
+                                                     "provider_warnings":  [
+
+                                                                           ]
+                                                 },
+                                                 {
+                                                     "candidate_id":  "c5-5",
+                                                     "title":  "Cultural Research Assistant",
+                                                     "company":  "Example Co 5",
+                                                     "location":  "Remote",
+                                                     "source_url":  "https://synthetic.invalid/jobs/c5-5",
+                                                     "source_provider":  "remoteok",
+                                                     "snippet":  "Cultural role with missing JD, work type, and eligibility metadata.",
+                                                     "raw_description":  null,
+                                                     "discovery_query":  "culture research",
+                                                     "discovery_rank":  5,
+                                                     "detail_status":  "missing",
+                                                     "provider_warnings":  [
+
+                                                                           ]
+                                                 }
+                                             ]
+                  },
+                  {
+                      "case_id":  "cross_source_repost",
+                      "fixture_version":  "search-quality-v2.1",
+                      "tags":  {
+                                   "persona":  "synthetic",
+                                   "scenario":  "cross_source_repost"
+                               },
+                      "system_input":  {
+                                           "confirmed_profile":  {
+                                                                     "summary":  "Operations analyst targeting supply-chain and logistics analytics roles.",
+                                                                     "target_roles":  [
+                                                                                          "Logistics Data Analyst",
+                                                                                          "Supply Chain Analyst"
+                                                                                      ],
+                                                                     "target_directions":  [
+                                                                                               "Logistics analytics"
+                                                                                           ],
+                                                                     "core_skills":  [
+                                                                                         "SQL",
+                                                                                         "logistics",
+                                                                                         "inventory analysis"
+                                                                                     ],
+                                                                     "supporting_skills":  [
+                                                                                               "carrier analysis",
+                                                                                               "procurement"
+                                                                                           ],
+                                                                     "search_keywords":  [
+                                                                                             "logistics analyst",
+                                                                                             "supply chain",
+                                                                                             "data"
+                                                                                         ],
+                                                                     "preferred_locations":  [
+                                                                                                 "Remote"
+                                                                                             ],
+                                                                     "work_arrangements":  [
+                                                                                               "remote"
+                                                                                           ],
+                                                                     "strengths":  [
+                                                                                       "Evidence-based analysis"
+                                                                                   ],
+                                                                     "risks":  [
+                                                                                   "Limited senior-level experience"
+                                                                               ],
+                                                                     "missing_info_questions":  [
+                                                                                                    "Confirm work authorization if required."
+                                                                                                ]
+                                                                 },
+                                           "search_mission":  {
+                                                                  "target_roles":  [
+                                                                                       "Logistics Data Analyst",
+                                                                                       "Supply Chain Analyst"
+                                                                                   ],
+                                                                  "locations":  [
+                                                                                    "Remote"
+                                                                                ],
+                                                                  "work_arrangements":  [
+                                                                                            "remote"
+                                                                                        ],
+                                                                  "must_have":  [
+                                                                                    "SQL"
+                                                                                ],
+                                                                  "nice_to_have":  [
+                                                                                       "carrier analysis"
+                                                                                   ],
+                                                                  "free_text":  "Logistics analytics",
+                                                                  "exploration_level":  "balanced"
+                                                              },
+                                           "search_request":  {
+                                                                  "session_id":  "fixture-session",
+                                                                  "query":  "cross-source role",
+                                                                  "locations":  [
+                                                                                    "Remote"
+                                                                                ],
+                                                                  "target_roles":  [
+                                                                                       "Logistics Data Analyst",
+                                                                                       "Supply Chain Analyst"
+                                                                                   ],
+                                                                  "keywords":  [
+                                                                                   "logistics analyst",
+                                                                                   "supply chain",
+                                                                                   "data"
+                                                                               ],
+                                                                  "max_results":  5,
+                                                                  "selected_sources":  [
+                                                                                           "remoteok",
+                                                                                           "linkedin"
+                                                                                       ],
+                                                                  "search_mode":  "live_search",
+                                                                  "analysis_mode":  "deterministic",
+                                                                  "use_llm":  false
+                                                              }
+                                       },
+                      "selected_sources":  [
+                                               "remoteok",
+                                               "linkedin"
+                                           ],
+                      "allowed_locations":  [
+                                                "Remote"
+                                            ],
+                      "candidate_judgments":  [
+                                                  {
+                                                      "candidate_id":  "c6-1",
+                                                      "canonical_identity":  "synthetic-6-1",
+                                                      "relevance_grade":  3,
+                                                      "strict_constraint_status":  "satisfied",
+                                                      "strict_violation_codes":  [
+
+                                                                                 ],
+                                                      "strict_violation_evidence":  [
+
+                                                                                    ],
+                                                      "duplicate_cluster_id":  null,
+                                                      "duplicate_status":  "none",
+                                                      "stale_status":  "fresh",
+                                                      "detail_available":  true,
+                                                      "source":  "remoteok",
+                                                      "location":  "Remote",
+                                                      "annotation_rationale":  "This relevant analyst role has a distinct identity and complete detail."
+                                                  },
+                                                  {
+                                                      "candidate_id":  "c6-2",
+                                                      "canonical_identity":  "synthetic-6-2",
+                                                      "relevance_grade":  2,
+                                                      "strict_constraint_status":  "satisfied",
+                                                      "strict_violation_codes":  [
+
+                                                                                 ],
+                                                      "strict_violation_evidence":  [
+
+                                                                                    ],
+                                                      "duplicate_cluster_id":  null,
+                                                      "duplicate_status":  "none",
+                                                      "stale_status":  "fresh",
+                                                      "detail_available":  true,
+                                                      "source":  "remoteok",
+                                                      "location":  "Remote",
+                                                      "annotation_rationale":  "Procurement responsibilities are relevant and distinct from the repost cluster."
+                                                  },
+                                                  {
+                                                      "candidate_id":  "c6-3",
+                                                      "canonical_identity":  "synthetic-6-3",
+                                                      "relevance_grade":  1,
+                                                      "strict_constraint_status":  "satisfied",
+                                                      "strict_violation_codes":  [
+
+                                                                                 ],
+                                                      "strict_violation_evidence":  [
+
+                                                                                    ],
+                                                      "duplicate_cluster_id":  "cross-source-repost-6",
+                                                      "duplicate_status":  "confirmed",
+                                                      "stale_status":  "fresh",
+                                                      "detail_available":  false,
+                                                      "source":  "remoteok",
+                                                      "location":  "Remote",
+                                                      "annotation_rationale":  "RemoteOK title, company, and duties match the LinkedIn listing, confirming one repost cluster."
+                                                  },
+                                                  {
+                                                      "candidate_id":  "c6-4",
+                                                      "canonical_identity":  "synthetic-6-4",
+                                                      "relevance_grade":  1,
+                                                      "strict_constraint_status":  "satisfied",
+                                                      "strict_violation_codes":  [
+
+                                                                                 ],
+                                                      "strict_violation_evidence":  [
+
+                                                                                    ],
+                                                      "duplicate_cluster_id":  "cross-source-repost-6",
+                                                      "duplicate_status":  "confirmed",
+                                                      "stale_status":  "fresh",
+                                                      "detail_available":  false,
+                                                      "source":  "linkedin",
+                                                      "location":  "Remote",
+                                                      "annotation_rationale":  "LinkedIn title, company, and duties match the RemoteOK listing, confirming one repost cluster."
+                                                  },
+                                                  {
+                                                      "candidate_id":  "c6-5",
+                                                      "canonical_identity":  "synthetic-6-5",
+                                                      "relevance_grade":  1,
+                                                      "strict_constraint_status":  "satisfied",
+                                                      "strict_violation_codes":  [
+
+                                                                                 ],
+                                                      "strict_violation_evidence":  [
+
+                                                                                    ],
+                                                      "duplicate_cluster_id":  null,
+                                                      "duplicate_status":  "suspected",
+                                                      "stale_status":  "fresh",
+                                                      "detail_available":  false,
+                                                      "source":  "linkedin",
+                                                      "location":  "Remote",
+                                                      "annotation_rationale":  "Similar wording suggests a possible duplicate, but title and scope evidence are insufficient to confirm it."
+                                                  }
+                                              ],
+                      "scripted_responses":  [
+                                                 {
+                                                     "source":  "remoteok",
+                                                     "query":  "cross-source role",
+                                                     "location":  "Remote",
+                                                     "candidate_ids":  [
+                                                                           "c6-1",
+                                                                           "c6-2",
+                                                                           "c6-3"
+                                                                       ]
+                                                 },
+                                                 {
+                                                     "source":  "linkedin",
+                                                     "query":  "cross-source role",
+                                                     "location":  "Remote",
+                                                     "candidate_ids":  [
+                                                                           "c6-4",
+                                                                           "c6-5"
+                                                                       ]
+                                                 }
+                                             ],
+                      "candidate_payloads":  [
+                                                 {
+                                                     "candidate_id":  "c6-1",
+                                                     "title":  "Supply Chain Analyst",
+                                                     "company":  "Example Co 6",
+                                                     "location":  "Remote",
+                                                     "source_url":  "https://synthetic.invalid/jobs/c6-1",
+                                                     "source_provider":  "remoteok",
+                                                     "snippet":  "Analyzes supplier performance and inventory for Example Co 6.",
+                                                     "raw_description":  "Analyzes supplier performance and inventory for Example Co 6. Full synthetic JD available for offline evaluation.",
+                                                     "discovery_query":  "cross-source role",
+                                                     "discovery_rank":  1,
+                                                     "detail_status":  "available",
+                                                     "provider_warnings":  [
+
+                                                                           ]
+                                                 },
+                                                 {
+                                                     "candidate_id":  "c6-2",
+                                                     "title":  "Procurement Specialist",
+                                                     "company":  "Example Co 6",
+                                                     "location":  "Remote",
+                                                     "source_url":  "https://synthetic.invalid/jobs/c6-2",
+                                                     "source_provider":  "remoteok",
+                                                     "snippet":  "Runs sourcing reviews and negotiates supplier terms for Example Co 6.",
+                                                     "raw_description":  "Runs sourcing reviews and negotiates supplier terms for Example Co 6. Full synthetic JD available for offline evaluation.",
+                                                     "discovery_query":  "cross-source role",
+                                                     "discovery_rank":  2,
+                                                     "detail_status":  "available",
+                                                     "provider_warnings":  [
+
+                                                                           ]
+                                                 },
+                                                 {
+                                                     "candidate_id":  "c6-3",
+                                                     "title":  "Logistics Data Analyst",
+                                                     "company":  "Example Co 6",
+                                                     "location":  "Remote",
+                                                     "source_url":  "https://synthetic.invalid/jobs/c6-3",
+                                                     "source_provider":  "remoteok",
+                                                     "snippet":  "Builds carrier-delay dashboards for Example Co 6; reposted across platforms.",
+                                                     "raw_description":  null,
+                                                     "discovery_query":  "cross-source role",
+                                                     "discovery_rank":  3,
+                                                     "detail_status":  "missing",
+                                                     "provider_warnings":  [
+
+                                                                           ]
+                                                 },
+                                                 {
+                                                     "candidate_id":  "c6-4",
+                                                     "title":  "Logistics Data Analyst",
+                                                     "company":  "Example Co 6",
+                                                     "location":  "Remote",
+                                                     "source_url":  "https://synthetic.invalid/jobs/c6-4",
+                                                     "source_provider":  "linkedin",
+                                                     "snippet":  "Builds carrier-delay dashboards for Example Co 6; reposted across platforms.",
+                                                     "raw_description":  null,
+                                                     "discovery_query":  "cross-source role",
+                                                     "discovery_rank":  4,
+                                                     "detail_status":  "missing",
+                                                     "provider_warnings":  [
+
+                                                                           ]
+                                                 },
+                                                 {
+                                                     "candidate_id":  "c6-5",
+                                                     "title":  "Logistics Analytics Associate",
+                                                     "company":  "Example Co 6",
+                                                     "location":  "Remote",
+                                                     "source_url":  "https://synthetic.invalid/jobs/c6-5",
+                                                     "source_provider":  "linkedin",
+                                                     "snippet":  "Analyzes delivery data for Example Co 6 with materially different scope.",
+                                                     "raw_description":  null,
+                                                     "discovery_query":  "cross-source role",
+                                                     "discovery_rank":  5,
+                                                     "detail_status":  "missing",
+                                                     "provider_warnings":  [
+
+                                                                           ]
+                                                 }
+                                             ]
+                  },
+                  {
+                      "case_id":  "stale_date_unknown",
+                      "fixture_version":  "search-quality-v2.1",
+                      "tags":  {
+                                   "persona":  "synthetic",
+                                   "scenario":  "stale_date_unknown"
+                               },
+                      "system_input":  {
+                                           "confirmed_profile":  {
+                                                                     "summary":  "Marketing candidate targeting brand, content, and consumer-insights internships.",
+                                                                     "target_roles":  [
+                                                                                          "Brand Marketing Intern",
+                                                                                          "Consumer Insights Assistant"
+                                                                                      ],
+                                                                     "target_directions":  [
+                                                                                               "Brand and consumer marketing"
+                                                                                           ],
+                                                                     "core_skills":  [
+                                                                                         "campaign analysis",
+                                                                                         "content operations",
+                                                                                         "consumer research"
+                                                                                     ],
+                                                                     "supporting_skills":  [
+                                                                                               "social media",
+                                                                                               "reporting"
+                                                                                           ],
+                                                                     "search_keywords":  [
+                                                                                             "brand marketing",
+                                                                                             "consumer insights",
+                                                                                             "internship"
+                                                                                         ],
+                                                                     "preferred_locations":  [
+                                                                                                 "Remote"
+                                                                                             ],
+                                                                     "work_arrangements":  [
+                                                                                               "remote"
+                                                                                           ],
+                                                                     "strengths":  [
+                                                                                       "Evidence-based analysis"
+                                                                                   ],
+                                                                     "risks":  [
+                                                                                   "Limited senior-level experience"
+                                                                               ],
+                                                                     "missing_info_questions":  [
+                                                                                                    "Confirm work authorization if required."
+                                                                                                ]
+                                                                 },
+                                           "search_mission":  {
+                                                                  "target_roles":  [
+                                                                                       "Brand Marketing Intern",
+                                                                                       "Consumer Insights Assistant"
+                                                                                   ],
+                                                                  "locations":  [
+                                                                                    "Remote"
+                                                                                ],
+                                                                  "work_arrangements":  [
+                                                                                            "remote"
+                                                                                        ],
+                                                                  "must_have":  [
+                                                                                    "campaign analysis"
+                                                                                ],
+                                                                  "nice_to_have":  [
+                                                                                       "social media"
+                                                                                   ],
+                                                                  "free_text":  "Brand and consumer marketing",
+                                                                  "exploration_level":  "balanced"
+                                                              },
+                                           "search_request":  {
+                                                                  "session_id":  "fixture-session",
+                                                                  "query":  "stale culture role",
+                                                                  "locations":  [
+                                                                                    "Remote"
+                                                                                ],
+                                                                  "target_roles":  [
+                                                                                       "Brand Marketing Intern",
+                                                                                       "Consumer Insights Assistant"
+                                                                                   ],
+                                                                  "keywords":  [
+                                                                                   "brand marketing",
+                                                                                   "consumer insights",
+                                                                                   "internship"
+                                                                               ],
+                                                                  "max_results":  5,
+                                                                  "selected_sources":  [
+                                                                                           "remoteok"
+                                                                                       ],
+                                                                  "search_mode":  "live_search",
+                                                                  "analysis_mode":  "deterministic",
+                                                                  "use_llm":  false
+                                                              }
+                                       },
+                      "selected_sources":  [
+                                               "remoteok"
+                                           ],
+                      "allowed_locations":  [
+                                                "Remote"
+                                            ],
+                      "candidate_judgments":  [
+                                                  {
+                                                      "candidate_id":  "c7-1",
+                                                      "canonical_identity":  "synthetic-7-1",
+                                                      "relevance_grade":  3,
+                                                      "strict_constraint_status":  "satisfied",
+                                                      "strict_violation_codes":  [
+
+                                                                                 ],
+                                                      "strict_violation_evidence":  [
+
+                                                                                    ],
+                                                      "duplicate_cluster_id":  null,
+                                                      "duplicate_status":  "none",
+                                                      "stale_status":  "fresh",
+                                                      "detail_available":  true,
+                                                      "source":  "remoteok",
+                                                      "location":  "Remote",
+                                                      "annotation_rationale":  "The current posting and marketing internship duties directly match the target."
+                                                  },
+                                                  {
+                                                      "candidate_id":  "c7-2",
+                                                      "canonical_identity":  "synthetic-7-2",
+                                                      "relevance_grade":  2,
+                                                      "strict_constraint_status":  "satisfied",
+                                                      "strict_violation_codes":  [
+
+                                                                                 ],
+                                                      "strict_violation_evidence":  [
+
+                                                                                    ],
+                                                      "duplicate_cluster_id":  null,
+                                                      "duplicate_status":  "none",
+                                                      "stale_status":  "fresh",
+                                                      "detail_available":  true,
+                                                      "source":  "remoteok",
+                                                      "location":  "Remote",
+                                                      "annotation_rationale":  "Consumer-insights evidence is relevant and the posting is explicitly current."
+                                                  },
+                                                  {
+                                                      "candidate_id":  "c7-3",
+                                                      "canonical_identity":  "synthetic-7-3",
+                                                      "relevance_grade":  1,
+                                                      "strict_constraint_status":  "satisfied",
+                                                      "strict_violation_codes":  [
+
+                                                                                 ],
+                                                      "strict_violation_evidence":  [
+
+                                                                                    ],
+                                                      "duplicate_cluster_id":  null,
+                                                      "duplicate_status":  "none",
+                                                      "stale_status":  "stale",
+                                                      "detail_available":  false,
+                                                      "source":  "remoteok",
+                                                      "location":  "Remote",
+                                                      "annotation_rationale":  "The role is relevant, but the explicit old closed posting is stale."
+                                                  },
+                                                  {
+                                                      "candidate_id":  "c7-4",
+                                                      "canonical_identity":  "synthetic-7-4",
+                                                      "relevance_grade":  1,
+                                                      "strict_constraint_status":  "satisfied",
+                                                      "strict_violation_codes":  [
+
+                                                                                 ],
+                                                      "strict_violation_evidence":  [
+
+                                                                                    ],
+                                                      "duplicate_cluster_id":  null,
+                                                      "duplicate_status":  "none",
+                                                      "stale_status":  "fresh",
+                                                      "detail_available":  false,
+                                                      "source":  "remoteok",
+                                                      "location":  "Remote",
+                                                      "annotation_rationale":  "Campaign analytics is relevant and a recent posting signal supports fresh status."
+                                                  },
+                                                  {
+                                                      "candidate_id":  "c7-5",
+                                                      "canonical_identity":  "synthetic-7-5",
+                                                      "relevance_grade":  1,
+                                                      "strict_constraint_status":  "satisfied",
+                                                      "strict_violation_codes":  [
+
+                                                                                 ],
+                                                      "strict_violation_evidence":  [
+
+                                                                                    ],
+                                                      "duplicate_cluster_id":  null,
+                                                      "duplicate_status":  "none",
+                                                      "stale_status":  "unknown",
+                                                      "detail_available":  false,
+                                                      "source":  "remoteok",
+                                                      "location":  "Remote",
+                                                      "annotation_rationale":  "The role is relevant, but absent posting-date evidence requires unknown freshness."
+                                                  }
+                                              ],
+                      "scripted_responses":  [
+                                                 {
+                                                     "source":  "remoteok",
+                                                     "query":  "stale culture role",
+                                                     "location":  "Remote",
+                                                     "candidate_ids":  [
+                                                                           "c7-1",
+                                                                           "c7-2",
+                                                                           "c7-3",
+                                                                           "c7-4",
+                                                                           "c7-5"
+                                                                       ]
+                                                 }
+                                             ],
+                      "candidate_payloads":  [
+                                                 {
+                                                     "candidate_id":  "c7-1",
+                                                     "title":  "Brand Marketing Intern",
+                                                     "company":  "Example Co 7",
+                                                     "location":  "Remote",
+                                                     "source_url":  "https://synthetic.invalid/jobs/c7-1",
+                                                     "source_provider":  "remoteok",
+                                                     "snippet":  "Current internship supporting campaign briefs and channel reporting.",
+                                                     "raw_description":  "Current internship supporting campaign briefs and channel reporting. Full synthetic JD available for offline evaluation.",
+                                                     "discovery_query":  "stale culture role",
+                                                     "discovery_rank":  1,
+                                                     "detail_status":  "available",
+                                                     "provider_warnings":  [
+
+                                                                           ]
+                                                 },
+                                                 {
+                                                     "candidate_id":  "c7-2",
+                                                     "title":  "Consumer Insights Assistant",
+                                                     "company":  "Example Co 7",
+                                                     "location":  "Remote",
+                                                     "source_url":  "https://synthetic.invalid/jobs/c7-2",
+                                                     "source_provider":  "remoteok",
+                                                     "snippet":  "Current role analyzing survey results and audience segments.",
+                                                     "raw_description":  "Current role analyzing survey results and audience segments. Full synthetic JD available for offline evaluation.",
+                                                     "discovery_query":  "stale culture role",
+                                                     "discovery_rank":  2,
+                                                     "detail_status":  "available",
+                                                     "provider_warnings":  [
+
+                                                                           ]
+                                                 },
+                                                 {
+                                                     "candidate_id":  "c7-3",
+                                                     "title":  "Content Operations Intern",
+                                                     "company":  "Example Co 7",
+                                                     "location":  "Remote",
+                                                     "source_url":  "https://synthetic.invalid/jobs/c7-3",
+                                                     "source_provider":  "remoteok",
+                                                     "snippet":  "Content internship posted 180 days ago and marked closed.",
+                                                     "raw_description":  null,
+                                                     "discovery_query":  "stale culture role",
+                                                     "discovery_rank":  3,
+                                                     "detail_status":  "missing",
+                                                     "provider_warnings":  [
+
+                                                                           ]
+                                                 },
+                                                 {
+                                                     "candidate_id":  "c7-4",
+                                                     "title":  "Campaign Analyst",
+                                                     "company":  "Example Co 7",
+                                                     "location":  "Remote",
+                                                     "source_url":  "https://synthetic.invalid/jobs/c7-4",
+                                                     "source_provider":  "remoteok",
+                                                     "snippet":  "Recently posted role measuring campaign performance; full JD unavailable.",
+                                                     "raw_description":  null,
+                                                     "discovery_query":  "stale culture role",
+                                                     "discovery_rank":  4,
+                                                     "detail_status":  "missing",
+                                                     "provider_warnings":  [
+
+                                                                           ]
+                                                 },
+                                                 {
+                                                     "candidate_id":  "c7-5",
+                                                     "title":  "Social Media Intern",
+                                                     "company":  "Example Co 7",
+                                                     "location":  "Remote",
+                                                     "source_url":  "https://synthetic.invalid/jobs/c7-5",
+                                                     "source_provider":  "remoteok",
+                                                     "snippet":  "Relevant social-media internship with no posting date supplied.",
+                                                     "raw_description":  null,
+                                                     "discovery_query":  "stale culture role",
+                                                     "discovery_rank":  5,
+                                                     "detail_status":  "missing",
+                                                     "provider_warnings":  [
+
+                                                                           ]
+                                                 }
+                                             ]
+                  },
+                  {
+                      "case_id":  "partial_failure_culture",
+                      "fixture_version":  "search-quality-v2.1",
+                      "tags":  {
+                                   "persona":  "bilingual",
+                                   "scenario":  "partial_failure_culture"
+                               },
+                      "system_input":  {
+                                           "confirmed_profile":  {
+                                                                     "summary":  "Culture-sector candidate targeting museum research and heritage programs.",
+                                                                     "target_roles":  [
+                                                                                          "Museum Research Intern",
+                                                                                          "Heritage Programs Assistant"
+                                                                                      ],
+                                                                     "target_directions":  [
+                                                                                               "Cultural and heritage research"
+                                                                                           ],
+                                                                     "core_skills":  [
+                                                                                         "museum research",
+                                                                                         "heritage programs",
+                                                                                         "archival work"
+                                                                                     ],
+                                                                     "supporting_skills":  [
+                                                                                               "public programs",
+                                                                                               "visitor research"
+                                                                                           ],
+                                                                     "search_keywords":  [
+                                                                                             "museum intern",
+                                                                                             "heritage",
+                                                                                             "culture"
+                                                                                         ],
+                                                                     "preferred_locations":  [
+                                                                                                 "Remote"
+                                                                                             ],
+                                                                     "work_arrangements":  [
+                                                                                               "remote"
+                                                                                           ],
+                                                                     "strengths":  [
+                                                                                       "Evidence-based analysis"
+                                                                                   ],
+                                                                     "risks":  [
+                                                                                   "Limited senior-level experience"
+                                                                               ],
+                                                                     "missing_info_questions":  [
+                                                                                                    "Confirm work authorization if required."
+                                                                                                ]
+                                                                 },
+                                           "search_mission":  {
+                                                                  "target_roles":  [
+                                                                                       "Museum Research Intern",
+                                                                                       "Heritage Programs Assistant"
+                                                                                   ],
+                                                                  "locations":  [
+                                                                                    "Remote"
+                                                                                ],
+                                                                  "work_arrangements":  [
+                                                                                            "remote"
+                                                                                        ],
+                                                                  "must_have":  [
+                                                                                    "museum research"
+                                                                                ],
+                                                                  "nice_to_have":  [
+                                                                                       "public programs"
+                                                                                   ],
+                                                                  "free_text":  "Cultural and heritage research",
+                                                                  "exploration_level":  "balanced"
+                                                              },
+                                           "search_request":  {
+                                                                  "session_id":  "fixture-session",
+                                                                  "query":  "partial culture role",
+                                                                  "locations":  [
+                                                                                    "Remote"
+                                                                                ],
+                                                                  "target_roles":  [
+                                                                                       "Museum Research Intern",
+                                                                                       "Heritage Programs Assistant"
+                                                                                   ],
+                                                                  "keywords":  [
+                                                                                   "museum intern",
+                                                                                   "heritage",
+                                                                                   "culture"
+                                                                               ],
+                                                                  "max_results":  5,
+                                                                  "selected_sources":  [
+                                                                                           "remoteok",
+                                                                                           "linkedin"
+                                                                                       ],
+                                                                  "search_mode":  "live_search",
+                                                                  "analysis_mode":  "deterministic",
+                                                                  "use_llm":  false
+                                                              }
+                                       },
+                      "selected_sources":  [
+                                               "remoteok",
+                                               "linkedin"
+                                           ],
+                      "allowed_locations":  [
+                                                "Remote"
+                                            ],
+                      "candidate_judgments":  [
+                                                  {
+                                                      "candidate_id":  "c8-1",
+                                                      "canonical_identity":  "synthetic-8-1",
+                                                      "relevance_grade":  3,
+                                                      "strict_constraint_status":  "satisfied",
+                                                      "strict_violation_codes":  [
+
+                                                                                 ],
+                                                      "strict_violation_evidence":  [
+
+                                                                                    ],
+                                                      "duplicate_cluster_id":  null,
+                                                      "duplicate_status":  "none",
+                                                      "stale_status":  "fresh",
+                                                      "detail_available":  true,
+                                                      "source":  "remoteok",
+                                                      "location":  "Remote",
+                                                      "annotation_rationale":  "The returned internship is relevant and has usable detail despite the later source failure."
+                                                  },
+                                                  {
+                                                      "candidate_id":  "c8-2",
+                                                      "canonical_identity":  "synthetic-8-2",
+                                                      "relevance_grade":  2,
+                                                      "strict_constraint_status":  "satisfied",
+                                                      "strict_violation_codes":  [
+
+                                                                                 ],
+                                                      "strict_violation_evidence":  [
+
+                                                                                    ],
+                                                      "duplicate_cluster_id":  null,
+                                                      "duplicate_status":  "none",
+                                                      "stale_status":  "fresh",
+                                                      "detail_available":  true,
+                                                      "source":  "remoteok",
+                                                      "location":  "Remote",
+                                                      "annotation_rationale":  "Heritage-program responsibilities align with the cultural profile and remain usable after partial failure."
+                                                  },
+                                                  {
+                                                      "candidate_id":  "c8-3",
+                                                      "canonical_identity":  "synthetic-8-3",
+                                                      "relevance_grade":  1,
+                                                      "strict_constraint_status":  "satisfied",
+                                                      "strict_violation_codes":  [
+
+                                                                                 ],
+                                                      "strict_violation_evidence":  [
+
+                                                                                    ],
+                                                      "duplicate_cluster_id":  null,
+                                                      "duplicate_status":  "none",
+                                                      "stale_status":  "fresh",
+                                                      "detail_available":  false,
+                                                      "source":  "remoteok",
+                                                      "location":  "Remote",
+                                                      "annotation_rationale":  "Archive work is relevant, but missing full JD limits evidence after the partial response."
+                                                  },
+                                                  {
+                                                      "candidate_id":  "c8-4",
+                                                      "canonical_identity":  "synthetic-8-4",
+                                                      "relevance_grade":  1,
+                                                      "strict_constraint_status":  "satisfied",
+                                                      "strict_violation_codes":  [
+
+                                                                                 ],
+                                                      "strict_violation_evidence":  [
+
+                                                                                    ],
+                                                      "duplicate_cluster_id":  null,
+                                                      "duplicate_status":  "none",
+                                                      "stale_status":  "fresh",
+                                                      "detail_available":  false,
+                                                      "source":  "remoteok",
+                                                      "location":  "Remote",
+                                                      "annotation_rationale":  "Visitor research is relevant, while incomplete detail lowers confidence."
+                                                  },
+                                                  {
+                                                      "candidate_id":  "c8-5",
+                                                      "canonical_identity":  "synthetic-8-5",
+                                                      "relevance_grade":  1,
+                                                      "strict_constraint_status":  "unknown",
+                                                      "strict_violation_codes":  [
+
+                                                                                 ],
+                                                      "strict_violation_evidence":  [
+
+                                                                                    ],
+                                                      "duplicate_cluster_id":  null,
+                                                      "duplicate_status":  "none",
+                                                      "stale_status":  "fresh",
+                                                      "detail_available":  false,
+                                                      "source":  "remoteok",
+                                                      "location":  "Remote",
+                                                      "annotation_rationale":  "The cultural title is relevant, but partial response data cannot establish constraint satisfaction."
+                                                  }
+                                              ],
+                      "scripted_responses":  [
+                                                 {
+                                                     "source":  "remoteok",
+                                                     "query":  "partial culture role",
+                                                     "location":  "Remote",
+                                                     "candidate_ids":  [
+                                                                           "c8-1",
+                                                                           "c8-2",
+                                                                           "c8-3",
+                                                                           "c8-4",
+                                                                           "c8-5"
+                                                                       ],
+                                                     "error_code":  null
+                                                 },
+                                                 {
+                                                     "source":  "linkedin",
+                                                     "query":  "partial culture role",
+                                                     "location":  "Remote",
+                                                     "candidate_ids":  [
+
+                                                                       ],
+                                                     "error_code":  "scripted_source_failure"
+                                                 }
+                                             ],
+                      "candidate_payloads":  [
+                                                 {
+                                                     "candidate_id":  "c8-1",
+                                                     "title":  "Museum Research Intern",
+                                                     "company":  "Example Co 8",
+                                                     "location":  "Remote",
+                                                     "source_url":  "https://synthetic.invalid/jobs/c8-1",
+                                                     "source_provider":  "remoteok",
+                                                     "snippet":  "Returned before a provider partial failure; complete museum-research JD available.",
+                                                     "raw_description":  "Returned before a provider partial failure; complete museum-research JD available. Full synthetic JD available for offline evaluation.",
+                                                     "discovery_query":  "partial culture role",
+                                                     "discovery_rank":  1,
+                                                     "detail_status":  "available",
+                                                     "provider_warnings":  [
+
+                                                                           ]
+                                                 },
+                                                 {
+                                                     "candidate_id":  "c8-2",
+                                                     "title":  "Heritage Programs Assistant",
+                                                     "company":  "Example Co 8",
+                                                     "location":  "Remote",
+                                                     "source_url":  "https://synthetic.invalid/jobs/c8-2",
+                                                     "source_provider":  "remoteok",
+                                                     "snippet":  "Returned heritage-program role with research and public-program duties.",
+                                                     "raw_description":  "Returned heritage-program role with research and public-program duties. Full synthetic JD available for offline evaluation.",
+                                                     "discovery_query":  "partial culture role",
+                                                     "discovery_rank":  2,
+                                                     "detail_status":  "available",
+                                                     "provider_warnings":  [
+
+                                                                           ]
+                                                 },
+                                                 {
+                                                     "candidate_id":  "c8-3",
+                                                     "title":  "Archive Digitization Intern",
+                                                     "company":  "Example Co 8",
+                                                     "location":  "Remote",
+                                                     "source_url":  "https://synthetic.invalid/jobs/c8-3",
+                                                     "source_provider":  "remoteok",
+                                                     "snippet":  "Archive digitization internship returned with snippet-only detail.",
+                                                     "raw_description":  null,
+                                                     "discovery_query":  "partial culture role",
+                                                     "discovery_rank":  3,
+                                                     "detail_status":  "missing",
+                                                     "provider_warnings":  [
+
+                                                                           ]
+                                                 },
+                                                 {
+                                                     "candidate_id":  "c8-4",
+                                                     "title":  "Visitor Research Assistant",
+                                                     "company":  "Example Co 8",
+                                                     "location":  "Remote",
+                                                     "source_url":  "https://synthetic.invalid/jobs/c8-4",
+                                                     "source_provider":  "remoteok",
+                                                     "snippet":  "Visitor-study role returned without complete responsibilities.",
+                                                     "raw_description":  null,
+                                                     "discovery_query":  "partial culture role",
+                                                     "discovery_rank":  4,
+                                                     "detail_status":  "missing",
+                                                     "provider_warnings":  [
+
+                                                                           ]
+                                                 },
+                                                 {
+                                                     "candidate_id":  "c8-5",
+                                                     "title":  "Cultural Projects Assistant",
+                                                     "company":  "Example Co 8",
+                                                     "location":  "Remote",
+                                                     "source_url":  "https://synthetic.invalid/jobs/c8-5",
+                                                     "source_provider":  "remoteok",
+                                                     "snippet":  "Candidate returned during partial failure without work-type or constraint metadata.",
+                                                     "raw_description":  null,
+                                                     "discovery_query":  "partial culture role",
+                                                     "discovery_rank":  5,
+                                                     "detail_status":  "missing",
+                                                     "provider_warnings":  [
+
+                                                                           ]
+                                                 }
+                                             ]
+                  }
+              ]
+}

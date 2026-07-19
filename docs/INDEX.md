@@ -21,6 +21,12 @@ history archive. Git preserves completed plans and deleted designs.
   refactoring practices.
 - [JOB_SEARCH_USECASE_REFACTOR_PLAN.md](JOB_SEARCH_USECASE_REFACTOR_PLAN.md):
   phased behavior-preserving split of the current search use-case module.
+- [SEARCH_RETRIEVAL_QUALITY_V2_PLAN.md](SEARCH_RETRIEVAL_QUALITY_V2_PLAN.md):
+  phased plan for typed queries, provider budgets, hard constraints, recall
+  expansion, and JD-informed final ranking.
+- [SEARCH_SUBAGENT_OPERATING_MODEL.md](SEARCH_SUBAGENT_OPERATING_MODEL.md):
+  project-scoped specialist agents, delegation rules, handoff contracts, and
+  durable knowledge practices for Search V2 work.
 - [SEARCH_HISTORY_RECOVERY.md](SEARCH_HISTORY_RECOVERY.md): user-visible run
   history and the current recovery boundary.
 - [SEARCH_MISSION.md](SEARCH_MISSION.md): intent collection, agent

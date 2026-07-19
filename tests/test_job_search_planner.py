@@ -1,7 +1,19 @@
 from __future__ import annotations
 
+from threading import Barrier
+
 from app.schemas.confirmed_profile import ConfirmedProfile
 from app.services.job_search_planner import build_search_plan
+from app.services.job_search_execution.provider_search import (
+    _run_provider_search,
+    build_provider_search_tasks,
+    candidate_pool_cap_for,
+    select_provider_queries,
+)
+from app.services.job_search_providers.base import RawJobCandidate
+from app.services.job_search_providers.multi_source_provider import (
+    MultiSourceJobSearchProvider,
+)
 from app.services.llm_service import LLMServiceError
 from app.services.search_signal_normalizer import build_bilingual_search_signals
 
@@ -62,6 +74,123 @@ def test_job_search_planner_llm_success_path() -> None:
     assert "Python" in plan.must_have_signals
     assert plan.search_intent is not None
     assert plan.search_intent.role_families == ["engineering"]
+    assert {item.query_type for item in plan.planned_queries} >= {
+        "broad",
+        "role_domain",
+        "evidence",
+        "tool",
+    }
+
+
+def test_query_selector_balances_query_types_instead_of_taking_first_three() -> None:
+    plan = build_search_plan(_confirmed_profile(), use_llm=True, llm_service=FakePlannerLLM())
+
+    selected = select_provider_queries(plan)
+
+    assert len(selected) == 5
+    assert [item.query_type for item in selected] == [
+        "role_domain",
+        "evidence",
+        "broad",
+        "tool",
+        "broad",
+    ]
+    assert "Backend Engineer APIs LLM applications" in [item.query for item in selected]
+
+
+def test_candidate_recall_pool_is_large_but_bounded() -> None:
+    assert candidate_pool_cap_for(5) == 30
+    assert candidate_pool_cap_for(10) == 60
+    assert candidate_pool_cap_for(20) == 100
+
+
+def test_provider_tasks_translate_queries_and_cover_sources_and_locations() -> None:
+    class SourceProvider:
+        provider_kind = "test"
+
+        def __init__(self, provider_name: str) -> None:
+            self.provider_name = provider_name
+
+        def search_jobs(self, *, query: str, location: str | None, limit: int):
+            return []
+
+    provider = MultiSourceJobSearchProvider(
+        [
+            SourceProvider("cuhksz_career"),
+            SourceProvider("linkedin"),
+            SourceProvider("remoteok"),
+        ]
+    )
+    plan = build_search_plan(
+        _confirmed_profile(),
+        use_llm=True,
+        llm_service=FakePlannerLLM(),
+    )
+
+    tasks = build_provider_search_tasks(provider, search_plan=plan, per_call_limit=5)
+    by_source = {
+        source: [task for task in tasks if task.source == source]
+        for source in provider.source_names
+    }
+
+    assert [task.source for task in tasks[:3]] == provider.source_names
+    assert all(task.location is None for task in by_source["cuhksz_career"])
+    assert all(
+        task.planned_query.query not in plan.queries
+        for task in by_source["cuhksz_career"]
+    )
+    assert {task.location for task in by_source["linkedin"]} == {"Remote", "Tokyo"}
+    assert all(task.planned_query.query_type != "tool" for task in by_source["linkedin"])
+    assert len(by_source["remoteok"]) == 1
+    assert by_source["remoteok"][0].planned_query.query_type == "broad"
+
+
+def test_multi_source_recall_runs_sources_concurrently_and_merges_in_task_order() -> None:
+    barrier = Barrier(2)
+
+    class ConcurrentSourceProvider:
+        provider_kind = "test"
+
+        def __init__(self, provider_name: str) -> None:
+            self.provider_name = provider_name
+            self.calls = 0
+
+        def search_jobs(self, *, query: str, location: str | None, limit: int):
+            self.calls += 1
+            if self.calls == 1:
+                barrier.wait(timeout=1)
+            return [
+                RawJobCandidate(
+                    title=f"{self.provider_name} Backend Engineer",
+                    company=self.provider_name,
+                    location=location,
+                    source_url=f"https://example.com/{self.provider_name}/{self.calls}",
+                    source_provider=self.provider_name,
+                    snippet="Backend engineering role.",
+                )
+            ]
+
+    provider = MultiSourceJobSearchProvider(
+        [
+            ConcurrentSourceProvider("linkedin"),
+            ConcurrentSourceProvider("remoteok"),
+        ]
+    )
+    plan = build_search_plan(
+        _confirmed_profile(),
+        use_llm=True,
+        llm_service=FakePlannerLLM(),
+    )
+
+    result = _run_provider_search(provider, search_plan=plan, max_results=5)
+
+    assert [stat.source for stat in result.query_stats[:2]] == ["linkedin", "remoteok"]
+    assert {candidate.source_provider for candidate in result.candidates} == {
+        "linkedin",
+        "remoteok",
+    }
+    assert result.details()["source_execution_mode"] == "bounded_parallel"
+    assert result.details()["source_concurrency"] == 2
 
 
 def test_job_search_planner_fallback_path() -> None:

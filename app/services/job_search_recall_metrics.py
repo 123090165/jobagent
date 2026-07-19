@@ -122,6 +122,32 @@ def dedupe_recall_candidates(
     return deduped, duplicate_count, truncated_count
 
 
+def dedupe_cross_source_reposts(
+    candidates: Iterable[RawJobCandidate],
+) -> tuple[list[RawJobCandidate], int]:
+    """Collapse conservative title/company/location matches across different sources."""
+    retained: list[RawJobCandidate] = []
+    cluster_indexes: dict[str, int] = {}
+    duplicate_count = 0
+    for candidate in candidates:
+        identity = _cross_source_identity(candidate)
+        existing_index = cluster_indexes.get(identity) if identity else None
+        if existing_index is None:
+            if identity:
+                cluster_indexes[identity] = len(retained)
+            retained.append(candidate)
+            continue
+
+        existing = retained[existing_index]
+        if existing.source_provider == candidate.source_provider:
+            retained.append(candidate)
+            continue
+        duplicate_count += 1
+        if _candidate_evidence_quality(candidate) > _candidate_evidence_quality(existing):
+            retained[existing_index] = candidate
+    return retained, duplicate_count
+
+
 def build_source_recall_stats(
     raw_candidates: Iterable[RawJobCandidate],
     deduped_candidates: Iterable[RawJobCandidate],
@@ -170,6 +196,31 @@ def has_missing_detail(candidate: RawJobCandidate) -> bool:
     if status in SNIPPET_ONLY_DETAIL_STATUSES:
         return True
     return not bool((candidate.raw_description or "").strip())
+
+
+def _cross_source_identity(candidate: RawJobCandidate) -> str | None:
+    parts = [
+        _identity_text(candidate.title),
+        _identity_text(candidate.company),
+        _identity_text(candidate.location),
+    ]
+    if not all(parts):
+        return None
+    return "|".join(parts)
+
+
+def _identity_text(value: str | None) -> str:
+    return "".join(re.findall(r"[a-z0-9\u4e00-\u9fff]+", (value or "").casefold()))
+
+
+def _candidate_evidence_quality(candidate: RawJobCandidate) -> tuple[int, int, int, int]:
+    description = (candidate.raw_description or "").strip()
+    return (
+        int(not has_missing_detail(candidate)),
+        len(description),
+        int(bool(candidate.source_url)),
+        -len(candidate.provider_warnings),
+    )
 
 
 def _source_name(candidate: RawJobCandidate) -> str:

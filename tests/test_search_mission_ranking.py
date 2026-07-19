@@ -28,7 +28,6 @@ def test_excluded_mission_role_adds_penalty_and_changes_ranking() -> None:
         }
     )
     plan = JobSearchPlan(
-        queries=["Backend Engineer"],
         locations=["Remote"],
         target_roles=["Backend Engineer"],
         must_have_signals=["Python"],

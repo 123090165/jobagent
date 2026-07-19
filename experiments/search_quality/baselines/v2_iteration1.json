@@ -1,0 +1,992 @@
+{
+  "schema_version": "search-quality-baseline-v1",
+  "baseline_id": "v2_iteration1",
+  "execution_mode": "offline_replay",
+  "runtime_profile": "search_v2_iteration1_deterministic",
+  "fixture_version": "search-quality-v2.1",
+  "fixture_digest": "sha256:1fabbb463ab733c866f5b6f11db543b8116c223e103f64da61a28594d3086698",
+  "git_commit": "ab0b8eda77c7624c1db4add4f692855401c88811",
+  "case_count": 8,
+  "configuration": {
+    "analysis_mode": "deterministic",
+    "use_llm": false,
+    "max_results": 5,
+    "provider_query_limit": 6
+  },
+  "cases": [
+    {
+      "case_id": "technical_ai_intern",
+      "planned_queries": [
+        "AI ML internship",
+        "AI/ML Intern machine learning computer vision",
+        "AI Role-specific search based on confirmed profile evidence",
+        "AI Technical skill signal detected Role-specific search based on confirmed profile evidence",
+        "ML Intern Technical skill signal detected Role-specific search based on confirmed profile evidence",
+        "AI"
+      ],
+      "pool_candidate_ids": [
+        "c1-1",
+        "c1-2",
+        "c1-3",
+        "c1-4",
+        "c1-5"
+      ],
+      "top_5_candidate_ids": [
+        "c1-1",
+        "c1-2",
+        "c1-5",
+        "c1-4"
+      ],
+      "trace_steps": [
+        {
+          "name": "Search planning",
+          "mode": "deterministic",
+          "fallback_reason": null
+        },
+        {
+          "name": "Provider search",
+          "mode": "provider",
+          "fallback_reason": null
+        },
+        {
+          "name": "Candidate filtering",
+          "mode": "deterministic",
+          "fallback_reason": null
+        },
+        {
+          "name": "JD analysis",
+          "mode": "mock",
+          "fallback_reason": null
+        },
+        {
+          "name": "Profile matching",
+          "mode": "deterministic",
+          "fallback_reason": null
+        },
+        {
+          "name": "Result assembly",
+          "mode": "deterministic",
+          "fallback_reason": null
+        }
+      ],
+      "source_attempts": [
+        {
+          "source": "remoteok",
+          "query": "AI",
+          "location": "Remote",
+          "returned_count": 5,
+          "error_code": null
+        }
+      ],
+      "metrics": {
+        "pool_recall": {
+          "numerator": 4.0,
+          "denominator": 4.0,
+          "value": 1.0
+        },
+        "eligible_pool_recall": {
+          "numerator": 3.0,
+          "denominator": 3.0,
+          "value": 1.0
+        },
+        "precision_at_5": {
+          "numerator": 3.0,
+          "denominator": 5.0,
+          "value": 0.6
+        },
+        "filled_slots_at_5": {
+          "numerator": 4.0,
+          "denominator": 5.0,
+          "value": 0.8
+        },
+        "ndcg_at_5": {
+          "numerator": 9.392789260714373,
+          "denominator": 9.392789260714373,
+          "value": 1.0
+        },
+        "constraint_violation_at_5": {
+          "numerator": 0.0,
+          "denominator": 4.0,
+          "value": 0.0
+        },
+        "duplicate_at_5": {
+          "numerator": 0.0,
+          "denominator": 4.0,
+          "value": 0.0
+        }
+      }
+    },
+    {
+      "case_id": "bilingual_role_alias",
+      "planned_queries": [
+        "bilingual AI ML",
+        "Machine Learning Intern AI research assistant bilingual",
+        "AI Research Assistant machine learning intern bilingual",
+        "Machine Learning Intern Technical skill signal detected Role-specific search based on confirmed profile evidence",
+        "AI Research Assistant Technical skill signal detected Role-specific search based on confirmed profile evidence",
+        "Machine Learning Intern"
+      ],
+      "pool_candidate_ids": [
+        "c2-1",
+        "c2-2",
+        "c2-3",
+        "c2-4",
+        "c2-5"
+      ],
+      "top_5_candidate_ids": [
+        "c2-2",
+        "c2-1",
+        "c2-4",
+        "c2-5",
+        "c2-3"
+      ],
+      "trace_steps": [
+        {
+          "name": "Search planning",
+          "mode": "deterministic",
+          "fallback_reason": null
+        },
+        {
+          "name": "Provider search",
+          "mode": "provider",
+          "fallback_reason": null
+        },
+        {
+          "name": "Candidate filtering",
+          "mode": "deterministic",
+          "fallback_reason": null
+        },
+        {
+          "name": "JD analysis",
+          "mode": "mock",
+          "fallback_reason": null
+        },
+        {
+          "name": "Profile matching",
+          "mode": "deterministic",
+          "fallback_reason": null
+        },
+        {
+          "name": "Result assembly",
+          "mode": "deterministic",
+          "fallback_reason": null
+        }
+      ],
+      "source_attempts": [
+        {
+          "source": "remoteok",
+          "query": "Machine Learning Intern",
+          "location": "Remote",
+          "returned_count": 5,
+          "error_code": null
+        }
+      ],
+      "metrics": {
+        "pool_recall": {
+          "numerator": 4.0,
+          "denominator": 4.0,
+          "value": 1.0
+        },
+        "eligible_pool_recall": {
+          "numerator": 4.0,
+          "denominator": 4.0,
+          "value": 1.0
+        },
+        "precision_at_5": {
+          "numerator": 4.0,
+          "denominator": 5.0,
+          "value": 0.8
+        },
+        "filled_slots_at_5": {
+          "numerator": 5.0,
+          "denominator": 5.0,
+          "value": 1.0
+        },
+        "ndcg_at_5": {
+          "numerator": 8.234037640308138,
+          "denominator": 9.823465818787765,
+          "value": 0.8382008745386192
+        },
+        "constraint_violation_at_5": {
+          "numerator": 0.0,
+          "denominator": 5.0,
+          "value": 0.0
+        },
+        "duplicate_at_5": {
+          "numerator": 0.0,
+          "denominator": 5.0,
+          "value": 0.0
+        }
+      }
+    },
+    {
+      "case_id": "hard_constraint_supply_chain",
+      "planned_queries": [
+        "supply chain analyst",
+        "Supply Chain Analyst procurement remote",
+        "Procurement Analyst supply chain remote",
+        "Supply Chain Analyst Supply chain and logistics signal Supply chain operations, procurement, and logistics",
+        "Procurement Analyst Supply chain and logistics signal Supply chain operations, procurement, and logistics",
+        "Procurement Analyst"
+      ],
+      "pool_candidate_ids": [
+        "c3-1",
+        "c3-2",
+        "c3-3",
+        "c3-4",
+        "c3-5"
+      ],
+      "top_5_candidate_ids": [
+        "c3-1",
+        "c3-2",
+        "c3-5",
+        "c3-3"
+      ],
+      "trace_steps": [
+        {
+          "name": "Search planning",
+          "mode": "deterministic",
+          "fallback_reason": null
+        },
+        {
+          "name": "Provider search",
+          "mode": "provider",
+          "fallback_reason": null
+        },
+        {
+          "name": "Candidate filtering",
+          "mode": "deterministic",
+          "fallback_reason": null
+        },
+        {
+          "name": "JD analysis",
+          "mode": "mock",
+          "fallback_reason": null
+        },
+        {
+          "name": "Profile matching",
+          "mode": "deterministic",
+          "fallback_reason": null
+        },
+        {
+          "name": "Result assembly",
+          "mode": "deterministic",
+          "fallback_reason": null
+        }
+      ],
+      "source_attempts": [
+        {
+          "source": "remoteok",
+          "query": "Procurement Analyst",
+          "location": "Remote",
+          "returned_count": 5,
+          "error_code": null
+        }
+      ],
+      "metrics": {
+        "pool_recall": {
+          "numerator": 5.0,
+          "denominator": 5.0,
+          "value": 1.0
+        },
+        "eligible_pool_recall": {
+          "numerator": 4.0,
+          "denominator": 4.0,
+          "value": 1.0
+        },
+        "precision_at_5": {
+          "numerator": 4.0,
+          "denominator": 5.0,
+          "value": 0.8
+        },
+        "filled_slots_at_5": {
+          "numerator": 4.0,
+          "denominator": 5.0,
+          "value": 0.8
+        },
+        "ndcg_at_5": {
+          "numerator": 9.823465818787765,
+          "denominator": 9.823465818787765,
+          "value": 1.0
+        },
+        "constraint_violation_at_5": {
+          "numerator": 0.0,
+          "denominator": 4.0,
+          "value": 0.0
+        },
+        "duplicate_at_5": {
+          "numerator": 0.0,
+          "denominator": 4.0,
+          "value": 0.0
+        }
+      }
+    },
+    {
+      "case_id": "multi_location",
+      "planned_queries": [
+        "multi-location analyst",
+        "Data Analyst business intelligence",
+        "BI Analyst data analyst business intelligence",
+        "Data Analyst Technical skill signal detected Role-specific search based on confirmed profile evidence",
+        "BI Analyst Technical skill signal detected Role-specific search based on confirmed profile evidence",
+        "Data Analyst"
+      ],
+      "pool_candidate_ids": [
+        "c4-1",
+        "c4-2"
+      ],
+      "top_5_candidate_ids": [
+        "c4-1",
+        "c4-2"
+      ],
+      "trace_steps": [
+        {
+          "name": "Search planning",
+          "mode": "deterministic",
+          "fallback_reason": null
+        },
+        {
+          "name": "Provider search",
+          "mode": "provider",
+          "fallback_reason": null
+        },
+        {
+          "name": "Candidate filtering",
+          "mode": "deterministic",
+          "fallback_reason": null
+        },
+        {
+          "name": "JD analysis",
+          "mode": "mock",
+          "fallback_reason": null
+        },
+        {
+          "name": "Profile matching",
+          "mode": "deterministic",
+          "fallback_reason": null
+        },
+        {
+          "name": "Result assembly",
+          "mode": "deterministic",
+          "fallback_reason": null
+        }
+      ],
+      "source_attempts": [
+        {
+          "source": "remoteok",
+          "query": "Data Analyst",
+          "location": "Remote",
+          "returned_count": 2,
+          "error_code": null
+        }
+      ],
+      "metrics": {
+        "pool_recall": {
+          "numerator": 2.0,
+          "denominator": 3.0,
+          "value": 0.6666666666666666
+        },
+        "eligible_pool_recall": {
+          "numerator": 2.0,
+          "denominator": 3.0,
+          "value": 0.6666666666666666
+        },
+        "precision_at_5": {
+          "numerator": 2.0,
+          "denominator": 5.0,
+          "value": 0.4
+        },
+        "filled_slots_at_5": {
+          "numerator": 2.0,
+          "denominator": 5.0,
+          "value": 0.4
+        },
+        "ndcg_at_5": {
+          "numerator": 8.892789260714373,
+          "denominator": 9.392789260714373,
+          "value": 0.9467676761267002
+        },
+        "constraint_violation_at_5": {
+          "numerator": 0.0,
+          "denominator": 2.0,
+          "value": 0.0
+        },
+        "duplicate_at_5": {
+          "numerator": 0.0,
+          "denominator": 2.0,
+          "value": 0.0
+        }
+      }
+    },
+    {
+      "case_id": "missing_jd_culture",
+      "planned_queries": [
+        "culture research",
+        "Museum Research Assistant cultural heritage archive",
+        "Public History Intern museum research cultural heritage",
+        "Museum Research Assistant Museum education and cultural research signal Museum education, cultural research, and public history",
+        "Public History Intern Museum education and cultural research signal Museum education, cultural research, and public history",
+        "Museum Research Assistant"
+      ],
+      "pool_candidate_ids": [
+        "c5-1",
+        "c5-2",
+        "c5-3",
+        "c5-4",
+        "c5-5"
+      ],
+      "top_5_candidate_ids": [
+        "c5-1",
+        "c5-2",
+        "c5-4",
+        "c5-5",
+        "c5-3"
+      ],
+      "trace_steps": [
+        {
+          "name": "Search planning",
+          "mode": "deterministic",
+          "fallback_reason": null
+        },
+        {
+          "name": "Provider search",
+          "mode": "provider",
+          "fallback_reason": null
+        },
+        {
+          "name": "Candidate filtering",
+          "mode": "deterministic",
+          "fallback_reason": null
+        },
+        {
+          "name": "JD analysis",
+          "mode": "mock",
+          "fallback_reason": null
+        },
+        {
+          "name": "Profile matching",
+          "mode": "deterministic",
+          "fallback_reason": null
+        },
+        {
+          "name": "Result assembly",
+          "mode": "deterministic",
+          "fallback_reason": null
+        }
+      ],
+      "source_attempts": [
+        {
+          "source": "remoteok",
+          "query": "Museum Research Assistant",
+          "location": "Remote",
+          "returned_count": 5,
+          "error_code": null
+        }
+      ],
+      "metrics": {
+        "pool_recall": {
+          "numerator": 5.0,
+          "denominator": 5.0,
+          "value": 1.0
+        },
+        "eligible_pool_recall": {
+          "numerator": 5.0,
+          "denominator": 5.0,
+          "value": 1.0
+        },
+        "precision_at_5": {
+          "numerator": 5.0,
+          "denominator": 5.0,
+          "value": 1.0
+        },
+        "filled_slots_at_5": {
+          "numerator": 5.0,
+          "denominator": 5.0,
+          "value": 1.0
+        },
+        "ndcg_at_5": {
+          "numerator": 10.210318626022307,
+          "denominator": 10.210318626022307,
+          "value": 1.0
+        },
+        "constraint_violation_at_5": {
+          "numerator": 0.0,
+          "denominator": 5.0,
+          "value": 0.0
+        },
+        "duplicate_at_5": {
+          "numerator": 0.0,
+          "denominator": 5.0,
+          "value": 0.0
+        }
+      }
+    },
+    {
+      "case_id": "cross_source_repost",
+      "planned_queries": [
+        "cross-source role",
+        "Logistics Data Analyst logistics analyst supply chain",
+        "Supply Chain Analyst logistics analyst data",
+        "Logistics Data Analyst Supply chain and logistics signal Supply chain operations, procurement, and logistics",
+        "Supply Chain Analyst Supply chain and logistics signal Supply chain operations, procurement, and logistics",
+        "Logistics Data Analyst"
+      ],
+      "pool_candidate_ids": [
+        "c6-4",
+        "c6-5",
+        "c6-1",
+        "c6-2",
+        "c6-3"
+      ],
+      "top_5_candidate_ids": [
+        "c6-4",
+        "c6-1",
+        "c6-5",
+        "c6-2"
+      ],
+      "trace_steps": [
+        {
+          "name": "Search planning",
+          "mode": "deterministic",
+          "fallback_reason": null
+        },
+        {
+          "name": "Provider search",
+          "mode": "provider",
+          "fallback_reason": null
+        },
+        {
+          "name": "Candidate filtering",
+          "mode": "deterministic",
+          "fallback_reason": null
+        },
+        {
+          "name": "JD analysis",
+          "mode": "mock",
+          "fallback_reason": null
+        },
+        {
+          "name": "Profile matching",
+          "mode": "deterministic",
+          "fallback_reason": null
+        },
+        {
+          "name": "Result assembly",
+          "mode": "deterministic",
+          "fallback_reason": null
+        }
+      ],
+      "source_attempts": [
+        {
+          "source": "linkedin",
+          "query": "cross-source role",
+          "location": "Remote",
+          "returned_count": 2,
+          "error_code": null
+        },
+        {
+          "source": "remoteok",
+          "query": "cross-source role",
+          "location": "Remote",
+          "returned_count": 3,
+          "error_code": null
+        },
+        {
+          "source": "linkedin",
+          "query": "Logistics Data Analyst logistics analyst supply chain",
+          "location": "Remote",
+          "returned_count": 2,
+          "error_code": null
+        },
+        {
+          "source": "remoteok",
+          "query": "Logistics Data Analyst logistics analyst supply chain",
+          "location": "Remote",
+          "returned_count": 3,
+          "error_code": null
+        },
+        {
+          "source": "linkedin",
+          "query": "Supply Chain Analyst logistics analyst data",
+          "location": "Remote",
+          "returned_count": 2,
+          "error_code": null
+        },
+        {
+          "source": "remoteok",
+          "query": "Supply Chain Analyst logistics analyst data",
+          "location": "Remote",
+          "returned_count": 3,
+          "error_code": null
+        },
+        {
+          "source": "linkedin",
+          "query": "Logistics Data Analyst Supply chain and logistics signal Supply chain operations, procurement, and logistics",
+          "location": "Remote",
+          "returned_count": 2,
+          "error_code": null
+        },
+        {
+          "source": "remoteok",
+          "query": "Logistics Data Analyst Supply chain and logistics signal Supply chain operations, procurement, and logistics",
+          "location": "Remote",
+          "returned_count": 3,
+          "error_code": null
+        },
+        {
+          "source": "linkedin",
+          "query": "Supply Chain Analyst Supply chain and logistics signal Supply chain operations, procurement, and logistics",
+          "location": "Remote",
+          "returned_count": 2,
+          "error_code": null
+        },
+        {
+          "source": "remoteok",
+          "query": "Supply Chain Analyst Supply chain and logistics signal Supply chain operations, procurement, and logistics",
+          "location": "Remote",
+          "returned_count": 3,
+          "error_code": null
+        },
+        {
+          "source": "linkedin",
+          "query": "Logistics Data Analyst",
+          "location": "Remote",
+          "returned_count": 2,
+          "error_code": null
+        },
+        {
+          "source": "remoteok",
+          "query": "Logistics Data Analyst",
+          "location": "Remote",
+          "returned_count": 3,
+          "error_code": null
+        }
+      ],
+      "metrics": {
+        "pool_recall": {
+          "numerator": 4.0,
+          "denominator": 4.0,
+          "value": 1.0
+        },
+        "eligible_pool_recall": {
+          "numerator": 4.0,
+          "denominator": 4.0,
+          "value": 1.0
+        },
+        "precision_at_5": {
+          "numerator": 4.0,
+          "denominator": 5.0,
+          "value": 0.8
+        },
+        "filled_slots_at_5": {
+          "numerator": 4.0,
+          "denominator": 5.0,
+          "value": 0.8
+        },
+        "ndcg_at_5": {
+          "numerator": 7.208537949220382,
+          "denominator": 9.823465818787765,
+          "value": 0.7338080146249167
+        },
+        "constraint_violation_at_5": {
+          "numerator": 0.0,
+          "denominator": 4.0,
+          "value": 0.0
+        },
+        "duplicate_at_5": {
+          "numerator": 0.0,
+          "denominator": 4.0,
+          "value": 0.0
+        }
+      }
+    },
+    {
+      "case_id": "stale_date_unknown",
+      "planned_queries": [
+        "stale culture role",
+        "Brand Marketing Intern consumer insights internship",
+        "Consumer Insights Assistant brand marketing internship",
+        "Brand Marketing Intern Marketing and consumer insight signal Brand marketing, content operations, and consumer insights",
+        "Consumer Insights Assistant Marketing and consumer insight signal Brand marketing, content operations, and consumer insights",
+        "Brand Marketing Intern"
+      ],
+      "pool_candidate_ids": [
+        "c7-1",
+        "c7-2",
+        "c7-3",
+        "c7-4",
+        "c7-5"
+      ],
+      "top_5_candidate_ids": [
+        "c7-1",
+        "c7-2",
+        "c7-5",
+        "c7-3",
+        "c7-4"
+      ],
+      "trace_steps": [
+        {
+          "name": "Search planning",
+          "mode": "deterministic",
+          "fallback_reason": null
+        },
+        {
+          "name": "Provider search",
+          "mode": "provider",
+          "fallback_reason": null
+        },
+        {
+          "name": "Candidate filtering",
+          "mode": "deterministic",
+          "fallback_reason": null
+        },
+        {
+          "name": "JD analysis",
+          "mode": "mock",
+          "fallback_reason": null
+        },
+        {
+          "name": "Profile matching",
+          "mode": "deterministic",
+          "fallback_reason": null
+        },
+        {
+          "name": "Result assembly",
+          "mode": "deterministic",
+          "fallback_reason": null
+        }
+      ],
+      "source_attempts": [
+        {
+          "source": "remoteok",
+          "query": "Brand Marketing Intern",
+          "location": "Remote",
+          "returned_count": 5,
+          "error_code": null
+        }
+      ],
+      "metrics": {
+        "pool_recall": {
+          "numerator": 5.0,
+          "denominator": 5.0,
+          "value": 1.0
+        },
+        "eligible_pool_recall": {
+          "numerator": 5.0,
+          "denominator": 5.0,
+          "value": 1.0
+        },
+        "precision_at_5": {
+          "numerator": 5.0,
+          "denominator": 5.0,
+          "value": 1.0
+        },
+        "filled_slots_at_5": {
+          "numerator": 5.0,
+          "denominator": 5.0,
+          "value": 1.0
+        },
+        "ndcg_at_5": {
+          "numerator": 10.210318626022307,
+          "denominator": 10.210318626022307,
+          "value": 1.0
+        },
+        "constraint_violation_at_5": {
+          "numerator": 0.0,
+          "denominator": 5.0,
+          "value": 0.0
+        },
+        "duplicate_at_5": {
+          "numerator": 0.0,
+          "denominator": 5.0,
+          "value": 0.0
+        }
+      }
+    },
+    {
+      "case_id": "partial_failure_culture",
+      "planned_queries": [
+        "partial culture role",
+        "Museum Research Intern museum intern heritage",
+        "Heritage Programs Assistant museum intern culture",
+        "Museum Research Intern Museum education and cultural research signal Museum education, cultural research, and public history",
+        "Heritage Programs Assistant Museum education and cultural research signal Museum education, cultural research, and public history",
+        "Museum Research Intern"
+      ],
+      "pool_candidate_ids": [
+        "c8-1",
+        "c8-2",
+        "c8-3",
+        "c8-4",
+        "c8-5"
+      ],
+      "top_5_candidate_ids": [
+        "c8-1",
+        "c8-2",
+        "c8-4",
+        "c8-3",
+        "c8-5"
+      ],
+      "trace_steps": [
+        {
+          "name": "Search planning",
+          "mode": "deterministic",
+          "fallback_reason": null
+        },
+        {
+          "name": "Provider search",
+          "mode": "provider",
+          "fallback_reason": null
+        },
+        {
+          "name": "Candidate filtering",
+          "mode": "deterministic",
+          "fallback_reason": null
+        },
+        {
+          "name": "JD analysis",
+          "mode": "mock",
+          "fallback_reason": null
+        },
+        {
+          "name": "Profile matching",
+          "mode": "deterministic",
+          "fallback_reason": null
+        },
+        {
+          "name": "Result assembly",
+          "mode": "deterministic",
+          "fallback_reason": null
+        }
+      ],
+      "source_attempts": [
+        {
+          "source": "linkedin",
+          "query": "partial culture role",
+          "location": "Remote",
+          "returned_count": 0,
+          "error_code": "scripted_source_failure"
+        },
+        {
+          "source": "remoteok",
+          "query": "partial culture role",
+          "location": "Remote",
+          "returned_count": 5,
+          "error_code": null
+        },
+        {
+          "source": "linkedin",
+          "query": "Museum Research Intern museum intern heritage",
+          "location": "Remote",
+          "returned_count": 0,
+          "error_code": "scripted_source_failure"
+        },
+        {
+          "source": "remoteok",
+          "query": "Museum Research Intern museum intern heritage",
+          "location": "Remote",
+          "returned_count": 5,
+          "error_code": null
+        },
+        {
+          "source": "linkedin",
+          "query": "Heritage Programs Assistant museum intern culture",
+          "location": "Remote",
+          "returned_count": 0,
+          "error_code": "scripted_source_failure"
+        },
+        {
+          "source": "remoteok",
+          "query": "Heritage Programs Assistant museum intern culture",
+          "location": "Remote",
+          "returned_count": 5,
+          "error_code": null
+        },
+        {
+          "source": "linkedin",
+          "query": "Museum Research Intern Museum education and cultural research signal Museum education, cultural research, and public history",
+          "location": "Remote",
+          "returned_count": 0,
+          "error_code": "scripted_source_failure"
+        },
+        {
+          "source": "remoteok",
+          "query": "Museum Research Intern Museum education and cultural research signal Museum education, cultural research, and public history",
+          "location": "Remote",
+          "returned_count": 5,
+          "error_code": null
+        },
+        {
+          "source": "linkedin",
+          "query": "Heritage Programs Assistant Museum education and cultural research signal Museum education, cultural research, and public history",
+          "location": "Remote",
+          "returned_count": 0,
+          "error_code": "scripted_source_failure"
+        },
+        {
+          "source": "remoteok",
+          "query": "Heritage Programs Assistant Museum education and cultural research signal Museum education, cultural research, and public history",
+          "location": "Remote",
+          "returned_count": 5,
+          "error_code": null
+        },
+        {
+          "source": "linkedin",
+          "query": "Museum Research Intern",
+          "location": "Remote",
+          "returned_count": 0,
+          "error_code": "scripted_source_failure"
+        },
+        {
+          "source": "remoteok",
+          "query": "Museum Research Intern",
+          "location": "Remote",
+          "returned_count": 5,
+          "error_code": null
+        }
+      ],
+      "metrics": {
+        "pool_recall": {
+          "numerator": 5.0,
+          "denominator": 5.0,
+          "value": 1.0
+        },
+        "eligible_pool_recall": {
+          "numerator": 5.0,
+          "denominator": 5.0,
+          "value": 1.0
+        },
+        "precision_at_5": {
+          "numerator": 5.0,
+          "denominator": 5.0,
+          "value": 1.0
+        },
+        "filled_slots_at_5": {
+          "numerator": 5.0,
+          "denominator": 5.0,
+          "value": 1.0
+        },
+        "ndcg_at_5": {
+          "numerator": 10.210318626022307,
+          "denominator": 10.210318626022307,
+          "value": 1.0
+        },
+        "constraint_violation_at_5": {
+          "numerator": 0.0,
+          "denominator": 5.0,
+          "value": 0.0
+        },
+        "duplicate_at_5": {
+          "numerator": 0.0,
+          "denominator": 5.0,
+          "value": 0.0
+        }
+      }
+    }
+  ],
+  "measurement_notes": [
+    "Offline fixture timing is intentionally excluded.",
+    "Additional deterministic planner queries alias the case's versioned explicit response payloads."
+  ],
+  "manifest_digest": "sha256:aa03ab05b6c09e336ddf09b4ed078e8f8b768a3ec814a79ea6e98f5e0c94f670"
+}

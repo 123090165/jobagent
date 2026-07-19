@@ -32,22 +32,27 @@ Search planning
 
 ### Search Planning
 
-Build executable provider queries and ranking signals from the confirmed
-profile and user input. LLM planning is optional. Plan assembly, normalization,
-query caps, and safety rules remain deterministic.
+Build typed logical queries and ranking signals from the confirmed profile and
+user input, then translate them into source-specific tasks. Query selection
+covers multiple intent types instead of truncating the first three strings.
+LLM planning is optional. Plan assembly, quotas, normalization, query caps, and
+safety rules remain deterministic.
 
 ### Provider Search
 
 Execute a bounded query budget, normalize candidates, canonicalize source
-identity, deduplicate, and enforce a candidate-pool cap. Trace source coverage,
-missing details, duplicates, warnings, and query durations.
+identity, deduplicate, and enforce a candidate-pool cap. Different sources run
+with bounded concurrency; tasks for the same source remain sequential. Merge
+results in deterministic task order and preserve partial failures. Trace source
+coverage, concurrency, missing details, duplicates, warnings, and query durations.
 
 ### Candidate Filtering
 
-Compute a deterministic scorecard baseline. In LLM mode, ask the configured
-JSON LLM to produce bounded scorecards grounded in candidate evidence. Validate
-indexes, scores, evidence, and result shape. Fall back to deterministic ranking
-on request or quality failure.
+Apply structured hard constraints first. Explicit conflicts are rejected,
+missing constraint evidence is marked unknown, and accepted/unknown candidates
+continue to deterministic pre-ranking. In LLM mode, only the bounded pre-ranked
+window is sent for scorecards. Validate indexes, scores, evidence, and result
+shape. Fall back to deterministic ranking on request or quality failure.
 
 ### JD Analysis
 
@@ -58,9 +63,10 @@ unsupported or materially incomplete analysis.
 
 ### Profile Matching And Assembly
 
-Combine candidate scorecards, JD analysis, and confirmed profile evidence into
-stable result cards. Reapply canonical identity so duplicate jobs cannot return
-after ranking.
+Use analyzed JD evidence to compute the final score instead of reusing the
+recall score. Reapply canonical identity so duplicate jobs cannot return after
+ranking. Within a five-point score window, prefer new companies and sources to
+avoid a homogeneous Top K without overriding a clear quality gap.
 
 ## LLM Boundary
 
@@ -105,7 +111,7 @@ Future operational metrics should include:
 - provider availability and detail coverage;
 - fallback reason distribution;
 - LLM timeout/rate-limit counts;
-- Top 5 relevance and user dismiss reasons.
+- Top 5 relevance; user outcome metrics only after real behavior data exists.
 
 ## Search Quality Evaluation
 

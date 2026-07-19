@@ -4,6 +4,7 @@ from app.services.job_search_providers.base import RawJobCandidate
 from app.services.job_search_recall_metrics import (
     build_source_recall_stats,
     candidate_recall_key,
+    dedupe_cross_source_reposts,
     dedupe_recall_candidates,
     has_missing_detail,
 )
@@ -123,6 +124,27 @@ def test_candidate_recall_key_canonicalizes_linkedin_job_urls() -> None:
     assert len(deduped) == 1
     assert duplicate_count == 1
     assert truncated_count == 0
+
+
+def test_cross_source_repost_keeps_the_candidate_with_better_jd_evidence() -> None:
+    linkedin = _candidate(
+        title="Logistics Data Analyst",
+        source_provider="linkedin",
+        source_url="https://linkedin.com/jobs/view/123",
+        detail_status="linkedin_external_link",
+    )
+    remoteok = _candidate(
+        title="Logistics Data Analyst",
+        source_provider="remoteok",
+        source_url="https://remoteok.com/jobs/456",
+        detail_status="official_json_api",
+        raw_description="Full job description with responsibilities and requirements.",
+    )
+
+    retained, duplicate_count = dedupe_cross_source_reposts([linkedin, remoteok])
+
+    assert retained == [remoteok]
+    assert duplicate_count == 1
 
 
 def test_source_recall_stats_report_missing_detail_and_warnings() -> None:

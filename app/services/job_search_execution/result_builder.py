@@ -5,8 +5,12 @@ from uuid import NAMESPACE_URL, uuid5
 
 from app.schemas.confirmed_profile import ConfirmedProfile
 from app.schemas.job_search import JobSearchResult
-from app.services.job_candidate_filter import CandidateScorecard
+from app.services.job_candidate_filter import (
+    CandidateScorecard,
+    build_candidate_scorecard,
+)
 from app.services.job_search_planner import JobSearchPlan
+from app.services.job_search_providers.base import RawJobCandidate
 from app.services.job_search_recall_metrics import candidate_recall_key
 
 
@@ -124,87 +128,121 @@ def _match_candidates(
     search_plan: JobSearchPlan,
     analyzed_items: list[dict[str, object]],
 ) -> list[dict[str, object]]:
-    profile_terms = _clean_list(
-        confirmed_profile.target_roles
-        + confirmed_profile.search_keywords
-        + confirmed_profile.core_skills
-        + confirmed_profile.supporting_skills
-        + search_plan.must_have_signals
-    )
-    target_roles = [item.lower() for item in _clean_list(confirmed_profile.target_roles + search_plan.target_roles)]
-
     matched_items: list[dict[str, object]] = []
-    for item in analyzed_items:
+    for candidate_index, item in enumerate(analyzed_items):
         candidate = item["candidate"]
         analysis = item["analysis"]
-        scorecard = item.get("scorecard")
-        if isinstance(scorecard, CandidateScorecard):
-            matched_items.append(
-                {
-                    "candidate": candidate,
-                    "analysis": analysis,
-                    "analysis_mode": item["analysis_mode"],
-                    "match_score": scorecard.match_score,
-                    "score_breakdown": scorecard.score_breakdown,
-                    "evidence_quotes": scorecard.evidence_quotes,
-                    "matched_keywords": scorecard.matched_keywords[:6],
-                    "match_reasons": (
-                        scorecard.match_reasons
-                        or ["Candidate was selected by the shared LLM scoring rubric."]
-                    ),
-                    "risks": _clean_list(scorecard.risks + _metadata_risks(candidate, confirmed_profile)),
-                    "confidence_label": scorecard.confidence_label,
-                }
-            )
-            continue
-        text_parts = [
-            getattr(candidate, "title", "") or "",
-            getattr(candidate, "company", "") or "",
-            getattr(candidate, "location", "") or "",
-            getattr(candidate, "snippet", "") or "",
-            getattr(analysis, "raw_jd", "") or "",
-            " ".join(getattr(analysis, "keywords", []) or []),
-            " ".join(getattr(analysis, "required_skills", []) or []),
-            " ".join(getattr(analysis, "preferred_skills", []) or []),
-        ]
-        combined_text = " ".join(text_parts).lower()
-        matched_keywords = [term for term in profile_terms if term.lower() in combined_text]
-        role_overlap = any(role in combined_text for role in target_roles)
-        required_skill_count = len(set(matched_keywords))
-        score = min(98, 45 + required_skill_count * 7 + (15 if role_overlap else 0))
-        risks = []
-        if not getattr(candidate, "source_url", None):
-            risks.append("Source URL is missing.")
-        if not matched_keywords:
-            risks.append("Limited explicit keyword overlap with the confirmed profile.")
-        if getattr(candidate, "location", None) is None and confirmed_profile.preferred_locations:
-            risks.append("Location metadata is incomplete.")
-
-        match_reasons = []
-        if role_overlap:
-            match_reasons.append("Target role language overlaps with the confirmed profile.")
-        if matched_keywords:
-            match_reasons.append("Matched profile signals: " + ", ".join(matched_keywords[:5]) + ".")
-        if not match_reasons:
-            match_reasons.append("Candidate remains in scope based on broad search-plan alignment.")
+        recall_scorecard = item.get("scorecard")
+        enriched_candidate = _candidate_with_analysis(candidate, analysis)
+        final_scorecard = build_candidate_scorecard(
+            candidate_index,
+            enriched_candidate,
+            confirmed_profile=confirmed_profile,
+            search_plan=search_plan,
+        )
+        recall_risks = (
+            recall_scorecard.risks
+            if isinstance(recall_scorecard, CandidateScorecard)
+            else []
+        )
 
         matched_items.append(
             {
                 "candidate": candidate,
                 "analysis": analysis,
                 "analysis_mode": item["analysis_mode"],
-                "match_score": score,
-                "score_breakdown": {},
-                "evidence_quotes": [],
-                "matched_keywords": matched_keywords[:6],
-                "match_reasons": match_reasons,
-                "risks": _clean_list(risks),
-                "confidence_label": _confidence_label_for_score(score),
+                "recall_score": (
+                    recall_scorecard.match_score
+                    if isinstance(recall_scorecard, CandidateScorecard)
+                    else None
+                ),
+                "match_score": final_scorecard.match_score,
+                "score_breakdown": final_scorecard.score_breakdown,
+                "evidence_quotes": final_scorecard.evidence_quotes,
+                "matched_keywords": final_scorecard.matched_keywords[:6],
+                "match_reasons": final_scorecard.match_reasons,
+                "risks": _clean_list(
+                    recall_risks
+                    + final_scorecard.risks
+                    + _metadata_risks(candidate, confirmed_profile)
+                ),
+                "confidence_label": final_scorecard.confidence_label,
             }
         )
 
     matched_items.sort(key=lambda item: int(item["match_score"]), reverse=True)
-    return matched_items
+    return _diversify_matched_items(matched_items)
+
+
+def _diversify_matched_items(
+    matched_items: list[dict[str, object]],
+    *,
+    score_window: int = 5,
+) -> list[dict[str, object]]:
+    """Prefer new companies and sources only among candidates with close scores."""
+    pending = list(enumerate(matched_items))
+    diversified: list[tuple[int, dict[str, object]]] = []
+    company_counts: Counter[str] = Counter()
+    source_counts: Counter[str] = Counter()
+    while pending:
+        best_score = int(pending[0][1]["match_score"])
+        window = [
+            entry
+            for entry in pending
+            if int(entry[1]["match_score"]) >= best_score - score_window
+        ]
+        original_index, selected = min(
+            window,
+            key=lambda entry: (
+                company_counts[_diversity_company_key(entry)],
+                source_counts[_diversity_source_key(entry)],
+                -int(entry[1]["match_score"]),
+                entry[0],
+            ),
+        )
+        pending.remove((original_index, selected))
+        company_counts[_diversity_company_key((original_index, selected))] += 1
+        source_counts[_diversity_source_key((original_index, selected))] += 1
+        diversified.append((original_index, selected))
+
+    for rank, (original_index, item) in enumerate(diversified):
+        item["diversity_adjusted"] = rank != original_index
+    return [item for _, item in diversified]
+
+
+def _diversity_company_key(entry: tuple[int, dict[str, object]]) -> str:
+    original_index, item = entry
+    candidate = item["candidate"]
+    company = str(getattr(candidate, "company", "") or "").strip().casefold()
+    return company or f"missing-company:{original_index}"
+
+
+def _diversity_source_key(entry: tuple[int, dict[str, object]]) -> str:
+    original_index, item = entry
+    candidate = item["candidate"]
+    source = str(getattr(candidate, "source_provider", "") or "").strip().casefold()
+    return source or f"missing-source:{original_index}"
+
+
+def _candidate_with_analysis(candidate: RawJobCandidate, analysis: object) -> RawJobCandidate:
+    evidence_sections = [
+        getattr(analysis, "raw_jd", "") or "",
+        *list(getattr(analysis, "responsibilities", []) or []),
+        *list(getattr(analysis, "required_skills", []) or []),
+        *list(getattr(analysis, "preferred_skills", []) or []),
+        *list(getattr(analysis, "experience_requirements", []) or []),
+        *list(getattr(analysis, "education_requirements", []) or []),
+        *list(getattr(analysis, "keywords", []) or []),
+    ]
+    analysis_text = "\n".join(_clean_list(evidence_sections))
+    return candidate.model_copy(
+        update={
+            "title": candidate.title or getattr(analysis, "job_title", None),
+            "company": candidate.company or getattr(analysis, "company", None),
+            "location": candidate.location or getattr(analysis, "location", None),
+            "raw_description": analysis_text or candidate.raw_description,
+        }
+    )
 
 
 def _assemble_results(
@@ -243,6 +281,8 @@ def _assemble_results(
                 match_reasons=list(item["match_reasons"]),
                 risks=list(item["risks"]),
                 match_score=score,
+                recall_score=item.get("recall_score"),
+                final_match_score=score,
                 score_breakdown=dict(item.get("score_breakdown", {})),
                 evidence_quotes=list(item.get("evidence_quotes", [])),
                 recommended_action=_recommended_action(score),

@@ -3,6 +3,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 from app.application.job_search_usecases import _assemble_results
+from app.services.job_search_execution.result_builder import _diversify_matched_items
 from app.services.job_search_providers.base import RawJobCandidate
 
 
@@ -52,3 +53,30 @@ def test_assemble_results_dedupes_canonical_source_urls() -> None:
     assert len(results) == 1
     assert results[0].match_score == 91
     assert results[0].description == "higher scored duplicate"
+
+
+def test_diversity_only_reorders_close_scores() -> None:
+    first = _candidate("https://example.com/1", "first")
+    second = _candidate("https://example.com/2", "second")
+    different_company = _candidate("https://example.com/3", "third").model_copy(
+        update={"company": "Different", "source_provider": "linkedin"}
+    )
+    distant = _candidate("https://example.com/4", "fourth").model_copy(
+        update={"company": "Distant", "source_provider": "remoteok"}
+    )
+
+    diversified = _diversify_matched_items(
+        [
+            _matched_item(first, 90),
+            _matched_item(second, 89),
+            _matched_item(different_company, 88),
+            _matched_item(distant, 70),
+        ]
+    )
+
+    assert [item["candidate"].company for item in diversified] == [
+        "Example",
+        "Different",
+        "Example",
+        "Distant",
+    ]

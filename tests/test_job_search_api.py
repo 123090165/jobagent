@@ -131,9 +131,9 @@ def test_job_search_preview_returns_cuhksz_search_urls(monkeypatch, tmp_path) ->
     assert "健康算法实习生" not in payload["provider_search_terms"]
     assert any("title=%E7%AE%97%E6%B3%95" in url for url in payload["provider_search_urls"])
     assert any("title=%E5%81%A5%E5%BA%B7%E7%AE%97%E6%B3%95" in url for url in payload["provider_search_urls"])
-    assert 1 <= payload["provider_query_count"] <= 3
+    assert 1 <= payload["provider_query_count"] <= 6
     assert payload["estimated_provider_requests"] >= len(payload["provider_search_urls"])
-    assert payload["estimated_candidate_pool_size"] <= 20
+    assert payload["estimated_candidate_pool_size"] <= 60
     assert payload["estimated_total_llm_requests"] == (
         payload["estimated_llm_planning_requests"]
         + payload["estimated_llm_filtering_requests"]
@@ -245,7 +245,7 @@ def test_job_search_preview_returns_selected_multi_source_strategy(monkeypatch, 
     assert any("site%3Alinkedin.com%2Fjobs" in url for url in payload["provider_search_urls"])
     assert any("remoteok.com/api" in url for url in payload["provider_search_urls"])
     assert any("Multi-source search" in note for note in payload["query_strategy_notes"])
-    assert payload["estimated_candidate_pool_size"] <= 20
+    assert payload["estimated_candidate_pool_size"] <= 60
 
 
 def test_browser_helper_job_search_requires_candidates(monkeypatch, tmp_path) -> None:

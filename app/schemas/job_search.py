@@ -18,6 +18,14 @@ JobSearchResultSource: TypeAlias = Literal["local_mock", "live_search"]
 JobSearchAnalysisMode: TypeAlias = Literal["deterministic", "llm", "fallback", "mock"]
 JobSearchConfidenceLabel: TypeAlias = Literal["strong", "medium", "limited", "weak"]
 JobSearchPlanningMode: TypeAlias = Literal["deterministic", "llm", "fallback"]
+JobSearchQueryType: TypeAlias = Literal[
+    "user",
+    "broad",
+    "role_domain",
+    "evidence",
+    "tool",
+    "fallback",
+]
 JobSearchSourceKind: TypeAlias = Literal[
     "mock",
     "native_job_board",
@@ -53,6 +61,13 @@ class JobSearchIntent(BaseModel):
     quality_warnings: list[str] = Field(default_factory=list)
 
 
+class PlannedQuery(BaseModel):
+    query: str
+    query_type: JobSearchQueryType
+    priority: float = Field(ge=0.0, le=1.0)
+    rationale: str
+
+
 class JobSearchResult(BaseModel):
     job_result_id: str
     title: str
@@ -67,6 +82,8 @@ class JobSearchResult(BaseModel):
     match_reasons: list[str] = Field(default_factory=list)
     risks: list[str] = Field(default_factory=list)
     match_score: int
+    recall_score: int | None = None
+    final_match_score: int | None = None
     score_breakdown: dict[str, int] = Field(default_factory=dict)
     evidence_quotes: list[str] = Field(default_factory=list)
     recommended_action: str
@@ -294,6 +311,7 @@ class JobSearchPreviewResponse(BaseModel):
     target_roles: list[str] = Field(default_factory=list)
     keywords: list[str] = Field(default_factory=list)
     provider_queries: list[str] = Field(default_factory=list)
+    planned_queries: list[PlannedQuery] = Field(default_factory=list)
     search_intent: JobSearchIntent | None = None
     search_source_kind: JobSearchSourceKind = "native_job_board"
     search_source_notes: list[str] = Field(default_factory=list)

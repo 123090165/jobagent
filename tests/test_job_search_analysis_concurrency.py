@@ -139,7 +139,7 @@ def test_jd_analysis_parallel_failure_falls_back_per_candidate(monkeypatch) -> N
     result = job_search_usecases._analyze_candidates(
         _filter_result(["first", "bad", "third"]),
         use_llm=True,
-        llm_service=None,
+        llm_service=object(),
     )
 
     assert [item["analysis"].raw_jd for item in result["items"]] == ["first", "bad", "third"]

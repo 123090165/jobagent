@@ -185,8 +185,9 @@ def test_execute_live_run_with_fake_provider_completes(monkeypatch, tmp_path) ->
     assert completed.job_search_run.results
     assert all(item.source == "live_search" for item in completed.job_search_run.results)
     assert completed.job_search_run.results[0].company == "Prompt Harbor"
-    assert completed.job_search_run.results[0].match_score == 89
-    assert completed.job_search_run.results[0].score_breakdown["domain_alignment"] == 24
+    assert completed.job_search_run.results[0].recall_score == 89
+    assert completed.job_search_run.results[0].final_match_score == 76
+    assert completed.job_search_run.results[0].match_score == 76
     assert completed.job_search_run.results[0].evidence_quotes
     assert completed.steps[-1].status == "completed"
     provider_step = next(step for step in completed.steps if step.name == "Provider search")
