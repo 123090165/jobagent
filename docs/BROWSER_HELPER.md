@@ -27,16 +27,20 @@ error to the frontend.
 ## Current-Page Capture
 
 ~~~text
-User opens a job detail page
--> opens JobAgent Side Panel
--> clicks Analyze current job
+User pairs Browser Helper from the authenticated Assistant page
+-> opens a job detail page and the JobAgent Side Panel
+-> clicks Capture current JD
 -> extension reads visible page text and metadata
--> POST /api/v1/browser/job-captures/analyze
--> normal JD analysis and matching
--> compact Side Panel report
+-> POST /api/v1/browser/job-captures stores an owned capture without LLM analysis
+-> POST /api/v1/chat/conversations/{id}/context/browser-captures binds only the owned capture ID
+-> Chat is unlocked with the full captured JD visible in a scrollable preview
+-> user selects or creates a conversation and asks questions directly in the Side Panel composer
+-> POST /api/v1/chat/conversations/{id}/turns
+-> optional Analyze JD match reuses the stored capture and an Analysis profile
+-> POST /api/v1/browser/job-captures/{capture_id}/analyze
 ~~~
 
-Capture runs only after explicit user action. For BOSS, validate that the page
+Capture runs only after explicit user action and does not require a Profile. For BOSS, validate that the page
 is a job detail page and stop on login, verification, blank, search, or home
 pages.
 
@@ -56,17 +60,47 @@ It must never send:
 
 Model calls, persistence, quality gates, and matching remain backend-only.
 
-## Authentication Limitation
+## Authentication
 
-The Vue bridge uses the logged-in frontend when creating a browser-helper search
-run. The Side Panel current-page request currently does not carry the web login
-token and relies on backend local-user compatibility.
+The authenticated Assistant page creates a dedicated eight-hour
+`browser_helper` session and passes it through the installed page bridge. The
+extension keeps that token in `chrome.storage.session`, never local storage.
+Creating this session requires a valid full login token; local-user fallback is
+not accepted. When an unpaired Side Panel opens JobAgent, it uses
+`pair_browser_helper=1`; the login redirect preserves that intent and Assistant
+pairs automatically after authentication. The Assistant verifies the page
+bridge before creating the scoped session. Pairing updates extension session
+storage, which causes an already-open Side Panel to reload its authenticated
+state automatically.
+The token is accepted only by the small Chat subset needed to create/list
+conversations, read/send turns, pin an owned browser capture, and by current-page
+capture. Chat deletion, memory clearing, context catalogs, ordinary profile,
+saved-job, auth, and other APIs require a full session. Every repository lookup
+remains scoped by the token's `user_id`.
 
-Before hosted or true multi-user use:
+The Side Panel stores only UI selections in local extension storage. It does not
+persist chat bodies or JD text. A captured page is stored once by the backend and
+referenced by an owned `capture_id`; the backend re-reads it under the current
+user before answering. Match analysis remains optional and creates normal search
+analysis records only when explicitly requested.
 
-- bind the extension to a JobAgent login or short-lived extension token;
-- remove manual session-id ownership as the only identity mechanism;
-- reject anonymous resource access outside explicit local-development mode.
+The Side Panel may also request a bounded Saved Job selector catalog. This
+catalog exposes only ID, title, company, and status. Selecting an item sends its
+ID as a one-turn attachment; the full JD, notes, and analysis remain backend-only
+and are re-read after ownership validation.
+
+For JD analysis, the backend maps each ready workflow session to its Resume
+Profile name. The Side Panel calls this an `Analysis profile`; it never displays
+the internal session ID. A single available Profile is selected automatically
+and shown as a compact status, while the selector appears only when multiple
+Profiles are available.
+
+For a hosted deployment, replace the localhost allowlist and page-bridge pairing
+with an origin-bound one-time exchange, and add explicit token revocation UI.
+
+Opening Assistant from the Side Panel reuses and focuses an existing local
+JobAgent tab when possible. It creates a new tab only when no recognized
+JobAgent application tab is open.
 
 ## Permissions
 
@@ -93,5 +127,7 @@ behavior changes. Do not broaden host access for a speculative provider.
 4. Complete a confirmed profile.
 5. Check helper and BOSS login state from Search Preview.
 6. Run BOSS-only and BOSS-plus-backend searches.
-7. Open a BOSS detail page and test Side Panel capture.
-8. Confirm no cookie values appear in backend payloads or logs.
+7. Pair the helper from Assistant, open a BOSS detail page, and test Side Panel capture.
+8. Attach once, pin once, continue the same conversation, and open it in full Chat.
+9. Confirm no cookie values or primary login token appear in extension storage,
+   backend payloads, or logs.

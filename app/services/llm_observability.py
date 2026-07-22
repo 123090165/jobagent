@@ -62,7 +62,10 @@ def langfuse_generation(
         return
 
     context = current_llm_observation()
-    capture_content = _truthy("JOBAGENT_LANGFUSE_CAPTURE_CONTENT")
+    capture_content = (
+        _truthy("JOBAGENT_LANGFUSE_CAPTURE_CONTENT")
+        and not bool(context.metadata.get("force_content_redacted"))
+    )
     input_payload: object = (
         [
             {"role": "system", "content": system_prompt},
@@ -100,7 +103,11 @@ def update_langfuse_generation(
 ) -> None:
     if generation is None:
         return
-    capture_content = _truthy("JOBAGENT_LANGFUSE_CAPTURE_CONTENT")
+    context = current_llm_observation()
+    capture_content = (
+        _truthy("JOBAGENT_LANGFUSE_CAPTURE_CONTENT")
+        and not bool(context.metadata.get("force_content_redacted"))
+    )
     update: dict[str, object] = {
         "output": output if capture_content else _output_summary(output),
     }

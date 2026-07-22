@@ -159,6 +159,41 @@ export async function pingBrowserHelper(): Promise<BrowserHelperStatus> {
   }
 }
 
+export interface BrowserHelperConnectionStatus {
+  paired: boolean;
+  expiresAt: string | null;
+}
+
+export async function bindBrowserHelperSession(payload: {
+  backendUrl: string;
+  appUrl: string;
+  accessToken: string;
+  expiresAt: string;
+  profileSessions: Array<{ session_id: string; label: string; is_default: boolean }>;
+}): Promise<void> {
+  const response = await sendHelperRequest<HelperResponseBase>({
+    action: "bindJobAgentSession",
+    ...payload
+  });
+  if (!response.ok) {
+    throw new Error(response.error ?? "Could not pair Browser Helper.");
+  }
+}
+
+export async function getBrowserHelperConnectionStatus(): Promise<BrowserHelperConnectionStatus> {
+  const response = await sendHelperRequest<HelperResponseBase & {
+    paired?: boolean;
+    expiresAt?: string | null;
+  }>({ action: "getBrowserHelperConnectionStatus" });
+  if (!response.ok) {
+    throw new Error(response.error ?? "Could not read Browser Helper connection status.");
+  }
+  return {
+    paired: Boolean(response.paired),
+    expiresAt: response.expiresAt ?? null
+  };
+}
+
 export async function checkBossLoginStatus(): Promise<BossLoginStatus> {
   const response = await sendHelperRequest<BossLoginResponse>(
     { action: "checkBossLogin" },

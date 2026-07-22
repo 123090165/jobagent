@@ -1,6 +1,6 @@
 <script setup lang="ts">
 defineProps<{
-  name: "home" | "profile" | "history" | "bookmark" | "menu" | "close" | "search" | "external" | "arrow-left" | "sparkles" | "check" | "alert" | "target" | "note";
+  name: "home" | "profile" | "history" | "bookmark" | "chat" | "menu" | "close" | "search" | "external" | "arrow-left" | "sparkles" | "check" | "alert" | "target" | "note";
 }>();
 </script>
 
@@ -10,6 +10,7 @@ defineProps<{
     <template v-else-if="name === 'profile'"><circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/></template>
     <template v-else-if="name === 'history'"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></template>
     <template v-else-if="name === 'bookmark'"><path d="M6 3h12v18l-6-4-6 4z"/></template>
+    <template v-else-if="name === 'chat'"><path d="M4 5h16v11H8l-4 4z"/><path d="M8 9h8M8 12h5"/></template>
     <template v-else-if="name === 'menu'"><path d="M4 7h16M4 12h16M4 17h16"/></template>
     <template v-else-if="name === 'close'"><path d="m6 6 12 12M18 6 6 18"/></template>
     <template v-else-if="name === 'search'"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></template>

@@ -33,7 +33,7 @@ compatibility mode, not production authorization. Before hosted deployment:
 
 - require authentication by default;
 - enable local-user only through an explicit development setting;
-- make the browser helper authenticate its backend requests;
+- replace local compatibility fallback with mandatory authentication on every route;
 - choose either secure HttpOnly cookies with a CSRF policy or a hardened bearer
   token lifecycle;
 - add login and registration throttling and security audit events.
@@ -89,6 +89,41 @@ Returned URLs are treated as untrusted external links and restricted to HTTP(S).
 Exporting an external-model prompt is an explicit user action because that file
 contains selected JD and profile context.
 
+Chat builds a metadata-only manifest from the owned conversation before the
+answer agent decides whether read-only tools are needed. The manifest exposes
+source types, labels, and statuses, not database selectors or raw resource
+bodies. Fixed application functions enforce source allowlists,
+conversation scope, tool-call limits, evidence budgets, and current `user_id`
+ownership. Chat has no business-data write tools.
+
+A non-career or ambiguous question receives no personal business context by
+default. Hard refusal is reserved for prohibited capabilities such as
+cross-user access, secret extraction, raw SQL or system command execution. If
+business-data mutation tools are added later, the LLM may only propose a typed
+operation; a user-bound backend confirmation must occur before execution, and
+repository ownership checks remain mandatory.
+
+Agent tool output never contains an executable database query or user selector.
+The resolver can reference only explicit owned attachments, the current
+conversation's pinned IDs, recent owned resources, or citation IDs previously
+persisted in that same owned conversation. A refresh request may retain those
+IDs as selectors, but current content is fetched again through user-scoped
+repositories; cached evidence or prior answer text is not treated as refreshed
+business data.
+
+Retry lineage is resolved under both the authenticated `user_id` and current
+conversation ID. A retry cannot override the source turn's question or
+attachments; every reused selector is authorized again before retrieval. Raw
+provider exception text is not returned to clients. Fallback diagnostics are
+reduced to bounded operational categories such as network, timeout,
+authentication, rate-limit, model-unavailable, or invalid-response.
+
+Chat prompt and output content remains redacted from Langfuse even when global
+content capture is enabled. This keeps local memory deletion meaningful without
+requiring third-party trace deletion. Raw resume text is excluded from chat
+evidence by default. Job descriptions, saved notes, old turns, summaries, and
+model output are all untrusted input and cannot act as system instructions.
+
 ## Database Evolution
 
 init_database() currently combines table creation, additive column checks,
@@ -128,6 +163,24 @@ Before supporting concurrent public users:
 The browser helper may inspect BOSS authentication cookies locally and issue
 user-triggered requests inside the browser session. Cookie values must not be
 included in backend payloads or logs.
+
+Assistant pairing issues a separate eight-hour `browser_helper` bearer session.
+Issuance requires an authenticated full session and does not use anonymous
+local-user compatibility.
+The extension stores it in `chrome.storage.session`; it is accepted only by the
+Chat create/list/read-turn/send-turn/pin subset and current-page capture. It
+cannot delete Chat memory or authorize ordinary profile, saved-job, or account
+APIs. Backend resource reads still require the scoped session's `user_id`.
+
+The dedicated Browser Helper catalog is intentionally metadata-only: Saved Job
+ID, title, company, and status. It never returns raw JD text, notes, tags, or
+analysis. A selected ID is treated as an untrusted reference and ownership is
+checked again when the Chat turn is created.
+
+Current-page JD capture stores one backend-owned record and returns only a
+`capture_id` plus a bounded preview. The extension does not persist JD text.
+Chat and optional match analysis resolve that capture under the scoped session's
+`user_id`; a capture ID owned by another user is treated as unavailable.
 
 Request the minimum Chrome permissions required by current behavior. Any new
 host permission, cookie access, or automated navigation requires a security and

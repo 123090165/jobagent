@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "JobAgent Browser Helper",
-  "version": "0.3.2",
-  "description": "Browser-assisted BOSS job candidate collection for JobAgent.",
+  "version": "0.4.7",
+  "description": "Capture BOSS job pages and continue JobAgent Assistant conversations.",
   "permissions": ["tabs", "activeTab", "cookies", "scripting", "storage", "sidePanel"],
   "host_permissions": [
     "http://127.0.0.1:8000/*",

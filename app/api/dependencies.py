@@ -27,6 +27,36 @@ def get_current_user(
     return user
 
 
+def get_authenticated_user(
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_auth),
+) -> UserAccount:
+    if credentials is None:
+        raise _unauthorized_error()
+    if credentials.scheme.lower() != "bearer" or not credentials.credentials:
+        raise _unauthorized_error()
+    user = auth_session_repository.get_user_for_token_hash(
+        hash_auth_token(credentials.credentials)
+    )
+    if user is None:
+        raise _unauthorized_error()
+    return user
+
+
+def get_chat_or_browser_helper_user(
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_auth),
+) -> UserAccount:
+    if credentials is None:
+        return user_repository.ensure_local_user()
+    if credentials.scheme.lower() != "bearer" or not credentials.credentials:
+        raise _unauthorized_error()
+    principal = auth_session_repository.get_principal_for_token_hash(
+        hash_auth_token(credentials.credentials)
+    )
+    if principal is None or principal.session_scope not in {"full", "browser_helper"}:
+        raise _unauthorized_error()
+    return principal.user
+
+
 def get_required_auth_token(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_auth),
 ) -> str:

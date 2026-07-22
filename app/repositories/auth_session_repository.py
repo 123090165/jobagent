@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from uuid import uuid4
 
@@ -11,6 +12,12 @@ def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+@dataclass(frozen=True)
+class AuthSessionPrincipal:
+    user: UserAccount
+    session_scope: str
+
+
 class AuthSessionRepository:
     def create(
         self,
@@ -19,6 +26,7 @@ class AuthSessionRepository:
         token_hash: str,
         expires_at: datetime,
         user_agent: str | None = None,
+        session_scope: str = "full",
     ) -> str:
         auth_session_id = str(uuid4())
         now = _utc_now()
@@ -33,9 +41,10 @@ class AuthSessionRepository:
                     created_at,
                     expires_at,
                     revoked_at,
-                    user_agent
+                    user_agent,
+                    session_scope
                 )
-                VALUES (?, ?, ?, ?, ?, NULL, ?)
+                VALUES (?, ?, ?, ?, ?, NULL, ?, ?)
                 """,
                 (
                     auth_session_id,
@@ -44,12 +53,19 @@ class AuthSessionRepository:
                     now.isoformat(),
                     expires_at.isoformat(),
                     user_agent,
+                    session_scope,
                 ),
             )
             connection.commit()
         return auth_session_id
 
     def get_user_for_token_hash(self, token_hash: str) -> UserAccount | None:
+        principal = self.get_principal_for_token_hash(token_hash)
+        if principal is None or principal.session_scope != "full":
+            return None
+        return principal.user
+
+    def get_principal_for_token_hash(self, token_hash: str) -> AuthSessionPrincipal | None:
         now = _utc_now().isoformat()
         with get_connection() as connection:
             init_database(connection)
@@ -61,7 +77,8 @@ class AuthSessionRepository:
                     users.display_name,
                     users.created_at,
                     users.updated_at,
-                    users.disabled_at
+                    users.disabled_at,
+                    auth_sessions.session_scope
                 FROM auth_sessions
                 JOIN users ON users.user_id = auth_sessions.user_id
                 WHERE auth_sessions.token_hash = ?
@@ -73,7 +90,7 @@ class AuthSessionRepository:
             ).fetchone()
         if row is None:
             return None
-        return UserAccount(
+        user = UserAccount(
             user_id=row["user_id"],
             username=row["username"],
             display_name=row["display_name"],
@@ -85,6 +102,7 @@ class AuthSessionRepository:
                 else None
             ),
         )
+        return AuthSessionPrincipal(user=user, session_scope=row["session_scope"])
 
     def revoke_token_hash(self, token_hash: str) -> None:
         now = _utc_now().isoformat()

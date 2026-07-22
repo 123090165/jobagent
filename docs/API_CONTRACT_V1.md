@@ -138,13 +138,93 @@ contexts.
 ## Browser And Status
 
 ~~~text
-POST /api/v1/browser/job-captures/analyze
+POST /api/v1/browser/job-captures
+POST /api/v1/browser/job-captures/{capture_id}/analyze
+POST /api/v1/browser/job-captures/analyze  # compatibility: capture + analyze
 GET  /api/v1/job-search-providers/status
 GET  /api/v1/llm/status
 GET  /health
 ~~~
 
 Status endpoints expose configuration state, never secrets.
+
+## Career Assistant
+
+~~~text
+POST   /api/v1/chat/conversations
+POST   /api/v1/browser-helper/sessions
+GET    /api/v1/browser-helper/context-catalog
+GET    /api/v1/chat/context-catalog
+GET    /api/v1/chat/conversations
+GET    /api/v1/chat/conversations/{conversation_id}
+PATCH  /api/v1/chat/conversations/{conversation_id}
+GET    /api/v1/chat/conversations/{conversation_id}/memory
+GET    /api/v1/chat/conversations/{conversation_id}/turns
+POST   /api/v1/chat/conversations/{conversation_id}/turns
+POST   /api/v1/chat/conversations/{conversation_id}/context/search-results
+DELETE /api/v1/chat/conversations/{conversation_id}/context/search-results/{run_id}/{result_id}
+DELETE /api/v1/chat/conversations/{conversation_id}/turns/{turn_id}
+DELETE /api/v1/chat/conversations/{conversation_id}/memory
+DELETE /api/v1/chat/conversations/{conversation_id}
+~~~
+
+Browser Helper session issuance requires a valid full bearer session; anonymous
+local-user compatibility and an existing `browser_helper` token are rejected.
+The returned token expires after eight hours and is limited to current-page
+capture plus the documented Assistant subset.
+
+`POST /api/v1/chat/conversations/{conversation_id}/context/browser-captures`
+adds an owned browser capture ID to the conversation's bounded data scope. It
+does not copy JD text into the conversation row. The full JD remains in the
+capture resource and is re-read under the current user's authorization when a
+question requires search-result context.
+
+Conversations persist a bounded data-access policy (`auto`, `always`, or
+`off`). A turn uses a client-generated idempotency key. The answer agent may
+request only fixed read-only tool names, while application code converts those
+requests into source categories and performs every resource lookup with the
+current user's ID. Returned citations are resolved from the server evidence
+packet rather than accepted from model-provided metadata.
+
+Completed turns include a bounded `retrieval_plan`. `agent_sources` records the
+sources actually selected by agent tools and deterministic policy, while
+`requests` records the policy-approved source and one of `use_attachment`, `reuse_previous`,
+`use_pinned`, or `load_recent`. A turn may include up to five owned search-result,
+browser-capture, or Saved Job references in `context_attachments`. Search-result
+and browser-capture references can be retained by their dedicated context
+endpoints; only identifiers are stored in the conversation scope. `reuse_previous`
+reuses only the prior resource selector; the
+repository still reads the current owned record. `freshness=refresh_required`
+forbids treating prior answer text or evidence content as a current snapshot.
+The plan contains no database query, user identity, business resource body, or
+model answer instruction.
+
+Completed turns persist their original `context_attachments`. A retry creates a
+new turn with `retry_of_turn_id`; the backend ignores replacement question or
+rejects replacement attachment selectors, then reuses the owned source turn's
+original question and attachments. Historical turns created before this field
+existed retry without
+attachments. Model failures expose only bounded categories such as
+`network_error`, `timeout`, `authentication_failed`, `rate_limited`,
+`model_unavailable`, or `invalid_response`, never raw provider responses or
+credentials.
+
+The memory status endpoint is an owned, read-only projection. It reports
+completed/recent turn counts, the current summary boundary and version, pinned
+resource references, and references used by the latest completed answer.
+Business resource bodies are not copied into this projection. Resource labels
+and availability are resolved under the current user's permissions when the
+response is built.
+
+The context catalog returns lightweight, current-user-owned Profile, completed
+Search Run, and active Saved Job options. A conversation may pin whole search
+runs or individual `(job_search_run_id, job_result_id)` pairs. Pinned IDs remain
+advisory context and are re-authorized on every read.
+
+Deleting a turn deletes its question, answer, route, and citations and
+invalidates derived memory. Clearing memory keeps the conversation resource but
+removes all turns and derived state. Deleting a conversation physically removes
+its local chat rows.
 
 ## Errors
 

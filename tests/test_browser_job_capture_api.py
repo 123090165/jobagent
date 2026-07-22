@@ -64,6 +64,13 @@ def _capture_payload(session_id: str) -> dict:
     }
 
 
+def _capture_only_payload() -> dict:
+    payload = _capture_payload("unused")
+    payload.pop("session_id")
+    payload.pop("use_llm")
+    return payload
+
+
 def test_browser_job_capture_request_validates_jd_text() -> None:
     payload = _capture_payload("session-1")
     payload["jd_text"] = "too short"
@@ -113,6 +120,95 @@ def test_browser_job_capture_analyze_endpoint_reuses_job_search_pipeline(monkeyp
     assert payload["job_search_run_id"]
     assert payload["job_result_id"]
     assert any("generic extractor used" in warning for warning in payload["warnings"])
+
+    conversation = client.post(
+        "/api/v1/chat/conversations", json={"title": "Captured role"}
+    ).json()
+    ref = {
+        "job_search_run_id": payload["job_search_run_id"],
+        "job_result_id": payload["job_result_id"],
+    }
+    pin_url = (
+        f"/api/v1/chat/conversations/{conversation['conversation_id']}"
+        "/context/search-results"
+    )
+    first_pin = client.post(pin_url, json=ref)
+    second_pin = client.post(pin_url, json=ref)
+    assert first_pin.status_code == 200
+    assert second_pin.status_code == 200
+    assert second_pin.json()["data_scope"]["job_search_result_refs"] == [ref]
+
+    turn = client.post(
+        f"/api/v1/chat/conversations/{conversation['conversation_id']}/turns",
+        json={
+            "client_turn_id": "captured-job-question",
+            "question": "What are the main risks in this attached job?",
+            "llm_provider": "mock",
+            "context_attachments": [{"type": "search_result", **ref}],
+        },
+    )
+    assert turn.status_code == 200
+    assert turn.json()["retrieval_plan"]["requests"][0]["strategy"] == "use_attachment"
+    assert turn.json()["retrieved_refs"] == [
+        f"search_result:{ref['job_search_run_id']}:{ref['job_result_id']}"
+    ]
+
+
+def test_browser_job_capture_can_be_saved_and_used_in_chat_without_analysis(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("JOBAGENT_DB_PATH", str(tmp_path / "capture-only-chat.sqlite3"))
+    captured = client.post(
+        "/api/v1/browser/job-captures",
+        json=_capture_only_payload(),
+    )
+    assert captured.status_code == 201
+    capture_id = captured.json()["capture_id"]
+    assert captured.json()["capture"]["title"] == "Backend Engineer Intern"
+    assert "jd_text" not in captured.json()["capture"]
+
+    conversation = client.post("/api/v1/chat/conversations", json={}).json()
+    turn = client.post(
+        f"/api/v1/chat/conversations/{conversation['conversation_id']}/turns",
+        json={
+            "client_turn_id": "capture-only-question",
+            "question": "What are the main risks in this attached job?",
+            "llm_provider": "mock",
+            "context_attachments": [{
+                "type": "browser_capture",
+                "capture_id": capture_id,
+            }],
+        },
+    )
+    assert turn.status_code == 200
+    assert turn.json()["retrieval_plan"]["requests"][0] == {
+        "source": "search_results",
+        "strategy": "use_attachment",
+        "policy_reason": "explicit_attachment",
+    }
+    assert turn.json()["retrieved_refs"] == [
+        f"search_result:browser_capture:{capture_id}"
+    ]
+
+
+def test_saved_browser_capture_can_be_analyzed_later(monkeypatch, tmp_path) -> None:
+    confirmed = _create_session_with_confirmed_profile(
+        tmp_path,
+        monkeypatch,
+        name="saved-capture-analysis.sqlite3",
+    )
+    capture_id = client.post(
+        "/api/v1/browser/job-captures",
+        json=_capture_only_payload(),
+    ).json()["capture_id"]
+    response = client.post(
+        f"/api/v1/browser/job-captures/{capture_id}/analyze",
+        json={
+            "session_id": confirmed["profile_session"]["session_id"],
+            "analysis_mode": "deterministic",
+            "use_llm": False,
+        },
+    )
+    assert response.status_code == 200
+    assert response.json()["report"]["overall_score"] > 0
 
 
 def test_browser_job_capture_requires_confirmed_profile(monkeypatch, tmp_path) -> None:

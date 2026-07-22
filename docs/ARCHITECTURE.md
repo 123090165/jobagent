@@ -93,6 +93,66 @@ not survive process termination and concurrency is not coordinated across runs.
 Trace steps preserve status, mode, fallback reason, warnings, duration, and
 selected diagnostics. Traces are operational evidence, not a durable queue.
 
+## Career Assistant
+
+The persistent chat assistant is a read-only consumer of profile, search, and
+saved-job resources. It is not a seventh Search V2 stage and does not alter the
+search pipeline or its trace contract.
+
+Each turn follows a bounded agent and retrieval flow:
+
+~~~text
+owned conversation state
+-> compact context manifest
+-> answer agent selects read-only tools or answers directly
+-> deterministic minimum-context policy
+-> reference resolver
+-> server-side ownership checks
+-> optional typed resource retrieval (one bounded tool round)
+-> grounded answer with validated citations
+-> persisted turn
+-> optional derived-memory compaction
+~~~
+
+The compact manifest contains labels and source types for pinned context and
+previous references; it contains no
+executable resource IDs or raw JD bodies. The same answer agent may answer
+ordinary questions directly or request a bounded set of read-only tools. A
+deterministic minimum-context policy supplements obvious fit, comparison,
+pinned-context, and follow-up needs so an agent omission cannot silently hide
+available evidence. The resolver chooses only among `use_attachment`,
+`reuse_previous`, `use_pinned`, and `load_recent`; repositories then enforce the
+current `user_id` ownership. Raw resume text is excluded from assistant context.
+
+There is no separate LLM router call. The persisted route is derived from the
+agent's actual tool selection and the enforced retrieval plan for compatibility
+and diagnostics. Ordinary questions may receive a direct answer without
+personal-data retrieval. Only the deterministic hard safety gate produces
+`refused`. Conversation commands such as retrying the previous question are
+resolved before the agent step while the original user message remains in chat
+history.
+
+`chat_turns` retains the original question and answer until user deletion. It
+also retains bounded original attachment selectors and optional retry lineage
+so a fallback can be retried without relying on natural-language command
+recognition or copying resource bodies.
+Conversation summaries are rebuildable navigation memory and never replace raw
+turns or current profile/job evidence. Deleting a turn invalidates derived
+summary state; clearing memory removes all turns, summaries, citations, and
+last-retrieval state while retaining an empty conversation shell.
+
+Conversations are global user resources rather than children of a Profile,
+Search Run, or Saved Job route. Resource pages may create a global conversation
+with pinned context, and users can later adjust or clear that context through
+the Assistant workspace. This permits cross-resource comparisons without
+coupling conversation lifetime to page navigation.
+
+The Assistant memory panel is a derived view over the owned conversation,
+turns, summary metadata, pinned resource IDs, and latest citations. It does not
+introduce a second store for Profile, job-description, or search-result data.
+Failure to build this auxiliary view does not block loading chat history or
+creating a new answer.
+
 ## Persistence
 
 Local development uses sqlite3 and JOBAGENT_DB_PATH, defaulting to

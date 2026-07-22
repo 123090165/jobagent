@@ -166,6 +166,7 @@ export interface JobSearchRun {
   job_search_run_id: string;
   session_id: string;
   confirmed_profile_id: string;
+  resume_profile_id: string | null;
   query: string;
   locations: string[];
   target_roles: string[];

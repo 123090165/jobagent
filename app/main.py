@@ -9,6 +9,9 @@ from fastapi.responses import JSONResponse
 from app.config.env_loader import load_local_env
 from app.api.v1.auth import router as auth_v1_router
 from app.api.v1.browser_job_captures import router as browser_job_captures_v1_router
+from app.api.v1.browser_helper_sessions import router as browser_helper_sessions_v1_router
+from app.api.v1.chat import context_router as chat_context_v1_router
+from app.api.v1.chat import router as chat_v1_router
 from app.api.v1.confirmed_profiles import router as confirmed_profiles_v1_router
 from app.api.v1.job_search_providers import router as job_search_providers_v1_router
 from app.api.v1.job_search_runs import router as job_search_runs_v1_router
@@ -82,6 +85,9 @@ def create_app() -> FastAPI:
     api.include_router(job_search_runs_v1_router)
     api.include_router(job_search_providers_v1_router)
     api.include_router(browser_job_captures_v1_router)
+    api.include_router(browser_helper_sessions_v1_router)
+    api.include_router(chat_v1_router)
+    api.include_router(chat_context_v1_router)
     api.include_router(llm_v1_router)
     return api
 

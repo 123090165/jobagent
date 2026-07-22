@@ -178,8 +178,7 @@ class BrowserHelperJobSearchRunCreateRequest(BaseModel):
     candidates: list[BrowserHelperJobCandidate] = Field(default_factory=list)
 
 
-class BrowserJobCaptureRequest(BaseModel):
-    session_id: str
+class BrowserJobCaptureCreateRequest(BaseModel):
     source: BrowserJobCaptureSource = "unknown"
     source_url: str
     page_title: str
@@ -196,7 +195,7 @@ class BrowserJobCaptureRequest(BaseModel):
     llm_provider: JobSearchLlmProvider | None = None
     use_llm: bool | None = None
 
-    @field_validator("session_id", "source_url", "page_title", "extractor_version")
+    @field_validator("source_url", "page_title", "extractor_version")
     @classmethod
     def _required_string(cls, value: str) -> str:
         cleaned = value.strip()
@@ -259,6 +258,34 @@ class BrowserJobCaptureRequest(BaseModel):
         return cleaned
 
 
+class BrowserJobCaptureRequest(BrowserJobCaptureCreateRequest):
+    session_id: str
+
+    @field_validator("session_id")
+    @classmethod
+    def _required_session_id(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("field cannot be empty")
+        return cleaned
+
+
+class BrowserJobCaptureAnalysisRequest(BaseModel):
+    session_id: str = Field(min_length=1, max_length=100)
+    analysis_mode: JobSearchRequestedAnalysisMode | None = None
+    llm_provider: JobSearchLlmProvider | None = None
+    use_llm: bool | None = None
+
+
+class BrowserJobCaptureResource(BrowserJobCaptureCreateRequest):
+    capture_id: str
+    created_at: datetime
+
+
+class BrowserJobCaptureRecord(BrowserJobCaptureResource):
+    user_id: str
+
+
 class BrowserJobCaptureSummary(BaseModel):
     source: BrowserJobCaptureSource
     source_url: str
@@ -270,6 +297,11 @@ class BrowserJobCaptureSummary(BaseModel):
     jd_text_preview: str
     captured_at: datetime
     extractor_version: str
+
+
+class BrowserJobCaptureCreateResponse(BaseModel):
+    capture_id: str
+    capture: BrowserJobCaptureSummary
 
 
 class BrowserJobCaptureReport(BaseModel):

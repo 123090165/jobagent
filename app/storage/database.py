@@ -51,6 +51,7 @@ def init_database(connection: sqlite3.Connection) -> None:
             expires_at TEXT NOT NULL,
             revoked_at TEXT,
             user_agent TEXT,
+            session_scope TEXT NOT NULL DEFAULT 'full',
             FOREIGN KEY (user_id) REFERENCES users(user_id)
         );
 
@@ -537,9 +538,76 @@ def init_database(connection: sqlite3.Connection) -> None:
             FOREIGN KEY (confirmed_profile_id) REFERENCES confirmed_profiles(confirmed_profile_id),
             UNIQUE (user_id, session_id)
         );
+
+        CREATE TABLE IF NOT EXISTS chat_conversations (
+            conversation_id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            title TEXT NOT NULL,
+            title_is_auto INTEGER NOT NULL DEFAULT 0,
+            data_access_mode TEXT NOT NULL DEFAULT 'auto',
+            data_scope_json TEXT NOT NULL DEFAULT '{}',
+            summary_json TEXT NOT NULL DEFAULT '{}',
+            summary_through_sequence INTEGER NOT NULL DEFAULT 0,
+            summary_version INTEGER NOT NULL DEFAULT 0,
+            last_retrieval_used INTEGER NOT NULL DEFAULT 0,
+            last_retrieval_sources_json TEXT NOT NULL DEFAULT '[]',
+            last_completed_sequence INTEGER NOT NULL DEFAULT 0,
+            next_sequence INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users(user_id)
+        );
+
+        CREATE TABLE IF NOT EXISTS chat_turns (
+            turn_id TEXT PRIMARY KEY,
+            conversation_id TEXT NOT NULL,
+            user_id TEXT NOT NULL,
+            sequence INTEGER NOT NULL,
+            client_turn_id TEXT NOT NULL,
+            question TEXT NOT NULL,
+            answer TEXT,
+            status TEXT NOT NULL,
+            route_json TEXT,
+            retrieval_plan_json TEXT,
+            retrieval_used INTEGER NOT NULL DEFAULT 0,
+            retrieved_refs_json TEXT NOT NULL DEFAULT '[]',
+            citations_json TEXT NOT NULL DEFAULT '[]',
+            analysis_mode TEXT,
+            analysis_provider TEXT,
+            fallback_reason TEXT,
+            quality_warnings_json TEXT NOT NULL DEFAULT '[]',
+            context_attachments_json TEXT NOT NULL DEFAULT '[]',
+            retry_of_turn_id TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY (conversation_id) REFERENCES chat_conversations(conversation_id) ON DELETE CASCADE,
+            FOREIGN KEY (user_id) REFERENCES users(user_id),
+            UNIQUE (user_id, conversation_id, sequence),
+            UNIQUE (user_id, conversation_id, client_turn_id)
+        );
+
+        CREATE TABLE IF NOT EXISTS browser_job_captures (
+            capture_id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            source TEXT NOT NULL,
+            source_url TEXT NOT NULL,
+            page_title TEXT NOT NULL,
+            title TEXT,
+            company TEXT,
+            location TEXT,
+            salary TEXT,
+            jd_text TEXT NOT NULL,
+            visible_text TEXT,
+            captured_at TEXT NOT NULL,
+            extractor_version TEXT NOT NULL,
+            warnings_json TEXT NOT NULL DEFAULT '[]',
+            created_at TEXT NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users(user_id)
+        );
         """
     )
     _ensure_local_user(connection)
+    _ensure_column(connection, "auth_sessions", "session_scope", "TEXT NOT NULL DEFAULT 'full'")
     _ensure_column(connection, "analysis_records", "application_id", "INTEGER")
     _ensure_column(connection, "application_records", "resume_version_id", "INTEGER")
     _ensure_column(connection, "workflow_step_traces", "workflow_run_id", "TEXT")
@@ -560,6 +628,28 @@ def init_database(connection: sqlite3.Connection) -> None:
     _ensure_column(connection, "parsed_resume_reviews", "analysis_warnings_json", "TEXT DEFAULT '[]'")
     _ensure_column(connection, "interview_preparations", "question_generation_json", "TEXT")
     _ensure_column(connection, "interview_preparations", "recommendation_generation_json", "TEXT")
+    _ensure_column(connection, "chat_conversations", "title_is_auto", "INTEGER NOT NULL DEFAULT 0")
+    _ensure_column(connection, "chat_conversations", "next_sequence", "INTEGER NOT NULL DEFAULT 1")
+    _ensure_column(connection, "chat_turns", "retrieval_plan_json", "TEXT")
+    _ensure_column(connection, "chat_turns", "context_attachments_json", "TEXT NOT NULL DEFAULT '[]'")
+    _ensure_column(connection, "chat_turns", "retry_of_turn_id", "TEXT")
+    connection.execute(
+        """
+        UPDATE chat_conversations
+        SET next_sequence = COALESCE((
+            SELECT MAX(sequence) + 1
+            FROM chat_turns
+            WHERE chat_turns.user_id = chat_conversations.user_id
+              AND chat_turns.conversation_id = chat_conversations.conversation_id
+        ), 1)
+        WHERE next_sequence <= COALESCE((
+            SELECT MAX(sequence)
+            FROM chat_turns
+            WHERE chat_turns.user_id = chat_conversations.user_id
+              AND chat_turns.conversation_id = chat_conversations.conversation_id
+        ), 0)
+        """
+    )
     _ensure_user_columns(connection)
     _backfill_user_ownership(connection)
     _backfill_saved_job_status_events(connection)
@@ -583,6 +673,12 @@ def init_database(connection: sqlite3.Connection) -> None:
         )
     connection.execute(
         "INSERT OR IGNORE INTO schema_migrations (version, name) VALUES (4, 'preparation_generation_stages')"
+    )
+    connection.execute(
+        "INSERT OR IGNORE INTO schema_migrations (version, name) VALUES (5, 'persistent_chat_memory')"
+    )
+    connection.execute(
+        "INSERT OR IGNORE INTO schema_migrations (version, name) VALUES (6, 'chat_retrieval_plan')"
     )
     _seed_learning_catalog(connection)
     connection.commit()
@@ -853,5 +949,11 @@ def _ensure_indexes(connection: sqlite3.Connection) -> None:
             ON interview_preparations(user_id, saved_job_id, updated_at);
         CREATE INDEX IF NOT EXISTS idx_search_missions_user_session
             ON search_missions(user_id, session_id, status);
+        CREATE INDEX IF NOT EXISTS idx_chat_conversations_user_updated
+            ON chat_conversations(user_id, updated_at);
+        CREATE INDEX IF NOT EXISTS idx_chat_turns_user_conversation_sequence
+            ON chat_turns(user_id, conversation_id, sequence);
+        CREATE INDEX IF NOT EXISTS idx_browser_job_captures_user_created
+            ON browser_job_captures(user_id, created_at);
         """
     )

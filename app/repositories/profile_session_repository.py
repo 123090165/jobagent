@@ -88,6 +88,23 @@ class ProfileSessionRepository:
             return None
         return self._row_to_profile_session(row)
 
+    def list_ready_by_user(self, user_id: str, *, limit: int = 20) -> list[ProfileSession]:
+        with get_connection() as connection:
+            init_database(connection)
+            rows = connection.execute(
+                """
+                SELECT
+                    session_id, status, created_at, updated_at, resume_document_id,
+                    parsed_review_id, profile_draft_id, confirmed_profile_id, current_step
+                FROM profile_sessions
+                WHERE user_id = ? AND confirmed_profile_id IS NOT NULL
+                ORDER BY updated_at DESC, created_at DESC
+                LIMIT ?
+                """,
+                (user_id, limit),
+            ).fetchall()
+        return [self._row_to_profile_session(row) for row in rows]
+
     def attach_resume_document(
         self,
         *,

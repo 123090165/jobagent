@@ -3,31 +3,72 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>JobAgent</title>
+    <title>JobAgent Assistant</title>
     <link rel="stylesheet" href="sidepanel.css" />
   </head>
   <body>
     <main class="panel">
-      <section class="section">
-        <label class="field">
-          <span>Backend URL</span>
-          <input id="backendUrl" type="url" spellcheck="false" />
-        </label>
-        <label class="field">
-          <span>Profile session ID</span>
-          <input id="sessionId" type="text" spellcheck="false" />
-        </label>
-        <label class="checkbox">
-          <input id="useLlm" type="checkbox" />
-          <span>Use LLM analysis</span>
-        </label>
-        <button id="analyzeButton" type="button">Analyze current job</button>
-      </section>
+      <header class="panel-header">
+        <div><span class="eyebrow">JobAgent</span><h1>Assistant</h1></div>
+        <button id="openAssistantButton" class="quiet" type="button">Open full chat</button>
+      </header>
 
       <section id="status" class="status" aria-live="polite"></section>
-      <section id="capture" class="section hidden"></section>
-      <section id="report" class="section hidden"></section>
-      <section id="warnings" class="section hidden"></section>
+      <section id="pairing" class="card hidden">
+        <strong>Sign in and connect JobAgent</strong>
+        <p>This opens Assistant and pairs the extension automatically after authentication.</p>
+        <button id="openPairingButton" type="button">Open and pair JobAgent</button>
+      </section>
+
+      <section id="assistant" class="hidden">
+        <section class="card capture-card">
+          <div class="row split"><strong>1. Capture current JD</strong><span id="captureBadge" class="badge">Required</span></div>
+          <p class="meta">Read the visible JD from this page without running match analysis.</p>
+          <button id="captureButton" type="button">Capture current JD</button>
+          <div id="capture" class="capture-preview hidden"></div>
+        </section>
+
+        <section id="analysisControls" class="card hidden">
+          <div class="row split"><strong>Optional match analysis</strong><span class="badge">Optional</span></div>
+          <label id="profileField" class="field"><span>Analysis profile</span><select id="profileSessionSelect"></select></label>
+          <div id="activeProfile" class="active-profile hidden"></div>
+          <label class="checkbox"><input id="useLlm" type="checkbox" checked /><span>Run LLM match analysis</span></label>
+          <button id="analyzeButton" type="button">Analyze JD match</button>
+        </section>
+
+        <section id="analysisReport" class="card analysis-report hidden">
+          <div class="row split"><strong>JD analysis</strong><span id="analysisScore" class="score"></span></div>
+          <p id="analysisRecommendation" class="recommendation"></p>
+          <div class="analysis-grid">
+            <div><span>Matched strengths</span><ul id="analysisStrengths"></ul></div>
+            <div><span>Critical gaps</span><ul id="analysisGaps"></ul></div>
+          </div>
+          <div class="analysis-list"><span>Resume actions</span><ul id="analysisActions"></ul></div>
+          <div id="analysisWarnings" class="analysis-warnings hidden"></div>
+        </section>
+
+        <section id="chatStage" class="hidden">
+          <div class="stage-heading"><strong>2. Ask about this JD</strong><span>The captured JD is attached to the selected conversation.</span></div>
+          <div class="row">
+            <label class="field grow"><span>Conversation</span><select id="conversationSelect"></select></label>
+            <button id="newConversationButton" type="button">New conversation</button>
+          </div>
+          <div id="conversationContext" class="context-ready"></div>
+
+          <section class="composer">
+            <strong>Ask a question</strong>
+            <label class="field">
+              <span>Compare with saved job (optional)</span>
+              <select id="savedJobSelect"></select>
+            </label>
+            <textarea id="question" rows="4" placeholder="Ask about this captured JD, your profile, or a selected saved job..."></textarea>
+            <button id="sendButton" type="button">Send question</button>
+          </section>
+
+          <div class="history-heading">Conversation history</div>
+          <section id="turns" class="turns" aria-live="polite"></section>
+        </section>
+      </section>
     </main>
     <script src="sidepanel.js"></script>
   </body>

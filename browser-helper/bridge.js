@@ -1,10 +1,19 @@
 const READY_MESSAGE = {
   __jobagentHelper: true,
   type: "JOBAGENT_HELPER_READY",
-  version: "0.3.2"
+  version: "0.4.7"
 };
 
 window.postMessage(READY_MESSAGE, "*");
+
+chrome.runtime.onMessage.addListener((message) => {
+  if (message?.action !== "assistantContextUpdated") return;
+  window.postMessage({
+    __jobagentHelper: true,
+    type: "JOBAGENT_HELPER_CONTEXT_UPDATED",
+    conversationId: String(message.conversationId || "")
+  }, "*");
+});
 
 window.addEventListener("message", (event) => {
   if (event.source !== window) {

@@ -1,5 +1,12 @@
-const HELPER_VERSION = "0.3.2";
+const HELPER_VERSION = "0.4.7";
 const DEFAULT_JOBAGENT_BACKEND_URL = "http://127.0.0.1:8000";
+const DEFAULT_JOBAGENT_APP_URL = "http://127.0.0.1:5173";
+const ASSISTANT_SESSION_KEYS = ["backendUrl", "appUrl", "accessToken", "expiresAt", "profileSessions"];
+const JOBAGENT_DEV_APP_ORIGINS = new Set([
+  "http://127.0.0.1:5173", "http://localhost:5173",
+  "http://127.0.0.1:5174", "http://localhost:5174",
+  "http://127.0.0.1:4173", "http://localhost:4173"
+]);
 const CURRENT_PAGE_CAPTURE_VERSION = "browser-helper-current-page-v1";
 const CURRENT_PAGE_MIN_TEXT_LENGTH = 80;
 const CURRENT_PAGE_MAX_TEXT_LENGTH = 20000;
@@ -136,10 +143,20 @@ const BOSS_CITY_CODES = new Map([
   ["\u91cd\u5e86", "101040100"]
 ]);
 
-if (chrome.sidePanel?.setPanelBehavior) {
-  chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {
-    // Older Chromium builds may expose sidePanel without panel behavior support.
-  });
+initializeSidePanelBehavior();
+
+function initializeSidePanelBehavior() {
+  if (!chrome.sidePanel?.setPanelBehavior) return;
+  try {
+    const update = chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
+    if (update && typeof update.catch === "function") {
+      void update.catch(() => {
+        // The side panel remains available even when action-click behavior is unsupported.
+      });
+    }
+  } catch (_error) {
+    // Some Chromium builds expose the API but throw when configuring it during startup.
+  }
 }
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
@@ -160,7 +177,17 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
             "openBossLogin",
             "searchBoss",
             "analyzeCurrentJob",
-            "bossCurrentPageCapture"
+            "captureCurrentJob",
+            "analyzeCapturedJob",
+            "bossCurrentPageCapture",
+            "bindJobAgentSession",
+            "getBrowserHelperConnectionStatus",
+            "getAssistantState",
+            "createAssistantConversation",
+            "loadAssistantTurns",
+            "sendAssistantTurn",
+            "attachAssistantBrowserCapture",
+            "pinAssistantSearchResult"
           ]
         });
         return;
@@ -247,6 +274,143 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         return;
       }
 
+      if (message.action === "captureCurrentJob") {
+        sendResponse(await persistCurrentJobPage());
+        return;
+      }
+
+      if (message.action === "analyzeCapturedJob") {
+        sendResponse(await analyzeCapturedJob({
+          captureId: message.captureId,
+          sessionId: message.sessionId,
+          useLlm: message.useLlm,
+          analysisMode: message.analysisMode,
+          llmProvider: message.llmProvider
+        }));
+        return;
+      }
+
+      if (message.action === "bindJobAgentSession") {
+        const backendUrl = normalizeBackendUrl(message.backendUrl || DEFAULT_JOBAGENT_BACKEND_URL);
+        assertAllowedBackendUrl(backendUrl);
+        const accessToken = String(message.accessToken || "").trim();
+        if (!accessToken) {
+          throw new Error("A browser-helper access token is required.");
+        }
+        await chrome.storage.session.set({
+          backendUrl,
+          appUrl: normalizeLocalUrl(message.appUrl || backendUrl),
+          accessToken,
+          expiresAt: String(message.expiresAt || ""),
+          profileSessions: Array.isArray(message.profileSessions) ? message.profileSessions : []
+        });
+        sendResponse({ ok: true, version: HELPER_VERSION });
+        return;
+      }
+
+      if (message.action === "getBrowserHelperConnectionStatus") {
+        const session = await getAssistantSession();
+        sendResponse({
+          ok: true,
+          paired: Boolean(session),
+          expiresAt: session?.expiresAt || null
+        });
+        return;
+      }
+
+      if (message.action === "getAssistantState") {
+        const session = await getAssistantSession();
+        if (!session) {
+          sendResponse({ ok: true, paired: false, conversations: [], profileSessions: [] });
+          return;
+        }
+        const [conversationPayload, contextCatalog] = await Promise.all([
+          jobAgentApiRequest("/api/v1/chat/conversations?limit=50"),
+          jobAgentApiRequest("/api/v1/browser-helper/context-catalog")
+        ]);
+        sendResponse({
+          ok: true,
+          paired: true,
+          backendUrl: session.backendUrl,
+          expiresAt: session.expiresAt,
+          profileSessions: session.profileSessions,
+          conversations: conversationPayload.items || [],
+          savedJobs: contextCatalog.saved_jobs || []
+        });
+        return;
+      }
+
+      if (message.action === "createAssistantConversation") {
+        const conversation = await jobAgentApiRequest("/api/v1/chat/conversations", {
+          method: "POST",
+          body: { title: String(message.title || "Browser conversation").trim() }
+        });
+        sendResponse({ ok: true, conversation });
+        return;
+      }
+
+      if (message.action === "loadAssistantTurns") {
+        const conversationId = encodeURIComponent(String(message.conversationId || ""));
+        const payload = await jobAgentApiRequest(`/api/v1/chat/conversations/${conversationId}/turns?limit=100`);
+        sendResponse({ ok: true, turns: payload.items || [] });
+        return;
+      }
+
+      if (message.action === "pinAssistantSearchResult") {
+        const conversationId = encodeURIComponent(String(message.conversationId || ""));
+        const conversation = await jobAgentApiRequest(
+          `/api/v1/chat/conversations/${conversationId}/context/search-results`,
+          { method: "POST", body: message.searchResultRef }
+        );
+        sendResponse({ ok: true, conversation });
+        return;
+      }
+
+      if (message.action === "attachAssistantBrowserCapture") {
+        const conversationId = encodeURIComponent(String(message.conversationId || ""));
+        const conversation = await jobAgentApiRequest(
+          `/api/v1/chat/conversations/${conversationId}/context/browser-captures`,
+          {
+            method: "POST",
+            body: { type: "browser_capture", capture_id: String(message.captureId || "") }
+          }
+        );
+        await notifyAssistantContextUpdated(String(message.conversationId || ""));
+        sendResponse({ ok: true, conversation });
+        return;
+      }
+
+      if (message.action === "sendAssistantTurn") {
+        const conversationId = encodeURIComponent(String(message.conversationId || ""));
+        const turn = await jobAgentApiRequest(
+          `/api/v1/chat/conversations/${conversationId}/turns`,
+          {
+            method: "POST",
+            body: {
+              client_turn_id: crypto.randomUUID(),
+              question: String(message.question || "").trim(),
+              context_attachments: Array.isArray(message.contextAttachments)
+                ? message.contextAttachments
+                : []
+            }
+          }
+        );
+        sendResponse({ ok: true, turn });
+        return;
+      }
+
+      if (message.action === "openAssistantConversation") {
+        const session = await getAssistantSession();
+        const tab = await openOrFocusAssistantTab({
+          appUrl: session?.appUrl || DEFAULT_JOBAGENT_APP_URL,
+          conversationId: message.conversationId,
+          requestPair: Boolean(message.requestPair),
+          allowKnownDevOrigin: !session
+        });
+        sendResponse({ ok: true, tabId: tab.id, reused: tab.reused });
+        return;
+      }
+
       sendResponse({ ok: false, error: `unknown action: ${message.action}` });
     } catch (error) {
       sendResponse({ ok: false, error: String(error) });
@@ -255,46 +419,33 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   return true;
 });
 
-async function analyzeCurrentJobPage({ backendUrl, sessionId, useLlm, analysisMode, llmProvider }) {
-  const normalizedSessionId = String(sessionId || "").trim();
-  if (!normalizedSessionId) {
-    return {
-      ok: false,
-      errorType: "configuration",
-      error: "Profile session ID is required before analyzing the current job page."
-    };
+async function analyzeCurrentJobPage({ sessionId, useLlm, analysisMode, llmProvider }) {
+  const captured = await persistCurrentJobPage();
+  if (!captured.ok) return captured;
+  const analyzed = await analyzeCapturedJob({
+    captureId: captured.captureId,
+    sessionId,
+    useLlm,
+    analysisMode,
+    llmProvider
+  });
+  return { ...analyzed, capture: captured.capture };
+}
+
+async function persistCurrentJobPage() {
+  const assistantSession = await getAssistantSession();
+  if (!assistantSession) {
+    return { ok: false, errorType: "authentication", error: "Pair Browser Helper first." };
   }
   const now = Date.now();
   if (now - lastCurrentPageCaptureStartedAt < CURRENT_PAGE_CAPTURE_COOLDOWN_MS) {
-    return {
-      ok: false,
-      errorType: "capture_safety",
-      error: "Please wait a moment before capturing another page."
-    };
+    return { ok: false, errorType: "capture_safety", error: "Please wait a moment before capturing another page." };
   }
   lastCurrentPageCaptureStartedAt = now;
-
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (!tab?.id) {
-    return {
-      ok: false,
-      errorType: "capture",
-      error: "No active tab is available for current-page capture."
-    };
-  }
+  if (!tab?.id) return { ok: false, errorType: "capture", error: "No active tab is available for capture." };
   const tabGuard = validateCurrentPageCaptureTab(tab);
-  if (!tabGuard.ok) {
-    return {
-      ok: false,
-      errorType: "capture_safety",
-      error: tabGuard.error,
-      diagnostics: {
-        tabUrl: tab.url || null,
-        tabTitle: tab.title || null
-      }
-    };
-  }
-
+  if (!tabGuard.ok) return { ok: false, errorType: "capture_safety", error: tabGuard.error };
   let captureResult = null;
   try {
     [captureResult] = await chrome.scripting.executeScript({
@@ -308,90 +459,201 @@ async function analyzeCurrentJobPage({ backendUrl, sessionId, useLlm, analysisMo
       }]
     });
   } catch (error) {
-    return {
-      ok: false,
-      errorType: "capture",
-      error: `The extension could not read the current page: ${String(error)}`,
-      diagnostics: {
-        tabUrl: tab.url || null,
-        tabTitle: tab.title || null
-      }
-    };
+    return { ok: false, errorType: "capture", error: `The extension could not read the current page: ${String(error)}` };
   }
   const capture = captureResult?.result;
-  if (!capture) {
-    return {
-      ok: false,
-      errorType: "capture",
-      error: "Current-page capture returned no result.",
-      diagnostics: {
-        tabUrl: tab.url || null,
-        tabTitle: tab.title || null,
-        injectionFrameId: captureResult?.frameId ?? null
-      }
-    };
-  }
+  if (!capture) return { ok: false, errorType: "capture", error: "Current-page capture returned no result." };
   if (capture.blocked) {
-    return {
-      ok: false,
-      errorType: "capture_safety",
-      error: capture.blocked_reason || "The current page is not safe to analyze.",
-      capture
-    };
+    return { ok: false, errorType: "capture_safety", error: capture.blocked_reason || "The current page cannot be captured." };
   }
-  capture.session_id = normalizedSessionId;
-  const requestedAnalysisMode = analysisMode === "deterministic" || useLlm === false
-    ? "deterministic"
-    : "llm";
-  const requestedLlmProvider = requestedAnalysisMode === "llm"
-    ? String(llmProvider || "deepseek").trim().toLowerCase()
-    : null;
-  capture.analysis_mode = requestedAnalysisMode;
-  capture.llm_provider = requestedLlmProvider;
-  capture.use_llm = requestedAnalysisMode === "llm" && requestedLlmProvider === "deepseek";
   if (capture.jd_text.length < CURRENT_PAGE_MIN_TEXT_LENGTH) {
-    return {
-      ok: false,
-      errorType: "capture",
-      error: "The extension did not read enough visible page text to analyze this job.",
-      capture
-    };
+    return { ok: false, errorType: "capture", error: "The extension did not read enough JD text.", capture };
   }
-
-  const apiUrl = `${normalizeBackendUrl(backendUrl)}/api/v1/browser/job-captures/analyze`;
   try {
-    const response = await fetch(apiUrl, {
+    const response = await fetch(`${assistantSession.backendUrl}/api/v1/browser/job-captures`, {
       method: "POST",
       headers: {
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${assistantSession.accessToken}`
       },
       body: JSON.stringify(capture)
     });
     const payload = await readJsonResponse(response);
     if (!response.ok) {
-      return {
-        ok: false,
-        errorType: "backend",
-        status: response.status,
-        errorCode: payload?.error_code || null,
-        error: payload?.detail || `JobAgent backend returned ${response.status}.`,
-        capture,
-        backendResponse: payload
-      };
+      const error = response.status === 404
+        ? "The JobAgent capture endpoint is unavailable. Restart the backend with the current code, then try again."
+        : payload?.detail || `JobAgent backend returned ${response.status}.`;
+      return { ok: false, errorType: "backend", status: response.status, error };
     }
     return {
       ok: true,
-      capture,
-      analysis: payload
+      capture: { ...capture, ...(payload.capture || {}) },
+      captureId: payload.capture_id
     };
   } catch (error) {
-    return {
-      ok: false,
-      errorType: "network",
-      error: `Failed to call JobAgent backend: ${String(error)}`,
-      capture
-    };
+    return { ok: false, errorType: "network", error: `Failed to save the captured JD: ${String(error)}` };
   }
+}
+
+async function analyzeCapturedJob({ captureId, sessionId, useLlm, analysisMode, llmProvider }) {
+  const assistantSession = await getAssistantSession();
+  if (!assistantSession) return { ok: false, errorType: "authentication", error: "Pair Browser Helper first." };
+  const normalizedCaptureId = String(captureId || "").trim();
+  const normalizedSessionId = String(sessionId || "").trim();
+  if (!normalizedCaptureId || !normalizedSessionId) {
+    return { ok: false, errorType: "configuration", error: "A captured JD and Analysis profile are required." };
+  }
+  const requestedAnalysisMode = analysisMode === "deterministic" || useLlm === false ? "deterministic" : "llm";
+  const requestedLlmProvider = requestedAnalysisMode === "llm"
+    ? String(llmProvider || "deepseek").trim().toLowerCase()
+    : null;
+  try {
+    const response = await fetch(`${assistantSession.backendUrl}/api/v1/browser/job-captures/${encodeURIComponent(normalizedCaptureId)}/analyze`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${assistantSession.accessToken}`
+      },
+      body: JSON.stringify({
+        session_id: normalizedSessionId,
+        analysis_mode: requestedAnalysisMode,
+        llm_provider: requestedLlmProvider,
+        use_llm: requestedAnalysisMode === "llm" && requestedLlmProvider === "deepseek"
+      })
+    });
+    const payload = await readJsonResponse(response);
+    if (!response.ok) {
+      return { ok: false, errorType: "backend", status: response.status, error: payload?.detail || `JobAgent backend returned ${response.status}.` };
+    }
+    return { ok: true, analysis: payload };
+  } catch (error) {
+    return { ok: false, errorType: "network", error: `Failed to analyze the captured JD: ${String(error)}` };
+  }
+}
+
+async function getAssistantSession() {
+  const stored = await chrome.storage.session.get(ASSISTANT_SESSION_KEYS);
+  const accessToken = String(stored.accessToken || "").trim();
+  const expiresAt = String(stored.expiresAt || "");
+  if (!accessToken || (expiresAt && Date.parse(expiresAt) <= Date.now())) {
+    if (accessToken) {
+      await chrome.storage.session.remove(ASSISTANT_SESSION_KEYS);
+    }
+    return null;
+  }
+  const backendUrl = normalizeBackendUrl(stored.backendUrl || DEFAULT_JOBAGENT_BACKEND_URL);
+  assertAllowedBackendUrl(backendUrl);
+  return {
+    backendUrl,
+    appUrl: normalizeLocalUrl(stored.appUrl || backendUrl),
+    accessToken,
+    expiresAt,
+    profileSessions: Array.isArray(stored.profileSessions) ? stored.profileSessions : []
+  };
+}
+
+async function openOrFocusAssistantTab({ appUrl, conversationId, requestPair, allowKnownDevOrigin }) {
+  const preferredAppUrl = normalizeLocalUrl(appUrl);
+  const preferredOrigin = new URL(preferredAppUrl).origin;
+  const tabs = await chrome.tabs.query({});
+  const candidates = tabs
+    .map((tab) => ({ tab, parsed: parseHttpUrl(tab.url) }))
+    .filter(({ parsed }) => parsed && (
+      parsed.origin === preferredOrigin ||
+      (allowKnownDevOrigin && JOBAGENT_DEV_APP_ORIGINS.has(parsed.origin))
+    ))
+    .sort((left, right) => {
+      const leftAssistant = left.parsed.pathname.startsWith("/assistant") ? 1 : 0;
+      const rightAssistant = right.parsed.pathname.startsWith("/assistant") ? 1 : 0;
+      const leftPreferred = left.parsed.origin === preferredOrigin ? 1 : 0;
+      const rightPreferred = right.parsed.origin === preferredOrigin ? 1 : 0;
+      return rightAssistant - leftAssistant || rightPreferred - leftPreferred;
+    });
+  const existing = candidates[0];
+  const resolvedAppUrl = existing && allowKnownDevOrigin
+    ? existing.parsed.origin
+    : preferredAppUrl;
+  const targetUrl = buildAssistantUrl(resolvedAppUrl, { conversationId, requestPair });
+  if (!existing?.tab.id) {
+    const created = await chrome.tabs.create({ url: targetUrl, active: true });
+    return { ...created, reused: false };
+  }
+  const updated = await chrome.tabs.update(existing.tab.id, { url: targetUrl, active: true });
+  if (existing.tab.windowId !== undefined) {
+    await chrome.windows.update(existing.tab.windowId, { focused: true });
+  }
+  return { ...updated, reused: true };
+}
+
+async function notifyAssistantContextUpdated(conversationId) {
+  const session = await getAssistantSession();
+  if (!session || !conversationId) return;
+  const appOrigin = new URL(session.appUrl).origin;
+  const tabs = await chrome.tabs.query({});
+  const assistantTabs = tabs.filter((tab) => {
+    const parsed = parseHttpUrl(tab.url);
+    return tab.id && parsed?.origin === appOrigin;
+  });
+  await Promise.allSettled(assistantTabs.map((tab) => chrome.tabs.sendMessage(tab.id, {
+    action: "assistantContextUpdated",
+    conversationId
+  })));
+}
+
+function buildAssistantUrl(appUrl, { conversationId, requestPair }) {
+  const query = new URLSearchParams();
+  if (conversationId) query.set("conversation", String(conversationId));
+  if (requestPair) query.set("pair_browser_helper", "1");
+  const suffix = query.size ? `?${query.toString()}` : "";
+  return `${appUrl}/assistant${suffix}`;
+}
+
+function parseHttpUrl(value) {
+  try {
+    const parsed = new URL(String(value || ""));
+    return ["http:", "https:"].includes(parsed.protocol) ? parsed : null;
+  } catch (_error) {
+    return null;
+  }
+}
+
+async function jobAgentApiRequest(path, options = {}) {
+  const session = await getAssistantSession();
+  if (!session) {
+    throw new Error("Browser Helper is not paired, or its session expired.");
+  }
+  const response = await fetch(`${session.backendUrl}${path}`, {
+    method: options.method || "GET",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${session.accessToken}`
+    },
+    body: options.body === undefined ? undefined : JSON.stringify(options.body)
+  });
+  const payload = await readJsonResponse(response);
+  if (!response.ok) {
+    if (response.status === 401) {
+      await chrome.storage.session.remove(ASSISTANT_SESSION_KEYS);
+    }
+    throw new Error(payload?.detail || `JobAgent backend returned ${response.status}.`);
+  }
+  return payload;
+}
+
+function assertAllowedBackendUrl(value) {
+  const parsed = new URL(value);
+  if (parsed.protocol !== "http:" || !["127.0.0.1", "localhost"].includes(parsed.hostname)) {
+    throw new Error("Browser Helper only connects to a local JobAgent backend.");
+  }
+}
+
+function normalizeLocalUrl(value) {
+  const normalized = String(value || "").trim().replace(/\/+$/, "");
+  const parsed = new URL(normalized);
+  if (!["http:", "https:"].includes(parsed.protocol) || !["127.0.0.1", "localhost"].includes(parsed.hostname)) {
+    throw new Error("Browser Helper only opens a local JobAgent application.");
+  }
+  return normalized;
 }
 
 function validateCurrentPageCaptureTab(tab) {

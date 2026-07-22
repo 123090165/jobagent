@@ -4,6 +4,7 @@ import { useRoute, useRouter } from "vue-router";
 import { NButton, NCard, NInput, NSelect, NTag } from "naive-ui";
 
 import FlowPageHeader from "../components/FlowPageHeader.vue";
+import { createChatConversation } from "../api/chat";
 import {
   listJobSearchResultFeedback,
   saveJobSearchResultFeedback
@@ -36,6 +37,7 @@ const resultFeedback = ref<Record<string, JobSearchResultFeedback>>({});
 const feedbackTypes = ref<Record<string, JobSearchFeedbackType | null>>({});
 const feedbackNotes = ref<Record<string, string>>({});
 const savingFeedbackIds = ref<string[]>([]);
+const openingAssistantResultIds = ref<string[]>([]);
 const feedbackMessage = ref<string | null>(null);
 const nowMs = ref(Date.now());
 let elapsedTimer: number | null = null;
@@ -252,6 +254,34 @@ async function saveSearchResult(result: JobSearchResult) {
     return null;
   } finally {
     savingResultIds.value = savingResultIds.value.filter((id) => id !== result.job_result_id);
+  }
+}
+
+async function askAssistantAboutResult(result: JobSearchResult) {
+  const run = profileSessionStore.jobSearchRun;
+  if (!run || openingAssistantResultIds.value.includes(result.job_result_id)) return;
+  openingAssistantResultIds.value = [...openingAssistantResultIds.value, result.job_result_id];
+  try {
+    const conversation = await createChatConversation({
+      title: `Discuss ${result.title}`.slice(0, 120),
+      data_scope: {
+        resume_profile_id: run.resume_profile_id,
+        job_search_result_refs: [{
+          job_search_run_id: run.job_search_run_id,
+          job_result_id: result.job_result_id
+        }]
+      }
+    });
+    await router.push({
+      name: "assistant",
+      query: { conversation: conversation.conversation_id }
+    });
+  } catch {
+    savedJobMessage.value = `Could not open an assistant conversation for ${result.title}.`;
+  } finally {
+    openingAssistantResultIds.value = openingAssistantResultIds.value.filter(
+      (item) => item !== result.job_result_id
+    );
   }
 }
 
@@ -718,6 +748,14 @@ function formatQueryLabel(value: unknown): string {
           <div class="job-card-footer">
             <span>{{ result.recommended_action }}</span>
             <div class="flow-toolbar-secondary">
+              <n-button
+                size="small"
+                secondary
+                :loading="openingAssistantResultIds.includes(result.job_result_id)"
+                @click="askAssistantAboutResult(result)"
+              >
+                Ask Assistant
+              </n-button>
               <n-button
                 size="small"
                 type="primary"

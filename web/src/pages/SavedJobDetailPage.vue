@@ -4,6 +4,7 @@ import { useRoute, useRouter } from "vue-router";
 import { NButton, NCollapse, NCollapseItem, NInput, NModal, NRadio, NRadioGroup, NSelect, NTabPane, NTabs, NTag } from "naive-ui";
 
 import AppIcon from "../components/AppIcon.vue";
+import { createChatConversation } from "../api/chat";
 import { useSavedJobsStore } from "../stores/savedJobs";
 import type { PreparationAnswer, PreparationQuestion, SavedJobStatus } from "../types/savedJob";
 
@@ -19,6 +20,7 @@ const actionMessage = ref<string | null>(null);
 const preparationDialogOpen = ref(false);
 const currentPreparationQuestion = ref(0);
 const preparationAnswers = ref<Record<string, PreparationAnswer>>({});
+const openingAssistant = ref(false);
 const statusOptions: Array<{ label: string; value: SavedJobStatus }> = [
   { label: "Saved", value: "saved" },
   { label: "Interested", value: "interested" },
@@ -81,6 +83,29 @@ async function saveTracking() {
     actionMessage.value = "Tracking details saved.";
   } catch {
     // Store error is rendered above.
+  }
+}
+
+async function askAssistantAboutJob() {
+  if (!job.value || openingAssistant.value) return;
+  openingAssistant.value = true;
+  actionMessage.value = null;
+  try {
+    const conversation = await createChatConversation({
+      title: `Discuss ${job.value.title}`.slice(0, 120),
+      data_scope: {
+        resume_profile_id: job.value.latest_analysis?.resume_profile_id ?? null,
+        saved_job_ids: [job.value.saved_job_id]
+      }
+    });
+    await router.push({
+      name: "assistant",
+      query: { conversation: conversation.conversation_id }
+    });
+  } catch {
+    actionMessage.value = "Could not open an assistant conversation for this job.";
+  } finally {
+    openingAssistant.value = false;
   }
 }
 
@@ -313,6 +338,9 @@ function preparationResource(url: string) {
           <div class="saved-job-header-actions">
             <span class="status-pill">{{ job.status }}</span>
             <n-select v-model:value="status" :options="statusOptions" @update:value="saveTracking" />
+            <n-button secondary :loading="openingAssistant" @click="askAssistantAboutJob">
+              <AppIcon name="chat" /> Ask Assistant
+            </n-button>
             <n-button v-if="job.source_url" tag="a" :href="job.source_url" target="_blank" secondary>
               Open Listing
             </n-button>

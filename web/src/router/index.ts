@@ -14,6 +14,7 @@ import SavedJobsPage from "../pages/SavedJobsPage.vue";
 import SavedJobDetailPage from "../pages/SavedJobDetailPage.vue";
 import SearchPreviewPage from "../pages/SearchPreviewPage.vue";
 import SearchMissionPage from "../pages/SearchMissionPage.vue";
+import ChatPage from "../pages/ChatPage.vue";
 
 async function requireSessionStep(sessionId: string, allowedSteps: string[]) {
   const profileSessionStore = useProfileSessionStore();
@@ -57,6 +58,11 @@ const router = createRouter({
       path: "/saved-jobs/:savedJobId",
       name: "saved-job-detail",
       component: SavedJobDetailPage
+    },
+    {
+      path: "/assistant",
+      name: "assistant",
+      component: ChatPage
     },
     {
       path: "/profile/:sessionId/review",

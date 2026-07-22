@@ -33,12 +33,15 @@ def test_browser_helper_background_supports_user_triggered_current_page_capture(
     assert "chrome.scripting.executeScript" in background
     assert "captureCurrentJobPage" in background
     assert "document.body?.innerText" in background
-    assert "/api/v1/browser/job-captures/analyze" in background
-    assert "capture.analysis_mode = requestedAnalysisMode" in background
-    assert "capture.llm_provider = requestedLlmProvider" in background
+    assert "/api/v1/browser/job-captures`" in background
+    assert "/analyze`" in background
+    assert "analysis_mode: requestedAnalysisMode" in background
+    assert "llm_provider: requestedLlmProvider" in background
     assert "CURRENT_PAGE_MIN_TEXT_LENGTH = 80" in background
     assert "Generic visible-text extractor was used" in background
     assert "chrome.sidePanel.setPanelBehavior" in background
+    assert "function initializeSidePanelBehavior()" in background
+    assert 'typeof update.catch === "function"' in background
 
 
 def test_boss_search_and_current_page_capture_are_both_available() -> None:
@@ -79,20 +82,73 @@ def test_current_page_capture_injected_function_is_self_contained() -> None:
 def test_browser_helper_side_panel_exposes_required_states_and_settings() -> None:
     html = _read("browser-helper/sidepanel.html")
     script = _read("browser-helper/sidepanel.js")
+    background = _read("browser-helper/background.js")
 
-    assert "Backend URL" in html
-    assert "Profile session ID" in html
-    assert "Analyze current job" in html
+    assert "Conversation" in html
+    assert "Analysis profile" in html
+    assert "Profile session" not in html
+    assert "Capture current JD" in html
+    assert "without running match analysis" in html
+    assert "Optional match analysis" in html
+    assert "Analyze JD match" in html
+    assert "JD analysis" in html
+    assert "Ask about this JD" in html
+    assert "Send question" in html
+    assert "The captured JD is attached to the selected conversation" in html
+    assert "Keep analyzed JD in this conversation" not in html
+    assert "Compare with saved job" in html
     assert "chrome.storage.local" in script
     assert "chrome.runtime.sendMessage" in script
-    assert 'analysisMode: useLlmInput.checked ? "llm" : "deterministic"' in script
+    assert 'analysisMode: nodes.useLlm.checked ? "llm" : "deterministic"' in script
     assert 'llmProvider: "deepseek"' in script
-    assert "stored.useLlm !== false" in script
+    assert "saved.useLlm !== false" in script
     assert "chrome.permissions.request" in script
     assert "chrome.permissions.remove" in script
     assert "https://www.zhipin.com/*" in script
-    assert "Capturing the current page" in script
-    assert "Analysis complete" in script
-    assert "errorType" in script
-    assert "Matched strengths" in script
-    assert "Critical gaps" in script
+    assert "Reading the current BOSS job page" in script
+    assert 'action: "captureCurrentJob"' in script
+    assert 'action: "analyzeCapturedJob"' in script
+    assert 'type: "browser_capture"' in script
+    assert 'action: "sendAssistantTurn"' in script
+    assert 'action: "attachAssistantBrowserCapture"' in script
+    assert "capture.jd_text" in script
+    assert "attachCaptureToConversation" in script
+    assert "capture: { ...capture, ...(payload.capture || {}) }" in background
+    assert "notifyAssistantContextUpdated" in background
+    assert "JOBAGENT_HELPER_CONTEXT_UPDATED" in _read("browser-helper/bridge.js")
+    assert 'type: "saved_job"' in script
+    assert "renderAnalysisReport" in script
+    assert "configureAnalysisProfiles" in script
+    assert "profiles.length === 1" in script
+    assert "(Default)" in script
+    assert 'nodes.chatStage.classList.remove("hidden")' in script
+    assert 'nodes.analysisControls.classList.remove("hidden")' in script
+    assert 'requestPair: true' in script
+    assert "chrome.storage.onChanged.addListener" in script
+    assert "refreshAssistantState" in script
+    assert "void init().catch(renderInitializationFailure)" in script
+    assert "function renderInitializationFailure(error)" in script
+    assert "function bindAsyncEvent(node, eventName, handler)" in script
+    assert ".catch(renderActionFailure)" in script
+    assert "function revokeTemporaryPermission(origin)" in script
+
+
+def test_browser_helper_chat_token_is_session_only_and_sent_as_bearer() -> None:
+    background = _read("browser-helper/background.js")
+
+    assert "chrome.storage.session.set" in background
+    assert "chrome.storage.session.get" in background
+    assert '"Authorization": `Bearer ${session.accessToken}`' in background
+    assert 'message.action === "bindJobAgentSession"' in background
+    assert 'message.action === "getBrowserHelperConnectionStatus"' in background
+    assert 'message.action === "getAssistantState"' in background
+    assert "/api/v1/browser-helper/context-catalog" in background
+    assert 'message.action === "sendAssistantTurn"' in background
+    assert 'message.action === "pinAssistantSearchResult"' in background
+    assert 'query.set("pair_browser_helper", "1")' in background
+    assert "openOrFocusAssistantTab" in background
+    assert "chrome.tabs.query({})" in background
+    assert "chrome.tabs.update(existing.tab.id" in background
+    assert "chrome.windows.update(existing.tab.windowId" in background
+    assert "reused: false" in background
+    assert "reused: true" in background
