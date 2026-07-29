@@ -79,6 +79,27 @@ def test_anonymous_trace_id_is_stable_and_namespaced() -> None:
     assert "private-user-id" not in first
 
 
+def test_observation_can_force_redaction_when_global_capture_is_enabled(monkeypatch) -> None:
+    fake = FakeLangfuse()
+    monkeypatch.setenv("JOBAGENT_LANGFUSE_ENABLED", "true")
+    monkeypatch.setenv("JOBAGENT_LANGFUSE_CAPTURE_CONTENT", "true")
+    monkeypatch.setattr(langfuse, "get_client", lambda: fake)
+    service = LLMService(LLMConfig(api_key="test", model="test-model"))
+    monkeypatch.setattr(service, "_post_chat_completions", lambda payload: {
+        "choices": [{"message": {"content": '{"answer": "private"}'}}],
+        "usage": {},
+    })
+
+    with llm_observation_context(
+        "chat.answer",
+        metadata={"force_content_redacted": True},
+    ):
+        service.chat_completion_json(system_prompt="private system", user_prompt="private user")
+
+    assert fake.start_payload["input"]["content_redacted"] is True
+    assert fake.generation.update_payload["output"]["content_redacted"] is True
+
+
 def test_agent_trace_propagates_queryable_attributes_and_flushes(monkeypatch) -> None:
     fake = FakeLangfuse()
     propagated: dict[str, object] = {}
