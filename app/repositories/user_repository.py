@@ -88,6 +88,26 @@ class UserRepository:
             return None
         return self._row_to_user(row)
 
+    def list_all(self, *, include_disabled: bool = False) -> list[UserAccount]:
+        where_clause = "" if include_disabled else "WHERE disabled_at IS NULL"
+        with get_connection() as connection:
+            init_database(connection)
+            rows = connection.execute(
+                f"""
+                SELECT
+                    user_id,
+                    username,
+                    display_name,
+                    created_at,
+                    updated_at,
+                    disabled_at
+                FROM users
+                {where_clause}
+                ORDER BY created_at, user_id
+                """
+            ).fetchall()
+        return [self._row_to_user(row) for row in rows]
+
     def get_with_password(self, username: str) -> dict[str, object] | None:
         with get_connection() as connection:
             init_database(connection)

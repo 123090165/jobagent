@@ -41,8 +41,10 @@ from app.services.chat_answer_generator import (
     compress_chat_memory,
     deterministic_chat_answer,
 )
-from app.services.chat_context_builder import build_chat_evidence
 from app.services.chat_intent_rules import resolve_conversation_command
+from app.services.chat_personal_knowledge import (
+    build_chat_evidence_with_personal_knowledge,
+)
 from app.services.chat_retrieval_planner import (
     build_agent_retrieval_plan,
     resolve_chat_retrieval,
@@ -360,7 +362,7 @@ def create_chat_turn(
         )
         route = refusal_route or derive_agent_route(
             effective_question,
-            sources=resolved_retrieval.sources,
+            sources=retrieval_plan.agent_sources,
             tool_calls=requested_tools,
             reason=(
                 "agent_tool_selection"
@@ -370,13 +372,21 @@ def create_chat_turn(
             ),
         )
         try:
-            evidence, context_warnings = build_chat_evidence(
-                effective_question,
-                user_id=user_id,
-                conversation=conversation,
-                requested_sources=resolved_retrieval.sources,
-                active_refs=resolved_retrieval.active_refs,
-            ) if route.domain == "in_scope" and route.retrieval else ([], [])
+            evidence, context_warnings = (
+                build_chat_evidence_with_personal_knowledge(
+                    effective_question,
+                    user_id=user_id,
+                    conversation=conversation,
+                    requested_sources=resolved_retrieval.sources,
+                    active_refs=resolved_retrieval.active_refs,
+                    semantic_sources=retrieval_plan.agent_sources,
+                    personal_knowledge_requested=(
+                        "search_personal_knowledge" in requested_tools
+                    ),
+                )
+                if route.domain == "in_scope" and route.retrieval
+                else ([], [])
+            )
         except Exception as exc:
             repository.fail_turn(
                 user_id=user_id,

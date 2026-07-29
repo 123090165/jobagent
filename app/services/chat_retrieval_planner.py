@@ -10,7 +10,7 @@ from app.schemas.chat import (
     ChatSource,
     ChatTurn,
 )
-from app.services.chat_agent import ChatAgentToolName
+from app.services.chat_agent import ChatAgentToolName, personal_knowledge_sources
 from app.services.chat_intent_rules import (
     requests_highest_saved_job_score,
     requires_fresh_context,
@@ -50,6 +50,7 @@ def build_agent_retrieval_plan(
     pinned_sources = _pinned_sources(conversation)
     previous_sources = _previous_sources(recent_turns)
     requests_by_source: dict[ChatSource, ChatRetrievalRequest] = {}
+    semantic_sources: list[ChatSource] = []
 
     def add(source: ChatSource, strategy: ChatRetrievalStrategy, reason: str) -> None:
         existing = requests_by_source.get(source)
@@ -85,6 +86,13 @@ def build_agent_retrieval_plan(
                 ),
                 "agent_tool:find_saved_jobs",
             )
+        elif tool_name == "search_personal_knowledge":
+            semantic_sources.extend(
+                personal_knowledge_sources(
+                    question,
+                    allowed_sources=conversation.data_scope.allowed_sources,
+                )
+            )
         elif tool_name == "read_search_results":
             add(
                 "search_results",
@@ -99,10 +107,15 @@ def build_agent_retrieval_plan(
     policy_reasons = ["agent_tool_selection"] if tool_calls else []
     if attachment_sources:
         policy_reasons.append("explicit_attachment")
+    if semantic_sources:
+        policy_reasons.append("agent_tool:search_personal_knowledge")
     if len(requests) != len(requests_by_source):
         policy_reasons.append("disallowed_sources_removed")
     return ChatRetrievalPlan(
-        agent_sources=list(dict.fromkeys(request.source for request in requests)),
+        agent_sources=list(dict.fromkeys([
+            *(request.source for request in requests),
+            *semantic_sources,
+        ])),
         requests=requests,
         freshness=freshness,
         policy_reasons=policy_reasons,

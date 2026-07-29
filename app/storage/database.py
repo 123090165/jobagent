@@ -604,6 +604,40 @@ def init_database(connection: sqlite3.Connection) -> None:
             created_at TEXT NOT NULL,
             FOREIGN KEY (user_id) REFERENCES users(user_id)
         );
+
+        CREATE TABLE IF NOT EXISTS rag_index_outbox (
+            event_id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            resource_type TEXT NOT NULL,
+            resource_id TEXT NOT NULL,
+            resource_version INTEGER NOT NULL,
+            operation TEXT NOT NULL,
+            status TEXT NOT NULL,
+            attempt_count INTEGER NOT NULL DEFAULT 0,
+            available_at TEXT NOT NULL,
+            last_error_code TEXT,
+            last_error_message TEXT,
+            created_at TEXT NOT NULL,
+            completed_at TEXT,
+            FOREIGN KEY (user_id) REFERENCES users(user_id),
+            UNIQUE (user_id, resource_type, resource_id, resource_version)
+        );
+
+        CREATE TABLE IF NOT EXISTS rag_resource_status (
+            user_id TEXT NOT NULL,
+            resource_type TEXT NOT NULL,
+            resource_id TEXT NOT NULL,
+            desired_version INTEGER NOT NULL,
+            indexed_version INTEGER,
+            indexed_document_id TEXT,
+            sync_status TEXT NOT NULL,
+            last_event_id TEXT NOT NULL,
+            last_synced_at TEXT,
+            last_error_code TEXT,
+            updated_at TEXT NOT NULL,
+            PRIMARY KEY (user_id, resource_type, resource_id),
+            FOREIGN KEY (user_id) REFERENCES users(user_id)
+        );
         """
     )
     _ensure_local_user(connection)
@@ -679,6 +713,9 @@ def init_database(connection: sqlite3.Connection) -> None:
     )
     connection.execute(
         "INSERT OR IGNORE INTO schema_migrations (version, name) VALUES (6, 'chat_retrieval_plan')"
+    )
+    connection.execute(
+        "INSERT OR IGNORE INTO schema_migrations (version, name) VALUES (7, 'rag_resource_sync')"
     )
     _seed_learning_catalog(connection)
     connection.commit()
@@ -955,5 +992,11 @@ def _ensure_indexes(connection: sqlite3.Connection) -> None:
             ON chat_turns(user_id, conversation_id, sequence);
         CREATE INDEX IF NOT EXISTS idx_browser_job_captures_user_created
             ON browser_job_captures(user_id, created_at);
+        CREATE INDEX IF NOT EXISTS idx_rag_index_outbox_pending
+            ON rag_index_outbox(status, available_at, created_at);
+        CREATE INDEX IF NOT EXISTS idx_rag_index_outbox_resource
+            ON rag_index_outbox(user_id, resource_type, resource_id, resource_version);
+        CREATE INDEX IF NOT EXISTS idx_rag_resource_status_user
+            ON rag_resource_status(user_id, sync_status, updated_at);
         """
     )

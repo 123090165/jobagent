@@ -15,6 +15,7 @@ import SavedJobDetailPage from "../pages/SavedJobDetailPage.vue";
 import SearchPreviewPage from "../pages/SearchPreviewPage.vue";
 import SearchMissionPage from "../pages/SearchMissionPage.vue";
 import ChatPage from "../pages/ChatPage.vue";
+import KnowledgeStatusPage from "../pages/KnowledgeStatusPage.vue";
 
 async function requireSessionStep(sessionId: string, allowedSteps: string[]) {
   const profileSessionStore = useProfileSessionStore();
@@ -63,6 +64,11 @@ const router = createRouter({
       path: "/assistant",
       name: "assistant",
       component: ChatPage
+    },
+    {
+      path: "/knowledge-status",
+      name: "knowledge-status",
+      component: KnowledgeStatusPage
     },
     {
       path: "/profile/:sessionId/review",

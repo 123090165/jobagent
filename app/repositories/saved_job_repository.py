@@ -5,6 +5,7 @@ import sqlite3
 from datetime import datetime, timezone
 from uuid import uuid4
 
+from app.repositories.rag_sync_repository import rag_sync_repository
 from app.schemas.saved_job import (
     SavedJob,
     SavedJobAnalysis,
@@ -119,6 +120,13 @@ class SavedJobRepository:
                 to_status=job.status,
                 reason="Job saved",
                 changed_at=now,
+            )
+            rag_sync_repository.enqueue_if_enabled(
+                connection=connection,
+                user_id=user_id,
+                resource_type="saved_job",
+                resource_id=job.saved_job_id,
+                operation="upsert",
             )
             connection.commit()
         return job
@@ -367,6 +375,13 @@ class SavedJobRepository:
                     reason="Status updated",
                     changed_at=updated.updated_at,
                 )
+            rag_sync_repository.enqueue_if_enabled(
+                connection=connection,
+                user_id=user_id,
+                resource_type="saved_job",
+                resource_id=saved_job_id,
+                operation="delete" if updated.archived_at is not None else "upsert",
+            )
             connection.commit()
         return self.get(user_id=user_id, saved_job_id=saved_job_id)
 
@@ -395,6 +410,13 @@ class SavedJobRepository:
                     reason="Job archived",
                     changed_at=datetime.fromisoformat(now),
                 )
+            rag_sync_repository.enqueue_if_enabled(
+                connection=connection,
+                user_id=user_id,
+                resource_type="saved_job",
+                resource_id=saved_job_id,
+                operation="delete",
+            )
             connection.commit()
         return self.get(user_id=user_id, saved_job_id=saved_job_id)
 
@@ -426,6 +448,13 @@ class SavedJobRepository:
             cursor = connection.execute(
                 "DELETE FROM saved_jobs WHERE user_id = ? AND saved_job_id = ?",
                 (user_id, saved_job_id),
+            )
+            rag_sync_repository.enqueue_if_enabled(
+                connection=connection,
+                user_id=user_id,
+                resource_type="saved_job",
+                resource_id=saved_job_id,
+                operation="delete",
             )
             connection.commit()
         return cursor.rowcount > 0

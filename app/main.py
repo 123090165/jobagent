@@ -19,6 +19,7 @@ from app.api.v1.llm import router as llm_v1_router
 from app.api.v1.profile_drafts import router as profile_drafts_v1_router
 from app.api.v1.resume_profiles import router as resume_profiles_v1_router
 from app.api.v1.profile_sessions import router as profile_sessions_v1_router
+from app.api.v1.rag import router as rag_v1_router
 from app.api.v1.saved_jobs import router as saved_jobs_v1_router
 from app.schemas.api import HealthResponse
 from app.services.errors import JobAgentError
@@ -89,6 +90,7 @@ def create_app() -> FastAPI:
     api.include_router(chat_v1_router)
     api.include_router(chat_context_v1_router)
     api.include_router(llm_v1_router)
+    api.include_router(rag_v1_router)
     return api
 
 

@@ -1,0 +1,102 @@
+{
+  "fixture_version": "career-private-v1",
+  "documents": [
+    {
+      "document_key": "saved-kubernetes-platform",
+      "resource_type": "saved_job",
+      "owner": "primary",
+      "payload": {
+        "title": "Platform Engineer",
+        "company": "Cloud Example",
+        "location": "Remote",
+        "raw_jd_text": "Build Kubernetes platforms, operate Python services, and improve cloud reliability.",
+        "tags": ["kubernetes", "remote", "python"]
+      },
+      "searchable_text": "远程 Platform Engineer，要求 Kubernetes、Python 服务和云平台可靠性。"
+    },
+    {
+      "document_key": "saved-health-ml",
+      "resource_type": "saved_job",
+      "owner": "primary",
+      "payload": {
+        "title": "Health Machine Learning Engineer",
+        "company": "Health Example",
+        "location": "Shenzhen",
+        "raw_jd_text": "Develop physiological signal models and production machine learning evaluation.",
+        "tags": ["machine-learning", "health"]
+      },
+      "searchable_text": "医疗机器学习岗位，开发生理信号模型并进行生产评估。"
+    },
+    {
+      "document_key": "saved-brand-marketing",
+      "resource_type": "saved_job",
+      "owner": "primary",
+      "payload": {
+        "title": "Brand Marketing Specialist",
+        "company": "Retail Example",
+        "location": "Shanghai",
+        "raw_jd_text": "Plan consumer campaigns, manage social content, and coordinate retail events.",
+        "tags": ["marketing"]
+      },
+      "searchable_text": "品牌营销岗位，负责消费者活动、社交内容和零售事件。"
+    },
+    {
+      "document_key": "profile-rag-backend",
+      "resource_type": "resume_profile",
+      "owner": "primary",
+      "payload": {
+        "summary": "Backend engineer who built a tenant-aware RAG service and vector retrieval pipeline.",
+        "target_roles": ["Backend Engineer", "AI Agent Engineer"],
+        "core_skills": ["Python", "FastAPI", "PostgreSQL", "Vector Database"],
+        "strengths": [
+          "Built hybrid vector and keyword retrieval",
+          "Reduced API latency through caching and query optimization"
+        ]
+      },
+      "searchable_text": "后端工程师，使用 Python 和 FastAPI 构建向量数据库、RAG 混合检索，并完成 API 性能优化。"
+    },
+    {
+      "document_key": "other-user-kubernetes",
+      "resource_type": "saved_job",
+      "owner": "other",
+      "payload": {
+        "title": "Private Kubernetes Administrator",
+        "company": "Other User Company",
+        "raw_jd_text": "Kubernetes Kubernetes Kubernetes private foreign-user resource."
+      },
+      "searchable_text": "其他用户的私有 Kubernetes 岗位，不允许返回。"
+    }
+  ],
+  "cases": [
+    {
+      "case_id": "saved-kubernetes",
+      "query": "我收藏过哪些要求 Kubernetes 的岗位？",
+      "resource_types": ["saved_job"],
+      "expected_document_keys": ["saved-kubernetes-platform"],
+      "forbidden_document_keys": ["other-user-kubernetes"],
+      "top_k": 3
+    },
+    {
+      "case_id": "saved-health-model",
+      "query": "哪个收藏职位需要生理信号机器学习经验？",
+      "resource_types": ["saved_job"],
+      "expected_document_keys": ["saved-health-ml"],
+      "forbidden_document_keys": ["other-user-kubernetes"],
+      "top_k": 3
+    },
+    {
+      "case_id": "resume-vector-rag",
+      "query": "我的哪些经历与向量数据库和 RAG 检索有关？",
+      "resource_types": ["resume_profile"],
+      "expected_document_keys": ["profile-rag-backend"],
+      "top_k": 3
+    },
+    {
+      "case_id": "resume-performance",
+      "query": "我的经历中有哪些 API 性能优化证据？",
+      "resource_types": ["resume_profile"],
+      "expected_document_keys": ["profile-rag-backend"],
+      "top_k": 3
+    }
+  ]
+}

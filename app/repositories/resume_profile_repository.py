@@ -4,6 +4,7 @@ import json
 from datetime import datetime, timezone
 from uuid import uuid4
 
+from app.repositories.rag_sync_repository import rag_sync_repository
 from app.schemas.confirmed_profile import ConfirmedProfile
 from app.schemas.resume_profile import ResumeProfile, ResumeProfileUpdateRequest
 from app.storage.database import get_connection, init_database
@@ -85,6 +86,13 @@ class ResumeProfileRepository:
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 self._profile_values(profile),
+            )
+            rag_sync_repository.enqueue_if_enabled(
+                connection=connection,
+                user_id=user_id,
+                resource_type="resume_profile",
+                resource_id=profile.resume_profile_id,
+                operation="upsert",
             )
             connection.commit()
         return profile
@@ -217,6 +225,13 @@ class ResumeProfileRepository:
                     resume_profile_id,
                 ),
             )
+            rag_sync_repository.enqueue_if_enabled(
+                connection=connection,
+                user_id=user_id,
+                resource_type="resume_profile",
+                resource_id=resume_profile_id,
+                operation="upsert",
+            )
             connection.commit()
         return updated
 
@@ -275,6 +290,13 @@ class ResumeProfileRepository:
                         "UPDATE resume_profiles SET is_default = 1 WHERE user_id = ? AND resume_profile_id = ?",
                         (user_id, replacement["resume_profile_id"]),
                     )
+            rag_sync_repository.enqueue_if_enabled(
+                connection=connection,
+                user_id=user_id,
+                resource_type="resume_profile",
+                resource_id=resume_profile_id,
+                operation="delete",
+            )
             connection.commit()
         return self.get(user_id=user_id, resume_profile_id=resume_profile_id)
 
@@ -292,6 +314,13 @@ class ResumeProfileRepository:
                 WHERE user_id = ? AND resume_profile_id = ?
                 """,
                 (now, user_id, resume_profile_id),
+            )
+            rag_sync_repository.enqueue_if_enabled(
+                connection=connection,
+                user_id=user_id,
+                resource_type="resume_profile",
+                resource_id=resume_profile_id,
+                operation="upsert",
             )
             connection.commit()
         restored = self.get(user_id=user_id, resume_profile_id=resume_profile_id)
@@ -347,6 +376,13 @@ class ResumeProfileRepository:
                         "UPDATE resume_profiles SET is_default = 1 WHERE user_id = ? AND resume_profile_id = ?",
                         (user_id, replacement["resume_profile_id"]),
                     )
+            rag_sync_repository.enqueue_if_enabled(
+                connection=connection,
+                user_id=user_id,
+                resource_type="resume_profile",
+                resource_id=resume_profile_id,
+                operation="delete",
+            )
             connection.commit()
         return cursor.rowcount > 0
 

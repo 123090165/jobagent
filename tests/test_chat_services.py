@@ -413,6 +413,46 @@ def test_data_access_off_overrides_agent_tools() -> None:
     assert plan.policy_reasons == ["data_access_off"]
 
 
+def test_semantic_personal_question_selects_mcp_knowledge_tool() -> None:
+    conversation = _conversation()
+
+    tools = default_agent_tools(
+        "我收藏过哪些要求 Kubernetes 的岗位？",
+        conversation=conversation,
+        context_manifest={},
+    )
+    plan = build_agent_retrieval_plan(
+        "我收藏过哪些要求 Kubernetes 的岗位？",
+        tool_calls=tools,
+        conversation=conversation,
+        recent_turns=[],
+    )
+
+    assert tools == ["search_personal_knowledge"]
+    assert plan.agent_sources == ["saved_jobs"]
+    assert plan.requests == []
+    assert "agent_tool:search_personal_knowledge" in plan.policy_reasons
+
+
+def test_personal_experience_question_targets_resume_knowledge() -> None:
+    conversation = _conversation()
+
+    tools = default_agent_tools(
+        "我的哪些经历能够证明后端开发能力？",
+        conversation=conversation,
+        context_manifest={},
+    )
+    plan = build_agent_retrieval_plan(
+        "我的哪些经历能够证明后端开发能力？",
+        tool_calls=tools,
+        conversation=conversation,
+        recent_turns=[],
+    )
+
+    assert "search_personal_knowledge" in tools
+    assert plan.agent_sources == ["profile"]
+
+
 def test_search_context_combines_exact_results_with_whole_selected_runs() -> None:
     def search_result(result_id: str, title: str) -> SimpleNamespace:
         return SimpleNamespace(

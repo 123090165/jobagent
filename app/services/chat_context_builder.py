@@ -234,7 +234,7 @@ def build_chat_evidence(
                 content={"question": turn.question, "answer": (turn.answer or "")[:1200]},
             ))
 
-    return _apply_budget(evidence), warnings
+    return apply_evidence_budget(evidence), warnings
 
 
 def evidence_packet(evidence: list[ChatEvidence]) -> list[dict[str, object]]:
@@ -244,7 +244,7 @@ def evidence_packet(evidence: list[ChatEvidence]) -> list[dict[str, object]]:
     ]
 
 
-def _apply_budget(items: list[ChatEvidence]) -> list[ChatEvidence]:
+def apply_evidence_budget(items: list[ChatEvidence]) -> list[ChatEvidence]:
     selected: list[ChatEvidence] = []
     chars = 0
     for item in items[:MAX_EVIDENCE_RESOURCES]:

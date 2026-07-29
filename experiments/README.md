@@ -1,5 +1,20 @@
 # Resume Extraction Comparison Experiment
 
+## Private RAG Quality
+
+`experiments/rag_quality/` contains a versioned, privacy-aware retrieval corpus
+for Resume Profile and Saved Job knowledge. Run the network-free lexical
+baseline with:
+
+```powershell
+python -m scripts.evaluate_rag_quality --mode lexical
+```
+
+Use `--mode live` only with the local Modular RAG management and MCP endpoints
+configured. Live mode seeds temporary users, exercises the durable outbox and
+authorized MCP query, checks forbidden cross-user hits, and cleans up the
+indexed resources after evaluation.
+
 This directory contains local-only experiments for comparing DeepSeek-based resume extraction strategies. It does not modify production parser behavior, API routes, frontend behavior, repositories, or job brief logic.
 
 ## Modes

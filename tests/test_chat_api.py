@@ -7,6 +7,9 @@ from types import SimpleNamespace
 from fastapi.testclient import TestClient
 
 from app.main import app
+from app.schemas.chat import ChatCitation
+from app.services.chat_context_builder import ChatEvidence
+from app.services.chat_personal_knowledge import PersonalKnowledgeSearchOutcome
 
 
 client = TestClient(app)
@@ -64,6 +67,150 @@ class FakeChatLLM:
 
 def _resolution(service) -> SimpleNamespace:
     return SimpleNamespace(provider="deepseek", service=service, configured=True)
+
+
+def test_chat_agent_uses_mcp_personal_knowledge_with_grounded_citation(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    monkeypatch.setenv(
+        "JOBAGENT_DB_PATH",
+        str(tmp_path / "chat-personal-knowledge.sqlite3"),
+    )
+    headers = _register("chat-personal-knowledge")
+    requested_queries: list[str] = []
+
+    class PersonalKnowledgeAgent:
+        def chat_completion_json(
+            self,
+            *,
+            system_prompt,
+            user_prompt,
+            expected_root_key=None,
+        ):
+            payload = json.loads(user_prompt)
+            if payload["phase"] == "choose_tools_or_answer":
+                return {
+                    "action": "use_tools",
+                    "tool_calls": ["search_personal_knowledge"],
+                    "answer": "",
+                    "citation_ids": [],
+                    "limitations": [],
+                }
+            assert payload["evidence"][0]["content"]["retrieval_source"] == (
+                "modular_rag_mcp"
+            )
+            return {
+                "action": "final",
+                "tool_calls": [],
+                "answer": "你收藏的 Platform Engineer 岗位明确要求 Kubernetes。",
+                "citation_ids": ["saved_job:job-rag"],
+                "limitations": [],
+            }
+
+    def fake_personal_search(question, **kwargs):
+        requested_queries.append(question)
+        return PersonalKnowledgeSearchOutcome(
+            evidence=[
+                ChatEvidence(
+                    citation=ChatCitation(
+                        citation_id="saved_job:job-rag",
+                        source_type="saved_jobs",
+                        resource_id="job-rag",
+                        label="Platform Engineer · Example",
+                        excerpt="Requires Kubernetes.",
+                    ),
+                    content={
+                        "retrieval_source": "modular_rag_mcp",
+                        "text": "Requires Kubernetes.",
+                    },
+                )
+            ],
+            sources=["saved_jobs"],
+            warnings=[],
+            service_available=True,
+        )
+
+    monkeypatch.setattr(
+        "app.application.chat_usecases.resolve_llm_provider",
+        lambda provider=None: _resolution(PersonalKnowledgeAgent()),
+    )
+    monkeypatch.setattr(
+        "app.services.chat_personal_knowledge.search_personal_knowledge",
+        fake_personal_search,
+    )
+    conversation = client.post(
+        "/api/v1/chat/conversations",
+        headers=headers,
+        json={},
+    ).json()
+
+    response = client.post(
+        f"/api/v1/chat/conversations/{conversation['conversation_id']}/turns",
+        headers=headers,
+        json={
+            "client_turn_id": "rag-tool-turn",
+            "question": "我收藏过哪些要求 Kubernetes 的岗位？",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert requested_queries == ["我收藏过哪些要求 Kubernetes 的岗位？"]
+    assert payload["retrieval_used"] is True
+    assert payload["retrieval_plan"]["requests"] == []
+    assert payload["citations"][0]["resource_id"] == "job-rag"
+    assert payload["answer"] == "你收藏的 Platform Engineer 岗位明确要求 Kubernetes。"
+
+
+def test_chat_personal_knowledge_falls_back_when_mcp_is_not_configured(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    monkeypatch.setenv(
+        "JOBAGENT_DB_PATH",
+        str(tmp_path / "chat-personal-fallback.sqlite3"),
+    )
+    monkeypatch.delenv("JOBAGENT_RAG_MCP_URL", raising=False)
+    headers = _register("chat-personal-fallback")
+    job = client.post(
+        "/api/v1/saved-jobs",
+        headers=headers,
+        json={
+            "title": "Platform Engineer",
+            "company": "Example",
+            "raw_jd_text": "Build and operate Kubernetes platforms.",
+        },
+    ).json()
+    monkeypatch.setattr(
+        "app.application.chat_usecases.resolve_llm_provider",
+        lambda provider=None: SimpleNamespace(provider="mock", service=None),
+    )
+    conversation = client.post(
+        "/api/v1/chat/conversations",
+        headers=headers,
+        json={},
+    ).json()
+
+    response = client.post(
+        f"/api/v1/chat/conversations/{conversation['conversation_id']}/turns",
+        headers=headers,
+        json={
+            "client_turn_id": "rag-fallback-turn",
+            "question": "我收藏过哪些要求 Kubernetes 的岗位？",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["retrieval_used"] is True
+    assert payload["retrieved_refs"] == [f"saved_job:{job['saved_job_id']}"]
+    assert "personal_knowledge_unavailable:not_configured" in payload[
+        "quality_warnings"
+    ]
+    assert "personal_knowledge_fallback:jobagent_database" in payload[
+        "quality_warnings"
+    ]
 
 
 def test_browser_helper_session_is_scoped_to_chat(monkeypatch, tmp_path) -> None:
@@ -577,7 +724,7 @@ def test_ordinary_out_of_scope_question_does_not_retrieve_or_refuse(monkeypatch,
         raise AssertionError("business context retrieval must not run")
 
     monkeypatch.setattr(
-        "app.application.chat_usecases.build_chat_evidence",
+        "app.application.chat_usecases.build_chat_evidence_with_personal_knowledge",
         unexpected_retrieval,
     )
     monkeypatch.setattr(
