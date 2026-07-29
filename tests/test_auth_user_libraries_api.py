@@ -167,7 +167,25 @@ def test_save_job_from_search_result_creates_saved_job_and_analysis(monkeypatch,
         },
     )
     assert duplicate_response.status_code == 200
-    assert duplicate_response.json()["saved_job_id"] == saved["saved_job_id"]
+    duplicate = duplicate_response.json()
+    assert duplicate["saved_job_id"] == saved["saved_job_id"]
+    assert (
+        duplicate["latest_analysis"]["saved_job_analysis_id"]
+        != saved["latest_analysis"]["saved_job_analysis_id"]
+    )
+
+    analyses_response = client.get(
+        f"/api/v1/saved-jobs/{saved['saved_job_id']}/analyses", headers=headers
+    )
+    assert analyses_response.status_code == 200
+    analyses = analyses_response.json()["items"]
+    assert len(analyses) == 2
+    assert analyses[0]["saved_job_analysis_id"] == duplicate["latest_analysis"][
+        "saved_job_analysis_id"
+    ]
+    assert analyses[1]["saved_job_analysis_id"] == saved["latest_analysis"][
+        "saved_job_analysis_id"
+    ]
 
     contexts_response = client.get(
         f"/api/v1/saved-jobs/{saved['saved_job_id']}/contexts", headers=headers
@@ -178,12 +196,53 @@ def test_save_job_from_search_result_creates_saved_job_and_analysis(monkeypatch,
     assert contexts[0]["resume_profile_id"] == profile["resume_profile_id"]
     assert contexts[0]["job_search_run_id"] == run["job_search_run_id"]
     assert contexts[0]["job_search_result_id"] == result["job_result_id"]
+    assert contexts[0]["saved_job_analysis_id"] == duplicate["latest_analysis"][
+        "saved_job_analysis_id"
+    ]
     assert contexts[0]["profile_label"] == profile["name"]
     assert contexts[0]["search_query"] == run["query"]
 
     list_response = client.get("/api/v1/saved-jobs", headers=headers)
     assert list_response.status_code == 200
     assert len(list_response.json()["items"]) == 1
+
+
+def test_duplicate_saved_job_keeps_the_richer_current_jd(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("JOBAGENT_DB_PATH", str(tmp_path / "saved-job-refresh.sqlite3"))
+    headers = _auth_headers(_register("saved-job-refresh"))
+    payload = {
+        "source_url": "https://jobs.example.com/backend",
+        "title": "Backend Engineer",
+        "company": "Example",
+        "raw_jd_text": "Python required.",
+        "structured_jd": {"requirements": ["Python"], "source": "search"},
+    }
+    first = client.post("/api/v1/saved-jobs", headers=headers, json=payload).json()
+
+    richer = client.post(
+        "/api/v1/saved-jobs",
+        headers=headers,
+        json={
+            **payload,
+            "raw_jd_text": "Python and SQL are required. Build and maintain backend APIs.",
+            "structured_jd": {
+                "requirements": ["Python", "SQL"],
+                "evidence_quotes": ["Python and SQL are required."],
+            },
+        },
+    ).json()
+    shorter = client.post(
+        "/api/v1/saved-jobs",
+        headers=headers,
+        json={**payload, "raw_jd_text": "Python.", "structured_jd": {"requirements": []}},
+    ).json()
+
+    assert richer["saved_job_id"] == first["saved_job_id"]
+    assert richer["raw_jd_text"] == "Python and SQL are required. Build and maintain backend APIs."
+    assert richer["structured_jd"]["requirements"] == ["Python", "SQL"]
+    assert richer["structured_jd"]["source"] == "search"
+    assert shorter["raw_jd_text"] == richer["raw_jd_text"]
+    assert shorter["structured_jd"]["requirements"] == ["Python", "SQL"]
 
 
 def test_search_history_is_user_scoped_and_ordered(monkeypatch, tmp_path) -> None:

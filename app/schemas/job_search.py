@@ -6,6 +6,7 @@ from typing import Literal, TypeAlias
 
 from pydantic import BaseModel, Field, field_validator
 
+from app.schemas.job import JDRequirement
 from app.schemas.profile_session import ProfileSession
 
 JobSearchMode: TypeAlias = Literal["local_mock", "live_search", "browser_helper"]
@@ -86,6 +87,9 @@ class JobSearchResult(BaseModel):
     final_match_score: int | None = None
     score_breakdown: dict[str, int] = Field(default_factory=dict)
     evidence_quotes: list[str] = Field(default_factory=list)
+    job_requirements: list[JDRequirement] = Field(default_factory=list)
+    unknowns: list[str] = Field(default_factory=list)
+    hard_constraint_status: Literal["satisfied", "unknown"] = "satisfied"
     recommended_action: str
     analysis_mode: JobSearchAnalysisMode = "mock"
     confidence_label: JobSearchConfidenceLabel = "limited"

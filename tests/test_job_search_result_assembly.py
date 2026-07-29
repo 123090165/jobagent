@@ -3,6 +3,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 from app.application.job_search_usecases import _assemble_results
+from app.schemas.job import JDRequirement
 from app.services.job_search_execution.result_builder import _diversify_matched_items
 from app.services.job_search_providers.base import RawJobCandidate
 
@@ -23,7 +24,18 @@ def _candidate(source_url: str, snippet: str) -> RawJobCandidate:
 def _matched_item(candidate: RawJobCandidate, score: int) -> dict[str, object]:
     return {
         "candidate": candidate,
-        "analysis": SimpleNamespace(raw_jd=candidate.raw_description),
+        "analysis": SimpleNamespace(
+            raw_jd=candidate.raw_description,
+            requirements=[
+                JDRequirement(
+                    category="skill",
+                    name="algorithm",
+                    necessity="required",
+                    evidence_quote=candidate.raw_description,
+                    confidence=0.9,
+                )
+            ],
+        ),
         "analysis_mode": "deterministic",
         "match_score": score,
         "score_breakdown": {"total": score},
@@ -53,6 +65,7 @@ def test_assemble_results_dedupes_canonical_source_urls() -> None:
     assert len(results) == 1
     assert results[0].match_score == 91
     assert results[0].description == "higher scored duplicate"
+    assert results[0].job_requirements[0].name == "algorithm"
 
 
 def test_diversity_only_reorders_close_scores() -> None:

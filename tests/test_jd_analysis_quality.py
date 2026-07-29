@@ -60,7 +60,7 @@ def test_load_existing_prompt() -> None:
     prompt = load_prompt("jd_analysis/system.md")
 
     assert "JDAnalysisAgent" in prompt
-    assert "jd_analysis_v2" in prompt
+    assert "jd_analysis_v3" in prompt
 
 
 def test_load_missing_prompt_raises_clear_error() -> None:

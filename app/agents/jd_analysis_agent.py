@@ -8,10 +8,11 @@ from app.agents.types import AgentExecutionMode, AgentRunMetadata, AgentRunResul
 from app.prompts.loader import load_prompt
 from app.schemas.job import JobAnalysis
 from app.services.jd_analysis_quality import evaluate_jd_analysis_quality
+from app.services.jd_requirements import build_legacy_requirements, ground_requirements
 from app.services.llm_service import LLMService, LLMServiceError
 
 
-JD_ANALYSIS_PROMPT_VERSION = "jd_analysis_v2"
+JD_ANALYSIS_PROMPT_VERSION = "jd_analysis_v3"
 JD_ANALYSIS_SYSTEM_PROMPT = load_prompt("jd_analysis/system.md")
 
 
@@ -99,9 +100,20 @@ def _validate_job_analysis(payload: dict[str, Any], *, raw_jd: str) -> JobAnalys
         "soft_skills",
         "implicit_requirements",
         "keywords",
+        "requirements",
     ]:
         normalized.setdefault(field, [])
-    return JobAnalysis.model_validate(normalized)
+    analysis = JobAnalysis.model_validate(normalized)
+    requirements = analysis.requirements or build_legacy_requirements(
+        raw_jd=raw_jd,
+        required_skills=analysis.required_skills,
+        preferred_skills=analysis.preferred_skills,
+        experience_requirements=analysis.experience_requirements,
+        education_requirements=analysis.education_requirements,
+    )
+    return analysis.model_copy(
+        update={"requirements": ground_requirements(raw_jd, requirements)}
+    )
 
 
 def _mock_jd_analysis(jd_text: str) -> JobAnalysis:

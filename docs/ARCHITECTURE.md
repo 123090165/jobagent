@@ -26,6 +26,7 @@ Current boundaries:
 - app/storage: database initialization and compatibility helpers;
 - web/src/api: typed HTTP clients;
 - web/src/stores: user and workflow state;
+- web/src/composables: page-level controls and browser-session coordination;
 - web/src/pages: product views;
 - browser-helper: local browser-assisted provider and capture extension.
 
@@ -85,6 +86,19 @@ Search planning
 -> Profile matching
 -> Result assembly
 ~~~
+
+Candidate filtering produces a `recall_score` from title, snippet, source, and
+basic profile fit. JD analysis then preserves the full description and extracts
+typed requirements with required/preferred/unknown necessity and grounded JD
+quotes. Profile matching builds one `JobMatchContext` per candidate, re-checks
+hard constraints against the enriched JD, and produces `final_match_score`, key
+evidence, and unknowns. Search cards display that final score. Saving a search
+result persists the same requirements and analysis snapshot; a later Job Brief
+explains that saved analysis rather than replacing the search score.
+Repeated saves append `SavedJobAnalysis` history and move `latest_analysis` to
+the newest snapshot. The Saved Job's current JD and structured fields are
+refreshed only with richer incoming content, so shorter snippets cannot replace
+a previously captured full description.
 
 FastAPI persists a run and schedules in-process BackgroundTasks. JD analysis
 uses a bounded per-run thread pool. This is an MVP execution model: work does
@@ -153,6 +167,20 @@ introduce a second store for Profile, job-description, or search-result data.
 Failure to build this auxiliary view does not block loading chat history or
 creating a new answer.
 
+## MCP Service Integrations
+
+Optional MCP services remain separate runtime processes. JobAgent owns the
+backend-side client, static tool allowlist, timeouts, response budgets, and
+typed adapters; the external service owns its retrieval implementation,
+dependencies, and storage.
+
+The Modular RAG integration currently provides service discovery and typed,
+allowlisted calls for collection listing, knowledge retrieval, and document
+summaries. It is not part of Search V2 and its tools are not exposed to the
+Career Assistant or another LLM without a separate product-policy integration.
+An unavailable optional MCP service does not prevent JobAgent from starting.
+See `MODULAR_RAG_MCP.md`.
+
 ## Persistence
 
 Local development uses sqlite3 and JOBAGENT_DB_PATH, defaulting to
@@ -171,21 +199,26 @@ Production direction:
 - durable queue/worker execution;
 - backup, retention, and recovery procedures.
 
-## Refactoring Boundaries
+## Search Module Boundaries
 
-app/application/job_search_usecases.py currently contains too many search
-responsibilities. Refactor it incrementally:
+app/application/job_search_usecases.py owns authorization, run lifecycle, and
+high-level orchestration. Stage behavior lives behind focused service modules:
 
-1. Keep creation, authorization, run lifecycle, and high-level orchestration in
-   the application layer.
-2. Move each stage implementation behind a focused service or step runner.
-3. Keep provider behavior in provider adapters.
-4. Keep normalization, quality gates, and scoring testable without network or
-   LLM calls.
-5. Keep repository transactions out of prompts and provider code.
+1. app/services/job_search_planner.py owns intent-to-plan assembly.
+2. app/services/job_search_execution/ owns preview, provider execution,
+   candidate analysis, result assembly, and trace helpers.
+3. app/services/job_candidate_filter.py coordinates candidate selection behind
+   the filter_candidates() facade; job_candidate_constraints.py,
+   job_candidate_scoring.py, and job_candidate_reranker.py own the three
+   deterministic constraint, scoring, and bounded LLM stages.
+4. app/services/job_search_providers/ owns source-specific provider behavior.
+5. repositories own persistence and must remain outside prompts and provider
+   adapters.
 
-File size alone is not a refactoring requirement. Refactor when mixed ownership,
-duplicated policy, or change risk makes the boundary valuable.
+New search work should extend the module that owns its stage instead of moving
+policy back into the application orchestrator. File size alone is not a
+refactoring requirement; split a module when mixed ownership, duplicated policy,
+or change risk makes the boundary valuable.
 
 Do not restore deleted Streamlit, unversioned API, legacy LangGraph runtime, or
 old tracker/import paths. Git history is the reference for removed code.

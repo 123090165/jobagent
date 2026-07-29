@@ -698,7 +698,10 @@ function formatQueryLabel(value: unknown): string {
 
           <div class="job-card-section">
             <strong>Search Fit</strong>
-            <p>{{ result.analysis_mode }} - {{ result.confidence_label }}</p>
+            <p>
+              {{ result.analysis_mode }} - {{ result.confidence_label }} - constraints
+              {{ result.hard_constraint_status }}
+            </p>
           </div>
 
           <div class="job-card-section">
@@ -735,6 +738,13 @@ function formatQueryLabel(value: unknown): string {
             <strong>Evidence</strong>
             <ul class="review-list">
               <li v-for="quote in result.evidence_quotes" :key="quote">{{ quote }}</li>
+            </ul>
+          </div>
+
+          <div v-if="result.unknowns.length" class="job-card-section">
+            <strong>Needs Confirmation</strong>
+            <ul class="review-list">
+              <li v-for="unknown in result.unknowns" :key="unknown">{{ unknown }}</li>
             </ul>
           </div>
 

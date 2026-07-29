@@ -5,10 +5,12 @@ from uuid import NAMESPACE_URL, uuid5
 
 from app.schemas.confirmed_profile import ConfirmedProfile
 from app.schemas.job_search import JobSearchResult
-from app.services.job_candidate_filter import (
+from app.services.job_candidate_scoring import (
     CandidateScorecard,
-    build_candidate_scorecard,
+    JobMatchContext,
+    build_final_candidate_scorecard,
 )
+from app.services.job_candidate_constraints import evaluate_constraints
 from app.services.job_search_planner import JobSearchPlan
 from app.services.job_search_providers.base import RawJobCandidate
 from app.services.job_search_recall_metrics import candidate_recall_key
@@ -127,6 +129,8 @@ def _match_candidates(
     confirmed_profile: ConfirmedProfile,
     search_plan: JobSearchPlan,
     analyzed_items: list[dict[str, object]],
+    *,
+    profile_evidence_text: str = "",
 ) -> list[dict[str, object]]:
     matched_items: list[dict[str, object]] = []
     for candidate_index, item in enumerate(analyzed_items):
@@ -134,11 +138,18 @@ def _match_candidates(
         analysis = item["analysis"]
         recall_scorecard = item.get("scorecard")
         enriched_candidate = _candidate_with_analysis(candidate, analysis)
-        final_scorecard = build_candidate_scorecard(
+        constraint_decision = evaluate_constraints(search_plan, [enriched_candidate])[0]
+        if constraint_decision.status == "rejected":
+            continue
+        final_scorecard = build_final_candidate_scorecard(
             candidate_index,
-            enriched_candidate,
-            confirmed_profile=confirmed_profile,
-            search_plan=search_plan,
+            JobMatchContext(
+                confirmed_profile=confirmed_profile,
+                search_plan=search_plan,
+                candidate=enriched_candidate,
+                analysis=analysis,
+                profile_evidence_text=profile_evidence_text,
+            ),
         )
         recall_risks = (
             recall_scorecard.risks
@@ -159,6 +170,16 @@ def _match_candidates(
                 "match_score": final_scorecard.match_score,
                 "score_breakdown": final_scorecard.score_breakdown,
                 "evidence_quotes": final_scorecard.evidence_quotes,
+                "unknowns": _clean_list(
+                    final_scorecard.unknowns
+                    + [
+                        f"Hard constraint field is unknown: {field}."
+                        for field in constraint_decision.unknown_fields
+                    ]
+                ),
+                "hard_constraint_status": (
+                    "unknown" if constraint_decision.status == "unknown" else "satisfied"
+                ),
                 "matched_keywords": final_scorecard.matched_keywords[:6],
                 "match_reasons": final_scorecard.match_reasons,
                 "risks": _clean_list(
@@ -259,7 +280,12 @@ def _assemble_results(
             continue
         seen_result_keys.add(result_key)
         analysis = item["analysis"]
-        description = getattr(candidate, "snippet", None) or getattr(analysis, "raw_jd", "")
+        description = (
+            getattr(analysis, "raw_jd", "")
+            or getattr(candidate, "raw_description", None)
+            or getattr(candidate, "snippet", None)
+            or ""
+        )
         source_url = getattr(candidate, "source_url", None)
         title = getattr(candidate, "title", None) or getattr(analysis, "job_title", None) or "Untitled role"
         company = getattr(candidate, "company", None) or getattr(analysis, "company", None) or "Unknown company"
@@ -285,6 +311,13 @@ def _assemble_results(
                 final_match_score=score,
                 score_breakdown=dict(item.get("score_breakdown", {})),
                 evidence_quotes=list(item.get("evidence_quotes", [])),
+                job_requirements=list(getattr(analysis, "requirements", []) or []),
+                unknowns=list(item.get("unknowns", [])),
+                hard_constraint_status=(
+                    "unknown"
+                    if item.get("hard_constraint_status") == "unknown"
+                    else "satisfied"
+                ),
                 recommended_action=_recommended_action(score),
                 analysis_mode=item["analysis_mode"],
                 confidence_label=item["confidence_label"],

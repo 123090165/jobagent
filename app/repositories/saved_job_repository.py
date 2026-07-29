@@ -54,7 +54,11 @@ class SavedJobRepository:
                     tags=_clean_list(existing.tags + payload.tags),
                 ),
             )
-            return updated or existing
+            return self._refresh_content_if_better(
+                user_id=user_id,
+                existing=updated or existing,
+                payload=payload,
+            )
 
         now = _utc_now()
         source_url = _clean_optional_string(payload.source_url)
@@ -130,6 +134,59 @@ class SavedJobRepository:
             )
             connection.commit()
         return job
+
+    def _refresh_content_if_better(
+        self,
+        *,
+        user_id: str,
+        existing: SavedJob,
+        payload: SavedJobCreateRequest,
+    ) -> SavedJob:
+        incoming_jd = payload.raw_jd_text.strip()
+        raw_jd_text = (
+            incoming_jd
+            if len(incoming_jd) > len(existing.raw_jd_text.strip())
+            else existing.raw_jd_text
+        )
+        structured_jd = _merge_richer_values(
+            existing.structured_jd,
+            payload.structured_jd,
+        )
+        if (
+            raw_jd_text == existing.raw_jd_text
+            and structured_jd == existing.structured_jd
+        ):
+            return existing
+
+        updated_at = _utc_now()
+        with get_connection() as connection:
+            init_database(connection)
+            connection.execute(
+                """
+                UPDATE saved_jobs
+                SET raw_jd_text = ?, structured_jd_json = ?, updated_at = ?
+                WHERE user_id = ? AND saved_job_id = ?
+                """,
+                (
+                    raw_jd_text,
+                    json.dumps(structured_jd),
+                    updated_at.isoformat(),
+                    user_id,
+                    existing.saved_job_id,
+                ),
+            )
+            rag_sync_repository.enqueue_if_enabled(
+                connection=connection,
+                user_id=user_id,
+                resource_type="saved_job",
+                resource_id=existing.saved_job_id,
+                operation="upsert",
+            )
+            connection.commit()
+        return self.get(
+            user_id=user_id,
+            saved_job_id=existing.saved_job_id,
+        ) or existing
 
     def create_analysis(
         self,
@@ -720,6 +777,23 @@ def _clean_list(values: list[object] | None) -> list[str]:
         seen.add(key)
         cleaned.append(item)
     return cleaned
+
+
+def _merge_richer_values(
+    existing: dict[str, object],
+    incoming: dict[str, object],
+) -> dict[str, object]:
+    merged = dict(existing)
+    for key, value in incoming.items():
+        if _content_size(value) >= _content_size(merged.get(key)):
+            merged[key] = value
+    return merged
+
+
+def _content_size(value: object) -> int:
+    if value is None:
+        return 0
+    return len(json.dumps(value, ensure_ascii=False, sort_keys=True))
 
 
 saved_job_repository = SavedJobRepository()

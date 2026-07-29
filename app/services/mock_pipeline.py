@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 
 from app.schemas.job import JobAnalysis
+from app.services.jd_requirements import build_legacy_requirements
 from app.schemas.resume import EducationItem, ResumeProfile
 from app.services.resume_section_parser import (
     KNOWN_RESUME_SKILLS,
@@ -134,7 +135,8 @@ def mock_jd_analysis(jd_text: str) -> JobAnalysis:
         raise ValueError("jd_text cannot be empty")
 
     lines = _clean_lines(text)
-    required_skills = _extract_required_skills(lines)
+    explicit_required_skills = _extract_required_skills(lines)
+    required_skills = list(explicit_required_skills)
     preferred_skills = _extract_preferred_skills(lines)
     all_skills = _dedupe([*required_skills, *preferred_skills, *_extract_skills(text)])
     if not required_skills:
@@ -153,6 +155,13 @@ def mock_jd_analysis(jd_text: str) -> JobAnalysis:
         if any(skill in all_skills for skill in ["LLM", "RAG", "OpenAI", "LangGraph"])
         else "Software Engineering"
     )
+    requirements = build_legacy_requirements(
+        raw_jd=text,
+        required_skills=explicit_required_skills,
+        preferred_skills=preferred_skills,
+        experience_requirements=experience_requirements,
+        education_requirements=education_requirements,
+    )
     return JobAnalysis(
         raw_jd=text,
         job_title=_first_reasonable_title(lines, "Target role"),
@@ -165,6 +174,7 @@ def mock_jd_analysis(jd_text: str) -> JobAnalysis:
         implicit_requirements=["Explain project evidence clearly."],
         keywords=all_skills,
         job_category=job_category,
+        requirements=requirements,
     )
 
 

@@ -12,6 +12,9 @@
 - `app/services/job_search_execution/provider_search.py`
 - `app/services/job_search_providers/`
 - `app/services/job_candidate_filter.py`
+- `app/services/job_candidate_constraints.py`
+- `app/services/job_candidate_scoring.py`
+- `app/services/job_candidate_reranker.py`
 - `app/services/job_search_execution/candidate_analysis.py`
 - `app/services/job_search_execution/result_builder.py`
 - `experiments/provider_recall_calibration.py`

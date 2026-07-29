@@ -225,6 +225,7 @@ def create_job_search_run(
         background_tasks.add_task(
             execute_job_search_run,
             run.job_search_run_id,
+            user_id=user_id or LOCAL_USER_ID,
             session_repository=session_repository,
             confirmed_repository=confirmed_repository,
             search_repository=search_repository,
@@ -298,6 +299,7 @@ def create_browser_helper_job_search_run(
         return run_response
     return execute_job_search_run(
         run_response.job_search_run.job_search_run_id,
+        user_id=user_id or LOCAL_USER_ID,
         session_repository=session_repository,
         confirmed_repository=confirmed_repository,
         search_repository=search_repository,
@@ -385,16 +387,18 @@ def _compose_browser_helper_provider(
 def execute_job_search_run(
     run_id: str,
     *,
+    user_id: str = LOCAL_USER_ID,
     session_repository: ProfileSessionRepository = profile_session_repository,
     confirmed_repository: ConfirmedProfileRepository = confirmed_profile_repository,
     search_repository: JobSearchRepository = job_search_repository,
+    resume_profiles: ResumeProfileRepository = resume_profile_repository,
     job_search_provider: JobSearchProvider | None = None,
     llm_service: JSONChatLLM | None = None,
     analysis_mode: str | None = None,
     llm_provider: str | None = None,
     max_results: int = 10,
 ) -> JobSearchRunResponse:
-    run = search_repository.get(run_id)
+    run = search_repository.get(run_id, user_id=user_id)
     if run is None:
         raise JobAgentError(
             message="Job search run not found.",
@@ -410,6 +414,23 @@ def execute_job_search_run(
             error_code="confirmed_profile_not_found",
             status_code=404,
         )
+
+    durable_profile = (
+        resume_profiles.get(
+            user_id=user_id,
+            resume_profile_id=run.resume_profile_id,
+        )
+        if run.resume_profile_id
+        else resume_profiles.get_by_confirmed_profile(
+            user_id=user_id,
+            confirmed_profile_id=run.confirmed_profile_id,
+        )
+    )
+    profile_evidence_text = (
+        durable_profile.raw_resume_text
+        if durable_profile is not None and durable_profile.raw_resume_text
+        else ""
+    )
 
     use_llm_analysis = _resolve_execution_analysis_enabled(run, analysis_mode=analysis_mode)
     requested_llm_provider = _resolve_execution_llm_provider(
@@ -580,6 +601,7 @@ def execute_job_search_run(
             confirmed_profile,
             search_plan,
             analyses["items"],
+            profile_evidence_text=profile_evidence_text,
         )
         search_repository.complete_trace_step(
             matching_step.step_id,

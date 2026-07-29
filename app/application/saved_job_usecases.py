@@ -783,6 +783,12 @@ def _structured_jd_from_result(result: JobSearchResult) -> dict[str, object]:
         "risks": result.risks,
         "score_breakdown": result.score_breakdown,
         "evidence_quotes": result.evidence_quotes,
+        "requirements": [
+            requirement.model_dump(mode="json")
+            for requirement in result.job_requirements
+        ],
+        "unknowns": result.unknowns,
+        "hard_constraint_status": result.hard_constraint_status,
     }
 
 

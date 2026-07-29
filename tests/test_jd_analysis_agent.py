@@ -43,6 +43,32 @@ def test_analyze_jd_with_llm_validates_structured_output() -> None:
     assert result.job_title == "AI 应用开发工程师"
     assert "Python" in result.required_skills
     assert "RAG" in result.preferred_skills
+    assert result.requirements
+    assert all(item.evidence_quote for item in result.requirements)
+
+
+def test_analyze_jd_replaces_ungrounded_requirement_quote() -> None:
+    jd_text = "Backend Engineer\nPython is required. Rust is preferred."
+    service = FakeLLMService(
+        {
+            "required_skills": ["Python"],
+            "preferred_skills": ["Rust"],
+            "keywords": ["Python", "Rust"],
+            "requirements": [
+                {
+                    "category": "skill",
+                    "name": "Python",
+                    "necessity": "required",
+                    "evidence_quote": "Invented Python requirement",
+                    "confidence": 0.95,
+                }
+            ],
+        }
+    )
+
+    result = analyze_jd_with_llm(jd_text, service=service)  # type: ignore[arg-type]
+
+    assert result.requirements[0].evidence_quote == "Python is required."
 
 
 def test_analyze_jd_falls_back_to_mock_when_llm_fails() -> None:

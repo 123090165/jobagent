@@ -88,24 +88,23 @@ repository contracts must not expose framework-specific types.
 
 ## Refactoring Decision
 
-Use progressive refactoring. Do not perform a broad rewrite now, and do not
-postpone all cleanup until feature development is finished.
+The search use-case stage extraction is in place. Continue with progressive
+refactoring instead of a broad rewrite.
 
 Immediate rules:
 
-- stop adding new responsibilities to job_search_usecases.py;
+- keep job_search_usecases.py focused on authorization, run lifecycle, and
+  orchestration;
 - keep current API and persistence behavior stable;
-- extract a stage when the next feature materially changes that stage;
+- simplify a remaining stage when its mixed responsibilities materially raise
+  change risk;
 - schedule a short refactoring milestone before the next large search or Job
   Brief feature.
 
-The first extraction should leave one readable orchestrator and focused modules
-for planning, provider execution, candidate selection, JD analysis, matching,
-and result assembly. Move behavior with tests; do not redesign all stages at
-once.
-
-The executable migration sequence and acceptance checks are defined in
-[JOB_SEARCH_USECASE_REFACTOR_PLAN.md](JOB_SEARCH_USECASE_REFACTOR_PLAN.md).
+Current search execution boundaries are documented in
+[ARCHITECTURE.md](ARCHITECTURE.md). Retrieval quality behavior and remaining
+evaluation work are documented in
+[SEARCH_RETRIEVAL_QUALITY_V2_PLAN.md](SEARCH_RETRIEVAL_QUALITY_V2_PLAN.md).
 
 Before public beta, address durable tasks, authentication mode, database
 migrations, and data lifecycle as explicit architecture work.

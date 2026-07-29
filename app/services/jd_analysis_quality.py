@@ -15,6 +15,7 @@ VERBOSE_SKILL_WARNING = "skill entries may be too verbose"
 EMPTY_KEYWORDS_WARNING = "keywords appear empty"
 VERBOSE_KEYWORDS_WARNING = "keyword entries may be too verbose"
 UNGROUNDED_METADATA_WARNING = "metadata may not be grounded in JD text"
+MISSING_REQUIREMENT_EVIDENCE_WARNING = "important requirements are missing grounded JD evidence"
 
 
 class JDAnalysisQualityReport(BaseModel):
@@ -62,6 +63,14 @@ def evaluate_jd_analysis_quality(
     checked_rules.append("metadata_grounding")
     if _has_ungrounded_metadata(normalized_jd, llm_analysis):
         warnings.append(UNGROUNDED_METADATA_WARNING)
+
+    checked_rules.append("requirement_evidence_grounding")
+    if any(
+        requirement.necessity in {"required", "preferred"}
+        and not requirement.evidence_quote
+        for requirement in llm_analysis.requirements
+    ):
+        warnings.append(MISSING_REQUIREMENT_EVIDENCE_WARNING)
 
     critical_warnings = {
         SPARSE_REQUIRED_SKILLS_WARNING,

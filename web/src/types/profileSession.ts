@@ -124,6 +124,21 @@ export interface ConfirmedProfileResponse {
   profile_session: ProfileSession;
 }
 
+export interface JDRequirement {
+  category:
+    | "skill"
+    | "experience"
+    | "education"
+    | "location"
+    | "employment_type"
+    | "work_authorization"
+    | "other";
+  name: string;
+  necessity: "required" | "preferred" | "unknown";
+  evidence_quote: string | null;
+  confidence: number;
+}
+
 export interface JobSearchResult {
   job_result_id: string;
   title: string;
@@ -140,6 +155,9 @@ export interface JobSearchResult {
   match_score: number;
   score_breakdown: Record<string, number>;
   evidence_quotes: string[];
+  job_requirements: JDRequirement[];
+  unknowns: string[];
+  hard_constraint_status: "satisfied" | "unknown";
   recommended_action: string;
   analysis_mode: "deterministic" | "llm" | "fallback" | "mock";
   confidence_label: "strong" | "medium" | "limited" | "weak";

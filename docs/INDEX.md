@@ -19,11 +19,9 @@ history archive. Git preserves completed plans and deleted designs.
   boundary.
 - [DEVELOPMENT.md](DEVELOPMENT.md): coding, testing, documentation, and
   refactoring practices.
-- [JOB_SEARCH_USECASE_REFACTOR_PLAN.md](JOB_SEARCH_USECASE_REFACTOR_PLAN.md):
-  phased behavior-preserving split of the current search use-case module.
 - [SEARCH_RETRIEVAL_QUALITY_V2_PLAN.md](SEARCH_RETRIEVAL_QUALITY_V2_PLAN.md):
-  phased plan for typed queries, provider budgets, hard constraints, recall
-  expansion, and JD-informed final ranking.
+  current design, implementation status, and evaluation baseline for typed
+  queries, provider budgets, hard constraints, recall, and final ranking.
 - [SEARCH_SUBAGENT_OPERATING_MODEL.md](SEARCH_SUBAGENT_OPERATING_MODEL.md):
   project-scoped specialist agents, delegation rules, handoff contracts, and
   durable knowledge practices for Search V2 work.
@@ -36,6 +34,8 @@ history archive. Git preserves completed plans and deleted designs.
   flow and the Search Analysis versus Job Brief responsibility boundary.
 - [INTERVIEW_PREPARATION.md](INTERVIEW_PREPARATION.md): evidence gaps, MCP
   learning resources, user questions, and external-model exchange.
+- [MODULAR_RAG_MCP.md](MODULAR_RAG_MCP.md): independent Modular RAG service,
+  MCP client contract, typed tool adapters, and live verification.
 
 ## Documentation Rules
 
