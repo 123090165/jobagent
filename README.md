@@ -102,8 +102,7 @@ known authentication limitations.
 - browser-helper/: local browser-assisted provider bridge;
 - experiments/: explicit provider and quality evaluation commands;
 - tests/: automated regression coverage;
-- docs/: current product and engineering guidance;
-- skills/: reusable project skills for Codex-assisted development.
+- docs/: current product and engineering guidance.
 
 ## Important Boundaries
 

@@ -1,4 +1,0 @@
-interface:
-  display_name: "Maintainable Coding"
-  short_description: "Keep changes simple, scoped, and maintainable"
-  default_prompt: "Use $maintainable-coding to implement this change with clear boundaries and focused verification."

@@ -48,9 +48,6 @@ that repeatedly touch unrelated sections.
 - Make data ownership and state transitions explicit.
 - Add comments only for non-obvious constraints or decisions.
 
-The reusable project skill at skills/maintainable-coding contains the same
-coding guidance for Codex-driven implementation and review.
-
 ## Testing
 
 Scale checks with the change:
