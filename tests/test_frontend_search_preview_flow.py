@@ -64,6 +64,7 @@ def test_confirmed_page_routes_to_search_setup_instead_of_creating_search_run() 
 def test_job_search_result_page_can_return_to_preview() -> None:
     job_search_page = _read("pages/JobSearchPage.vue")
     search_preview = _read("pages/SearchPreviewPage.vue")
+    preview_controls = _read("composables/useSearchPreviewControls.ts")
     store = _read("stores/profileSession.ts")
     types = _read("types/profileSession.ts")
 
@@ -71,9 +72,10 @@ def test_job_search_result_page_can_return_to_preview() -> None:
     assert 'name: "search-preview"' in job_search_page
     assert "jobSearchPreviewControls" in store
     assert "saveJobSearchPreviewControls" in store
+    assert "useSearchPreviewControls" in search_preview
     assert "restorePreviewControls" in search_preview
     assert "canReuseStoredPreview" in search_preview
-    assert "expectedStoredPreviewProvider" in search_preview
+    assert "expectedStoredPreviewProvider" in preview_controls
     assert "saveCurrentPreviewControls" in search_preview
     assert "Score Breakdown" in job_search_page
     assert "Evidence" in job_search_page
@@ -140,6 +142,8 @@ def test_search_preview_page_separates_recall_queries_from_ranking_signals() -> 
 
 def test_search_preview_page_exposes_browser_helper_probe() -> None:
     search_preview = _read("pages/SearchPreviewPage.vue")
+    preview_controls = _read("composables/useSearchPreviewControls.ts")
+    browser_session = _read("composables/useBrowserHelperSession.ts")
     helper_service = _read("services/browserHelper.ts")
     source_service = _read("services/jobSearchSources.ts")
 
@@ -148,15 +152,16 @@ def test_search_preview_page_exposes_browser_helper_probe() -> None:
     assert "Check BOSS Login" in search_preview
     assert "Open BOSS Login" in search_preview
     assert "Start Job Search" in search_preview
-    assert "pingBrowserHelper" in search_preview
-    assert "checkBossLoginStatus" in search_preview
-    assert "startBossLoginAutoRefresh" in search_preview
-    assert "stopBossLoginAutoRefresh" in search_preview
-    assert "BOSS login verified by a live page probe" in search_preview
+    assert "useBrowserHelperSession" in search_preview
+    assert "pingBrowserHelper" in browser_session
+    assert "checkBossLoginStatus" in browser_session
+    assert "startBossLoginAutoRefresh" in browser_session
+    assert "stopBossLoginAutoRefresh" in browser_session
+    assert "BOSS login verified by a live page probe" in browser_session
     assert "fetchBossCandidates" in search_preview
     assert "startBrowserHelperJobSearch" in search_preview
-    assert "legacySelectedSearchSources" in search_preview
-    assert "normalizeProviderSearchSources" in search_preview
+    assert "legacySelectedSearchSources" in preview_controls
+    assert "normalizeProviderSearchSources" in preview_controls
     assert "formatSearchSources" in search_preview
     assert "ProviderSearchSource" in source_service
     assert "formatProviderName" in source_service
@@ -166,9 +171,9 @@ def test_search_preview_page_exposes_browser_helper_probe() -> None:
     assert "backendProviderSourceLabel" in search_preview
     assert "Backend Sources" in search_preview
     assert "BOSS Queries" in search_preview
-    assert "profileSessionStore.jobSearchPreviewControls?.selectedProviderSearchSources" in search_preview
+    assert "profileSessionStore.jobSearchPreviewControls?.selectedProviderSearchSources" in preview_controls
     assert "createBrowserHelperJobSearch" in search_preview
-    assert "preview?.selected_sources" in search_preview
+    assert "preview?.selected_sources" in preview_controls
     assert "!profileSessionStore.isJobSearchPreviewLoading" in search_preview
     assert "__jobagentHelper" in helper_service
     assert 'action: "searchBoss"' in helper_service

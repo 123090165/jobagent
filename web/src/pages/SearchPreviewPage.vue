@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import {
   NButton,
@@ -13,78 +13,49 @@ import {
 } from "naive-ui";
 
 import FlowPageHeader from "../components/FlowPageHeader.vue";
-import {
-  checkBossLoginStatus,
-  fetchBossCandidates,
-  openBossLoginPage,
-  pingBrowserHelper,
-  type BossLoginStatus,
-  type BrowserHelperStatus
-} from "../services/browserHelper";
+import { fetchBossCandidates } from "../services/browserHelper";
 import {
   BOSS_DEFAULT_JOB_TYPE,
   buildBossSearchQueries,
   formatBossEmptyResultMessage
 } from "../services/bossSearchPlanning";
-import {
-  formatSearchSources,
-  legacySelectedSearchSources,
-  normalizeProviderSearchSources,
-  sameProviderSearchSources,
-  uniqueProviderSearchSources,
-  type ProviderSearchSource,
-  type SearchSource
-} from "../services/jobSearchSources";
-import {
-  useProfileSessionStore,
-  type JobSearchPreviewControls
-} from "../stores/profileSession";
-import type {
-  CreateJobSearchRunPayload,
-  JobSearchPreview,
-  JobSearchRun,
-  LlmProviderName
-} from "../types/profileSession";
+import { formatSearchSources } from "../services/jobSearchSources";
+import { useProfileSessionStore } from "../stores/profileSession";
+import type { JobSearchRun } from "../types/profileSession";
+import { useBrowserHelperSession } from "../composables/useBrowserHelperSession";
+import { useSearchPreviewControls } from "../composables/useSearchPreviewControls";
 
 const route = useRoute();
 const router = useRouter();
 const profileSessionStore = useProfileSessionStore();
 const sessionId = computed(() => String(route.params.sessionId ?? ""));
-const selectedProviderSearchSources = ref<ProviderSearchSource[]>(["cuhksz_career"]);
-const isBossSourceSelected = ref(false);
-const useLocalDemo = ref(false);
-const useLlmAnalysis = ref(true);
-const selectedLlmProvider = ref<LlmProviderName>("deepseek");
-const maxResults = ref<number | null>(10);
-const browserHelperStatus = ref<BrowserHelperStatus | null>(null);
-const bossLoginStatus = ref<BossLoginStatus | null>(null);
-const isBrowserHelperChecking = ref(false);
-const isBossLoginChecking = ref(false);
+const {
+  selectedProviderSearchSources,
+  isBossSourceSelected,
+  useLocalDemo,
+  useLlmAnalysis,
+  selectedLlmProvider,
+  maxResults,
+  isRestoringPreviewControls,
+  selectedSearchSources,
+  providerSearchSources,
+  canStartSearch,
+  effectiveMaxResults,
+  effectiveAnalysisMode,
+  effectiveLlmProvider,
+  buildPayload,
+  saveCurrentPreviewControls,
+  restorePreviewControls,
+  canReuseStoredPreview,
+  providerSourcesForRun
+} = useSearchPreviewControls(sessionId);
 const isBossSearching = ref(false);
-const isRestoringPreviewControls = ref(false);
-const browserHelperMessage = ref<string | null>(null);
 const nowMs = ref(Date.now());
-let bossLoginRefreshTimer: number | null = null;
 let searchElapsedTimer: number | null = null;
 const llmProviderOptions = [
   { label: "DeepSeek", value: "deepseek" },
   { label: "Ollama", value: "ollama" }
 ];
-const canStartSearch = computed(() => useLocalDemo.value || selectedSearchSources.value.length > 0);
-const effectiveMaxResults = computed(() => maxResults.value ?? 10);
-const effectiveAnalysisMode = computed(() =>
-  useLocalDemo.value || !useLlmAnalysis.value ? "deterministic" : "llm"
-);
-const effectiveLlmProvider = computed<LlmProviderName | null>(() =>
-  effectiveAnalysisMode.value === "llm" ? selectedLlmProvider.value : null
-);
-const selectedSearchSources = computed<SearchSource[]>(() => [
-  ...selectedProviderSearchSources.value,
-  ...(isBossSourceSelected.value ? (["boss"] as const) : [])
-]);
-const providerSearchSources = computed<ProviderSearchSource[]>(() => {
-  return [...selectedProviderSearchSources.value];
-});
 const isBossSelected = computed(() => isBossSourceSelected.value);
 const bossSearchQueriesForPreview = computed(() => {
   return profileSessionStore.jobSearchPreview
@@ -92,6 +63,20 @@ const bossSearchQueriesForPreview = computed(() => {
     : [];
 });
 const usesBrowserHelper = computed(() => isBossSelected.value && !useLocalDemo.value);
+const {
+  browserHelperStatus,
+  bossLoginStatus,
+  isBrowserHelperChecking,
+  isBossLoginChecking,
+  browserHelperMessage,
+  browserHelperStatusTag,
+  bossLoginStatusTag,
+  bossLoginStatusSummary,
+  canCheckBossLogin,
+  checkBrowserHelper,
+  checkBossLogin,
+  openBossLogin
+} = useBrowserHelperSession(usesBrowserHelper);
 const selectedSourceLabel = computed(() => {
   if (useLocalDemo.value) {
     return "Local demo";
@@ -183,28 +168,6 @@ const providerStatusLabel = computed(() => {
   return `CUHKSZ Career unavailable${status.reason ? ` - ${status.reason}` : ""}`;
 });
 
-const browserHelperStatusTag = computed(() => {
-  if (!browserHelperStatus.value) {
-    return "Not checked";
-  }
-  return browserHelperStatus.value.installed ? "Detected" : "Not detected";
-});
-
-const bossLoginStatusTag = computed(() => {
-  if (!bossLoginStatus.value) {
-    return "Not checked";
-  }
-  return bossLoginStatus.value.loggedIn ? "Logged in" : "Login required";
-});
-
-const bossLoginStatusSummary = computed(() => {
-  if (!bossLoginStatus.value) {
-    return "Check after detecting helper";
-  }
-  return formatBossLoginStatusSummary(bossLoginStatus.value);
-});
-
-const canCheckBossLogin = computed(() => Boolean(browserHelperStatus.value?.installed));
 const activeSearchElapsedLabel = computed(() => {
   if (
     !isBossSearching.value &&
@@ -237,111 +200,6 @@ const canStartUnifiedSearch = computed(() => {
   );
 });
 
-function buildPayload(): CreateJobSearchRunPayload {
-  const selectedProviderSources = providerSearchSources.value;
-  return {
-    session_id: sessionId.value,
-    search_mode: useLocalDemo.value ? "local_mock" : "live_search",
-    search_provider: useLocalDemo.value
-      ? "mock"
-      : usesBrowserHelper.value && selectedProviderSources.length === 0
-        ? "browser_helper"
-        : "multi_source",
-    selected_sources: useLocalDemo.value ? [] : selectedProviderSources,
-    analysis_mode: effectiveAnalysisMode.value,
-    llm_provider: effectiveLlmProvider.value,
-    use_llm: effectiveLlmProvider.value === "deepseek",
-    max_results: effectiveMaxResults.value
-  };
-}
-
-function saveCurrentPreviewControls(): void {
-  const controls: JobSearchPreviewControls = {
-    sessionId: sessionId.value,
-    selectedProviderSearchSources: normalizeProviderSearchSources(selectedProviderSearchSources.value),
-    isBossSourceSelected: isBossSourceSelected.value,
-    useLocalDemo: useLocalDemo.value,
-    useLlm: effectiveLlmProvider.value === "deepseek",
-    useLlmAnalysis: useLocalDemo.value ? false : useLlmAnalysis.value,
-    llmProvider: selectedLlmProvider.value,
-    maxResults: maxResults.value
-  };
-  profileSessionStore.saveJobSearchPreviewControls(controls);
-}
-
-async function restorePreviewControls(): Promise<boolean> {
-  const controls = profileSessionStore.jobSearchPreviewControls;
-  if (!controls || controls.sessionId !== sessionId.value) {
-    return false;
-  }
-  isRestoringPreviewControls.value = true;
-  try {
-    const legacySources = legacySelectedSearchSources(controls);
-    selectedProviderSearchSources.value = normalizeProviderSearchSources(
-      controls.selectedProviderSearchSources ?? legacySources
-    );
-    isBossSourceSelected.value = Boolean(
-      controls.isBossSourceSelected || legacySources.includes("boss")
-    );
-    useLocalDemo.value = controls.useLocalDemo;
-    useLlmAnalysis.value = controls.useLocalDemo
-      ? false
-      : controls.useLlmAnalysis ?? true;
-    selectedLlmProvider.value = controls.llmProvider ?? (controls.useLlm ? "deepseek" : "ollama");
-    maxResults.value = controls.maxResults;
-    await nextTick();
-    return true;
-  } finally {
-    isRestoringPreviewControls.value = false;
-  }
-}
-
-function canReuseStoredPreview(): boolean {
-  const preview = profileSessionStore.jobSearchPreview;
-  if (!preview || preview.session_id !== sessionId.value) {
-    return false;
-  }
-  const payload = buildPayload();
-  return (
-    preview.search_mode === payload.search_mode &&
-    preview.search_provider === expectedStoredPreviewProvider(payload) &&
-    preview.analysis_mode === payload.analysis_mode &&
-    preview.llm_enabled === (payload.analysis_mode === "llm") &&
-    preview.llm_provider === (payload.analysis_mode === "llm" ? payload.llm_provider : null) &&
-    sameProviderSearchSources(
-      normalizeProviderSearchSources(preview.selected_sources ?? []),
-      payload.selected_sources ?? []
-    )
-  );
-}
-
-function expectedStoredPreviewProvider(payload: CreateJobSearchRunPayload): string | null {
-  if (payload.search_mode === "local_mock") {
-    return "mock";
-  }
-  const selectedSources = normalizeProviderSearchSources(payload.selected_sources ?? []);
-  if (selectedSources.length === 1) {
-    return selectedSources[0];
-  }
-  if (selectedSources.length > 1) {
-    return `multi_source:${selectedSources.join(",")}`;
-  }
-  return payload.search_provider ?? null;
-}
-
-function providerSourcesForRun(preview: JobSearchPreview | null): ProviderSearchSource[] {
-  const previewSources = normalizeProviderSearchSources(preview?.selected_sources ?? []);
-  const savedSources = normalizeProviderSearchSources(
-    profileSessionStore.jobSearchPreviewControls?.selectedProviderSearchSources ??
-      legacySelectedSearchSources(profileSessionStore.jobSearchPreviewControls)
-  );
-  return uniqueProviderSearchSources([
-    ...providerSearchSources.value,
-    ...previewSources,
-    ...savedSources
-  ]);
-}
-
 async function refreshPreview() {
   if (!profileSessionStore.session?.confirmed_profile_id) {
     return;
@@ -370,7 +228,6 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
-  stopBossLoginAutoRefresh();
   stopSearchElapsedTicker();
 });
 
@@ -378,16 +235,10 @@ watch(selectedSearchSources, async () => {
   if (isRestoringPreviewControls.value) {
     return;
   }
-  saveCurrentPreviewControls();
   if (!usesBrowserHelper.value) {
     browserHelperMessage.value = null;
   }
-  try {
-    await profileSessionStore.loadJobSearchProviderStatus(providerStatusTarget.value);
-    await refreshPreview();
-  } catch {
-    // Error state is rendered from the store.
-  }
+  await refreshPreviewFromControls({ loadProviderStatus: true });
 }, { deep: true });
 
 watch(useLocalDemo, async (value) => {
@@ -397,52 +248,39 @@ watch(useLocalDemo, async (value) => {
   if (value) {
     useLlmAnalysis.value = false;
   }
-  saveCurrentPreviewControls();
-  try {
-    await profileSessionStore.loadJobSearchProviderStatus(providerStatusTarget.value);
-    await refreshPreview();
-  } catch {
-    // Error state is rendered from the store.
-  }
+  await refreshPreviewFromControls({ loadProviderStatus: true });
 });
 
-watch(useLlmAnalysis, async () => {
+watch([useLlmAnalysis, selectedLlmProvider], async () => {
   if (isRestoringPreviewControls.value) {
     return;
   }
-  saveCurrentPreviewControls();
-  try {
-    await profileSessionStore.loadLlmStatus(selectedLlmProvider.value);
-    await refreshPreview();
-  } catch {
-    // Error state is rendered from the store.
-  }
-});
-
-watch(selectedLlmProvider, async (value) => {
-  if (isRestoringPreviewControls.value) {
-    return;
-  }
-  saveCurrentPreviewControls();
-  try {
-    await profileSessionStore.loadLlmStatus(value);
-    await refreshPreview();
-  } catch {
-    // Error state is rendered from the store.
-  }
+  await refreshPreviewFromControls({ loadLlmStatus: true });
 });
 
 watch(maxResults, async () => {
   if (isRestoringPreviewControls.value) {
     return;
   }
+  await refreshPreviewFromControls();
+});
+
+async function refreshPreviewFromControls(
+  options: { loadProviderStatus?: boolean; loadLlmStatus?: boolean } = {}
+): Promise<void> {
   saveCurrentPreviewControls();
   try {
+    if (options.loadProviderStatus) {
+      await profileSessionStore.loadJobSearchProviderStatus(providerStatusTarget.value);
+    }
+    if (options.loadLlmStatus) {
+      await profileSessionStore.loadLlmStatus(selectedLlmProvider.value);
+    }
     await refreshPreview();
   } catch {
     // Error state is rendered from the store.
   }
-});
+}
 
 function goBackToConfirmed() {
   void router.push({ name: "search-mission", params: { sessionId: sessionId.value } });
@@ -464,57 +302,6 @@ async function startJobSearch() {
   } catch {
     profileSessionStore.clearJobSearchClientTiming();
     // Error state is rendered from the store.
-  }
-}
-
-async function checkBrowserHelper() {
-  isBrowserHelperChecking.value = true;
-  browserHelperMessage.value = null;
-  try {
-    browserHelperStatus.value = await pingBrowserHelper();
-    browserHelperMessage.value = browserHelperStatus.value.error;
-    if (browserHelperStatus.value.installed) {
-      await checkBossLogin();
-    } else {
-      bossLoginStatus.value = null;
-    }
-  } finally {
-    isBrowserHelperChecking.value = false;
-  }
-}
-
-async function checkBossLogin() {
-  if (!browserHelperStatus.value?.installed) {
-    browserHelperMessage.value = "Install and detect the Browser Helper first.";
-    return;
-  }
-  isBossLoginChecking.value = true;
-  browserHelperMessage.value = null;
-  try {
-    bossLoginStatus.value = await checkBossLoginStatus();
-    browserHelperMessage.value = formatBossLoginStatusMessage(bossLoginStatus.value);
-    if (bossLoginStatus.value.loggedIn) {
-      stopBossLoginAutoRefresh();
-    }
-  } catch (error) {
-    browserHelperMessage.value = error instanceof Error ? error.message : "BOSS login status check failed.";
-  } finally {
-    isBossLoginChecking.value = false;
-  }
-}
-
-async function openBossLogin() {
-  if (!browserHelperStatus.value?.installed) {
-    browserHelperMessage.value = "Install and detect the Browser Helper first.";
-    return;
-  }
-  try {
-    await openBossLoginPage();
-    bossLoginStatus.value = null;
-    browserHelperMessage.value = "BOSS login page opened. Login status will refresh automatically.";
-    startBossLoginAutoRefresh();
-  } catch (error) {
-    browserHelperMessage.value = error instanceof Error ? error.message : "Failed to open BOSS login page.";
   }
 }
 
@@ -617,61 +404,6 @@ function formatDuration(milliseconds: number): string {
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
   return minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
-}
-
-function startBossLoginAutoRefresh(): void {
-  stopBossLoginAutoRefresh();
-  let attempts = 0;
-  const poll = async () => {
-    attempts += 1;
-    if (!usesBrowserHelper.value || !browserHelperStatus.value?.installed) {
-      stopBossLoginAutoRefresh();
-      return;
-    }
-    await checkBossLogin();
-    if (bossLoginStatus.value?.loggedIn || attempts >= 24) {
-      if (!bossLoginStatus.value?.loggedIn && attempts >= 24) {
-        browserHelperMessage.value = "BOSS login was not verified after automatic refresh. Use Check BOSS Login after completing login or verification.";
-      }
-      stopBossLoginAutoRefresh();
-      return;
-    }
-    bossLoginRefreshTimer = window.setTimeout(() => {
-      void poll();
-    }, 5000);
-  };
-  bossLoginRefreshTimer = window.setTimeout(() => {
-    void poll();
-  }, 3000);
-}
-
-function stopBossLoginAutoRefresh(): void {
-  if (bossLoginRefreshTimer !== null) {
-    window.clearTimeout(bossLoginRefreshTimer);
-    bossLoginRefreshTimer = null;
-  }
-}
-
-function formatBossLoginStatusMessage(status: BossLoginStatus): string {
-  if (status.loggedIn) {
-    return "BOSS login verified by a live page probe.";
-  }
-  if (status.cookieLoggedIn) {
-    return `BOSS cookies exist but the live session is not usable: ${status.verificationReason ?? status.verificationStatus}.`;
-  }
-  return status.verificationReason ?? "BOSS login is required before helper search.";
-}
-
-function formatBossLoginStatusSummary(status: BossLoginStatus): string {
-  const cookieSummary = `${status.cookieCount} cookies, ${status.matchedAuthCookies.length} auth-like`;
-  const probeSummary = `${status.probeJobCardCount} cards, ${status.probeValidJobDetailLinkCount} valid links`;
-  if (status.loggedIn) {
-    return `Verified session - ${cookieSummary}; probe ${probeSummary}`;
-  }
-  if (status.cookieLoggedIn) {
-    return `Cookies present but not verified - ${status.verificationStatus}; probe ${probeSummary}`;
-  }
-  return `Not logged in - ${cookieSummary}; ${status.verificationStatus}`;
 }
 
 function seeResult() {

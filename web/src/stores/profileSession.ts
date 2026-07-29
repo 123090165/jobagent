@@ -131,6 +131,31 @@ export const useProfileSessionStore = defineStore("profileSession", {
     jobSearchClientStages: []
   }),
   actions: {
+    resetJobSearchResults(): void {
+      this.jobSearchRun = null;
+      this.jobSearchRuns = [];
+      this.jobSearchSteps = [];
+    },
+    resetJobSearchState(): void {
+      this.jobSearchPreview = null;
+      this.jobSearchPreviewControls = null;
+      this.resetJobSearchResults();
+    },
+    invalidateAfterResumeChange(): void {
+      this.parsedReview = null;
+      this.profileDraft = null;
+      this.confirmedProfile = null;
+      this.resetJobSearchState();
+    },
+    invalidateAfterReviewChange(): void {
+      this.profileDraft = null;
+      this.confirmedProfile = null;
+      this.resetJobSearchResults();
+    },
+    invalidateAfterDraftChange(): void {
+      this.confirmedProfile = null;
+      this.resetJobSearchState();
+    },
     async createSession(): Promise<ProfileSession> {
       this.isCreating = true;
       this.error = null;
@@ -172,11 +197,7 @@ export const useProfileSessionStore = defineStore("profileSession", {
         this.parsedReview = null;
         this.profileDraft = null;
         this.confirmedProfile = null;
-        this.jobSearchPreview = null;
-        this.jobSearchPreviewControls = null;
-        this.jobSearchRun = null;
-        this.jobSearchRuns = [];
-        this.jobSearchSteps = [];
+        this.resetJobSearchState();
         this.error = toApiErrorMessage(error, "Failed to load profile session.");
         throw error;
       }
@@ -189,14 +210,7 @@ export const useProfileSessionStore = defineStore("profileSession", {
         const response = await submitResumeText(session.session_id, text);
         this.session = response.profile_session;
         this.resumeDocument = response.resume_document;
-        this.parsedReview = null;
-        this.profileDraft = null;
-        this.confirmedProfile = null;
-        this.jobSearchPreview = null;
-        this.jobSearchPreviewControls = null;
-        this.jobSearchRun = null;
-        this.jobSearchRuns = [];
-        this.jobSearchSteps = [];
+        this.invalidateAfterResumeChange();
         return response.profile_session;
       } catch (error) {
         this.error = toApiErrorMessage(error, "Failed to submit resume text.");
@@ -213,14 +227,7 @@ export const useProfileSessionStore = defineStore("profileSession", {
         const response = await submitResumeFile(session.session_id, file);
         this.session = response.profile_session;
         this.resumeDocument = response.resume_document;
-        this.parsedReview = null;
-        this.profileDraft = null;
-        this.confirmedProfile = null;
-        this.jobSearchPreview = null;
-        this.jobSearchPreviewControls = null;
-        this.jobSearchRun = null;
-        this.jobSearchRuns = [];
-        this.jobSearchSteps = [];
+        this.invalidateAfterResumeChange();
         return response.profile_session;
       } catch (error) {
         this.error = toApiErrorMessage(error, "Failed to submit resume file.");
@@ -262,11 +269,7 @@ export const useProfileSessionStore = defineStore("profileSession", {
         const response = await parseResumeForReview(sessionId, regenerate, useLlm);
         this.session = response.profile_session;
         this.parsedReview = response.parsed_review;
-        this.profileDraft = null;
-        this.confirmedProfile = null;
-        this.jobSearchRun = null;
-        this.jobSearchRuns = [];
-        this.jobSearchSteps = [];
+        this.invalidateAfterReviewChange();
         return response.parsed_review;
       } catch (error) {
         this.parsedReview = null;
@@ -283,12 +286,7 @@ export const useProfileSessionStore = defineStore("profileSession", {
         const response = await createProfileDraft(sessionId, regenerate);
         this.session = response.profile_session;
         this.profileDraft = response.profile_draft;
-        this.confirmedProfile = null;
-        this.jobSearchPreview = null;
-        this.jobSearchPreviewControls = null;
-        this.jobSearchRun = null;
-        this.jobSearchRuns = [];
-        this.jobSearchSteps = [];
+        this.invalidateAfterDraftChange();
         return response.profile_draft;
       } catch (error) {
         this.profileDraft = null;
@@ -324,12 +322,7 @@ export const useProfileSessionStore = defineStore("profileSession", {
         const response = await updateProfileDraft(draftId, payload);
         this.session = response.profile_session;
         this.profileDraft = response.profile_draft;
-        this.confirmedProfile = null;
-        this.jobSearchPreview = null;
-        this.jobSearchPreviewControls = null;
-        this.jobSearchRun = null;
-        this.jobSearchRuns = [];
-        this.jobSearchSteps = [];
+        this.invalidateAfterDraftChange();
         return response.profile_draft;
       } catch (error) {
         this.error = toApiErrorMessage(error, "Failed to save profile draft.");
