@@ -1,3 +1,5 @@
+"""基于收藏职位的 JD、搜索分析和画像快照生成版本化行动简报。"""
+
 from __future__ import annotations
 
 import json

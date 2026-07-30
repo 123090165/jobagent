@@ -1,3 +1,5 @@
+"""读写 SQLite 中的搜索结果反馈，并在查询和更新时强制 user_id 隔离。"""
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -8,6 +10,7 @@ from app.storage.database import get_connection, init_database
 
 
 class JobSearchFeedbackRepository:
+    """封装职位搜索反馈的 SQLite 读写与模型重建。"""
     def upsert(
         self,
         *,
@@ -20,6 +23,7 @@ class JobSearchFeedbackRepository:
         feedback_type: str,
         note: str | None,
     ) -> JobSearchResultFeedback:
+        """按方法参数限定的主键或用户范围新增或更新相关数据。"""
         existing = self.get_for_result(
             user_id=user_id,
             job_search_run_id=job_search_run_id,
@@ -78,6 +82,7 @@ class JobSearchFeedbackRepository:
         ) or feedback
 
     def list_for_run(self, *, user_id: str, job_search_run_id: str) -> list[JobSearchResultFeedback]:
+        """按方法参数限定的主键或用户范围列出for运行记录。"""
         with get_connection() as connection:
             init_database(connection)
             rows = connection.execute(
@@ -93,6 +98,7 @@ class JobSearchFeedbackRepository:
     def get_for_result(
         self, *, user_id: str, job_search_run_id: str, job_result_id: str
     ) -> JobSearchResultFeedback | None:
+        """按方法参数限定的主键或用户范围获取for结果。"""
         with get_connection() as connection:
             init_database(connection)
             row = connection.execute(

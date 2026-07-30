@@ -1,3 +1,4 @@
+# 对本地 JobAgent 与 Modular RAG 执行最小实时同步和检索验收。
 [CmdletBinding()]
 param(
     [string]$EnvFile = ".env.deepseek.local",

@@ -1,3 +1,4 @@
+# 检查配置后启动 FastAPI、Vue、RAG worker 和外部 Modular RAG 服务。
 [CmdletBinding()]
 param(
     [switch]$Stop,

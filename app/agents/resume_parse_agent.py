@@ -1,3 +1,5 @@
+"""把原始简历文本交给确定性解析器，并返回统一的 Agent 执行元数据。"""
+
 from __future__ import annotations
 
 from app.schemas.resume import ResumeProfile

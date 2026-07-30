@@ -1,3 +1,5 @@
+"""把用户搜索偏好解释为约束、相邻角色、冲突和最多三个澄清问题。"""
+
 from __future__ import annotations
 
 import json

@@ -1,3 +1,5 @@
+"""计算搜索回放的召回、精排、约束违反、重复和详情覆盖指标。"""
+
 from __future__ import annotations
 
 import math
@@ -60,6 +62,7 @@ def _eligible_cluster_grades(case: EvaluationCase) -> dict[str, int]:
 
 
 def pool_recall(case: EvaluationCase, pool_ids: Iterable[str]) -> MetricValue:
+    """计算全部相关候选中进入召回池的比例。"""
     validated_ids = _validate_candidate_ids(case, pool_ids, label="pool")
     judgments = _map(case)
     universe = _clusters(case)
@@ -77,6 +80,7 @@ def pool_recall(case: EvaluationCase, pool_ids: Iterable[str]) -> MetricValue:
 
 
 def eligible_pool_recall(case: EvaluationCase, pool_ids: Iterable[str]) -> MetricValue:
+    """只在满足系统约束的相关候选集合上计算召回率。"""
     validated_ids = _validate_candidate_ids(case, pool_ids, label="pool")
     universe = set(_eligible_cluster_grades(case))
     judgments = _map(case)
@@ -90,6 +94,7 @@ def eligible_pool_recall(case: EvaluationCase, pool_ids: Iterable[str]) -> Metri
 
 
 def mixed_constraint_cluster_count(case: EvaluationCase) -> MetricValue:
+    """统计同时包含合规与违规候选的相似职位簇。"""
     groups = _clusters(case)
     mixed = sum(
         1
@@ -101,6 +106,7 @@ def mixed_constraint_cluster_count(case: EvaluationCase) -> MetricValue:
 
 
 def precision_at_5(case: EvaluationCase, top_ids: Sequence[str]) -> MetricValue:
+    """计算前五个结果中相关候选的比例。"""
     shown = _validate_candidate_ids(case, list(top_ids)[:5], label="Top-K")
     judgments = _map(case)
     good = sum(
@@ -113,10 +119,12 @@ def precision_at_5(case: EvaluationCase, top_ids: Sequence[str]) -> MetricValue:
 
 
 def filled_slots_at_5(top_ids: Sequence[str]) -> MetricValue:
+    """计算前五展示位实际填充数量。"""
     return _mv(len(list(top_ids)[:5]), 5)
 
 
 def ndcg_at_5(case: EvaluationCase, top_ids: Sequence[str]) -> MetricValue:
+    """按人工相关等级计算前五结果的归一化折损累计增益。"""
     shown = _validate_candidate_ids(case, list(top_ids)[:5], label="Top-K")
     judgments = _map(case)
     eligible = _eligible_cluster_grades(case)
@@ -140,6 +148,7 @@ def ndcg_at_5(case: EvaluationCase, top_ids: Sequence[str]) -> MetricValue:
 
 
 def constraint_violation_at_5(case: EvaluationCase, top_ids: Sequence[str]) -> MetricValue:
+    """计算前五结果违反硬约束的比例。"""
     shown = _validate_candidate_ids(case, list(top_ids)[:5], label="Top-K")
     judgments = _map(case)
     violations = sum(
@@ -151,6 +160,7 @@ def constraint_violation_at_5(case: EvaluationCase, top_ids: Sequence[str]) -> M
 
 
 def duplicate_at_5(case: EvaluationCase, top_ids: Sequence[str]) -> MetricValue:
+    """计算前五结果中已确认重复项的比例。"""
     shown = _validate_candidate_ids(case, list(top_ids)[:5], label="Top-K")
     judgments = _map(case)
     seen: set[str] = set()
@@ -167,6 +177,7 @@ def duplicate_at_5(case: EvaluationCase, top_ids: Sequence[str]) -> MetricValue:
 
 
 def suspected_duplicate_at_5(case: EvaluationCase, top_ids: Sequence[str]) -> MetricValue:
+    """计算前五结果中疑似重复项的比例。"""
     shown = _validate_candidate_ids(case, list(top_ids)[:5], label="Top-K")
     judgments = _map(case)
     suspected = sum(
@@ -176,6 +187,7 @@ def suspected_duplicate_at_5(case: EvaluationCase, top_ids: Sequence[str]) -> Me
 
 
 def detail_coverage(case: EvaluationCase, candidate_ids: Iterable[str]) -> MetricValue:
+    """计算结果中具有完整职位详情的比例。"""
     validated_ids = _validate_candidate_ids(case, candidate_ids, label="final-scoring")
     judgments = _map(case)
     detailed = sum(1 for candidate_id in validated_ids if judgments[candidate_id].detail_available)

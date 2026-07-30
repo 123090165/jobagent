@@ -1,3 +1,5 @@
+"""在不记录敏感正文的前提下，把 LLM/Agent 调用写入可选 Langfuse trace。"""
+
 from __future__ import annotations
 
 import hmac

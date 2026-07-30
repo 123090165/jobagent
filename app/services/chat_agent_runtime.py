@@ -1,3 +1,5 @@
+"""执行一次有轮次上限的 Assistant Agent 循环，阻止重复工具调用并强制最后一轮回答。"""
+
 from __future__ import annotations
 
 from collections.abc import Callable

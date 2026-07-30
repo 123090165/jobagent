@@ -1,4 +1,7 @@
 <script setup lang="ts">
+/**
+ * 应用外壳：提供全局导航、主题、当前页面标题以及退出后的 Store 清理。
+ */
 import { computed, ref, watch } from "vue";
 import { NButton, NConfigProvider, NMessageProvider } from "naive-ui";
 import { RouterLink, RouterView, useRoute, useRouter } from "vue-router";

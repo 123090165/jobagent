@@ -1,3 +1,5 @@
+"""读取解析结果生成简历审阅；确认审阅后创建下游画像草稿并更新会话步骤。"""
+
 from __future__ import annotations
 
 import re
@@ -37,6 +39,7 @@ def parse_resume_for_review(
     resume_repository: ResumeDocumentRepository = resume_document_repository,
     parsed_review_repository: ParsedResumeReviewRepository = parsed_resume_review_repository,
 ) -> ParsedResumeReviewResponse:
+    """生成可审阅画像；未要求 regenerate 且源文档未变时复用已有结果。"""
     session = get_profile_session(session_id, repository=session_repository, user_id=user_id)
     if session.resume_document_id is None:
         raise JobAgentError(
@@ -154,6 +157,7 @@ def get_parsed_resume_review(
     session_repository: ProfileSessionRepository = profile_session_repository,
     parsed_review_repository: ParsedResumeReviewRepository = parsed_resume_review_repository,
 ) -> ParsedResumeReviewResponse:
+    """返回 session 当前解析结果及流程状态，不暴露历史失效版本。"""
     session = get_profile_session(session_id, repository=session_repository, user_id=user_id)
     if session.parsed_review_id is None:
         raise JobAgentError(

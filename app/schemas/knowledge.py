@@ -1,3 +1,5 @@
+"""定义knowledge在 API、领域服务和 JSON 快照之间共用的 Pydantic 契约。"""
+
 from __future__ import annotations
 
 from typing import Any
@@ -6,6 +8,7 @@ from pydantic import BaseModel, Field, field_validator
 
 
 class KnowledgeQueryRequest(BaseModel):
+    """描述knowledge查询的输入结构。"""
     query: str = Field(min_length=1, max_length=2_000)
     top_k: int = Field(default=5, ge=1, le=20)
     collection: str | None = Field(default=None, min_length=1, max_length=100)

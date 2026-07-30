@@ -1,10 +1,11 @@
-import { computed, nextTick, ref, type ComputedRef } from "vue";
+/**
+ * 保存并恢复搜索来源、模型和数量等页面控件，兼容旧缓存字段。
+ */
+import { computed, ref, type ComputedRef } from "vue";
 
 import {
   legacySelectedSearchSources,
   normalizeProviderSearchSources,
-  sameProviderSearchSources,
-  uniqueProviderSearchSources,
   type ProviderSearchSource,
   type SearchSource
 } from "../services/jobSearchSources";
@@ -14,7 +15,6 @@ import {
 } from "../stores/profileSession";
 import type {
   CreateJobSearchRunPayload,
-  JobSearchPreview,
   LlmProviderName
 } from "../types/profileSession";
 
@@ -26,7 +26,6 @@ export function useSearchPreviewControls(sessionId: ComputedRef<string>) {
   const useLlmAnalysis = ref(true);
   const selectedLlmProvider = ref<LlmProviderName>("deepseek");
   const maxResults = ref<number | null>(10);
-  const isRestoringPreviewControls = ref(false);
 
   const selectedSearchSources = computed<SearchSource[]>(() => [
     ...selectedProviderSearchSources.value,
@@ -80,65 +79,26 @@ export function useSearchPreviewControls(sessionId: ComputedRef<string>) {
     profileSessionStore.saveJobSearchPreviewControls(controls);
   }
 
-  async function restorePreviewControls(): Promise<boolean> {
+  function restorePreviewControls(): boolean {
     const controls = profileSessionStore.jobSearchPreviewControls;
     if (!controls || controls.sessionId !== sessionId.value) {
       return false;
     }
-    isRestoringPreviewControls.value = true;
-    try {
-      const legacySources = legacySelectedSearchSources(controls);
-      selectedProviderSearchSources.value = normalizeProviderSearchSources(
-        controls.selectedProviderSearchSources ?? legacySources
-      );
-      isBossSourceSelected.value = Boolean(
-        controls.isBossSourceSelected || legacySources.includes("boss")
-      );
-      useLocalDemo.value = controls.useLocalDemo;
-      useLlmAnalysis.value = controls.useLocalDemo
-        ? false
-        : controls.useLlmAnalysis ?? true;
-      selectedLlmProvider.value =
-        controls.llmProvider ?? (controls.useLlm ? "deepseek" : "ollama");
-      maxResults.value = controls.maxResults;
-      await nextTick();
-      return true;
-    } finally {
-      isRestoringPreviewControls.value = false;
-    }
-  }
-
-  function canReuseStoredPreview(): boolean {
-    const preview = profileSessionStore.jobSearchPreview;
-    if (!preview || preview.session_id !== sessionId.value) {
-      return false;
-    }
-    const payload = buildPayload();
-    return (
-      preview.search_mode === payload.search_mode &&
-      preview.search_provider === expectedStoredPreviewProvider(payload) &&
-      preview.analysis_mode === payload.analysis_mode &&
-      preview.llm_enabled === (payload.analysis_mode === "llm") &&
-      preview.llm_provider ===
-        (payload.analysis_mode === "llm" ? payload.llm_provider : null) &&
-      sameProviderSearchSources(
-        normalizeProviderSearchSources(preview.selected_sources ?? []),
-        payload.selected_sources ?? []
-      )
+    const legacySources = legacySelectedSearchSources(controls);
+    selectedProviderSearchSources.value = normalizeProviderSearchSources(
+      controls.selectedProviderSearchSources ?? legacySources
     );
-  }
-
-  function providerSourcesForRun(preview: JobSearchPreview | null): ProviderSearchSource[] {
-    const previewSources = normalizeProviderSearchSources(preview?.selected_sources ?? []);
-    const savedSources = normalizeProviderSearchSources(
-      profileSessionStore.jobSearchPreviewControls?.selectedProviderSearchSources ??
-        legacySelectedSearchSources(profileSessionStore.jobSearchPreviewControls)
+    isBossSourceSelected.value = Boolean(
+      controls.isBossSourceSelected || legacySources.includes("boss")
     );
-    return uniqueProviderSearchSources([
-      ...providerSearchSources.value,
-      ...previewSources,
-      ...savedSources
-    ]);
+    useLocalDemo.value = controls.useLocalDemo;
+    useLlmAnalysis.value = controls.useLocalDemo
+      ? false
+      : controls.useLlmAnalysis ?? true;
+    selectedLlmProvider.value =
+      controls.llmProvider ?? (controls.useLlm ? "deepseek" : "ollama");
+    maxResults.value = controls.maxResults;
+    return true;
   }
 
   return {
@@ -148,8 +108,6 @@ export function useSearchPreviewControls(sessionId: ComputedRef<string>) {
     useLlmAnalysis,
     selectedLlmProvider,
     maxResults,
-    isRestoringPreviewControls,
-    selectedSearchSources,
     providerSearchSources,
     canStartSearch,
     effectiveMaxResults,
@@ -157,22 +115,6 @@ export function useSearchPreviewControls(sessionId: ComputedRef<string>) {
     effectiveLlmProvider,
     buildPayload,
     saveCurrentPreviewControls,
-    restorePreviewControls,
-    canReuseStoredPreview,
-    providerSourcesForRun
+    restorePreviewControls
   };
-}
-
-function expectedStoredPreviewProvider(payload: CreateJobSearchRunPayload): string | null {
-  if (payload.search_mode === "local_mock") {
-    return "mock";
-  }
-  const selectedSources = normalizeProviderSearchSources(payload.selected_sources ?? []);
-  if (selectedSources.length === 1) {
-    return selectedSources[0];
-  }
-  if (selectedSources.length > 1) {
-    return `multi_source:${selectedSources.join(",")}`;
-  }
-  return payload.search_provider ?? null;
 }

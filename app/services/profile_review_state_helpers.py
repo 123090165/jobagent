@@ -1,3 +1,5 @@
+"""维护旧版画像审阅流程的 session state 字段和草稿/确认结果转换。"""
+
 from __future__ import annotations
 
 from copy import deepcopy

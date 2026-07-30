@@ -1,3 +1,5 @@
+"""定义profile review在 API、领域服务和 JSON 快照之间共用的 Pydantic 契约。"""
+
 from __future__ import annotations
 
 from typing import Literal
@@ -8,6 +10,7 @@ from app.schemas.resume import ResumeProfile
 
 
 class ResumeProfileReviewRequest(BaseModel):
+    """描述画像审阅结果的输入结构。"""
     resume_text: str
     target_roles: list[str] = Field(default_factory=list)
     llm_provider: str = "ollama"
@@ -36,6 +39,7 @@ class ResumeProfileUserEdits(BaseModel):
 
 
 class ResumeProfileConfirmRequest(BaseModel):
+    """描述画像confirm的输入结构。"""
     parsed_profile: ResumeProfile
     user_edits: ResumeProfileUserEdits = Field(default_factory=ResumeProfileUserEdits)
 

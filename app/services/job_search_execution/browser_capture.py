@@ -1,3 +1,5 @@
+"""把浏览器扩展提取的职位页转换为标准候选和可追踪的分析报告。"""
+
 from __future__ import annotations
 
 from app.schemas.job_search import (

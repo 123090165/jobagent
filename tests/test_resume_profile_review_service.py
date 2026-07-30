@@ -1,3 +1,5 @@
+"""回归验证可复用简历画像的正常链路、失败边界和兼容契约。"""
+
 from __future__ import annotations
 
 from app.schemas.resume import ProjectExperience, ResumeProfile
@@ -7,11 +9,13 @@ from app.services.resume_profile_review_service import build_resume_profile_revi
 
 
 class FakeResumeReviewLLM:
+    """为当前测试场景提供 FakeResumeReviewLLM 夹具或替身。"""
     def __init__(self) -> None:
         self.system_prompt = ""
         self.user_prompt = ""
 
     def chat_completion_json(self, *, system_prompt: str, user_prompt: str) -> dict:
+        """提供 FakeResumeReviewLLM.chat_completion_json 所需的测试行为。"""
         self.system_prompt = system_prompt
         self.user_prompt = user_prompt
         return {
@@ -40,15 +44,19 @@ class FakeResumeReviewLLM:
 
 
 class InvalidResumeReviewLLM:
+    """为当前测试场景提供 InvalidResumeReviewLLM 夹具或替身。"""
     def chat_completion_json(self, *, system_prompt: str, user_prompt: str) -> dict:
+        """提供 InvalidResumeReviewLLM.chat_completion_json 所需的测试行为。"""
         return {"resume_profile": {"name": 123, "skills": "not-a-list"}}
 
 
 class CorrectingResumeReviewLLM:
+    """为当前测试场景提供 CorrectingResumeReviewLLM 夹具或替身。"""
     def __init__(self) -> None:
         self.user_prompt = ""
 
     def chat_completion_json(self, *, system_prompt: str, user_prompt: str) -> dict:
+        """提供 CorrectingResumeReviewLLM.chat_completion_json 所需的测试行为。"""
         self.user_prompt = user_prompt
         return {
             "resume_profile": {
@@ -68,10 +76,12 @@ class CorrectingResumeReviewLLM:
 
 
 class FailingResumeReviewLLM:
+    """为当前测试场景提供 FailingResumeReviewLLM 夹具或替身。"""
     def __init__(self, message: str) -> None:
         self.message = message
 
     def chat_completion_json(self, *, system_prompt: str, user_prompt: str) -> dict:
+        """提供 FailingResumeReviewLLM.chat_completion_json 所需的测试行为。"""
         raise LLMServiceError(self.message)
 
 

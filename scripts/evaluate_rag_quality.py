@@ -1,3 +1,5 @@
+"""用固定语料离线评估个人 RAG 的召回与排序质量，并输出 JSON 报告。"""
+
 from __future__ import annotations
 
 import argparse

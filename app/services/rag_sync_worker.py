@@ -1,3 +1,5 @@
+"""领取 RAG outbox 事件，调用外部服务并按成功、失败或重试更新状态。"""
+
 from __future__ import annotations
 
 import asyncio

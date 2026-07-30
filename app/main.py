@@ -1,3 +1,5 @@
+"""FastAPI 进程入口：加载本地配置，注册跨域、统一错误处理以及全部 V1 路由。"""
+
 from __future__ import annotations
 
 import os
@@ -46,6 +48,7 @@ def _resolve_cors_allow_origins() -> list[str]:
 
 
 def create_app() -> FastAPI:
+    """装配 HTTP 边界；具体流程由各路由转交 application 用例。"""
     load_local_env()
 
     api = FastAPI(
@@ -77,6 +80,7 @@ def create_app() -> FastAPI:
             content={"detail": exc.message, "error_code": exc.error_code},
         )
 
+    # 所有产品接口在这里集中注册，便于核对“前端 -> API -> 用例”入口是否完整。
     api.include_router(profile_sessions_v1_router)
     api.include_router(auth_v1_router)
     api.include_router(resume_profiles_v1_router)

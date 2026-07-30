@@ -1,3 +1,5 @@
+"""编排 可复用简历画像 的所有权检查、状态转换、领域服务和持久化操作。"""
+
 from __future__ import annotations
 
 from app.repositories.resume_profile_repository import (

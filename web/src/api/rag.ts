@@ -1,3 +1,6 @@
+/**
+ * 读取个人知识库及同步队列状态，供状态页判断索引是否可用、是否存在失败任务。
+ */
 import { client } from "./client";
 
 export interface RagIndexEvent {

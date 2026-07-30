@@ -1,3 +1,5 @@
+"""回归验证jd analysis agent的正常链路、失败边界和兼容契约。"""
+
 from __future__ import annotations
 
 from typing import Any
@@ -15,11 +17,13 @@ AI 应用开发工程师
 
 
 class FakeLLMService:
+    """为当前测试场景提供 FakeLLMService 夹具或替身。"""
     def __init__(self, payload: dict[str, Any] | None = None, should_fail: bool = False) -> None:
         self.payload = payload or {}
         self.should_fail = should_fail
 
     def chat_completion_json(self, *, system_prompt: str, user_prompt: str) -> dict[str, Any]:
+        """提供 FakeLLMService.chat_completion_json 所需的测试行为。"""
         if self.should_fail:
             raise LLMServiceError("fake failure")
         return self.payload

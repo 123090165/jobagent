@@ -1,3 +1,5 @@
+"""回归验证cuhksz career provider的正常链路、失败边界和兼容契约。"""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -24,6 +26,7 @@ SIGNAL_NORMALIZER_SOURCE = Path("app/services/search_signal_normalizer.py")
 
 
 def read_fixture(name: str) -> str:
+    """提供 read_fixture 所需的测试行为。"""
     return (FIXTURES_DIR / name).read_text(encoding="utf-8")
 
 

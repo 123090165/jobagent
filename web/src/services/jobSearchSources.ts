@@ -1,3 +1,6 @@
+/**
+ * 规范化职位来源名称、旧别名和多来源 Provider 展示文本。
+ */
 export type ProviderSearchSource = "cuhksz_career" | "linkedin" | "remoteok";
 export type SearchSource = ProviderSearchSource | "boss";
 
@@ -35,6 +38,7 @@ export function normalizeProviderSearchSources(values: unknown): ProviderSearchS
   return values.filter(isProviderSearchSource);
 }
 
+// [兼容保留] 只读取旧 localStorage 中的 selectedSearchSources；迁移窗口结束后可删除。
 export function legacySelectedSearchSources(controls: unknown): string[] {
   if (!controls || typeof controls !== "object") {
     return [];

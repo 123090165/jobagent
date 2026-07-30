@@ -1,1 +1,1 @@
-"""Reusable evaluation contracts and metrics for JobAgent private RAG."""
+"""个人 RAG 的离线评估契约与指标；不会读取或写入线上用户数据。"""

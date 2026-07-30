@@ -1,4 +1,7 @@
 <script setup lang="ts">
+/**
+ * 展示收藏职位库，支持筛选、归档和批量状态操作。
+ */
 import { computed, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { NButton, NCheckbox, NDropdown, NInput, NSelect, NSwitch, NTag } from "naive-ui";

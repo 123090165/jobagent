@@ -1,3 +1,5 @@
+"""定义RAG 同步事件与资源状态在 API、领域服务和 JSON 快照之间共用的 Pydantic 契约。"""
+
 from __future__ import annotations
 
 from datetime import datetime

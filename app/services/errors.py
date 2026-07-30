@@ -1,3 +1,5 @@
+"""定义 service/application 共用的领域异常，API 层据此映射稳定的 HTTP 错误。"""
+
 from __future__ import annotations
 
 

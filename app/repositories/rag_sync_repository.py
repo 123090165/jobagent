@@ -1,3 +1,5 @@
+"""读写 SQLite 中的RAG 同步事件与资源状态，并在查询和更新时强制 user_id 隔离。"""
+
 from __future__ import annotations
 
 import os
@@ -20,6 +22,7 @@ def _utc_now() -> datetime:
 
 
 def rag_sync_enabled() -> bool:
+    """按方法参数限定的主键或用户范围处理知识库同步enabled。"""
     return os.getenv("JOBAGENT_RAG_SYNC_ENABLED", "false").strip().lower() in {
         "1",
         "true",
@@ -29,6 +32,7 @@ def rag_sync_enabled() -> bool:
 
 
 class RAGSyncRepository:
+    """封装rag同步的 SQLite 读写与模型重建。"""
     def enqueue_if_enabled(
         self,
         *,
@@ -38,6 +42,7 @@ class RAGSyncRepository:
         operation: RAGSyncOperation,
         connection: sqlite3.Connection | None = None,
     ) -> RAGIndexEvent | None:
+        """按方法参数限定的主键或用户范围处理enqueueifenabled。"""
         if not rag_sync_enabled():
             return None
         return self.enqueue(
@@ -57,6 +62,7 @@ class RAGSyncRepository:
         operation: RAGSyncOperation,
         connection: sqlite3.Connection | None = None,
     ) -> RAGIndexEvent:
+        """按方法参数限定的主键或用户范围处理enqueue。"""
         if connection is None:
             with get_connection() as owned_connection:
                 init_database(owned_connection)
@@ -148,6 +154,7 @@ class RAGSyncRepository:
         max_attempts: int = 8,
         lease_seconds: int = 300,
     ) -> list[RAGIndexEvent]:
+        """按方法参数限定的主键或用户范围领取pending。"""
         bounded_limit = max(1, min(100, int(limit)))
         bounded_attempts = max(1, min(100, int(max_attempts)))
         now_value = _utc_now()
@@ -229,6 +236,7 @@ class RAGSyncRepository:
         event_id: str,
         document_id: str | None,
     ) -> None:
+        """按方法参数限定的主键或用户范围标记completed。"""
         now = _utc_now()
         with get_connection() as connection:
             init_database(connection)
@@ -281,6 +289,7 @@ class RAGSyncRepository:
         error_message: str,
         retry_delay_seconds: int = 30,
     ) -> None:
+        """按方法参数限定的主键或用户范围标记failed。"""
         now = _utc_now()
         available_at = now + timedelta(seconds=max(1, retry_delay_seconds))
         bounded_message = error_message[:1_000]
@@ -320,6 +329,7 @@ class RAGSyncRepository:
         *,
         connection: sqlite3.Connection | None = None,
     ) -> RAGIndexEvent:
+        """按方法参数限定的主键或用户范围获取事件。"""
         if connection is None:
             with get_connection() as owned_connection:
                 init_database(owned_connection)
@@ -339,6 +349,7 @@ class RAGSyncRepository:
         resource_type: RAGResourceType,
         resource_id: str,
     ) -> RAGResourceStatus | None:
+        """按方法参数限定的主键或用户范围获取状态。"""
         with get_connection() as connection:
             init_database(connection)
             row = connection.execute(
@@ -356,6 +367,7 @@ class RAGSyncRepository:
         user_id: str | None = None,
         recent_failure_limit: int = 10,
     ) -> RAGSyncOverview:
+        """按方法参数限定的主键或用户范围获取overview。"""
         bounded_limit = max(1, min(100, int(recent_failure_limit)))
         resource_filter = "WHERE user_id = ?" if user_id else ""
         event_filter = "WHERE user_id = ?" if user_id else ""
@@ -453,6 +465,7 @@ class RAGSyncRepository:
         *,
         user_id: str | None = None,
     ) -> list[RAGResourceStatus]:
+        """按方法参数限定的主键或用户范围列出statuses。"""
         where_clause = "WHERE user_id = ?" if user_id else ""
         parameters: tuple[object, ...] = (user_id,) if user_id else ()
         with get_connection() as connection:
@@ -474,6 +487,7 @@ class RAGSyncRepository:
         user_id: str | None = None,
         limit: int = 100,
     ) -> int:
+        """按方法参数限定的主键或用户范围重试failed。"""
         bounded_limit = max(1, min(1_000, int(limit)))
         now = _utc_now().isoformat()
         user_filter = "AND outbox.user_id = ?" if user_id else ""

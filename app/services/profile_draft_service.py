@@ -1,3 +1,5 @@
+"""对画像草稿做规范化、完整性检查和可确认性判断。"""
+
 from __future__ import annotations
 
 from datetime import datetime, timezone

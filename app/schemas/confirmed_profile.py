@@ -1,3 +1,5 @@
+"""定义确认画像在 API、领域服务和 JSON 快照之间共用的 Pydantic 契约。"""
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -37,6 +39,7 @@ class ConfirmedProfileResponse(BaseModel):
 
 
 class ProfileSuggestionDecisionInput(BaseModel):
+    """描述画像suggestiondecision的输入结构。"""
     section: str
     item_index: int | None = None
     field: str
@@ -46,11 +49,13 @@ class ProfileSuggestionDecisionInput(BaseModel):
 
 
 class MissingInfoAnswerInput(BaseModel):
+    """描述missinginfo回答的输入结构。"""
     question: str
     answer: str
 
 
 class ConfirmedProfileCreateRequest(BaseModel):
+    """描述已确认画像create的输入结构。"""
     resume_record_id: int | None = None
     raw_resume_text: str
     baseline_profile: ResumeProfile

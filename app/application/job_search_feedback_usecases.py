@@ -1,3 +1,5 @@
+"""编排 搜索结果反馈 的所有权检查、状态转换、领域服务和持久化操作。"""
+
 from __future__ import annotations
 
 from app.repositories.job_search_feedback_repository import (

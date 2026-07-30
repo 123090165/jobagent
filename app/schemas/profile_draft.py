@@ -1,3 +1,5 @@
+"""定义画像草稿在 API、领域服务和 JSON 快照之间共用的 Pydantic 契约。"""
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -55,6 +57,7 @@ class ProfileDraftResponse(BaseModel):
 
 
 class UpdateProfileDraftRequest(BaseModel):
+    """描述画像草稿的输入结构。"""
     summary: str | None = None
     target_roles: list[str] | None = None
     target_directions: list[str] | None = None

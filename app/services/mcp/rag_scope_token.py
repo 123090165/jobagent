@@ -1,3 +1,5 @@
+"""签发短期 HMAC scope token，只允许外部 RAG 读取指定用户和资源类型。"""
+
 from __future__ import annotations
 
 import base64

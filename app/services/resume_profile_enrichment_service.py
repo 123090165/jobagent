@@ -1,3 +1,5 @@
+"""按教育、工作和项目分段调用 LLM 增强，再通过证据质量门合并结果。"""
+
 from __future__ import annotations
 
 import json

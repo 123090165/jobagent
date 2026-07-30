@@ -1,3 +1,5 @@
+"""在不创建 run 的情况下生成搜索查询、来源、预算和 BOSS 跳转信息。"""
+
 from __future__ import annotations
 
 from app.schemas.confirmed_profile import ConfirmedProfile

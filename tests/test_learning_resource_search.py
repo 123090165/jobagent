@@ -1,3 +1,5 @@
+"""回归验证学习资源的正常链路、失败边界和兼容契约。"""
+
 from __future__ import annotations
 
 import asyncio

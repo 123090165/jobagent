@@ -1,4 +1,7 @@
 <script setup lang="ts">
+/**
+ * 管理确认后沉淀的简历画像库及默认搜索画像。
+ */
 import { computed, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { NButton, NCard, NPopconfirm, NSwitch, NTag } from "naive-ui";

@@ -1,3 +1,5 @@
+"""使用 PBKDF2 生成并校验密码哈希；认证用例只依赖这里，不接触明文存储。"""
+
 from __future__ import annotations
 
 import hashlib

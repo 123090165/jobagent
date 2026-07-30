@@ -1,3 +1,5 @@
+"""调用 Modular RAG 管理接口执行 upsert/delete，并统一配置与连接错误。"""
+
 from __future__ import annotations
 
 import os
@@ -11,10 +13,12 @@ from app.schemas.rag_sync import FormattedRAGResource
 
 
 class RAGManagementError(RuntimeError):
+    """表示 RAGManagementError 对应的可识别失败。"""
     pass
 
 
 class RAGManagementConfigurationError(RAGManagementError):
+    """表示 RAGManagementConfigurationError 对应的可识别失败。"""
     pass
 
 

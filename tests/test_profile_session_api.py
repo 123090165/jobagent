@@ -1,3 +1,5 @@
+"""回归验证简历到搜索的流程会话的正常链路、失败边界和兼容契约。"""
+
 from __future__ import annotations
 
 from fastapi.testclient import TestClient

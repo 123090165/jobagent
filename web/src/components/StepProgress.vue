@@ -1,4 +1,7 @@
 <script setup lang="ts">
+/**
+ * 根据当前 ProfileSession 步骤渲染进度，并阻止用户直接跳过尚未完成的上游阶段。
+ */
 const props = withDefaults(
   defineProps<{
     activeIndex?: number;

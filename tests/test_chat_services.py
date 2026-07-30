@@ -1,3 +1,5 @@
+"""回归验证Assistant 会话、消息与上下文的正常链路、失败边界和兼容契约。"""
+
 from __future__ import annotations
 
 import json
@@ -34,10 +36,12 @@ from app.services.chat_retrieval_planner import (
 
 
 class ProfileRepositoryStub:
+    """为当前测试场景提供 ProfileRepositoryStub 夹具或替身。"""
     def __init__(self, profile: ResumeProfile) -> None:
         self.profile = profile
 
     def get(self, *, user_id: str, resume_profile_id: str):
+        """提供 ProfileRepositoryStub.get 所需的测试行为。"""
         return (
             self.profile
             if user_id == self.profile.user_id
@@ -46,35 +50,47 @@ class ProfileRepositoryStub:
         )
 
     def list_by_user(self, user_id: str):
+        """提供 ProfileRepositoryStub.list_by_user 所需的测试行为。"""
         return [self.profile] if user_id == self.profile.user_id else []
 
 
 class EmptyProfileRepository:
+    """封装empty画像的 SQLite 读写与模型重建。"""
     def get(self, *, user_id: str, resume_profile_id: str):
+        """提供 EmptyProfileRepository.get 所需的测试行为。"""
         return None
 
     def list_by_user(self, user_id: str):
+        """提供 EmptyProfileRepository.list_by_user 所需的测试行为。"""
         return []
 
 
 class EmptySearchRepository:
+    """封装empty搜索的 SQLite 读写与模型重建。"""
     def get(self, run_id: str, *, user_id: str):
+        """提供 EmptySearchRepository.get 所需的测试行为。"""
         return None
 
     def list_recent_by_user(self, user_id: str, *, limit: int):
+        """提供 EmptySearchRepository.list_recent_by_user 所需的测试行为。"""
         return []
 
 
 class EmptySavedJobRepository:
+    """封装empty收藏职位的 SQLite 读写与模型重建。"""
     def get(self, *, user_id: str, saved_job_id: str):
+        """提供 EmptySavedJobRepository.get 所需的测试行为。"""
         return None
 
     def list_by_user(self, user_id: str):
+        """提供 EmptySavedJobRepository.list_by_user 所需的测试行为。"""
         return []
 
 
 class EmptyChatRepository:
+    """封装empty对话的 SQLite 读写与模型重建。"""
     def list_turns(self, *, user_id: str, conversation_id: str, limit: int):
+        """提供 EmptyChatRepository.list_turns 所需的测试行为。"""
         return []
 
 

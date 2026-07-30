@@ -1,3 +1,5 @@
+"""编排 画像草稿 的所有权检查、状态转换、领域服务和持久化操作。"""
+
 from __future__ import annotations
 
 from app.application.profile_session_usecases import get_profile_session
@@ -71,6 +73,7 @@ def create_profile_draft(
     parsed_review_repository: ParsedResumeReviewRepository = parsed_resume_review_repository,
     draft_repository: ProfileDraftRepository = profile_draft_repository,
 ) -> ProfileDraftResponse:
+    """从审阅结果生成可编辑草稿；显式 regenerate 才会替换已有草稿。"""
     session = get_profile_session(session_id, repository=session_repository, user_id=user_id)
     if session.parsed_review_id is None:
         raise JobAgentError(
@@ -163,6 +166,7 @@ def update_profile_draft(
     session_repository: ProfileSessionRepository = profile_session_repository,
     draft_repository: ProfileDraftRepository = profile_draft_repository,
 ) -> ProfileDraftResponse:
+    """规范化用户修改并写回草稿；上游变化会清除当前确认画像和搜索状态。"""
     profile_draft = draft_repository.update(
         draft_id,
         _normalize_update_payload(payload),

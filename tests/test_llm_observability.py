@@ -1,3 +1,5 @@
+"""回归验证llm observability的正常链路、失败边界和兼容契约。"""
+
 from __future__ import annotations
 
 from contextlib import contextmanager
@@ -13,14 +15,17 @@ from app.services.llm_service import LLMConfig, LLMService
 
 
 class FakeGeneration:
+    """为当前测试场景提供 FakeGeneration 夹具或替身。"""
     def __init__(self) -> None:
         self.update_payload: dict[str, object] = {}
 
     def update(self, **kwargs) -> None:
+        """提供 FakeGeneration.update 所需的测试行为。"""
         self.update_payload = kwargs
 
 
 class FakeLangfuse:
+    """为当前测试场景提供 FakeLangfuse 夹具或替身。"""
     def __init__(self) -> None:
         self.start_payload: dict[str, object] = {}
         self.generation = FakeGeneration()
@@ -28,10 +33,12 @@ class FakeLangfuse:
 
     @contextmanager
     def start_as_current_observation(self, **kwargs):
+        """提供 FakeLangfuse.start_as_current_observation 所需的测试行为。"""
         self.start_payload = kwargs
         yield self.generation
 
     def flush(self) -> None:
+        """提供 FakeLangfuse.flush 所需的测试行为。"""
         self.flushed = True
 
 

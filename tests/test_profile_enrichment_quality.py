@@ -1,3 +1,5 @@
+"""回归验证profile enrichment quality的正常链路、失败边界和兼容契约。"""
+
 from __future__ import annotations
 
 from app.schemas.profile_enrichment import EvidenceBoundSuggestion

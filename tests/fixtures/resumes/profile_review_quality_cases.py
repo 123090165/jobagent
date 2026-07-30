@@ -1,9 +1,12 @@
+"""回归验证profile review quality cases的正常链路、失败边界和兼容契约。"""
+
 from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
 
 class ProfileReviewQualityCase(BaseModel):
+    """为当前测试场景提供 ProfileReviewQualityCase 夹具或替身。"""
     case_id: str
     title: str
     resume_text: str

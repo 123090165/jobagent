@@ -135,3 +135,5 @@ known authentication limitations.
 
 Start with [docs/INDEX.md](docs/INDEX.md). The roadmap, architecture, API,
 security, search, browser-helper, and development guides there are canonical.
+中文代码链路和待清理标注见
+[docs/CODE_FLOW_ZH.md](docs/CODE_FLOW_ZH.md)。

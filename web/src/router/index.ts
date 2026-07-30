@@ -1,3 +1,6 @@
+/**
+ * 声明产品路由和登录守卫，并在进入画像步骤前向后端核对 session 状态。
+ */
 import { createRouter, createWebHistory } from "vue-router";
 import { useAuthStore } from "../stores/auth";
 import { useProfileSessionStore } from "../stores/profileSession";
@@ -13,7 +16,6 @@ import ResumeProfilesPage from "../pages/ResumeProfilesPage.vue";
 import SavedJobsPage from "../pages/SavedJobsPage.vue";
 import SavedJobDetailPage from "../pages/SavedJobDetailPage.vue";
 import SearchPreviewPage from "../pages/SearchPreviewPage.vue";
-import SearchMissionPage from "../pages/SearchMissionPage.vue";
 import ChatPage from "../pages/ChatPage.vue";
 import KnowledgeStatusPage from "../pages/KnowledgeStatusPage.vue";
 
@@ -100,16 +102,13 @@ const router = createRouter({
         ])
     },
     {
+      // [兼容保留] 旧书签仍指向 search-mission；独立页面已合并进统一 Search Preview。
       path: "/profile/:sessionId/search-mission",
       name: "search-mission",
-      component: SearchMissionPage,
-      beforeEnter: async (to) =>
-        requireSessionStep(String(to.params.sessionId), [
-          "profile_confirmed",
-          "job_search_ready",
-          "job_search_running",
-          "job_search_completed"
-        ])
+      redirect: (to) => ({
+        name: "search-preview",
+        params: { sessionId: String(to.params.sessionId) }
+      })
     },
     {
       path: "/profile/:sessionId/search-preview",

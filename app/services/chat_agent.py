@@ -1,3 +1,5 @@
+"""定义 Assistant 的工具调用协议、模型决策结构、安全拒答和工具白名单。"""
+
 from __future__ import annotations
 
 import json
@@ -99,6 +101,7 @@ CHAT_AGENT_SYSTEM_PROMPT = (
 
 @dataclass(frozen=True)
 class ChatAgentToolCall:
+    """描述模型请求的一次只读工具调用及其稳定 call_id。"""
     call_id: str
     name: ChatAgentToolName
     query: str | None = None
@@ -106,6 +109,7 @@ class ChatAgentToolCall:
 
 @dataclass(frozen=True)
 class ChatAgentToolResult:
+    """把工具状态、引用和安全告警返回给下一轮 Agent。"""
     call_id: str
     name: ChatAgentToolName
     status: Literal["completed", "failed"]
@@ -115,6 +119,7 @@ class ChatAgentToolResult:
 
 @dataclass(frozen=True)
 class ChatAgentStep:
+    """描述 Agent 一轮的回答、工具请求、引用选择和限制说明。"""
     action: Literal["use_tools", "final"]
     tool_calls: list[ChatAgentToolCall]
     answer: str
@@ -133,6 +138,7 @@ def request_chat_agent_step(
     llm_service: JSONChatLLM | None,
     require_final: bool = False,
 ) -> tuple[ChatAgentStep | None, str | None]:
+    """请求 Agent 决定直接回答或调用只读工具，并验证结构化输出。"""
     if llm_service is None:
         return None, "agent_llm_unavailable"
     try:
@@ -179,6 +185,7 @@ def request_chat_agent_step(
 
 
 def classify_agent_failure(exc: Exception) -> str:
+    """把模型异常归一为可追踪且不泄露敏感内容的失败原因。"""
     message = str(exc).casefold()
     if any(term in message for term in ("429", "rate limit", "too many requests")):
         return "rate_limited"
@@ -205,6 +212,7 @@ def default_agent_tools(
     conversation: ChatConversation,
     context_manifest: dict[str, object],
 ) -> list[ChatAgentToolName]:
+    """根据当前上下文清单返回 Agent 可以看到的最小工具集合。"""
     if conversation.data_access_mode == "off":
         return []
     normalized = question.casefold()
@@ -252,6 +260,7 @@ def personal_knowledge_sources(
     *,
     allowed_sources: list[ChatSource],
 ) -> list[ChatSource]:
+    """从 Agent 请求中提取允许进入个人知识检索的来源类型。"""
     normalized = question.casefold()
     allowed = set(allowed_sources)
     mentions_profile = (
@@ -269,6 +278,7 @@ def personal_knowledge_sources(
 
 
 def hard_refusal_route(question: str) -> ChatRouteDecision | None:
+    """只对确定命中的高风险请求返回硬拒答路由。"""
     normalized = question.casefold()
     if not any(term in normalized for term in _FORBIDDEN_ACTION_TERMS):
         return None
@@ -288,6 +298,7 @@ def derive_agent_route(
     tool_calls: list[ChatAgentToolName],
     reason: str,
 ) -> ChatRouteDecision:
+    """根据真实工具使用情况派生持久化 route，不额外调用模型分类。"""
     normalized = question.casefold()
     follow_up = "read_previous_references" in tool_calls or any(
         term in normalized for term in _FOLLOW_UP_TERMS
@@ -307,6 +318,7 @@ def citations_for_agent_step(
     step: ChatAgentStep,
     evidence: list[ChatEvidence],
 ) -> list[ChatCitation]:
+    """只保留 Agent 选择且当前证据包中确实存在的引用。"""
     known = {item.citation.citation_id: item.citation for item in evidence}
     return [
         known[citation_id]

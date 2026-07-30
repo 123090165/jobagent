@@ -1,3 +1,5 @@
+"""读写 SQLite 中的学习资源，并在查询和更新时强制 user_id 隔离。"""
+
 from __future__ import annotations
 
 import json
@@ -7,7 +9,9 @@ from app.storage.database import get_connection, init_database
 
 
 class LearningResourceRepository:
+    """封装学习资源的 SQLite 读写与模型重建。"""
     def search(self, topic: str, *, limit: int = 2) -> list[LearningResource]:
+        """按方法参数限定的主键或用户范围搜索相关数据。"""
         normalized = topic.casefold().strip()
         with get_connection() as connection:
             init_database(connection)

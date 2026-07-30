@@ -1,3 +1,6 @@
+/**
+ * 协调浏览器扩展探测、受限 token 配对、BOSS 登录检查和搜索请求。
+ */
 import { computed, onUnmounted, ref, type ComputedRef } from "vue";
 
 import {

@@ -1,3 +1,6 @@
+/**
+ * 声明可复用简历画像库的列表、编辑和默认项契约。
+ */
 export interface ResumeProfile {
   resume_profile_id: string;
   user_id: string;

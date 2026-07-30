@@ -1,3 +1,5 @@
+"""实现 Streamable HTTP MCP 初始化、工具检查和有限响应读取。"""
+
 from __future__ import annotations
 
 import asyncio
@@ -16,18 +18,22 @@ class MCPClientError(RuntimeError):
 
 
 class MCPConfigurationError(MCPClientError):
+    """表示 MCPConfigurationError 对应的可识别失败。"""
     pass
 
 
 class MCPConnectionError(MCPClientError):
+    """表示 MCPConnectionError 对应的可识别失败。"""
     pass
 
 
 class MCPContractError(MCPClientError):
+    """表示 MCPContractError 对应的可识别失败。"""
     pass
 
 
 class MCPToolCallError(MCPClientError):
+    """表示 MCPToolCallError 对应的可识别失败。"""
     pass
 
 
@@ -81,6 +87,7 @@ class StreamableHTTPMCPClient:
         *,
         required_tools: Collection[str] = (),
     ) -> MCPServerInspection:
+        """连接 MCP 服务并确认必需工具存在；失败时返回类型化连接错误。"""
         try:
             return await asyncio.wait_for(
                 self._inspect(required_tools=frozenset(required_tools)),
@@ -98,6 +105,7 @@ class StreamableHTTPMCPClient:
         name: str,
         arguments: dict[str, Any] | None = None,
     ) -> MCPToolCallResult:
+        """调用白名单内工具，并在解析前限制返回内容的总字节数。"""
         if name not in self.allowed_tools:
             raise MCPConfigurationError(f"MCP tool is not allowed: {name}")
         try:

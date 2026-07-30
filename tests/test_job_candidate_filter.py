@@ -1,3 +1,5 @@
+"""回归验证job candidate filter的正常链路、失败边界和兼容契约。"""
+
 from __future__ import annotations
 
 from app.schemas.confirmed_profile import ConfirmedProfile
@@ -11,11 +13,13 @@ from app.services.llm_service import LLMServiceError
 
 
 class FakeFilterLLM:
+    """为当前测试场景提供 FakeFilterLLM 夹具或替身。"""
     def __init__(self) -> None:
         self.system_prompt = ""
         self.user_prompt = ""
 
     def chat_completion_json(self, *, system_prompt: str, user_prompt: str) -> dict:
+        """提供 FakeFilterLLM.chat_completion_json 所需的测试行为。"""
         self.system_prompt = system_prompt
         self.user_prompt = user_prompt
         return {
@@ -62,7 +66,9 @@ class FakeFilterLLM:
 
 
 class FailingFilterLLM:
+    """为当前测试场景提供 FailingFilterLLM 夹具或替身。"""
     def chat_completion_json(self, *, system_prompt: str, user_prompt: str) -> dict:
+        """提供 FailingFilterLLM.chat_completion_json 所需的测试行为。"""
         raise LLMServiceError("boom")
 
 

@@ -1,3 +1,5 @@
+"""定义Assistant 会话、消息与上下文在 API、领域服务和 JSON 快照之间共用的 Pydantic 契约。"""
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -58,6 +60,7 @@ class ChatDataScope(BaseModel):
 
 
 class ChatConversationCreateRequest(BaseModel):
+    """描述对话会话create的输入结构。"""
     title: str | None = Field(default=None, max_length=120)
     data_access_mode: ChatDataAccessMode = "auto"
     data_scope: ChatDataScope = Field(default_factory=ChatDataScope)
@@ -70,6 +73,7 @@ class ChatConversationCreateRequest(BaseModel):
 
 
 class ChatConversationUpdateRequest(BaseModel):
+    """描述对话会话update的输入结构。"""
     title: str | None = Field(default=None, max_length=120)
     data_access_mode: ChatDataAccessMode | None = None
     data_scope: ChatDataScope | None = None
@@ -168,6 +172,7 @@ class ChatRouteDecision(BaseModel):
 
 
 class ChatRetrievalRequest(BaseModel):
+    """描述对话retrieval的输入结构。"""
     source: ChatSource
     strategy: ChatRetrievalStrategy
     policy_reason: str = Field(max_length=120)
@@ -181,6 +186,7 @@ class ChatRetrievalPlan(BaseModel):
 
 
 class ChatTurnCreateRequest(BaseModel):
+    """描述对话消息轮次create的输入结构。"""
     client_turn_id: str = Field(min_length=1, max_length=100)
     question: str = Field(min_length=1, max_length=2000)
     llm_provider: Literal["mock", "ollama", "deepseek"] | None = None

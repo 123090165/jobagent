@@ -1,3 +1,5 @@
+"""按配置选择单一或多来源职位 Provider，并统一来源别名、状态与选择编码。"""
+
 from __future__ import annotations
 
 import os

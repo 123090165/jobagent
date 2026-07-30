@@ -1,3 +1,5 @@
+"""编排 简历到搜索的流程会话 的所有权检查、状态转换、领域服务和持久化操作。"""
+
 from __future__ import annotations
 
 from app.repositories.profile_session_repository import (

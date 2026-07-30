@@ -1,3 +1,6 @@
+/**
+ * 声明收藏职位、分析版本、状态事件、Brief 与面试准备的前端契约。
+ */
 export type SavedJobStatus =
   | "saved"
   | "interested"

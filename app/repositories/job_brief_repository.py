@@ -1,3 +1,5 @@
+"""读写 SQLite 中的Job Brief，并在查询和更新时强制 user_id 隔离。"""
+
 from __future__ import annotations
 
 import json
@@ -9,6 +11,7 @@ from app.storage.database import get_connection, init_database
 
 
 class JobBriefRepository:
+    """封装职位决策简报的 SQLite 读写与模型重建。"""
     def create(
         self,
         *,
@@ -21,6 +24,7 @@ class JobBriefRepository:
         analysis_provider: str | None = None,
         fallback_reason: str | None = None,
     ) -> JobBrief:
+        """按方法参数限定的主键或用户范围创建相关数据。"""
         created_at = datetime.now(timezone.utc)
         with get_connection() as connection:
             init_database(connection)
@@ -54,6 +58,7 @@ class JobBriefRepository:
         return item
 
     def list_by_job(self, *, user_id: str, saved_job_id: str) -> list[JobBrief]:
+        """按方法参数限定的主键或用户范围列出by职位。"""
         with get_connection() as connection:
             init_database(connection)
             rows = connection.execute(

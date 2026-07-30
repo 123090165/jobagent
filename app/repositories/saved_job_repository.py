@@ -1,3 +1,5 @@
+"""读写 SQLite 中的收藏职位及其分析上下文，并在查询和更新时强制 user_id 隔离。"""
+
 from __future__ import annotations
 
 import json
@@ -23,12 +25,14 @@ def _utc_now() -> datetime:
 
 
 class SavedJobRepository:
+    """封装收藏职位的 SQLite 读写与模型重建。"""
     def save(
         self,
         *,
         user_id: str,
         payload: SavedJobCreateRequest,
     ) -> SavedJob:
+        """按方法参数限定的主键或用户范围保存相关数据。"""
         existing = self._get_by_identity(
             user_id=user_id,
             source_url=_clean_optional_string(payload.source_url),
@@ -206,6 +210,7 @@ class SavedJobRepository:
         resume_actions: list[str] | None = None,
         interview_questions: list[str] | None = None,
     ) -> SavedJobAnalysis:
+        """按方法参数限定的主键或用户范围创建分析。"""
         created_at = _utc_now()
         item = SavedJobAnalysis(
             saved_job_analysis_id=str(uuid4()),
@@ -286,6 +291,7 @@ class SavedJobRepository:
         search_query: str | None = None,
         source_provider: str | None = None,
     ) -> SavedJobOrigin:
+        """按方法参数限定的主键或用户范围创建origin。"""
         created_at = _utc_now()
         origin_id = str(uuid4())
         with get_connection() as connection:
@@ -331,6 +337,7 @@ class SavedJobRepository:
         return self._row_to_origin(row)
 
     def list_origins(self, *, user_id: str, saved_job_id: str) -> list[SavedJobOrigin]:
+        """按方法参数限定的主键或用户范围列出origins。"""
         with get_connection() as connection:
             init_database(connection)
             rows = connection.execute(
@@ -344,6 +351,7 @@ class SavedJobRepository:
         return [self._row_to_origin(row) for row in rows]
 
     def list_by_user(self, user_id: str, *, include_archived: bool = False) -> list[SavedJob]:
+        """按方法参数限定的主键或用户范围列出by用户。"""
         where_clause = "WHERE user_id = ?"
         if not include_archived:
             where_clause += " AND archived_at IS NULL"
@@ -361,6 +369,7 @@ class SavedJobRepository:
         return [self._with_latest_analysis(self._row_to_job(row)) for row in rows]
 
     def get(self, *, user_id: str, saved_job_id: str) -> SavedJob | None:
+        """按方法参数限定的主键或用户范围获取相关数据。"""
         with get_connection() as connection:
             init_database(connection)
             row = connection.execute(
@@ -382,6 +391,7 @@ class SavedJobRepository:
         saved_job_id: str,
         payload: SavedJobUpdateRequest,
     ) -> SavedJob | None:
+        """按方法参数限定的主键或用户范围更新相关数据。"""
         existing = self.get(user_id=user_id, saved_job_id=saved_job_id)
         if existing is None:
             return None
@@ -443,6 +453,7 @@ class SavedJobRepository:
         return self.get(user_id=user_id, saved_job_id=saved_job_id)
 
     def archive(self, *, user_id: str, saved_job_id: str) -> SavedJob | None:
+        """按方法参数限定的主键或用户范围归档相关数据。"""
         existing = self.get(user_id=user_id, saved_job_id=saved_job_id)
         if existing is None:
             return None
@@ -478,6 +489,7 @@ class SavedJobRepository:
         return self.get(user_id=user_id, saved_job_id=saved_job_id)
 
     def delete(self, *, user_id: str, saved_job_id: str) -> bool:
+        """按方法参数限定的主键或用户范围删除相关数据。"""
         if self.get(user_id=user_id, saved_job_id=saved_job_id) is None:
             return False
         with get_connection() as connection:
@@ -517,6 +529,7 @@ class SavedJobRepository:
         return cursor.rowcount > 0
 
     def latest_analysis(self, *, user_id: str, saved_job_id: str) -> SavedJobAnalysis | None:
+        """按方法参数限定的主键或用户范围处理latest分析。"""
         with get_connection() as connection:
             init_database(connection)
             row = connection.execute(
@@ -534,6 +547,7 @@ class SavedJobRepository:
         return self._row_to_analysis(row)
 
     def list_analyses(self, *, user_id: str, saved_job_id: str) -> list[SavedJobAnalysis]:
+        """按方法参数限定的主键或用户范围列出analyses。"""
         with get_connection() as connection:
             init_database(connection)
             rows = connection.execute(
@@ -550,6 +564,7 @@ class SavedJobRepository:
     def list_status_events(
         self, *, user_id: str, saved_job_id: str
     ) -> list[SavedJobStatusEvent]:
+        """按方法参数限定的主键或用户范围列出状态events。"""
         with get_connection() as connection:
             init_database(connection)
             rows = connection.execute(

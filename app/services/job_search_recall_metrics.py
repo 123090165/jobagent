@@ -1,3 +1,5 @@
+"""对多来源候选去重并统计各 Provider 的召回、详情缺失和保留情况。"""
+
 from __future__ import annotations
 
 import re

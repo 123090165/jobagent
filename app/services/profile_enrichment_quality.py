@@ -1,3 +1,5 @@
+"""检查画像增强建议是否有简历证据，过滤模型臆造或重复内容。"""
+
 from __future__ import annotations
 
 import re

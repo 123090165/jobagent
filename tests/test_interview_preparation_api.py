@@ -1,3 +1,5 @@
+"""回归验证面试准备的正常链路、失败边界和兼容契约。"""
+
 from __future__ import annotations
 
 from fastapi.testclient import TestClient

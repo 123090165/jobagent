@@ -1,4 +1,7 @@
 <script setup lang="ts">
+/**
+ * 统一流程页的返回入口、步骤提示、标题和操作区，避免各阶段重复布局。
+ */
 import StepProgress from "./StepProgress.vue";
 
 withDefaults(

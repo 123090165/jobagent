@@ -1,3 +1,5 @@
+"""按中英文标题切分简历，并从各分段提取技能、教育、工作、项目和亮点。"""
+
 from __future__ import annotations
 
 import re

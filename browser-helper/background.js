@@ -1,3 +1,8 @@
+/**
+ * 扩展后台：管理配对会话、BOSS 登录态与搜索标签页，并提取当前职位页。
+ */
+// 扩展后台主链路：接收 Vue 请求 -> 使用浏览器登录态搜索/提取 -> 返回有限候选或终态错误。
+// Cookie 只在扩展内读取，任何响应都不得把 Cookie 或主站 token 发送给 FastAPI。
 const HELPER_VERSION = "0.4.7";
 const DEFAULT_JOBAGENT_BACKEND_URL = "http://127.0.0.1:8000";
 const DEFAULT_JOBAGENT_APP_URL = "http://127.0.0.1:5173";
@@ -145,6 +150,7 @@ const BOSS_CITY_CODES = new Map([
 
 initializeSidePanelBehavior();
 
+/** 配置点击扩展图标时打开 Side Panel；旧 Chromium 不支持时静默保留默认行为。 */
 function initializeSidePanelBehavior() {
   if (!chrome.sidePanel?.setPanelBehavior) return;
   try {
@@ -419,6 +425,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   return true;
 });
 
+/** 采集当前标签页并立即请求后端分析，不在扩展内复制 JD 分析规则。 */
 async function analyzeCurrentJobPage({ sessionId, useLlm, analysisMode, llmProvider }) {
   const captured = await persistCurrentJobPage();
   if (!captured.ok) return captured;
@@ -432,6 +439,7 @@ async function analyzeCurrentJobPage({ sessionId, useLlm, analysisMode, llmProvi
   return { ...analyzed, capture: captured.capture };
 }
 
+/** 把当前页采集写入后端，返回可供 SavedJob 或 Assistant 引用的 capture id。 */
 async function persistCurrentJobPage() {
   const assistantSession = await getAssistantSession();
   if (!assistantSession) {
@@ -495,6 +503,7 @@ async function persistCurrentJobPage() {
   }
 }
 
+/** 使用已保存 capture 触发标准职位分析，并把结果关联回扩展工作区。 */
 async function analyzeCapturedJob({ captureId, sessionId, useLlm, analysisMode, llmProvider }) {
   const assistantSession = await getAssistantSession();
   if (!assistantSession) return { ok: false, errorType: "authentication", error: "Pair Browser Helper first." };
@@ -531,6 +540,7 @@ async function analyzeCapturedJob({ captureId, sessionId, useLlm, analysisMode, 
   }
 }
 
+/** 读取受限 browser_helper 会话；过期或缺失时要求用户重新从主应用配对。 */
 async function getAssistantSession() {
   const stored = await chrome.storage.session.get(ASSISTANT_SESSION_KEYS);
   const accessToken = String(stored.accessToken || "").trim();
@@ -552,6 +562,7 @@ async function getAssistantSession() {
   };
 }
 
+/** 复用已打开的 JobAgent Assistant 标签页，避免每次操作创建新页面。 */
 async function openOrFocusAssistantTab({ appUrl, conversationId, requestPair, allowKnownDevOrigin }) {
   const preferredAppUrl = normalizeLocalUrl(appUrl);
   const preferredOrigin = new URL(preferredAppUrl).origin;
@@ -617,6 +628,7 @@ function parseHttpUrl(value) {
   }
 }
 
+/** 统一发送带受限 token 的 FastAPI 请求，并把非成功响应转换为可显示错误。 */
 async function jobAgentApiRequest(path, options = {}) {
   const session = await getAssistantSession();
   if (!session) {
@@ -713,6 +725,7 @@ async function readJsonResponse(response) {
   }
 }
 
+/** 在页面上下文提取职位字段和有限正文；只接受看起来像职位详情的页面。 */
 function captureCurrentJobPage({ minTextLength, maxTextLength, captureVersion, previewLength }) {
   function compactText(value) {
     const lines = String(value || "")
@@ -1160,6 +1173,7 @@ async function buildBossLoginStatus() {
   };
 }
 
+/** 在临时标签页检查 BOSS 登录、验证页和空结果信号，不读取或上传 Cookie 值。 */
 async function probeBossLoginSession() {
   const probeUrl = buildBossSearchUrl(
     BOSS_LOGIN_PROBE_QUERY,
@@ -1298,6 +1312,7 @@ function containsCjk(value) {
   return /[\u3400-\u9fff]/.test(String(value || ""));
 }
 
+/** 依次尝试有限中文查询，并合并页面/API 返回的去重职位候选。 */
 async function searchBossJobs({ queries, location, jobType, limit }) {
   const cityCode = resolveBossCityCode(location);
   const jobTypeCode = resolveBossJobTypeCode(jobType);
@@ -1375,6 +1390,7 @@ async function searchBossJobs({ queries, location, jobType, limit }) {
   }
 }
 
+/** 在扩展创建的 BOSS 标签页中执行一次查询，结束后按创建归属决定是否关闭。 */
 async function searchBossJobsInTab(tabId, { query, requestedLocation, limit, cityCode, jobTypeCode }) {
   const searchUrl = buildBossSearchUrl(query, requestedLocation, jobTypeCode);
   const apiUrl = buildBossSearchApiUrl(query, cityCode, jobTypeCode, limit);
@@ -1530,6 +1546,7 @@ function clampInteger(value, min, max, fallback) {
   return Math.max(min, Math.min(max, parsed));
 }
 
+/** 由扩展后台直接请求 BOSS API；失败后允许切换到页面上下文请求。 */
 async function fetchBossJobsFromWorkerApi({ query, requestedLocation, limit, searchUrl, apiUrl }) {
   try {
     const response = await fetch(apiUrl, {
@@ -1593,6 +1610,7 @@ async function fetchBossJobsFromWorkerApi({ query, requestedLocation, limit, sea
   }
 }
 
+/** 在 BOSS 页面上下文请求同源 API，用于后台请求被站点拒绝时回退。 */
 async function fetchBossJobsFromPageApi(tabId, { query, requestedLocation, limit, searchUrl, apiUrl }) {
   try {
     const [apiFetch] = await chrome.scripting.executeScript({
@@ -1692,6 +1710,7 @@ function summarizeObjectShape(value) {
   return summary;
 }
 
+/** 轮询页面直到出现职位、登录、验证或空结果终态，避免固定延时误判。 */
 async function waitForBossPageSignals(tabId, timeoutMs) {
   const startedAt = Date.now();
   let latestSignals = null;
@@ -1712,6 +1731,7 @@ async function waitForBossPageSignals(tabId, timeoutMs) {
   return latestSignals;
 }
 
+/** 汇总 DOM、正文和 API 诊断信号，供搜索流程判断下一步。 */
 async function readBossPageSignals(tabId) {
   try {
     const [signals] = await chrome.scripting.executeScript({
@@ -1766,6 +1786,7 @@ function fetchBossJobListFromPage({ apiUrl }) {
   });
 }
 
+/** 从多种 BOSS API 包装结构中寻找职位数组并转换为统一候选。 */
 function parseBossApiCandidates(data, { query, requestedLocation, limit, searchUrl }) {
   const jobs = findBossJobList(data);
   return jobs
@@ -1945,6 +1966,7 @@ function validBossJobDetailUrl(href) {
   }
 }
 
+/** 在页面上下文统计职位卡片、有效链接和阻断页面特征。 */
 function collectBossPageSignals(textMarkers) {
   const bodyText = document.body ? document.body.innerText || "" : "";
   const markers = normalizeBossTextMarkers(textMarkers);
@@ -1999,6 +2021,7 @@ function collectBossPageSignals(textMarkers) {
   }
 }
 
+/** 从当前 BOSS 列表页提取可见职位卡片，作为 API 解析失败时的回退。 */
 function extractBossJobsFromPage({ query, requestedLocation, limit, searchUrl, textMarkers }) {
   const warnings = [];
   const bodyText = document.body ? document.body.innerText || "" : "";

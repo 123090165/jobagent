@@ -1,3 +1,5 @@
+"""用固定查询和隐私化文档计算 RAG 召回、排序及用户隔离指标。"""
+
 from __future__ import annotations
 
 import json

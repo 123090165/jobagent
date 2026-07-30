@@ -1,3 +1,5 @@
+"""比较 LLM 与确定性 JD 分析，发现无依据字段或覆盖不足时建议回退。"""
+
 from __future__ import annotations
 
 from typing import Literal

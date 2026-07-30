@@ -1,3 +1,6 @@
+/**
+ * 管理可复用简历画像库的加载、编辑、默认项、归档和删除。
+ */
 import { defineStore } from "pinia";
 import { AxiosError } from "axios";
 

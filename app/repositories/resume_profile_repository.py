@@ -1,3 +1,5 @@
+"""读写 SQLite 中的可复用简历画像，并在查询和更新时强制 user_id 隔离。"""
+
 from __future__ import annotations
 
 import json
@@ -15,6 +17,7 @@ def _utc_now() -> datetime:
 
 
 class ResumeProfileRepository:
+    """封装画像的 SQLite 读写与模型重建。"""
     def create_or_update_from_confirmed(
         self,
         *,
@@ -22,6 +25,7 @@ class ResumeProfileRepository:
         confirmed_profile: ConfirmedProfile,
         raw_resume_text: str | None = None,
     ) -> ResumeProfile:
+        """按方法参数限定的主键或用户范围创建orupdatefrom已确认。"""
         existing = self.get_by_confirmed_profile(
             user_id=user_id,
             confirmed_profile_id=confirmed_profile.confirmed_profile_id,
@@ -98,6 +102,7 @@ class ResumeProfileRepository:
         return profile
 
     def list_by_user(self, user_id: str, *, include_archived: bool = False) -> list[ResumeProfile]:
+        """按方法参数限定的主键或用户范围列出by用户。"""
         where_clause = "WHERE user_id = ?"
         parameters: tuple[object, ...] = (user_id,)
         if not include_archived:
@@ -116,6 +121,7 @@ class ResumeProfileRepository:
         return [self._row_to_profile(row) for row in rows]
 
     def get(self, *, user_id: str, resume_profile_id: str) -> ResumeProfile | None:
+        """按方法参数限定的主键或用户范围获取相关数据。"""
         with get_connection() as connection:
             init_database(connection)
             row = connection.execute(
@@ -136,6 +142,7 @@ class ResumeProfileRepository:
         user_id: str,
         confirmed_profile_id: str,
     ) -> ResumeProfile | None:
+        """按方法参数限定的主键或用户范围获取by已确认画像。"""
         with get_connection() as connection:
             init_database(connection)
             row = connection.execute(
@@ -157,6 +164,7 @@ class ResumeProfileRepository:
         resume_profile_id: str,
         payload: ResumeProfileUpdateRequest,
     ) -> ResumeProfile | None:
+        """按方法参数限定的主键或用户范围更新相关数据。"""
         existing = self.get(user_id=user_id, resume_profile_id=resume_profile_id)
         if existing is None:
             return None
@@ -236,6 +244,7 @@ class ResumeProfileRepository:
         return updated
 
     def set_default(self, *, user_id: str, resume_profile_id: str) -> ResumeProfile | None:
+        """按方法参数限定的主键或用户范围设置default。"""
         existing = self.get(user_id=user_id, resume_profile_id=resume_profile_id)
         if existing is None or existing.archived_at is not None:
             return None
@@ -262,6 +271,7 @@ class ResumeProfileRepository:
         return self.get(user_id=user_id, resume_profile_id=resume_profile_id)
 
     def archive(self, *, user_id: str, resume_profile_id: str) -> ResumeProfile | None:
+        """按方法参数限定的主键或用户范围归档相关数据。"""
         existing = self.get(user_id=user_id, resume_profile_id=resume_profile_id)
         if existing is None:
             return None
@@ -301,6 +311,7 @@ class ResumeProfileRepository:
         return self.get(user_id=user_id, resume_profile_id=resume_profile_id)
 
     def restore(self, *, user_id: str, resume_profile_id: str) -> ResumeProfile | None:
+        """按方法参数限定的主键或用户范围恢复相关数据。"""
         existing = self.get(user_id=user_id, resume_profile_id=resume_profile_id)
         if existing is None:
             return None
@@ -329,6 +340,7 @@ class ResumeProfileRepository:
         return restored
 
     def delete(self, *, user_id: str, resume_profile_id: str) -> bool:
+        """按方法参数限定的主键或用户范围删除相关数据。"""
         existing = self.get(user_id=user_id, resume_profile_id=resume_profile_id)
         if existing is None:
             return False

@@ -1,3 +1,5 @@
+"""评估职位描述的完整度、可分析性和风险，并生成统一质量标签。"""
+
 from __future__ import annotations
 
 import re

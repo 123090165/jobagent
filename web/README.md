@@ -13,6 +13,9 @@ Axios, and Naive UI, and communicates with FastAPI only through /api/v1.
 
 ## Current Views
 
+> [旧说明待补全] 本列表尚未覆盖已经存在的 Assistant、Knowledge Status、
+> Job Brief 和 Interview Preparation 页面能力，详见 `docs/CODE_FLOW_ZH.md`。
+
 - login and registration;
 - resume intake and profile review;
 - editable profile draft and confirmed profile;

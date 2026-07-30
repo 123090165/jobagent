@@ -1,3 +1,5 @@
+"""定义职位搜索 run、结果与 trace在 API、领域服务和 JSON 快照之间共用的 Pydantic 契约。"""
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -165,6 +167,7 @@ class JobSearchRun(BaseModel):
 
 
 class JobSearchRunCreateRequest(BaseModel):
+    """描述职位搜索运行记录create的输入结构。"""
     session_id: str
     query: str | None = None
     search_mode: JobSearchMode = "live_search"
@@ -194,6 +197,7 @@ class BrowserHelperJobCandidate(BaseModel):
 
 
 class BrowserHelperJobSearchRunCreateRequest(BaseModel):
+    """描述浏览器助手职位搜索运行记录create的输入结构。"""
     session_id: str
     query: str | None = None
     helper_version: str | None = None
@@ -210,6 +214,7 @@ class BrowserHelperJobSearchRunCreateRequest(BaseModel):
 
 
 class BrowserJobCaptureCreateRequest(BaseModel):
+    """描述浏览器职位职位采集create的输入结构。"""
     source: BrowserJobCaptureSource = "unknown"
     source_url: str
     page_title: str
@@ -290,6 +295,7 @@ class BrowserJobCaptureCreateRequest(BaseModel):
 
 
 class BrowserJobCaptureRequest(BrowserJobCaptureCreateRequest):
+    """描述浏览器职位职位采集的输入结构。"""
     session_id: str
 
     @field_validator("session_id")
@@ -302,6 +308,7 @@ class BrowserJobCaptureRequest(BrowserJobCaptureCreateRequest):
 
 
 class BrowserJobCaptureAnalysisRequest(BaseModel):
+    """描述浏览器职位职位采集分析的输入结构。"""
     session_id: str = Field(min_length=1, max_length=100)
     analysis_mode: JobSearchRequestedAnalysisMode | None = None
     llm_provider: JobSearchLlmProvider | None = None

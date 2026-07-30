@@ -1,3 +1,5 @@
+"""实现 OpenAI-compatible JSON 请求、响应解析、重试边界和错误归一。"""
+
 from __future__ import annotations
 
 import json
@@ -59,6 +61,7 @@ class LLMService:
         user_prompt: str,
         expected_root_key: str | None = None,
     ) -> dict[str, Any]:
+        """请求一次 JSON 对话补全，并校验根结构后返回解析结果。"""
         if not self.config.is_configured:
             raise LLMServiceError("LLM is not configured. Set JOBAGENT_LLM_API_KEY first.")
 

@@ -1,3 +1,5 @@
+"""调用个人知识库检索，并重新校验返回资源仍属于当前用户。"""
+
 from __future__ import annotations
 
 import asyncio
@@ -44,7 +46,9 @@ class _AuthorizedKnowledgeService(Protocol):
         resource_types: tuple[str, ...],
         top_k: int,
         include_public: bool,
-    ) -> KnowledgeQueryResult: ...
+    ) -> KnowledgeQueryResult:
+        """以服务端注入的 user_id 查询知识库，并限制资源类型和返回数量。"""
+        ...
 
 
 @dataclass(frozen=True)

@@ -1,3 +1,6 @@
+/**
+ * 声明Assistant 会话、消息与上下文的前端类型，并与后端响应结构保持一致。
+ */
 export type ChatDataAccessMode = "auto" | "always" | "off";
 export type ChatSource = "profile" | "search_results" | "saved_jobs" | "chat_history";
 

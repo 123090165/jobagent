@@ -1,3 +1,5 @@
+"""回归验证frontend profile review helpers的正常链路、失败边界和兼容契约。"""
+
 from __future__ import annotations
 
 from app.services.profile_review_state_helpers import (

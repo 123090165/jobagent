@@ -1,3 +1,5 @@
+"""定义 RAG 离线评估语料、测试用例、单例结果和汇总报告。"""
+
 from __future__ import annotations
 
 from typing import Literal

@@ -1,3 +1,5 @@
+"""根据证据缺口生成准备问题、追问、建议和可供外部模型使用的提示文本。"""
+
 from __future__ import annotations
 
 import json

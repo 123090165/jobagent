@@ -1,3 +1,5 @@
+"""定义所有职位来源必须实现的 Provider 接口、原始候选结构和统一错误。"""
+
 from __future__ import annotations
 
 from typing import Protocol
@@ -24,6 +26,7 @@ class RawJobCandidate(BaseModel):
 
 
 class JobSearchProvider(Protocol):
+    """把职位搜索接入统一 Provider 协议。"""
     provider_name: str
     provider_kind: str
 

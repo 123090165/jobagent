@@ -1,4 +1,7 @@
 <script setup lang="ts">
+/**
+ * 展示确定性/LLM 简历审阅结果，并触发画像草稿生成。
+ */
 import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { NButton, NCard, NCode, NCollapse, NCollapseItem, NSwitch, NTag, NThing } from "naive-ui";

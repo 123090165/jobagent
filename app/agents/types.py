@@ -1,3 +1,5 @@
+"""执行types Agent，并用统一元数据记录确定性、LLM 或回退模式。"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

@@ -1,3 +1,5 @@
+"""定义profile enrichment在 API、领域服务和 JSON 快照之间共用的 Pydantic 契约。"""
+
 from __future__ import annotations
 
 from pydantic import BaseModel, Field
@@ -23,6 +25,7 @@ class SectionEnrichmentDraft(BaseModel):
 
 
 class ResumeProfileEnrichmentRequest(BaseModel):
+    """描述画像enrichment的输入结构。"""
     resume_text: str
     target_roles: list[str] = Field(default_factory=list)
     use_llm: bool = False

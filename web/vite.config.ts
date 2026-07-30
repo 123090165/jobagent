@@ -1,3 +1,6 @@
+/**
+ * 实现 vite.config 相关逻辑。
+ */
 import { defineConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
 

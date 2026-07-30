@@ -1,3 +1,5 @@
+"""定义搜索意图与约束在 API、领域服务和 JSON 快照之间共用的 Pydantic 契约。"""
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -21,6 +23,7 @@ class SearchMissionClarificationAnswer(BaseModel):
 
 
 class SearchMissionInput(BaseModel):
+    """描述搜索意图的输入结构。"""
     target_roles: list[str] = Field(default_factory=list)
     excluded_roles: list[str] = Field(default_factory=list)
     preferred_industries: list[str] = Field(default_factory=list)
@@ -103,5 +106,6 @@ class SearchMission(BaseModel):
 
 
 class SearchMissionInterpretRequest(BaseModel):
+    """描述搜索意图interpret的输入结构。"""
     use_llm: bool = False
     llm_provider: Literal["mock", "ollama", "deepseek"] = "deepseek"

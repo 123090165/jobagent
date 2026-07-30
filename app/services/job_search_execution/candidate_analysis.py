@@ -1,3 +1,5 @@
+"""以有界线程池并行分析候选 JD，并为单项失败保留告警和降级结果。"""
+
 from __future__ import annotations
 
 import os

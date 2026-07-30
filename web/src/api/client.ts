@@ -1,3 +1,6 @@
+/**
+ * 统一配置 Axios：注入登录 token，并把后端错误结构转换成页面可直接展示的异常。
+ */
 import axios from "axios";
 import { getAuthToken } from "../services/authToken";
 

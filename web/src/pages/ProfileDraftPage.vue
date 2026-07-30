@@ -1,4 +1,7 @@
 <script setup lang="ts">
+/**
+ * 编辑画像草稿；任何修改都会使下游确认画像和搜索状态失效。
+ */
 import { computed, onMounted, reactive, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { NButton, NCard, NInput } from "naive-ui";
@@ -133,7 +136,7 @@ async function confirmProfile() {
     });
     syncForm(updated);
     await profileSessionStore.confirmDraft(draftId);
-    await router.push({ name: "profile-confirmed", params: { sessionId: sessionId.value } });
+    await router.push({ name: "search-preview", params: { sessionId: sessionId.value } });
   } catch {
     // Error state is rendered from the store.
   }

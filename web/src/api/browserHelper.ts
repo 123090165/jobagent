@@ -1,3 +1,6 @@
+/**
+ * 创建和读取浏览器助手配对会话；页面拿到受限 token 后再通过扩展 bridge 发起采集。
+ */
 import { client } from "./client";
 
 export interface BrowserHelperProfileSessionOption {

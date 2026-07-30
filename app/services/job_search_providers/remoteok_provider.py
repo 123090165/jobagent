@@ -1,3 +1,5 @@
+"""读取 RemoteOK 官方 JSON API，并把远程职位规范化为统一候选。"""
+
 from __future__ import annotations
 
 import html
@@ -14,6 +16,7 @@ REMOTEOK_USER_AGENT = "JobAgent/0.1 remoteok-provider"
 
 
 class RemoteOKProvider:
+    """把remoteok接入统一 Provider 协议。"""
     provider_name = "remoteok"
     provider_kind = "native_api"
     detail_strategy = "official_json_api"

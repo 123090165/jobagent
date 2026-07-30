@@ -1,3 +1,5 @@
+"""回归验证职位搜索 run、结果与 trace的正常链路、失败边界和兼容契约。"""
+
 from __future__ import annotations
 
 from threading import Barrier
@@ -19,7 +21,9 @@ from app.services.search_signal_normalizer import build_bilingual_search_signals
 
 
 class FakePlannerLLM:
+    """为当前测试场景提供 FakePlannerLLM 夹具或替身。"""
     def chat_completion_json(self, *, system_prompt: str, user_prompt: str) -> dict:
+        """提供 FakePlannerLLM.chat_completion_json 所需的测试行为。"""
         return {
             "role_titles": ["Backend Engineer", "Platform Engineer"],
             "role_families": ["engineering"],
@@ -37,7 +41,9 @@ class FakePlannerLLM:
 
 
 class FailingPlannerLLM:
+    """为当前测试场景提供 FailingPlannerLLM 夹具或替身。"""
     def chat_completion_json(self, *, system_prompt: str, user_prompt: str) -> dict:
+        """提供 FailingPlannerLLM.chat_completion_json 所需的测试行为。"""
         raise LLMServiceError("boom")
 
 

@@ -1,3 +1,5 @@
+"""在确定性 JD 分析与可选 LLM 分析之间切换，并用质量门决定是否回退。"""
+
 from __future__ import annotations
 
 from typing import Any

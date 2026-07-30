@@ -1,3 +1,5 @@
+"""读写 SQLite 中的搜索意图与约束，并在查询和更新时强制 user_id 隔离。"""
+
 from __future__ import annotations
 
 import json
@@ -13,7 +15,9 @@ from app.storage.database import get_connection, init_database
 
 
 class SearchMissionRepository:
+    """封装搜索意图的 SQLite 读写与模型重建。"""
     def get(self, *, user_id: str, session_id: str) -> SearchMission | None:
+        """按方法参数限定的主键或用户范围获取相关数据。"""
         with get_connection() as connection:
             init_database(connection)
             row = connection.execute(
@@ -30,6 +34,7 @@ class SearchMissionRepository:
         confirmed_profile_id: str,
         payload: SearchMissionInput,
     ) -> SearchMission:
+        """按方法参数限定的主键或用户范围保存input。"""
         existing = self.get(user_id=user_id, session_id=session_id)
         now = datetime.now(timezone.utc)
         mission = SearchMission(
@@ -64,6 +69,7 @@ class SearchMissionRepository:
         analysis_provider: str | None,
         fallback_reason: str | None,
     ) -> SearchMission:
+        """按方法参数限定的主键或用户范围保存interpretation。"""
         updated = mission.model_copy(
             update={
                 "status": "review",
@@ -79,6 +85,7 @@ class SearchMissionRepository:
         return updated
 
     def confirm(self, mission: SearchMission) -> SearchMission:
+        """按方法参数限定的主键或用户范围确认相关数据。"""
         now = datetime.now(timezone.utc)
         updated = mission.model_copy(
             update={

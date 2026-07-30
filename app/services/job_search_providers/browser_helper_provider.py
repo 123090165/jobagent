@@ -1,3 +1,5 @@
+"""把浏览器扩展返回的候选包装为普通 Provider，使其复用后端分析流水线。"""
+
 from __future__ import annotations
 
 from app.services.job_search_providers.base import RawJobCandidate
@@ -6,6 +8,7 @@ BROWSER_HELPER_PROVIDER_PREFIX = "browser_helper"
 
 
 class BrowserHelperPayloadProvider:
+    """把浏览器助手payload接入统一 Provider 协议。"""
     provider_kind = "browser_helper"
     detail_strategy = "browser_helper_payload"
 

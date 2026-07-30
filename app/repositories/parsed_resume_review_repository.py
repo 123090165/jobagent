@@ -1,3 +1,5 @@
+"""读写 SQLite 中的简历解析审阅，并在查询和更新时强制 user_id 隔离。"""
+
 from __future__ import annotations
 
 import json
@@ -13,6 +15,7 @@ def _utc_now() -> datetime:
 
 
 class ParsedResumeReviewRepository:
+    """封装parsed简历审阅结果的 SQLite 读写与模型重建。"""
     def create(
         self,
         *,
@@ -32,6 +35,7 @@ class ParsedResumeReviewRepository:
         analysis_provider: str | None = None,
         analysis_warnings: list[str] | None = None,
     ) -> ParsedResumeReview:
+        """按方法参数限定的主键或用户范围创建相关数据。"""
         now = _utc_now()
         review = ParsedResumeReview(
             parsed_review_id=str(uuid4()),
@@ -103,6 +107,7 @@ class ParsedResumeReviewRepository:
         return review
 
     def get(self, parsed_review_id: str, *, user_id: str | None = None) -> ParsedResumeReview | None:
+        """按方法参数限定的主键或用户范围获取相关数据。"""
         with get_connection() as connection:
             init_database(connection)
             where_clause = "WHERE parsed_review_id = ?"
@@ -146,6 +151,7 @@ class ParsedResumeReviewRepository:
         resume_document_id: str,
         user_id: str | None = None,
     ) -> ParsedResumeReview | None:
+        """按方法参数限定的主键或用户范围获取currentfor会话。"""
         with get_connection() as connection:
             init_database(connection)
             where_clause = "WHERE session_id = ? AND resume_document_id = ?"

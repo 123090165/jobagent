@@ -1,3 +1,6 @@
+/**
+ * 管理收藏职位、分析历史、Job Brief、状态历史和面试准备工作区。
+ */
 import { defineStore } from "pinia";
 import { AxiosError } from "axios";
 
@@ -96,6 +99,7 @@ export const useSavedJobsStore = defineStore("savedJobs", {
       this.isLoading = true;
       this.error = null;
       try {
+        // 工作台并行读取各持久化视图；尚未创建 preparation 属于正常空状态。
         const [job, analyses, statusHistory, briefs, preparation] = await Promise.all([
           getSavedJob(savedJobId),
           listSavedJobAnalyses(savedJobId),
@@ -126,6 +130,7 @@ export const useSavedJobsStore = defineStore("savedJobs", {
       this.isSaving = true;
       this.error = null;
       try {
+        // 服务端可能返回已存在的职位，始终用返回值合并而不是在前端假设新建成功。
         const job = await saveJobFromSearchResult(payload);
         this.mergeJob(job);
         return job;

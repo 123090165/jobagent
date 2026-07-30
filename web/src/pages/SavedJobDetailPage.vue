@@ -1,4 +1,7 @@
 <script setup lang="ts">
+/**
+ * 职位工作台：查看 JD/分析，生成 Brief，完成准备问答或打开 Assistant。
+ */
 import { computed, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { NButton, NCollapse, NCollapseItem, NInput, NModal, NRadio, NRadioGroup, NSelect, NTabPane, NTabs, NTag } from "naive-ui";

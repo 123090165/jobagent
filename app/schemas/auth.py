@@ -1,3 +1,5 @@
+"""定义认证账户与会话在 API、领域服务和 JSON 快照之间共用的 Pydantic 契约。"""
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -15,6 +17,7 @@ class UserAccount(BaseModel):
 
 
 class AuthRegisterRequest(BaseModel):
+    """描述认证register的输入结构。"""
     username: str = Field(min_length=3, max_length=64)
     password: str = Field(min_length=8, max_length=256)
     display_name: str | None = Field(default=None, max_length=120)
@@ -39,6 +42,7 @@ class AuthRegisterRequest(BaseModel):
 
 
 class AuthLoginRequest(BaseModel):
+    """描述认证login的输入结构。"""
     username: str
     password: str
 

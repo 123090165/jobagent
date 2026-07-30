@@ -1,3 +1,5 @@
+"""读写 SQLite 中的简历到搜索的流程会话，并在查询和更新时强制 user_id 隔离。"""
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -16,7 +18,9 @@ def _utc_now() -> datetime:
 
 
 class ProfileSessionRepository:
+    """封装画像会话的 SQLite 读写与模型重建。"""
     def create(self, *, user_id: str = LOCAL_USER_ID) -> ProfileSession:
+        """按方法参数限定的主键或用户范围创建相关数据。"""
         now = _utc_now()
         session = ProfileSession(
             session_id=str(uuid4()),
@@ -60,6 +64,7 @@ class ProfileSessionRepository:
         return session
 
     def get(self, session_id: str, *, user_id: str | None = None) -> ProfileSession | None:
+        """按方法参数限定的主键或用户范围获取相关数据。"""
         with get_connection() as connection:
             init_database(connection)
             where_clause = "WHERE session_id = ?"
@@ -89,6 +94,7 @@ class ProfileSessionRepository:
         return self._row_to_profile_session(row)
 
     def list_ready_by_user(self, user_id: str, *, limit: int = 20) -> list[ProfileSession]:
+        """按方法参数限定的主键或用户范围列出readyby用户。"""
         with get_connection() as connection:
             init_database(connection)
             rows = connection.execute(
@@ -111,6 +117,7 @@ class ProfileSessionRepository:
         session_id: str,
         resume_document_id: str,
     ) -> ProfileSession | None:
+        """按方法参数限定的主键或用户范围关联简历文档。"""
         updated_at = _utc_now()
         with get_connection() as connection:
             init_database(connection)
@@ -144,6 +151,7 @@ class ProfileSessionRepository:
         session_id: str,
         parsed_review_id: str,
     ) -> ProfileSession | None:
+        """按方法参数限定的主键或用户范围关联parsed审阅结果。"""
         updated_at = _utc_now()
         with get_connection() as connection:
             init_database(connection)
@@ -176,6 +184,7 @@ class ProfileSessionRepository:
         session_id: str,
         profile_draft_id: str,
     ) -> ProfileSession | None:
+        """按方法参数限定的主键或用户范围关联画像草稿。"""
         updated_at = _utc_now()
         with get_connection() as connection:
             init_database(connection)
@@ -207,6 +216,7 @@ class ProfileSessionRepository:
         session_id: str,
         confirmed_profile_id: str,
     ) -> ProfileSession | None:
+        """按方法参数限定的主键或用户范围关联已确认画像。"""
         updated_at = _utc_now()
         with get_connection() as connection:
             init_database(connection)
@@ -232,6 +242,7 @@ class ProfileSessionRepository:
         return self.get(session_id)
 
     def mark_job_search_running(self, *, session_id: str) -> ProfileSession | None:
+        """按方法参数限定的主键或用户范围标记职位搜索running。"""
         updated_at = _utc_now()
         with get_connection() as connection:
             init_database(connection)
@@ -255,6 +266,7 @@ class ProfileSessionRepository:
         return self.get(session_id)
 
     def mark_job_search_completed(self, *, session_id: str) -> ProfileSession | None:
+        """按方法参数限定的主键或用户范围标记职位搜索completed。"""
         updated_at = _utc_now()
         with get_connection() as connection:
             init_database(connection)

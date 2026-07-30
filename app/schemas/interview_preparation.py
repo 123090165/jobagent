@@ -1,3 +1,5 @@
+"""定义面试准备在 API、领域服务和 JSON 快照之间共用的 Pydantic 契约。"""
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -47,6 +49,7 @@ class CapabilityDimension(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def upgrade_demonstrated_state(cls, data: object) -> object:
+        """读取旧快照时把已停用的 demonstrated 状态迁移为 supported。"""
         if isinstance(data, dict) and data.get("state") == "demonstrated":
             return {**data, "state": "supported"}
         return data
@@ -59,6 +62,7 @@ class OptionStateEffect(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def upgrade_demonstrated_state(cls, data: object) -> object:
+        """兼容旧答案效果中的 demonstrated 状态。"""
         if isinstance(data, dict) and data.get("state") == "demonstrated":
             return {**data, "state": "supported"}
         return data
@@ -84,6 +88,7 @@ class PreparationSkillGap(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def normalize_model_lists(cls, data: object) -> object:
+        """把旧模型返回的单条画像证据统一转换成列表。"""
         if not isinstance(data, dict):
             return data
         normalized = {**data}
@@ -110,6 +115,7 @@ class PreparationAnswerOption(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def upgrade_legacy_option(cls, data: object) -> object:
+        """补齐旧版选项缺失的语义、路由和详情策略字段。"""
         if not isinstance(data, dict):
             return data
         answer_kind = data.get("answer_kind")
@@ -166,6 +172,7 @@ class PreparationAnswerOption(BaseModel):
 
     @model_validator(mode="after")
     def validate_transition(self) -> "PreparationAnswerOption":
+        """拒绝与经验等级矛盾的证据迁移和下一步路由。"""
         allowed = {
             "work_experience": ({"supported", "partial"}, {"ask_evidence", "next_skill"}),
             "project_experience": ({"supported", "partial"}, {"ask_evidence", "next_skill"}),
@@ -212,6 +219,7 @@ class PreparationQuestion(BaseModel):
 
     @model_validator(mode="after")
     def require_distinct_options(self) -> "PreparationQuestion":
+        """保证同一问题内的选项 ID 唯一。"""
         ids = [item.option_id for item in self.options]
         if len(ids) != len(set(ids)):
             raise ValueError("Question option IDs must be unique")
@@ -247,6 +255,7 @@ class PreparationAnswer(BaseModel):
 
     @model_validator(mode="after")
     def require_structured_or_legacy_answer(self) -> "PreparationAnswer":
+        """校验结构化答案，并把旧 answer 文本迁移到自由回答字段。"""
         if self.response_mode == "option":
             if self.experience_level is None and not self.selected_option_id:
                 if (self.answer or "").strip():
@@ -317,11 +326,13 @@ class InterviewPreparationWorkspace(BaseModel):
 
 
 class PreparationGenerateRequest(BaseModel):
+    """描述面试准备generate的输入结构。"""
     resume_profile_id: str | None = None
     llm_provider: str | None = None
 
 
 class PreparationAnswerRequest(BaseModel):
+    """描述面试准备回答的输入结构。"""
     answers: list[PreparationAnswer] = Field(default_factory=list, max_length=5)
     llm_provider: str | None = None
     action: Literal["advance", "save", "complete", "stop"] = "complete"

@@ -1,3 +1,5 @@
+"""读写 SQLite 中的面试准备，并在查询和更新时强制 user_id 隔离。"""
+
 from __future__ import annotations
 
 import json
@@ -17,7 +19,9 @@ from app.storage.database import get_connection, init_database
 
 
 class InterviewPreparationRepository:
+    """封装interview面试准备的 SQLite 读写与模型重建。"""
     def save(self, item: InterviewPreparationWorkspace) -> InterviewPreparationWorkspace:
+        """按方法参数限定的主键或用户范围保存相关数据。"""
         with get_connection() as connection:
             init_database(connection)
             connection.execute(
@@ -61,6 +65,7 @@ class InterviewPreparationRepository:
         question_generation: PreparationGenerationStage,
         resource_mode: str, resource_warning: str | None,
     ) -> InterviewPreparationWorkspace:
+        """按方法参数限定的主键或用户范围创建相关数据。"""
         existing = self.get(user_id=user_id, saved_job_id=saved_job_id)
         now = datetime.now(timezone.utc)
         return self.save(InterviewPreparationWorkspace(
@@ -86,6 +91,7 @@ class InterviewPreparationRepository:
         learning_resources: list[LearningResource] | None = None,
         resource_mode: str | None = None, resource_warning: str | None = None,
     ) -> InterviewPreparationWorkspace:
+        """按方法参数限定的主键或用户范围完成相关数据。"""
         return self.save(item.model_copy(update={
             "status": "completed", "answers": answers,
             "recommendations": recommendations, "analysis_mode": analysis_mode,
@@ -101,6 +107,7 @@ class InterviewPreparationRepository:
         self, item: InterviewPreparationWorkspace, *, answers: list[PreparationAnswer],
         status: str,
     ) -> InterviewPreparationWorkspace:
+        """按方法参数限定的主键或用户范围保存answers。"""
         return self.save(item.model_copy(update={
             "status": status,
             "answers": answers,
@@ -109,6 +116,7 @@ class InterviewPreparationRepository:
         }))
 
     def get(self, *, user_id: str, saved_job_id: str) -> InterviewPreparationWorkspace | None:
+        """按方法参数限定的主键或用户范围获取相关数据。"""
         with get_connection() as connection:
             init_database(connection)
             row = connection.execute(

@@ -1,3 +1,5 @@
+"""把画像、搜索和收藏职位转换为可索引文本，同时控制敏感字段和长度。"""
+
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence

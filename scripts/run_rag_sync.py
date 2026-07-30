@@ -1,3 +1,5 @@
+"""启动 RAG outbox worker；可单次处理待同步资源，也可持续轮询并更新重试状态。"""
+
 from __future__ import annotations
 
 import argparse

@@ -1,3 +1,5 @@
+"""定义搜索质量样例、候选标注、脚本化 Provider 响应、指标值和报告契约。"""
+
 from __future__ import annotations
 
 import math
@@ -138,6 +140,7 @@ class EvaluationCase(BaseModel):
 
     @model_validator(mode="after")
     def validate_refs(self):
+        """验证候选、脚本响应和期望结果之间的引用完整性。"""
         ids = [c.candidate_id for c in self.candidate_judgments]
         if len(ids) != len(set(ids)):
             raise ValueError("duplicate candidate evaluator IDs")
@@ -179,6 +182,7 @@ class EvaluationCase(BaseModel):
 
     @property
     def reachable_candidate_ids(self) -> frozenset[str]:
+        """计算当前来源和地点约束下脚本 Provider 实际可召回的候选集合。"""
         candidate_ids: set[str] = set()
         for response in self.scripted_responses:
             if response.source not in self.selected_sources:
@@ -189,12 +193,15 @@ class EvaluationCase(BaseModel):
         return frozenset(candidate_ids)
 
     def judgment_map(self) -> dict[str, CandidateJudgment]:
+        """按 candidate_id 构建人工判断索引。"""
         return {c.candidate_id: c for c in self.candidate_judgments}
 
     def payload_map(self) -> dict[str, CandidatePayload]:
+        """按 candidate_id 构建候选输入索引。"""
         return {c.candidate_id: c for c in self.candidate_payloads}
 
     def lookup_scripted(self, *, source: str, query: str, location: str | None) -> ScriptedProviderResponse:
+        """精确查找预声明响应，禁止离线评估隐式访问网络。"""
         key = (source, query, location)
         for response in self.scripted_responses:
             if response.key == key:

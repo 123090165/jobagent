@@ -1,3 +1,5 @@
+"""编排 认证账户与会话 的所有权检查、状态转换、领域服务和持久化操作。"""
+
 from __future__ import annotations
 
 import os
@@ -36,6 +38,7 @@ def register_user(
     users: UserRepository = user_repository,
     sessions: AuthSessionRepository = auth_session_repository,
 ) -> AuthTokenResponse:
+    """创建账户并立即签发登录会话；用户名冲突会转换为稳定的 API 错误。"""
     password_hash, password_salt, password_algorithm = hash_password(payload.password)
     try:
         user = users.create(
@@ -61,6 +64,7 @@ def login_user(
     users: UserRepository = user_repository,
     sessions: AuthSessionRepository = auth_session_repository,
 ) -> AuthTokenResponse:
+    """校验密码后签发 bearer token；数据库只保存 token 哈希。"""
     record = users.get_with_password(payload.username)
     if record is None:
         raise _invalid_credentials_error()
@@ -86,6 +90,7 @@ def logout_user(
     *,
     sessions: AuthSessionRepository = auth_session_repository,
 ) -> None:
+    """撤销当前 token 对应的服务端会话；重复退出保持幂等。"""
     sessions.revoke_token_hash(hash_auth_token(token))
 
 

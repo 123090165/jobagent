@@ -1,3 +1,5 @@
+"""把 run 结果投影为可分页、可恢复的轻量 JobSearchItem。"""
+
 from __future__ import annotations
 
 from datetime import datetime, timezone

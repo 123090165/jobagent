@@ -1,3 +1,5 @@
+"""定义 认证账户与会话 的 HTTP 接口，并把已验证请求和当前用户交给 application 用例。"""
+
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Request, status

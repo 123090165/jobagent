@@ -1,3 +1,5 @@
+"""抓取港中深 Career 列表与详情页，并只接受允许域名中的职位链接。"""
+
 from __future__ import annotations
 
 import re
@@ -216,6 +218,7 @@ def extract_cuhksz_jd_text(detail_html: str) -> tuple[str, list[str]]:
 
 
 class CUHKSZCareerProvider:
+    """把cuhkszcareer接入统一 Provider 协议。"""
     provider_name = "cuhksz_career"
     provider_kind = "native_job_board"
     detail_strategy = "native_list_and_detail_crawl"

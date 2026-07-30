@@ -1,1 +1,1 @@
-"""FastAPI routes for JobAgent."""
+"""HTTP 传输层：解析请求并注入身份，不在这里实现业务规则。"""

@@ -1,3 +1,5 @@
+"""通过受控搜索引擎发现 LinkedIn 职位链接，不直接绕过站点登录或反爬。"""
+
 from __future__ import annotations
 
 from urllib.parse import urlparse
@@ -9,6 +11,7 @@ LINKEDIN_SEARCH_SITE = "linkedin.com/jobs"
 
 
 class LinkedInDiscoveryProvider:
+    """把linkedindiscovery接入统一 Provider 协议。"""
     provider_name = "linkedin"
     provider_kind = "search_engine"
     detail_strategy = "search_result_snippet_only"

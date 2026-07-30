@@ -1,3 +1,5 @@
+"""回归验证搜索意图与约束的正常链路、失败边界和兼容契约。"""
+
 from app.schemas.confirmed_profile import ConfirmedProfile
 from app.schemas.search_mission import SearchMissionClarificationAnswer, SearchMissionInput
 from app.services.search_mission_interpreter import interpret_search_mission
@@ -29,7 +31,9 @@ def _profile() -> ConfirmedProfile:
 
 
 class BrokenLlm:
+    """为当前测试场景提供 BrokenLlm 夹具或替身。"""
     def chat_completion_json(self, *, system_prompt: str, user_prompt: str) -> dict:
+        """提供 BrokenLlm.chat_completion_json 所需的测试行为。"""
         raise RuntimeError("provider unavailable")
 
 

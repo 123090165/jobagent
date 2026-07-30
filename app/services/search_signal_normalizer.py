@@ -1,3 +1,5 @@
+"""清洗并去重角色、技能、地点等搜索信号，防止低质量词进入召回。"""
+
 from __future__ import annotations
 
 from collections.abc import Iterable

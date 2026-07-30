@@ -1,3 +1,5 @@
+"""定义 浏览器职位采集 的 HTTP 接口，并把已验证请求和当前用户交给 application 用例。"""
+
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends
@@ -33,6 +35,7 @@ def analyze_browser_job_capture_endpoint(
     payload: BrowserJobCaptureRequest,
     current_user: UserAccount = Depends(get_chat_or_browser_helper_user),
 ) -> BrowserJobCaptureAnalyzeResponse:
+    # [兼容保留] 旧扩展可直接提交未落库 payload；新链路应先保存 capture 再按 ID 分析。
     return analyze_browser_job_capture(payload, user_id=current_user.user_id)
 
 

@@ -1,1 +1,1 @@
-"""Prompt registry package."""
+"""Prompt 模板包；模型输出仍须经过 schema 和确定性质量门校验。"""

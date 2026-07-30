@@ -5,6 +5,8 @@ history archive. Git preserves completed plans and deleted designs.
 
 ## Canonical Documents
 
+- [CODE_FLOW_ZH.md](CODE_FLOW_ZH.md): 中文代码链路、运行边界，以及旧代码和
+  旧说明的待清理标注。
 - [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md): product status, priorities, and
   delivery sequence.
 - [ARCHITECTURE.md](ARCHITECTURE.md): runtime boundaries, workflow state, and
@@ -44,6 +46,9 @@ history archive. Git preserves completed plans and deleted designs.
 - Prefer links to source directories over lists of every source file.
 
 ## Current Product Flow
+
+> 标注：下列是内部资源链路，不等同于前端展示的三个阶段；当前界面将 Mission
+> 收集与 Search Preview 合并为统一的 Search Setup。
 
 ~~~text
 User login

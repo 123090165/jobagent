@@ -1,3 +1,5 @@
+"""维护确定性简历解析共用的技能词表和规范化别名。"""
+
 from __future__ import annotations
 
 import re

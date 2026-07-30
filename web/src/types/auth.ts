@@ -1,3 +1,6 @@
+/**
+ * 声明认证账户与会话的前端类型，并与后端响应结构保持一致。
+ */
 export interface UserAccount {
   user_id: string;
   username: string;

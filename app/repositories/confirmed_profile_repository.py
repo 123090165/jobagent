@@ -1,3 +1,5 @@
+"""读写 SQLite 中的确认画像，并在查询和更新时强制 user_id 隔离。"""
+
 from __future__ import annotations
 
 import json
@@ -14,6 +16,7 @@ def _utc_now() -> datetime:
 
 
 class ConfirmedProfileRepository:
+    """封装已确认画像的 SQLite 读写与模型重建。"""
     def create_from_draft(
         self,
         *,
@@ -23,6 +26,7 @@ class ConfirmedProfileRepository:
         profile_draft: ProfileDraft,
         user_id: str = LOCAL_USER_ID,
     ) -> ConfirmedProfile:
+        """按方法参数限定的主键或用户范围创建from草稿。"""
         now = _utc_now()
         confirmed = ConfirmedProfile(
             confirmed_profile_id=str(uuid4()),
@@ -97,6 +101,7 @@ class ConfirmedProfileRepository:
         return confirmed
 
     def get(self, confirmed_profile_id: str, *, user_id: str | None = None) -> ConfirmedProfile | None:
+        """按方法参数限定的主键或用户范围获取相关数据。"""
         with get_connection() as connection:
             init_database(connection)
             where_clause = "WHERE confirmed_profile_id = ?"
@@ -141,6 +146,7 @@ class ConfirmedProfileRepository:
         profile_draft_id: str,
         user_id: str | None = None,
     ) -> ConfirmedProfile | None:
+        """按方法参数限定的主键或用户范围获取currentfor会话。"""
         with get_connection() as connection:
             init_database(connection)
             where_clause = "WHERE session_id = ? AND profile_draft_id = ?"

@@ -1,4 +1,7 @@
 <script setup lang="ts">
+/**
+ * 把项目内使用的图标名称映射到统一 SVG，页面只传语义名称和尺寸。
+ */
 defineProps<{
   name: "home" | "profile" | "history" | "bookmark" | "chat" | "menu" | "close" | "search" | "external" | "arrow-left" | "sparkles" | "check" | "alert" | "target" | "note";
 }>();

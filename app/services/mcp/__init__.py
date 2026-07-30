@@ -1,3 +1,5 @@
+"""导出 MCP 客户端、错误类型和 Modular RAG 适配器，供 service 层统一调用。"""
+
 from .client import (
     MCPClientError,
     MCPConfigurationError,

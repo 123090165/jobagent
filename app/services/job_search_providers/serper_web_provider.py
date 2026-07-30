@@ -1,3 +1,5 @@
+"""通过 Serper 在允许站点中检索职位，并限制查询数、结果数和 URL。"""
+
 from __future__ import annotations
 
 import json
@@ -47,6 +49,7 @@ def configured_serper_search_sites() -> list[str]:
 
 
 class SerperWebSearchProvider:
+    """把serperweb搜索接入统一 Provider 协议。"""
     provider_name = "serper_web"
     provider_kind = "search_engine"
     detail_strategy = "search_result_snippet_only"

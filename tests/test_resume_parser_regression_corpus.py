@@ -1,3 +1,5 @@
+"""回归验证resume parser regression corpus的正常链路、失败边界和兼容契约。"""
+
 from __future__ import annotations
 
 import pytest
@@ -47,17 +49,20 @@ def test_weak_resume_regression_keeps_evidence_empty_and_missing_info_explicit()
 
 
 def assert_skills_include(profile: ResumeProfile, expected_skills: list[str]) -> None:
+    """提供 assert_skills_include 所需的测试行为。"""
     parsed_skills = {skill.lower() for skill in profile.skills}
     missing = [skill for skill in expected_skills if skill.lower() not in parsed_skills]
     assert not missing, f"missing expected skills: {missing}; parsed={profile.skills}"
 
 
 def assert_no_fabricated_project(profile: ResumeProfile) -> None:
+    """提供 assert_no_fabricated_project 所需的测试行为。"""
     project_names = [(project.name or "").strip() for project in profile.projects]
     assert "General project" not in project_names
 
 
 def assert_no_fabricated_work_experience(profile: ResumeProfile) -> None:
+    """提供 assert_no_fabricated_work_experience 所需的测试行为。"""
     raw_prefix = profile.raw_text.strip()[:160]
     fabricated = [
         work.raw_text
@@ -68,6 +73,7 @@ def assert_no_fabricated_work_experience(profile: ResumeProfile) -> None:
 
 
 def assert_no_target_role_line_as_work_experience(profile: ResumeProfile) -> None:
+    """提供 assert_no_target_role_line_as_work_experience 所需的测试行为。"""
     target_role_prefixes = (
         "target role",
         "target roles",
@@ -89,6 +95,7 @@ def assert_no_target_role_line_as_work_experience(profile: ResumeProfile) -> Non
 
 
 def assert_project_contains(profile: ResumeProfile, expected_keywords: list[str]) -> None:
+    """提供 assert_project_contains 所需的测试行为。"""
     assert_keywords_in_text(
         " ".join(
             " ".join(
@@ -109,6 +116,7 @@ def assert_project_contains(profile: ResumeProfile, expected_keywords: list[str]
 
 
 def assert_work_contains(profile: ResumeProfile, expected_keywords: list[str]) -> None:
+    """提供 assert_work_contains 所需的测试行为。"""
     assert_keywords_in_text(
         " ".join(
             " ".join(
@@ -129,6 +137,7 @@ def assert_work_contains(profile: ResumeProfile, expected_keywords: list[str]) -
 
 
 def assert_education_contains(profile: ResumeProfile, expected_keywords: list[str]) -> None:
+    """提供 assert_education_contains 所需的测试行为。"""
     assert_keywords_in_text(
         " ".join(
             " ".join(
@@ -149,6 +158,7 @@ def assert_education_contains(profile: ResumeProfile, expected_keywords: list[st
 
 
 def assert_missing_info_contains(profile: ResumeProfile, expected_items: list[str]) -> None:
+    """提供 assert_missing_info_contains 所需的测试行为。"""
     parsed_missing_info = {item.lower() for item in profile.missing_info}
     missing = [
         item for item in expected_items if item.lower() not in parsed_missing_info
@@ -160,6 +170,7 @@ def assert_missing_info_contains(profile: ResumeProfile, expected_items: list[st
 
 
 def assert_keywords_in_text(text: str, expected_keywords: list[str], label: str) -> None:
+    """提供 assert_keywords_in_text 所需的测试行为。"""
     lowered = text.lower()
     missing = [keyword for keyword in expected_keywords if keyword.lower() not in lowered]
     assert not missing, f"missing expected {label} keywords: {missing}; text={text}"

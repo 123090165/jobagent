@@ -1,4 +1,7 @@
 <script setup lang="ts">
+/**
+ * 展示已确认画像和可搜索信号，并创建新的统一搜索设置。
+ */
 import { computed, onMounted } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { NButton, NCard } from "naive-ui";
@@ -42,7 +45,7 @@ async function startJobSearch() {
   if (!profileSessionStore.session?.confirmed_profile_id) {
     return;
   }
-  void router.push({ name: "search-mission", params: { sessionId: sessionId.value } });
+  void router.push({ name: "search-preview", params: { sessionId: sessionId.value } });
 }
 </script>
 
@@ -50,7 +53,7 @@ async function startJobSearch() {
   <section class="flow-page">
     <FlowPageHeader
       title="Profile Confirmed"
-      description="Review the locked profile before preparing a provider-specific search plan."
+      description="The profile is ready. Continue to configure and start a search on one page."
       :meta="`Session ${sessionId}`"
       :active-step="0"
     />
@@ -92,7 +95,7 @@ async function startJobSearch() {
             :disabled="!profileSessionStore.confirmedProfile"
             @click="startJobSearch"
           >
-            Set Search Preferences
+            New Job Search
           </n-button>
         </div>
       </div>

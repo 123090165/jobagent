@@ -1,1 +1,1 @@
-"""Agent implementations for JobAgent."""
+"""简历解析与 JD 分析 Agent；负责选择确定性、LLM 或降级执行模式。"""

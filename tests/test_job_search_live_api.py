@@ -1,3 +1,5 @@
+"""回归验证职位搜索 run、结果与 trace的正常链路、失败边界和兼容契约。"""
+
 from __future__ import annotations
 
 from fastapi.testclient import TestClient
@@ -12,10 +14,12 @@ client = TestClient(app)
 
 
 class FakeProvider:
+    """把fake接入统一 Provider 协议。"""
     provider_name = "mock"
     provider_kind = "mock"
 
     def search_jobs(self, *, query: str, location: str | None, limit: int):
+        """提供 FakeProvider.search_jobs 所需的测试行为。"""
         base_location = location or "Remote"
         return [
             RawJobCandidate(
@@ -46,7 +50,9 @@ class FakeProvider:
 
 
 class WideFakeProvider(FakeProvider):
+    """把widefake接入统一 Provider 协议。"""
     def search_jobs(self, *, query: str, location: str | None, limit: int):
+        """提供 WideFakeProvider.search_jobs 所需的测试行为。"""
         candidates = super().search_jobs(query=query, location=location, limit=2)
         return [
             *candidates,
@@ -66,7 +72,9 @@ class WideFakeProvider(FakeProvider):
 
 
 class FakeJSONLLM:
+    """为当前测试场景提供 FakeJSONLLM 夹具或替身。"""
     def chat_completion_json(self, *, system_prompt: str, user_prompt: str) -> dict:
+        """提供 FakeJSONLLM.chat_completion_json 所需的测试行为。"""
         if "ranked_candidates" in system_prompt:
             return {
                 "ranked_candidates": [

@@ -1,3 +1,5 @@
+"""读写 SQLite 中的职位搜索 run、结果与 trace，并在查询和更新时强制 user_id 隔离。"""
+
 from __future__ import annotations
 
 import json
@@ -19,6 +21,7 @@ def _utc_now() -> datetime:
 
 
 class JobSearchRepository:
+    """封装职位搜索的 SQLite 读写与模型重建。"""
     def create(
         self,
         *,
@@ -37,6 +40,7 @@ class JobSearchRepository:
         mission_ranking_priorities: list[str] | None = None,
         user_id: str = LOCAL_USER_ID,
     ) -> JobSearchRun:
+        """按方法参数限定的主键或用户范围创建相关数据。"""
         return self._create_run(
             session_id=session_id,
             confirmed_profile_id=confirmed_profile_id,
@@ -79,6 +83,7 @@ class JobSearchRepository:
         mission_ranking_priorities: list[str] | None = None,
         user_id: str = LOCAL_USER_ID,
     ) -> JobSearchRun:
+        """按方法参数限定的主键或用户范围创建pending。"""
         return self._create_run(
             session_id=session_id,
             confirmed_profile_id=confirmed_profile_id,
@@ -102,9 +107,11 @@ class JobSearchRepository:
         )
 
     def mark_running(self, run_id: str) -> JobSearchRun | None:
+        """按方法参数限定的主键或用户范围标记running。"""
         return self._update_run_state(run_id, status="running", error_message=None)
 
     def complete_run(self, run_id: str, results: list[JobSearchResult]) -> JobSearchRun | None:
+        """按方法参数限定的主键或用户范围完成运行记录。"""
         now = _utc_now()
         with get_connection() as connection:
             init_database(connection)
@@ -138,6 +145,7 @@ class JobSearchRepository:
         items: list[JobSearchItem],
         replace_existing: bool = False,
     ) -> None:
+        """按方法参数限定的主键或用户范围新增或更新items。"""
         with get_connection() as connection:
             init_database(connection)
             if replace_existing:
@@ -199,6 +207,7 @@ class JobSearchRepository:
         limit: int = 100,
         offset: int = 0,
     ) -> list[JobSearchItem]:
+        """按方法参数限定的主键或用户范围列出items。"""
         with get_connection() as connection:
             init_database(connection)
             rows = connection.execute(
@@ -214,6 +223,7 @@ class JobSearchRepository:
         return [self._row_to_job_search_item(row) for row in rows]
 
     def count_items(self, *, user_id: str, run_id: str) -> int:
+        """按方法参数限定的主键或用户范围处理countitems。"""
         with get_connection() as connection:
             init_database(connection)
             row = connection.execute(
@@ -233,6 +243,7 @@ class JobSearchRepository:
         run_id: str,
         item_id: str,
     ) -> JobSearchItem | None:
+        """按方法参数限定的主键或用户范围获取条目。"""
         with get_connection() as connection:
             init_database(connection)
             row = connection.execute(
@@ -246,9 +257,11 @@ class JobSearchRepository:
         return self._row_to_job_search_item(row) if row is not None else None
 
     def fail_run(self, run_id: str, error_message: str) -> JobSearchRun | None:
+        """按方法参数限定的主键或用户范围标记失败运行记录。"""
         return self._update_run_state(run_id, status="failed", error_message=error_message)
 
     def get(self, job_search_run_id: str, *, user_id: str | None = None) -> JobSearchRun | None:
+        """按方法参数限定的主键或用户范围获取相关数据。"""
         with get_connection() as connection:
             init_database(connection)
             where_clause = "WHERE job_search_run_id = ?"
@@ -295,6 +308,7 @@ class JobSearchRepository:
         *,
         user_id: str | None = None,
     ) -> list[JobSearchRun]:
+        """按方法参数限定的主键或用户范围列出recentby会话。"""
         with get_connection() as connection:
             init_database(connection)
             where_clause = "WHERE session_id = ?"
@@ -340,6 +354,7 @@ class JobSearchRepository:
         *,
         limit: int = 100,
     ) -> list[JobSearchRun]:
+        """按方法参数限定的主键或用户范围列出recentby用户。"""
         with get_connection() as connection:
             init_database(connection)
             rows = connection.execute(
@@ -376,6 +391,7 @@ class JobSearchRepository:
         return [self._row_to_job_search_run(row) for row in rows]
 
     def delete(self, *, user_id: str, run_id: str) -> bool:
+        """按方法参数限定的主键或用户范围删除相关数据。"""
         if self.get(run_id, user_id=user_id) is None:
             return False
         with get_connection() as connection:
@@ -429,6 +445,7 @@ class JobSearchRepository:
         quality_warnings: list[str] | None = None,
         details: dict[str, object] | None = None,
     ) -> JobSearchTraceStep:
+        """按方法参数限定的主键或用户范围创建执行追踪阶段。"""
         now = _utc_now()
         step = JobSearchTraceStep(
             step_id=str(uuid4()),
@@ -502,6 +519,7 @@ class JobSearchRepository:
         quality_warnings: list[str] | None = None,
         details: dict[str, object] | None = None,
     ) -> JobSearchTraceStep | None:
+        """按方法参数限定的主键或用户范围标记执行追踪阶段running。"""
         now = _utc_now()
         with get_connection() as connection:
             init_database(connection)
@@ -548,6 +566,7 @@ class JobSearchRepository:
         quality_warnings: list[str] | None = None,
         details: dict[str, object] | None = None,
     ) -> JobSearchTraceStep | None:
+        """按方法参数限定的主键或用户范围完成执行追踪阶段。"""
         return self._finalize_trace_step(
             step_id,
             status="completed",
@@ -570,6 +589,7 @@ class JobSearchRepository:
         quality_warnings: list[str] | None = None,
         details: dict[str, object] | None = None,
     ) -> JobSearchTraceStep | None:
+        """按方法参数限定的主键或用户范围标记失败执行追踪阶段。"""
         return self._finalize_trace_step(
             step_id,
             status="failed",
@@ -582,6 +602,7 @@ class JobSearchRepository:
         )
 
     def list_trace_steps(self, run_id: str) -> list[JobSearchTraceStep]:
+        """按方法参数限定的主键或用户范围列出执行追踪steps。"""
         with get_connection() as connection:
             init_database(connection)
             rows = connection.execute(
@@ -610,6 +631,7 @@ class JobSearchRepository:
         return [self._row_to_job_search_trace_step(row) for row in rows]
 
     def get_trace_step(self, step_id: str) -> JobSearchTraceStep | None:
+        """按方法参数限定的主键或用户范围获取执行追踪阶段。"""
         with get_connection() as connection:
             init_database(connection)
             row = connection.execute(

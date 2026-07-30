@@ -1,3 +1,5 @@
+"""连接 Modular RAG MCP，检查工具契约并可用指定用户 scope 执行测试查询。"""
+
 from __future__ import annotations
 
 import argparse

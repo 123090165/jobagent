@@ -1,3 +1,5 @@
+"""按数据库目录、官方内置目录和可选 MCP 的顺序检索学习资源并提供回退。"""
+
 from __future__ import annotations
 
 import json
@@ -15,10 +17,13 @@ from app.repositories.learning_resource_repository import (
 
 
 class LearningResourceSearch(Protocol):
-    async def search(self, topic: str, *, limit: int = 2) -> list[LearningResource]: ...
+    async def search(self, topic: str, *, limit: int = 2) -> list[LearningResource]:
+        """为一个技能主题返回数量受限、可展示的学习资源。"""
+        ...
 
 
 class LearningResourceSearchError(RuntimeError):
+    """表示 LearningResourceSearchError 对应的可识别失败。"""
     pass
 
 

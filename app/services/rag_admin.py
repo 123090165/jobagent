@@ -1,3 +1,5 @@
+"""汇总 RAG outbox、资源状态和失败事件，供管理命令查看与重试。"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

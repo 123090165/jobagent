@@ -1,3 +1,9 @@
+"""职位搜索编排。
+
+主链路：创建并持久化 run -> 后台执行 Provider 召回 -> 过滤与分析 -> 组装结果。
+阶段内规则放在 ``app.services.job_search_execution``，本模块只协调生命周期。
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -130,6 +136,7 @@ def create_job_search_run(
     mission_repository: SearchMissionRepository = search_mission_repository,
     resume_profiles: ResumeProfileRepository = resume_profile_repository,
 ) -> JobSearchRunResponse:
+    """校验搜索输入并创建 run；实时搜索只在持久化成功后调度后台执行。"""
     session = get_profile_session(payload.session_id, repository=session_repository, user_id=user_id)
     if session.confirmed_profile_id is None:
         raise JobAgentError(
@@ -224,6 +231,7 @@ def create_job_search_run(
     updated_session = session_repository.mark_job_search_running(session_id=session.session_id) or session
 
     if background_tasks is not None:
+        # 本地 MVP 使用进程内任务；run/trace 先落库，前端随后按 run_id 轮询。
         background_tasks.add_task(
             execute_job_search_run,
             run.job_search_run_id,
@@ -255,6 +263,7 @@ def create_browser_helper_job_search_run(
     search_repository: JobSearchRepository = job_search_repository,
     llm_service: JSONChatLLM | None = None,
 ) -> JobSearchRunResponse:
+    """把浏览器候选与用户选择的后端来源合并后，复用普通搜索 run 的执行链路。"""
     selected_sources = _clean_list(
         [normalize_job_search_source_name(source) for source in payload.selected_sources]
     )
@@ -322,6 +331,7 @@ def analyze_browser_job_capture(
     search_repository: JobSearchRepository = job_search_repository,
     llm_service: JSONChatLLM | None = None,
 ) -> BrowserJobCaptureAnalyzeResponse:
+    """把单个当前页采集包装成只含一个候选的搜索 run，保证分析规则完全一致。"""
     candidate = browser_job_capture_to_candidate(payload)
     run_response = create_browser_helper_job_search_run(
         BrowserHelperJobSearchRunCreateRequest(
@@ -400,6 +410,7 @@ def execute_job_search_run(
     llm_provider: str | None = None,
     max_results: int = 10,
 ) -> JobSearchRunResponse:
+    """执行已落库的搜索 run，并把每个阶段的终态写回 trace 与 run。"""
     run = search_repository.get(run_id, user_id=user_id)
     if run is None:
         raise JobAgentError(
@@ -455,6 +466,7 @@ def execute_job_search_run(
     search_repository.mark_running(run_id)
 
     try:
+        # 先冻结搜索计划，后续 Provider、过滤和匹配都读取同一份意图与约束。
         planning_step = steps[0]
         search_repository.mark_trace_step_running(
             planning_step.step_id,
@@ -497,6 +509,7 @@ def execute_job_search_run(
             },
         )
 
+        # Provider 层允许部分来源失败；只有没有可用候选时才使整个阶段失败。
         provider_step = steps[1]
         provider_name = getattr(provider, "provider_name", "mock")
         provider_mode = "mock" if provider_name == "mock" else "provider"
@@ -532,6 +545,7 @@ def execute_job_search_run(
             },
         )
 
+        # 先执行不可绕过的硬约束，再对通过的候选做确定性或 LLM 辅助排序。
         filter_step = steps[2]
         search_repository.mark_trace_step_running(
             filter_step.step_id,
@@ -568,6 +582,7 @@ def execute_job_search_run(
             },
         )
 
+        # JD 分析逐候选降级：某个模型调用失败不能抹掉其他候选的有效结果。
         jd_step = steps[3]
         search_repository.mark_trace_step_running(
             jd_step.step_id,
@@ -600,6 +615,7 @@ def execute_job_search_run(
             },
         )
 
+        # 使用结构化 JD 证据重新计算最终匹配分，搜索卡片不直接展示召回分。
         matching_step = steps[4]
         matching_mode = "llm" if filtered.mode == "llm" else "deterministic"
         search_repository.mark_trace_step_running(
@@ -635,6 +651,7 @@ def execute_job_search_run(
             },
         )
 
+        # run、轻量 items 和最后一个 trace 必须在同一条成功路径上完成。
         assembly_step = steps[5]
         search_repository.mark_trace_step_running(
             assembly_step.step_id,
@@ -673,6 +690,7 @@ def execute_job_search_run(
             steps=search_repository.list_trace_steps(run_id),
         )
     except Exception as exc:
+        # 无论在哪一阶段失败，都同时关闭当前 trace 和 run，避免前端永久轮询。
         failed_step = _find_running_or_pending_step(search_repository.list_trace_steps(run_id))
         if failed_step is not None:
             search_repository.fail_trace_step(
@@ -812,6 +830,7 @@ def preview_job_search_run(
     llm_service: JSONChatLLM | None = None,
     mission_repository: SearchMissionRepository = search_mission_repository,
 ) -> JobSearchPreviewResponse:
+    """只计算计划、来源和请求预算，不创建 run，也不触发真实 Provider 请求。"""
     session = get_profile_session(payload.session_id, repository=session_repository, user_id=user_id)
     if session.confirmed_profile_id is None:
         raise JobAgentError(

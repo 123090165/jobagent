@@ -1,3 +1,5 @@
+"""把 Modular RAG 工具包装成带用户 scope 的类型化查询接口。"""
+
 from __future__ import annotations
 
 import os

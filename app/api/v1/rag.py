@@ -1,3 +1,5 @@
+"""返回当前用户的 RAG 服务、同步队列和索引资源状态，供知识库状态页展示。"""
+
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends

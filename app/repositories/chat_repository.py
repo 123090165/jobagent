@@ -1,3 +1,5 @@
+"""读写 SQLite 中的Assistant 会话、消息与上下文，并在查询和更新时强制 user_id 隔离。"""
+
 from __future__ import annotations
 
 import json
@@ -26,12 +28,14 @@ def _utc_now() -> datetime:
 
 
 class ChatRepository:
+    """封装对话的 SQLite 读写与模型重建。"""
     def create_conversation(
         self,
         *,
         user_id: str,
         payload: ChatConversationCreateRequest,
     ) -> ChatConversation:
+        """按方法参数限定的主键或用户范围创建会话。"""
         now = _utc_now()
         conversation = ChatConversation(
             conversation_id=str(uuid4()),
@@ -68,6 +72,7 @@ class ChatRepository:
         return conversation
 
     def get_conversation(self, *, user_id: str, conversation_id: str) -> ChatConversation | None:
+        """按方法参数限定的主键或用户范围获取会话。"""
         with get_connection() as connection:
             init_database(connection)
             row = connection.execute(
@@ -77,6 +82,7 @@ class ChatRepository:
         return self._row_to_conversation(row) if row is not None else None
 
     def list_conversations(self, *, user_id: str, limit: int = 50) -> list[ChatConversation]:
+        """按方法参数限定的主键或用户范围列出conversations。"""
         with get_connection() as connection:
             init_database(connection)
             rows = connection.execute(
@@ -97,6 +103,7 @@ class ChatRepository:
         conversation_id: str,
         payload: ChatConversationUpdateRequest,
     ) -> ChatConversation | None:
+        """按方法参数限定的主键或用户范围更新会话。"""
         existing = self.get_conversation(user_id=user_id, conversation_id=conversation_id)
         if existing is None:
             return None
@@ -135,6 +142,7 @@ class ChatRepository:
         ref: ChatSearchResultRef,
         max_refs: int = 20,
     ) -> ChatConversation | None:
+        """按方法参数限定的主键或用户范围处理pin搜索结果。"""
         now = _utc_now()
         with get_connection() as connection:
             init_database(connection)
@@ -189,6 +197,7 @@ class ChatRepository:
         context_attachments: list[ChatTurnAttachment] | None = None,
         retry_of_turn_id: str | None = None,
     ) -> ChatTurn | None:
+        """按方法参数限定的主键或用户范围创建pending消息轮次。"""
         now = _utc_now()
         with get_connection() as connection:
             init_database(connection)
@@ -285,6 +294,7 @@ class ChatRepository:
         fallback_reason: str | None,
         quality_warnings: list[str],
     ) -> ChatTurn | None:
+        """按方法参数限定的主键或用户范围完成消息轮次。"""
         now = _utc_now()
         with get_connection() as connection:
             init_database(connection)
@@ -351,6 +361,7 @@ class ChatRepository:
         turn_id: str,
         fallback_reason: str,
     ) -> ChatTurn | None:
+        """按方法参数限定的主键或用户范围标记失败消息轮次。"""
         now = _utc_now()
         with get_connection() as connection:
             init_database(connection)
@@ -366,6 +377,7 @@ class ChatRepository:
         return self.get_turn(user_id=user_id, conversation_id=conversation_id, turn_id=turn_id)
 
     def get_turn(self, *, user_id: str, conversation_id: str, turn_id: str) -> ChatTurn | None:
+        """按方法参数限定的主键或用户范围获取消息轮次。"""
         with get_connection() as connection:
             init_database(connection)
             row = connection.execute(
@@ -383,6 +395,7 @@ class ChatRepository:
         user_id: str,
         conversation_id: str,
     ) -> ChatTurn | None:
+        """按方法参数限定的主键或用户范围获取latestcompleted消息轮次。"""
         with get_connection() as connection:
             init_database(connection)
             row = connection.execute(
@@ -403,6 +416,7 @@ class ChatRepository:
         limit: int = 50,
         before_sequence: int | None = None,
     ) -> list[ChatTurn]:
+        """按方法参数限定的主键或用户范围列出turns。"""
         where = "WHERE user_id = ? AND conversation_id = ?"
         parameters: list[object] = [user_id, conversation_id]
         if before_sequence is not None:
@@ -424,6 +438,7 @@ class ChatRepository:
         conversation_id: str,
         after_sequence: int | None = None,
     ) -> int:
+        """按方法参数限定的主键或用户范围处理countcompletedturns。"""
         where = "WHERE user_id = ? AND conversation_id = ? AND status = 'completed'"
         parameters: list[object] = [user_id, conversation_id]
         if after_sequence is not None:
@@ -445,6 +460,7 @@ class ChatRepository:
         summary: dict[str, object],
         through_sequence: int,
     ) -> ChatConversation | None:
+        """按方法参数限定的主键或用户范围更新summary。"""
         now = _utc_now()
         with get_connection() as connection:
             init_database(connection)
@@ -461,6 +477,7 @@ class ChatRepository:
         return self.get_conversation(user_id=user_id, conversation_id=conversation_id)
 
     def delete_turn(self, *, user_id: str, conversation_id: str, turn_id: str) -> bool:
+        """按方法参数限定的主键或用户范围删除消息轮次。"""
         with get_connection() as connection:
             init_database(connection)
             connection.execute("BEGIN IMMEDIATE")
@@ -479,6 +496,7 @@ class ChatRepository:
         return True
 
     def clear_memory(self, *, user_id: str, conversation_id: str) -> bool:
+        """按方法参数限定的主键或用户范围清空记忆。"""
         with get_connection() as connection:
             init_database(connection)
             connection.execute("BEGIN IMMEDIATE")
@@ -509,6 +527,7 @@ class ChatRepository:
         return True
 
     def delete_conversation(self, *, user_id: str, conversation_id: str) -> bool:
+        """按方法参数限定的主键或用户范围删除会话。"""
         with get_connection() as connection:
             init_database(connection)
             connection.execute("BEGIN IMMEDIATE")

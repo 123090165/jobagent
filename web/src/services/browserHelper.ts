@@ -1,3 +1,6 @@
+/**
+ * 封装网页与扩展 bridge 的请求协议、超时和 BOSS 搜索响应校验。
+ */
 import type { BrowserHelperJobCandidate } from "../types/profileSession";
 
 interface HelperResponseBase {

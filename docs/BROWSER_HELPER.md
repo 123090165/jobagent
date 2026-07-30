@@ -121,6 +121,9 @@ behavior changes. Do not broaden host access for a speculative provider.
 
 ## Manual Verification
 
+> [旧说明待更新] 当前统一 Search Setup 会在用户点击 Start 后自动检查 Helper
+> 和 BOSS 登录态；下面第 5 步仍描述旧的手工检查入口，暂留作回归检查参考。
+
 1. Start FastAPI and Vite.
 2. Load browser-helper/ as an unpacked Chrome or Edge extension.
 3. Open the JobAgent web application in the browser.

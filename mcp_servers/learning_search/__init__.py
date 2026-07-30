@@ -1,1 +1,1 @@
-"""Tavily-backed learning resource search MCP server."""
+"""学习资源搜索 MCP；失败时主业务使用内置资源回退。"""

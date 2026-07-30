@@ -1,3 +1,5 @@
+"""读写 SQLite 中的认证账户与会话，并在查询和更新时强制 user_id 隔离。"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -19,6 +21,7 @@ class AuthSessionPrincipal:
 
 
 class AuthSessionRepository:
+    """封装认证会话的 SQLite 读写与模型重建。"""
     def create(
         self,
         *,
@@ -28,6 +31,7 @@ class AuthSessionRepository:
         user_agent: str | None = None,
         session_scope: str = "full",
     ) -> str:
+        """按方法参数限定的主键或用户范围创建相关数据。"""
         auth_session_id = str(uuid4())
         now = _utc_now()
         with get_connection() as connection:
@@ -60,12 +64,14 @@ class AuthSessionRepository:
         return auth_session_id
 
     def get_user_for_token_hash(self, token_hash: str) -> UserAccount | None:
+        """按方法参数限定的主键或用户范围获取用户for令牌hash。"""
         principal = self.get_principal_for_token_hash(token_hash)
         if principal is None or principal.session_scope != "full":
             return None
         return principal.user
 
     def get_principal_for_token_hash(self, token_hash: str) -> AuthSessionPrincipal | None:
+        """按方法参数限定的主键或用户范围获取principalfor令牌hash。"""
         now = _utc_now().isoformat()
         with get_connection() as connection:
             init_database(connection)
@@ -105,6 +111,7 @@ class AuthSessionRepository:
         return AuthSessionPrincipal(user=user, session_scope=row["session_scope"])
 
     def revoke_token_hash(self, token_hash: str) -> None:
+        """按方法参数限定的主键或用户范围撤销令牌hash。"""
         now = _utc_now().isoformat()
         with get_connection() as connection:
             init_database(connection)
@@ -119,6 +126,7 @@ class AuthSessionRepository:
             connection.commit()
 
     def revoke_all_for_user(self, user_id: str) -> None:
+        """按方法参数限定的主键或用户范围撤销allfor用户。"""
         now = _utc_now().isoformat()
         with get_connection() as connection:
             init_database(connection)

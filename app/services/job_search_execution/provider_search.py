@@ -1,3 +1,5 @@
+"""按查询预算执行一个或多个 Provider，并合并部分成功的召回结果。"""
+
 from __future__ import annotations
 
 import time

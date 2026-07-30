@@ -1,3 +1,5 @@
+"""把画像和搜索设置归一为角色族、领域、技能与召回查询。"""
+
 from __future__ import annotations
 
 import json

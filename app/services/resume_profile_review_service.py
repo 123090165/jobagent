@@ -1,3 +1,5 @@
+"""生成画像审阅结果、缺失信息问题和用户可确认的修改建议。"""
+
 from __future__ import annotations
 
 from app.agents.resume_parse_agent import parse_resume

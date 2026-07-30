@@ -1,3 +1,5 @@
+"""回归验证frontend job bulk actions的正常链路、失败边界和兼容契约。"""
+
 from pathlib import Path
 
 

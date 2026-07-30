@@ -1,3 +1,5 @@
+"""用确定性规则识别重试、比较、最高分职位等需要补充上下文的请求。"""
+
 from __future__ import annotations
 
 from app.schemas.chat import ChatTurn

@@ -1,3 +1,5 @@
+"""回归验证linkedin discovery provider的正常链路、失败边界和兼容契约。"""
+
 from __future__ import annotations
 
 from app.services.job_search_providers.base import RawJobCandidate
@@ -5,11 +7,13 @@ from app.services.job_search_providers.linkedin_discovery_provider import Linked
 
 
 class FakeSerperProvider:
+    """把fakeserper接入统一 Provider 协议。"""
     provider_name = "serper_web"
     provider_kind = "search_engine"
     configured = True
 
     def search_jobs(self, *, query: str, location: str | None, limit: int) -> list[RawJobCandidate]:
+        """提供 FakeSerperProvider.search_jobs 所需的测试行为。"""
         assert query == "brand marketing intern"
         assert location == "Shanghai"
         assert limit == 6

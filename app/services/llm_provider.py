@@ -1,3 +1,5 @@
+"""解析 LLM Provider 配置，返回统一 JSONChatLLM 接口或明确的不可用实现。"""
+
 from __future__ import annotations
 
 import os

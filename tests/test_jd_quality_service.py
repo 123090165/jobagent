@@ -1,3 +1,5 @@
+"""回归验证jd quality service的正常链路、失败边界和兼容契约。"""
+
 from __future__ import annotations
 
 from app.services.jd_quality_service import evaluate_jd_quality

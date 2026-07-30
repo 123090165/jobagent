@@ -1,9 +1,11 @@
+/**
+ * 覆盖“简历录入→审阅→画像→搜索”的全部会话接口；Store 通过这些函数推进后端状态机。
+ */
 import { client } from "./client";
 import type {
   CreateBrowserHelperJobSearchPayload,
   CreateJobSearchRunPayload,
   ConfirmedProfileResponse,
-  JobSearchProviderStatus,
   JobSearchItemListResponse,
   JobSearchPreview,
   JobSearchTraceStepListResponse,
@@ -18,7 +20,6 @@ import type {
   ParsedResumeReviewResponse,
   ProfileDraftResponse,
   ProfileSession,
-  ResumeDocument,
   ResumeIntakeResponse,
   SearchMission,
   SearchMissionInput,
@@ -57,13 +58,6 @@ export async function submitResumeFile(
   const response = await client.post<ResumeIntakeResponse>(
     `/api/v1/profile-sessions/${sessionId}/resume-file`,
     formData
-  );
-  return response.data;
-}
-
-export async function getResumeDocument(sessionId: string): Promise<ResumeDocument> {
-  const response = await client.get<ResumeDocument>(
-    `/api/v1/profile-sessions/${sessionId}/resume`
   );
   return response.data;
 }
@@ -203,15 +197,6 @@ export async function previewJobSearchRun(
 
 export async function getLlmStatus(provider: LlmProviderName = "deepseek"): Promise<LlmStatus> {
   const response = await client.get<LlmStatus>("/api/v1/llm/status", {
-    params: { provider }
-  });
-  return response.data;
-}
-
-export async function getJobSearchProviderStatus(
-  provider?: "mock" | "cuhksz_career" | "linkedin" | "remoteok" | "serper_web" | "browser_helper" | "multi_source"
-): Promise<JobSearchProviderStatus> {
-  const response = await client.get<JobSearchProviderStatus>("/api/v1/job-search-providers/status", {
     params: { provider }
   });
   return response.data;

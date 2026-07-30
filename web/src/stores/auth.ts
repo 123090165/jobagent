@@ -1,3 +1,6 @@
+/**
+ * 维护当前登录用户和 token，启动时恢复会话，退出时撤销服务端会话。
+ */
 import { defineStore } from "pinia";
 import { AxiosError } from "axios";
 

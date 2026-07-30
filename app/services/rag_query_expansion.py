@@ -1,3 +1,5 @@
+"""从用户问题和资源上下文生成有限的个人知识检索扩展词。"""
+
 from __future__ import annotations
 
 

@@ -1,3 +1,5 @@
+"""启动 Tavily-backed 学习资源 MCP，并过滤低信号域名和非 HTTP 链接。"""
+
 from __future__ import annotations
 
 import os

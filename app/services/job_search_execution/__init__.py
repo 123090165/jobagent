@@ -1,1 +1,1 @@
-"""Job search execution service modules."""
+"""搜索执行阶段：预览、Provider 召回、候选分析、结果组装和 trace。"""

@@ -1,3 +1,5 @@
+"""回归验证multidomain flow cases的正常链路、失败边界和兼容契约。"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -9,6 +11,7 @@ SAMPLE_DIR = Path(__file__).parent / "multidomain_samples"
 
 @dataclass(frozen=True)
 class MultidomainFlowCase:
+    """为当前测试场景提供 MultidomainFlowCase 夹具或替身。"""
     case_id: str
     filename: str
     expected_role_terms: tuple[str, ...]
@@ -26,6 +29,7 @@ class MultidomainFlowCase:
 
     @property
     def path(self) -> Path:
+        """提供 MultidomainFlowCase.path 所需的测试行为。"""
         return SAMPLE_DIR / self.filename
 
 

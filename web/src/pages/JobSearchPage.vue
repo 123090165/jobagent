@@ -1,4 +1,7 @@
 <script setup lang="ts">
+/**
+ * 轮询搜索 run 和 trace，展示证据化结果，并处理反馈、收藏和 Assistant 上下文。
+ */
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import {
@@ -148,6 +151,7 @@ const allSelectableSelected = computed(() =>
 onMounted(async () => {
   startElapsedTicker();
   try {
+    // 历史 run 也走同一恢复路径：先读当前状态，未结束时才启动轮询。
     const loadedRun = await profileSessionStore.loadJobSearchRun(runId.value);
     if (!profileSessionStore.jobSearchSteps.length) {
       await profileSessionStore.loadJobSearchSteps(runId.value);
@@ -155,6 +159,7 @@ onMounted(async () => {
     if (["pending", "running"].includes(loadedRun.status)) {
       await profileSessionStore.pollJobSearchRun(runId.value);
     }
+    // items 或反馈读取失败不应遮住已经完成并持久化的搜索结果。
     await Promise.allSettled([
       profileSessionStore.loadJobSearchItems(runId.value),
       loadResultFeedback()
@@ -209,6 +214,7 @@ async function persistSearchResult(result: JobSearchResult) {
   if (!run.value) throw new Error("Search run is unavailable.");
   savingResultIds.value = [...savingResultIds.value, result.job_result_id];
   try {
+    // 后端可复用同一来源的 SavedJob，但会追加本次 run 和画像对应的分析上下文。
     const savedJob = await savedJobsStore.saveFromSearchResult({
       job_search_run_id: run.value.job_search_run_id,
       job_result_id: result.job_result_id,

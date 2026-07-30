@@ -1,3 +1,5 @@
+"""提供网络无关的简历与 JD 确定性解析，作为测试基线和 LLM 失败回退。"""
+
 from __future__ import annotations
 
 import re

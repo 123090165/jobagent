@@ -1,9 +1,12 @@
+"""返回固定的本地候选，供演示和网络无关测试使用。"""
+
 from __future__ import annotations
 
 from app.services.job_search_providers.base import RawJobCandidate
 
 
 class MockJobSearchProvider:
+    """把mock职位搜索接入统一 Provider 协议。"""
     provider_name = "mock"
     provider_kind = "mock"
 

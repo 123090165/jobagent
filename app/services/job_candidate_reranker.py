@@ -1,3 +1,5 @@
+"""对有限候选调用 LLM 重排，并把不可验证或异常输出降级为确定性分数。"""
+
 from __future__ import annotations
 
 import json

@@ -1,3 +1,5 @@
+"""定义可复用简历画像在 API、领域服务和 JSON 快照之间共用的 Pydantic 契约。"""
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -34,6 +36,7 @@ class ResumeProfileListResponse(BaseModel):
 
 
 class ResumeProfileUpdateRequest(BaseModel):
+    """描述画像update的输入结构。"""
     name: str | None = None
     summary: str | None = None
     target_roles: list[str] | None = None

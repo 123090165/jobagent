@@ -1,3 +1,5 @@
+"""在排序前检查地点、排除岗位和硬性条件，返回可解释的过滤决定。"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

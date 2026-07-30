@@ -1,3 +1,5 @@
+"""安全读取 TXT、Markdown、PDF 和 DOCX 简历，并限制文件、页数和解压规模。"""
+
 from __future__ import annotations
 
 import os

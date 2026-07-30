@@ -1,3 +1,7 @@
+/**
+ * 网页与扩展后台之间的窄消息桥，只转发带 JobAgent 标记的请求和响应。
+ */
+// 页面与扩展的窄消息桥：只转发带 __jobagentHelper 标记的请求和响应。
 const READY_MESSAGE = {
   __jobagentHelper: true,
   type: "JOBAGENT_HELPER_READY",

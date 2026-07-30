@@ -1,3 +1,5 @@
+"""为搜索质量回放生成稳定摘要、补全清单元数据并渲染 Markdown 报告。"""
+
 from __future__ import annotations
 
 import hashlib

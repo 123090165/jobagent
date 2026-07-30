@@ -1,3 +1,5 @@
+"""请求 LLM 审阅简历画像，并把输出限制在可验证的修改建议内。"""
+
 from __future__ import annotations
 
 import json

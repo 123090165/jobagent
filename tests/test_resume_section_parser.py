@@ -1,3 +1,5 @@
+"""回归验证resume section parser的正常链路、失败边界和兼容契约。"""
+
 from __future__ import annotations
 
 from app.services.mock_pipeline import mock_resume_parse

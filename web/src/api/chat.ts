@@ -1,3 +1,6 @@
+/**
+ * 封装Assistant 会话、消息与上下文的类型化 HTTP 请求；这里只处理传输，不复制后端规则。
+ */
 import { client } from "./client";
 import type {
   ChatConversation,

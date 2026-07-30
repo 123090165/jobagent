@@ -1,3 +1,5 @@
+"""把已验证的检索证据组织成带引用回答，并校验模型返回的 citation id。"""
+
 from __future__ import annotations
 
 import json

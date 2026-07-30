@@ -1,3 +1,5 @@
+"""回归验证浏览器职位采集的正常链路、失败边界和兼容契约。"""
+
 from __future__ import annotations
 
 from datetime import datetime, timezone

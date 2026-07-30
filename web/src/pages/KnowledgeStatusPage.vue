@@ -1,4 +1,7 @@
 <script setup lang="ts">
+/**
+ * 展示个人知识库服务、同步 outbox 和资源索引状态。
+ */
 import { computed, onMounted, ref } from "vue";
 import { NButton, NTag } from "naive-ui";
 

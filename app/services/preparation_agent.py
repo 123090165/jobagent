@@ -1,3 +1,5 @@
+"""用 LangGraph 保存面试准备问答状态，并根据答案质量决定追问、暂停或完成。"""
+
 from __future__ import annotations
 
 import os
@@ -34,6 +36,7 @@ class PreparationAgent:
     """Human-in-the-loop graph with backend-owned semantic transitions."""
 
     def start(self, preparation_id: str, questions: list[PreparationQuestion]) -> None:
+        """创建首个 checkpoint，并让图停在等待用户回答的位置。"""
         with self._graph() as graph:
             graph.invoke(
                 {
@@ -56,6 +59,7 @@ class PreparationAgent:
         *,
         questions: list[PreparationQuestion],
     ) -> PreparationAgentState:
+        """从 checkpoint 恢复问答，根据 action 推进、暂停、完成或主动停止。"""
         with self._graph() as graph:
             config = self._config(preparation_id)
             snapshot = graph.get_state(config)

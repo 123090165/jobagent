@@ -1,3 +1,6 @@
+/**
+ * 管理收藏职位及其后续工作流：分析版本、状态事件、决策简报和面试准备。
+ */
 import { client } from "./client";
 import type {
   SavedJob,
@@ -96,14 +99,6 @@ export async function submitPreparationAnswers(
     { answers, action }
   );
   return response.data;
-}
-
-export async function downloadPreparationPrompt(savedJobId: string): Promise<Blob> {
-  const response = await client.get(
-    `/api/v1/saved-jobs/${savedJobId}/preparation/prompt.txt`,
-    { responseType: "blob" }
-  );
-  return response.data as Blob;
 }
 
 export async function saveJobFromSearchResult(

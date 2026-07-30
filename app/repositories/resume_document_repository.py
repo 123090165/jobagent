@@ -1,3 +1,5 @@
+"""读写 SQLite 中的原始简历文档，并在查询和更新时强制 user_id 隔离。"""
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -12,6 +14,7 @@ def _utc_now() -> datetime:
 
 
 class ResumeDocumentRepository:
+    """封装文档的 SQLite 读写与模型重建。"""
     def create(
         self,
         *,
@@ -22,6 +25,7 @@ class ResumeDocumentRepository:
         filename: str | None = None,
         file_type: str | None = None,
     ) -> ResumeDocument:
+        """按方法参数限定的主键或用户范围创建相关数据。"""
         now = _utc_now()
         document = ResumeDocument(
             resume_document_id=str(uuid4()),
@@ -69,6 +73,7 @@ class ResumeDocumentRepository:
         return document
 
     def get(self, resume_document_id: str, *, user_id: str | None = None) -> ResumeDocument | None:
+        """按方法参数限定的主键或用户范围获取相关数据。"""
         with get_connection() as connection:
             init_database(connection)
             where_clause = "WHERE resume_document_id = ?"

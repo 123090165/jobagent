@@ -1,4 +1,4 @@
-"""Offline, evaluator-only search quality contracts and metrics."""
+"""职位搜索离线回放的样例、指标和报告结构，不进入线上请求链。"""
 
 from .schemas import (
     CandidatePayload,

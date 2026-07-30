@@ -1,3 +1,5 @@
+"""回归验证搜索意图与约束的正常链路、失败边界和兼容契约。"""
+
 from app.schemas.confirmed_profile import ConfirmedProfile
 from app.services.job_candidate_filter import filter_candidates
 from app.services.job_search_planner import JobSearchPlan

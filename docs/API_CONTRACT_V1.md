@@ -70,6 +70,9 @@ their profile-label and search-query snapshots remain available for audit.
 
 ## Job Search
 
+> [旧说明待补全] 当前代码还提供
+> `GET /api/v1/job-search-runs/{run_id}/items`，下列摘要尚未把它列入。
+
 ~~~text
 GET  /api/v1/profile-sessions/{session_id}/search-mission
 PUT  /api/v1/profile-sessions/{session_id}/search-mission

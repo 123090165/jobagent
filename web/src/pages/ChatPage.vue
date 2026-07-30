@@ -1,4 +1,7 @@
 <script setup lang="ts">
+/**
+ * 职业助手工作区：管理会话、上下文附件、引用、记忆状态和消息重试。
+ */
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
 import {
   NButton,

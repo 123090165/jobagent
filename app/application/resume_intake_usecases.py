@@ -1,3 +1,5 @@
+"""接收简历文本或文件，创建解析结果，并推进 ProfileSession 到待审阅阶段。"""
+
 from __future__ import annotations
 
 from fastapi import UploadFile
@@ -31,6 +33,7 @@ def submit_resume_text(
     session_repository: ProfileSessionRepository = profile_session_repository,
     resume_repository: ResumeDocumentRepository = resume_document_repository,
 ) -> ResumeIntakeResponse:
+    """保存粘贴文本，并使该 session 现有的下游画像和搜索引用失效。"""
     session = get_profile_session(session_id, repository=session_repository, user_id=user_id)
     _validate_resume_text(text)
     document = resume_repository.create(
@@ -57,6 +60,7 @@ async def submit_resume_file(
     session_repository: ProfileSessionRepository = profile_session_repository,
     resume_repository: ResumeDocumentRepository = resume_document_repository,
 ) -> ResumeIntakeResponse:
+    """完成文件格式与资源限制检查后，进入和文本录入相同的持久化链路。"""
     session = get_profile_session(session_id, repository=session_repository, user_id=user_id)
     filename = normalize_resume_filename(upload_file.filename)
     raw_bytes = await upload_file.read()
@@ -96,6 +100,7 @@ def get_resume_document(
     session_repository: ProfileSessionRepository = profile_session_repository,
     resume_repository: ResumeDocumentRepository = resume_document_repository,
 ) -> ResumeDocument:
+    """只返回 session 当前指向的简历，避免读取已被替换的历史版本。"""
     session = get_profile_session(session_id, repository=session_repository, user_id=user_id)
     if session.resume_document_id is None:
         raise JobAgentError(

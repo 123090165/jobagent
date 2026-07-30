@@ -1,3 +1,5 @@
+"""回归验证learning search mcp server的正常链路、失败边界和兼容契约。"""
+
 from __future__ import annotations
 
 import asyncio

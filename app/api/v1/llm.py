@@ -1,3 +1,5 @@
+"""返回当前 LLM Provider 的配置和可用状态，不暴露密钥或底层连接细节。"""
+
 from __future__ import annotations
 
 from fastapi import APIRouter

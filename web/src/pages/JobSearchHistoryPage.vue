@@ -1,4 +1,7 @@
 <script setup lang="ts">
+/**
+ * 列出当前用户的历史搜索 run，支持恢复结果或删除历史。
+ */
 import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { NButton, NCard, NPopconfirm, NSelect, NTag } from "naive-ui";

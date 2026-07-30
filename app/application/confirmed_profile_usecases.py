@@ -1,3 +1,5 @@
+"""编排 确认画像 的所有权检查、状态转换、领域服务和持久化操作。"""
+
 from __future__ import annotations
 
 from app.application.profile_session_usecases import get_profile_session
@@ -37,6 +39,7 @@ def confirm_profile_draft(
     resume_repository: ResumeDocumentRepository = resume_document_repository,
     resume_profile_repository: ResumeProfileRepository = resume_profile_repository,
 ) -> ConfirmedProfileResponse:
+    """确认草稿、推进 session，并同步一份可脱离页面会话复用的 ResumeProfile。"""
     profile_draft = draft_repository.get(draft_id, user_id=user_id)
     if profile_draft is None:
         raise JobAgentError(
@@ -128,6 +131,7 @@ def get_confirmed_profile(
     session_repository: ProfileSessionRepository = profile_session_repository,
     confirmed_repository: ConfirmedProfileRepository = confirmed_profile_repository,
 ) -> ConfirmedProfileResponse:
+    """读取当前确认画像；历史确认记录不能冒充当前流程输入。"""
     confirmed_profile = confirmed_repository.get(confirmed_profile_id, user_id=user_id)
     if confirmed_profile is None:
         raise JobAgentError(

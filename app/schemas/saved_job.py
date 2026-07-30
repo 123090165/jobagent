@@ -1,3 +1,5 @@
+"""定义收藏职位及其分析上下文在 API、领域服务和 JSON 快照之间共用的 Pydantic 契约。"""
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -74,6 +76,7 @@ class SavedJob(BaseModel):
 
 
 class SavedJobCreateRequest(BaseModel):
+    """描述收藏职位create的输入结构。"""
     source_provider: str | None = None
     source_url: str | None = None
     title: str
@@ -97,12 +100,14 @@ class SavedJobCreateRequest(BaseModel):
 
 
 class SavedJobUpdateRequest(BaseModel):
+    """描述收藏职位update的输入结构。"""
     status: SavedJobStatus | None = None
     notes: str | None = None
     tags: list[str] | None = None
 
 
 class SavedJobFromSearchResultRequest(BaseModel):
+    """描述收藏职位from搜索结果的输入结构。"""
     job_search_run_id: str
     job_result_id: str
     resume_profile_id: str | None = None
@@ -112,6 +117,7 @@ class SavedJobFromSearchResultRequest(BaseModel):
 
 
 class SavedJobFromBrowserCaptureRequest(SavedJobCreateRequest):
+    """描述收藏职位from浏览器职位采集的输入结构。"""
     analysis: dict[str, object] | None = None
     resume_profile_id: str | None = None
     match_score: int | None = None

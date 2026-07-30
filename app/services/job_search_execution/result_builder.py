@@ -1,3 +1,5 @@
+"""把过滤、JD 分析和画像匹配结果组装成前端使用的 JobSearchResult。"""
+
 from __future__ import annotations
 
 from collections import Counter

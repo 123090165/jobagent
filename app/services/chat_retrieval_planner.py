@@ -1,3 +1,5 @@
+"""把 Agent 工具请求和最低上下文策略合并成有限、去重的检索计划。"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

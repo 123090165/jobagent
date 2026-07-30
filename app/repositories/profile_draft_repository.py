@@ -1,3 +1,5 @@
+"""读写 SQLite 中的画像草稿，并在查询和更新时强制 user_id 隔离。"""
+
 from __future__ import annotations
 
 import json
@@ -13,6 +15,7 @@ def _utc_now() -> datetime:
 
 
 class ProfileDraftRepository:
+    """封装画像草稿的 SQLite 读写与模型重建。"""
     def create(
         self,
         *,
@@ -31,6 +34,7 @@ class ProfileDraftRepository:
         missing_info_questions: list[str],
         user_id: str = LOCAL_USER_ID,
     ) -> ProfileDraft:
+        """按方法参数限定的主键或用户范围创建相关数据。"""
         now = _utc_now()
         draft = ProfileDraft(
             profile_draft_id=str(uuid4()),
@@ -99,6 +103,7 @@ class ProfileDraftRepository:
         return draft
 
     def get(self, profile_draft_id: str, *, user_id: str | None = None) -> ProfileDraft | None:
+        """按方法参数限定的主键或用户范围获取相关数据。"""
         with get_connection() as connection:
             init_database(connection)
             where_clause = "WHERE profile_draft_id = ?"
@@ -141,6 +146,7 @@ class ProfileDraftRepository:
         parsed_review_id: str,
         user_id: str | None = None,
     ) -> ProfileDraft | None:
+        """按方法参数限定的主键或用户范围获取currentfor会话。"""
         with get_connection() as connection:
             init_database(connection)
             where_clause = "WHERE session_id = ? AND parsed_review_id = ?"
@@ -185,6 +191,7 @@ class ProfileDraftRepository:
         *,
         user_id: str | None = None,
     ) -> ProfileDraft | None:
+        """按方法参数限定的主键或用户范围更新相关数据。"""
         existing = self.get(profile_draft_id, user_id=user_id)
         if existing is None:
             return None

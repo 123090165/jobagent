@@ -1,4 +1,7 @@
 <script setup lang="ts">
+/**
+ * 简历录入页面：创建 ProfileSession，提交文本或文件，并进入解析审阅。
+ */
 import { computed, ref } from "vue";
 import { useRouter } from "vue-router";
 import { NButton, NInput, NRadioButton, NRadioGroup } from "naive-ui";

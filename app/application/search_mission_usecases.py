@@ -1,3 +1,5 @@
+"""编排 搜索意图与约束 的所有权检查、状态转换、领域服务和持久化操作。"""
+
 from __future__ import annotations
 
 from app.application.profile_session_usecases import get_profile_session
@@ -26,6 +28,7 @@ def get_search_mission(
     sessions: ProfileSessionRepository = profile_session_repository,
     missions: SearchMissionRepository = search_mission_repository,
 ) -> SearchMission:
+    """读取当前 session 唯一的 Search Mission，并验证用户所有权。"""
     get_profile_session(session_id, repository=sessions, user_id=user_id)
     mission = missions.get(user_id=user_id, session_id=session_id)
     if mission is None:
@@ -41,6 +44,7 @@ def save_search_mission_input(
     sessions: ProfileSessionRepository = profile_session_repository,
     missions: SearchMissionRepository = search_mission_repository,
 ) -> SearchMission:
+    """保存用户原始搜索偏好；重新编辑后需要再次解释和确认。"""
     session = get_profile_session(session_id, repository=sessions, user_id=user_id)
     if session.confirmed_profile_id is None:
         raise JobAgentError(
@@ -66,6 +70,7 @@ def interpret_saved_search_mission(
     profiles: ConfirmedProfileRepository = confirmed_profile_repository,
     llm_service: JSONChatLLM | None = None,
 ) -> SearchMission:
+    """把偏好解释为结构化约束；LLM 不可用时保存确定性 fallback。"""
     mission = get_search_mission(session_id, user_id=user_id, missions=missions)
     profile = profiles.get(mission.confirmed_profile_id, user_id=user_id)
     if profile is None:
@@ -100,6 +105,7 @@ def confirm_search_mission(
     user_id: str,
     missions: SearchMissionRepository = search_mission_repository,
 ) -> SearchMission:
+    """确认至少含一个目标角色的 mission，供预览和 run 创建时快照使用。"""
     mission = get_search_mission(session_id, user_id=user_id, missions=missions)
     if not mission.mission.target_roles:
         raise JobAgentError(

@@ -1,3 +1,5 @@
+"""回归验证Assistant 会话、消息与上下文的正常链路、失败边界和兼容契约。"""
+
 from __future__ import annotations
 
 import json
@@ -25,10 +27,12 @@ def _register(username: str) -> dict[str, str]:
 
 
 class FakeChatLLM:
+    """为当前测试场景提供 FakeChatLLM 夹具或替身。"""
     def __init__(self) -> None:
         self.prompts: list[str] = []
 
     def chat_completion_json(self, *, system_prompt: str, user_prompt: str, expected_root_key=None):
+        """提供 FakeChatLLM.chat_completion_json 所需的测试行为。"""
         self.prompts.append(user_prompt)
         if "bounded career" in system_prompt:
             payload = json.loads(user_prompt)

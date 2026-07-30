@@ -1,3 +1,5 @@
+"""回归验证画像草稿的正常链路、失败边界和兼容契约。"""
+
 from __future__ import annotations
 
 from fastapi.testclient import TestClient

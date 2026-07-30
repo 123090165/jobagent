@@ -1,3 +1,5 @@
+"""查询 RAG 同步概况、核对资源状态，并按明确参数重试失败的 outbox 事件。"""
+
 from __future__ import annotations
 
 import argparse

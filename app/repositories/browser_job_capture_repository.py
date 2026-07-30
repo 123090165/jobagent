@@ -1,3 +1,5 @@
+"""读写 SQLite 中的浏览器职位采集，并在查询和更新时强制 user_id 隔离。"""
+
 from __future__ import annotations
 
 import json
@@ -12,12 +14,14 @@ from app.storage.database import get_connection, init_database
 
 
 class BrowserJobCaptureRepository:
+    """封装浏览器职位职位采集的 SQLite 读写与模型重建。"""
     def create(
         self,
         *,
         user_id: str,
         payload: BrowserJobCaptureCreateRequest,
     ) -> BrowserJobCaptureRecord:
+        """按方法参数限定的主键或用户范围创建相关数据。"""
         created_at = datetime.now(timezone.utc)
         record = BrowserJobCaptureRecord(
             **payload.model_dump(),
@@ -47,6 +51,7 @@ class BrowserJobCaptureRepository:
         return record
 
     def get(self, *, user_id: str, capture_id: str) -> BrowserJobCaptureRecord | None:
+        """按方法参数限定的主键或用户范围获取相关数据。"""
         with get_connection() as connection:
             init_database(connection)
             row = connection.execute(

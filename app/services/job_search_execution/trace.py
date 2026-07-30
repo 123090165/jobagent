@@ -1,3 +1,5 @@
+"""创建固定顺序的搜索 trace，并安全推进 pending/running/completed/failed 状态。"""
+
 from __future__ import annotations
 
 from app.repositories.job_search_repository import JobSearchRepository

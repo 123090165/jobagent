@@ -1,3 +1,5 @@
+"""并行调用多个职位来源，去重候选并保留每个来源的部分失败信息。"""
+
 from __future__ import annotations
 
 from app.services.job_search_providers.base import (
@@ -8,6 +10,7 @@ from app.services.job_search_providers.base import (
 
 
 class MultiSourceJobSearchProvider:
+    """把multi来源职位搜索接入统一 Provider 协议。"""
     provider_name = "multi_source"
     provider_kind = "hybrid"
     detail_strategy = "mixed_source_strategy"

@@ -1,3 +1,5 @@
+"""回归验证resume review usecases的正常链路、失败边界和兼容契约。"""
+
 from __future__ import annotations
 
 from app.application.resume_review_usecases import parse_resume_for_review
@@ -6,11 +8,13 @@ from app.application.resume_intake_usecases import submit_resume_text
 
 
 class FakeResumeReviewLLM:
+    """为当前测试场景提供 FakeResumeReviewLLM 夹具或替身。"""
     def __init__(self, *, name: str = "Alex Chen") -> None:
         self.name = name
         self.calls = 0
 
     def chat_completion_json(self, *, system_prompt: str, user_prompt: str) -> dict:
+        """提供 FakeResumeReviewLLM.chat_completion_json 所需的测试行为。"""
         self.calls += 1
         return {
             "resume_profile": {
@@ -38,7 +42,9 @@ class FakeResumeReviewLLM:
 
 
 class FailingIfCalledLLM:
+    """为当前测试场景提供 FailingIfCalledLLM 夹具或替身。"""
     def chat_completion_json(self, *, system_prompt: str, user_prompt: str) -> dict:
+        """提供 FailingIfCalledLLM.chat_completion_json 所需的测试行为。"""
         raise AssertionError("LLM service should not be called")
 
 

@@ -1,3 +1,5 @@
+"""回归验证resume intake api的正常链路、失败边界和兼容契约。"""
+
 from __future__ import annotations
 
 from io import BytesIO

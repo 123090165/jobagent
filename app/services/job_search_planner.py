@@ -1,3 +1,5 @@
+"""把结构化搜索意图转成 Provider 查询、硬约束和排序信号。"""
+
 from __future__ import annotations
 
 import time
@@ -42,6 +44,7 @@ EMPLOYMENT_TYPE_BY_ALIAS = {
 
 
 class SearchConstraint(BaseModel):
+    """表示一个可用于 Provider 查询或候选过滤的结构化约束。"""
     kind: Literal[
         "location",
         "work_arrangement",
@@ -55,6 +58,7 @@ class SearchConstraint(BaseModel):
 
 
 class JobSearchPlan(BaseModel):
+    """冻结一次搜索使用的查询、角色、地点、约束和排序信号。"""
     planned_queries: list[PlannedQuery] = Field(default_factory=list)
     locations: list[str] = Field(default_factory=list)
     target_roles: list[str] = Field(default_factory=list)
@@ -82,6 +86,7 @@ def build_search_plan(
     use_llm: bool,
     llm_service: JSONChatLLM | None = None,
 ) -> JobSearchPlan:
+    """把 confirmed profile、mission 和请求覆盖项合并成稳定搜索计划。"""
     total_start = time.perf_counter()
     intent_start = time.perf_counter()
     intent = build_search_intent(
@@ -118,6 +123,7 @@ def build_structured_constraints(
     known_locations: list[str],
     target_roles: list[str] | None = None,
 ) -> list[SearchConstraint]:
+    """把地点、排除岗位和 must-have 文本转换为可解释约束。"""
     constraints: list[SearchConstraint] = []
     locations_by_key = {item.casefold(): item for item in known_locations}
     for source_text in mission_constraints:
@@ -285,6 +291,7 @@ def _build_typed_queries(
 
 
 def build_focused_provider_queries(target_roles: list[str], search_signal_terms: list[str]) -> list[str]:
+    """在查询预算内优先组合高信息量角色与证据词，减少泛化召回。"""
     keyword_seed = _dedupe(search_signal_terms)[:6]
     role_seed = _dedupe(target_roles)[:4]
     if not role_seed:

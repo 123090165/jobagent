@@ -1,1 +1,1 @@
-"""Local MCP servers used by JobAgent."""
+"""独立 MCP 服务入口；这些模块通常由 ``python -m`` 启动而非被业务代码导入。"""

@@ -1,3 +1,5 @@
+"""把确认画像压缩成搜索阶段使用的角色、技能、地点和证据摘要。"""
+
 from __future__ import annotations
 
 import re

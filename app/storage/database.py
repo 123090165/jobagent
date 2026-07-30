@@ -1,3 +1,5 @@
+"""创建 SQLite 当前表结构、执行加法式兼容升级，并为旧数据库补列、索引和基础数据。"""
+
 from __future__ import annotations
 
 import os
@@ -10,10 +12,12 @@ LOCAL_USERNAME = "local"
 
 
 def get_database_path() -> Path:
+    """获取数据库path，供 Repository 统一使用。"""
     return Path(os.getenv("JOBAGENT_DB_PATH", str(DEFAULT_DATABASE_PATH)))
 
 
 def get_connection(database_path: str | Path | None = None) -> sqlite3.Connection:
+    """获取连接，供 Repository 统一使用。"""
     path = Path(database_path) if database_path else get_database_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     connection = sqlite3.connect(path)
@@ -23,6 +27,7 @@ def get_connection(database_path: str | Path | None = None) -> sqlite3.Connectio
 
 
 def init_database(connection: sqlite3.Connection) -> None:
+    """创建当前表并执行加法式兼容升级，不负责删除历史结构。"""
     connection.executescript(
         """
         CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -53,121 +58,6 @@ def init_database(connection: sqlite3.Connection) -> None:
             user_agent TEXT,
             session_scope TEXT NOT NULL DEFAULT 'full',
             FOREIGN KEY (user_id) REFERENCES users(user_id)
-        );
-
-        CREATE TABLE IF NOT EXISTS resume_records (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            raw_text TEXT NOT NULL,
-            profile_json TEXT NOT NULL,
-            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-        );
-
-        CREATE TABLE IF NOT EXISTS job_postings (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            raw_jd TEXT NOT NULL,
-            analysis_json TEXT NOT NULL,
-            job_title TEXT,
-            company TEXT,
-            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-        );
-
-        CREATE TABLE IF NOT EXISTS match_reports (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            resume_record_id INTEGER NOT NULL,
-            job_posting_id INTEGER NOT NULL,
-            report_json TEXT NOT NULL,
-            overall_score REAL NOT NULL,
-            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (resume_record_id) REFERENCES resume_records(id),
-            FOREIGN KEY (job_posting_id) REFERENCES job_postings(id)
-        );
-
-        CREATE TABLE IF NOT EXISTS project_challenges (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            match_report_id INTEGER NOT NULL,
-            challenge_json TEXT NOT NULL,
-            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (match_report_id) REFERENCES match_reports(id)
-        );
-
-        CREATE TABLE IF NOT EXISTS analysis_records (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            resume_record_id INTEGER NOT NULL,
-            job_posting_id INTEGER NOT NULL,
-            application_id INTEGER,
-            match_report_id INTEGER NOT NULL,
-            project_challenge_id INTEGER NOT NULL,
-            optimization_json TEXT NOT NULL,
-            markdown_report TEXT NOT NULL,
-            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (resume_record_id) REFERENCES resume_records(id),
-            FOREIGN KEY (job_posting_id) REFERENCES job_postings(id),
-            FOREIGN KEY (application_id) REFERENCES application_records(id),
-            FOREIGN KEY (match_report_id) REFERENCES match_reports(id),
-            FOREIGN KEY (project_challenge_id) REFERENCES project_challenges(id)
-        );
-
-        CREATE TABLE IF NOT EXISTS resume_versions (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            label TEXT NOT NULL,
-            base_resume_text TEXT NOT NULL,
-            tailored_resume_text TEXT,
-            target_job_posting_id INTEGER,
-            source_analysis_record_id INTEGER,
-            notes TEXT,
-            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (target_job_posting_id) REFERENCES job_postings(id),
-            FOREIGN KEY (source_analysis_record_id) REFERENCES analysis_records(id)
-        );
-
-        CREATE TABLE IF NOT EXISTS workflow_step_traces (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            analysis_record_id INTEGER NOT NULL,
-            workflow_run_id TEXT,
-            step_index INTEGER NOT NULL,
-            agent_name TEXT NOT NULL,
-            status TEXT NOT NULL,
-            mode TEXT NOT NULL,
-            summary TEXT NOT NULL,
-            duration_ms REAL,
-            fallback_reason TEXT,
-            guardrails_json TEXT NOT NULL,
-            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (analysis_record_id) REFERENCES analysis_records(id)
-        );
-
-        CREATE TABLE IF NOT EXISTS application_records (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            job_posting_id INTEGER NOT NULL UNIQUE,
-            status TEXT NOT NULL DEFAULT 'interested',
-            notes TEXT,
-            next_action TEXT,
-            resume_version_id INTEGER,
-            resume_version_label TEXT,
-            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (job_posting_id) REFERENCES job_postings(id),
-            FOREIGN KEY (resume_version_id) REFERENCES resume_versions(id)
-        );
-
-        CREATE TABLE IF NOT EXISTS confirmed_profile_records (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            resume_record_id INTEGER,
-            raw_resume_text TEXT NOT NULL,
-            baseline_profile_json TEXT NOT NULL,
-            confirmed_profile_json TEXT NOT NULL,
-            user_edits_json TEXT NOT NULL,
-            confirmation_summary_json TEXT NOT NULL,
-            remaining_warnings_json TEXT NOT NULL,
-            suggestion_decisions_json TEXT NOT NULL,
-            missing_info_answers_json TEXT NOT NULL,
-            confidence_label TEXT NOT NULL,
-            target_roles_json TEXT NOT NULL,
-            notes TEXT,
-            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (resume_record_id) REFERENCES resume_records(id)
         );
 
         CREATE TABLE IF NOT EXISTS profile_sessions (
@@ -658,10 +548,6 @@ def init_database(connection: sqlite3.Connection) -> None:
     )
     _ensure_local_user(connection)
     _ensure_column(connection, "auth_sessions", "session_scope", "TEXT NOT NULL DEFAULT 'full'")
-    _ensure_column(connection, "analysis_records", "application_id", "INTEGER")
-    _ensure_column(connection, "application_records", "resume_version_id", "INTEGER")
-    _ensure_column(connection, "workflow_step_traces", "workflow_run_id", "TEXT")
-    _ensure_column(connection, "workflow_step_traces", "duration_ms", "REAL")
     _ensure_column(connection, "job_search_runs", "search_mode", "TEXT DEFAULT 'local_mock'")
     _ensure_column(connection, "job_search_runs", "llm_enabled", "INTEGER DEFAULT 0")
     _ensure_column(connection, "job_search_runs", "search_provider", "TEXT")

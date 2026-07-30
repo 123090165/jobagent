@@ -1,3 +1,5 @@
+"""编排 Assistant 会话、消息与上下文 的所有权检查、状态转换、领域服务和持久化操作。"""
+
 from __future__ import annotations
 
 from collections.abc import Sequence
@@ -230,6 +232,7 @@ def create_chat_turn(
     repository: ChatRepository = chat_repository,
     captures: BrowserJobCaptureRepository = browser_job_capture_repository,
 ) -> ChatTurn:
+    """执行并持久化一次对话；检索、回答和引用始终绑定当前用户资源。"""
     conversation = get_chat_conversation(conversation_id, user_id=user_id, repository=repository)
     retry_source = None
     if payload.retry_of_turn_id:
@@ -299,6 +302,7 @@ def create_chat_turn(
         *(["search_results"] if search_attachments or capture_attachments else []),
         *(["saved_jobs"] if saved_job_attachments else []),
     ]
+    # manifest 只暴露上下文类型和标签，不把可执行资源 ID 或完整 JD 交给模型选择。
     context_manifest = _build_agent_context_manifest(
         conversation,
         user_id=user_id,
@@ -353,6 +357,7 @@ def create_chat_turn(
                 )
 
         def execute_tools(calls: list[ChatAgentToolCall]) -> ChatToolExecution:
+            # Agent 只声明需要哪类证据；真实 ID 解析和所有权校验仍由服务端完成。
             tool_names = list(dict.fromkeys(item.name for item in calls))
             retrieval_plan = build_agent_retrieval_plan(
                 effective_question,
@@ -495,6 +500,7 @@ def create_chat_turn(
     warnings = [*context_warnings, *answer_warnings]
     if conversation_command:
         warnings.append(f"conversation_command:{conversation_command}")
+    # 原始问题已先以 pending turn 落库，这里原子补齐最终回答、引用和诊断。
     completed = repository.complete_turn(
         user_id=user_id,
         turn=turn,
@@ -521,6 +527,7 @@ def create_chat_turn(
             error_code="chat_turn_persistence_failed",
             status_code=500,
         )
+    # 摘要是可重建的导航记忆；压缩失败不能回滚已经完成的对话。
     _maybe_compact(
         user_id=user_id,
         conversation_id=conversation_id,
@@ -633,6 +640,7 @@ def clear_chat_memory(
     user_id: str,
     repository: ChatRepository = chat_repository,
 ) -> None:
+    """清空消息、摘要、引用和最近检索状态，但保留可继续使用的空会话壳。"""
     if not repository.clear_memory(user_id=user_id, conversation_id=conversation_id):
         raise _not_found()
 
@@ -654,6 +662,7 @@ def _maybe_compact(
     llm_service,
     repository: ChatRepository,
 ) -> None:
+    """在对话增长后重建有限摘要；任何失败都保持原始 turn 可读。"""
     conversation = repository.get_conversation(user_id=user_id, conversation_id=conversation_id)
     if conversation is None:
         return

@@ -1,3 +1,5 @@
+"""把旧版技能列表升级为带必要性和原文证据的结构化 JD 要求。"""
+
 from __future__ import annotations
 
 import re

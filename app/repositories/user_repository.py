@@ -1,3 +1,5 @@
+"""读写 SQLite 中的用户账户，并在查询和更新时强制 user_id 隔离。"""
+
 from __future__ import annotations
 
 import sqlite3
@@ -13,10 +15,12 @@ def _utc_now() -> datetime:
 
 
 class DuplicateUsernameError(ValueError):
+    """表示 DuplicateUsernameError 对应的可识别失败。"""
     pass
 
 
 class UserRepository:
+    """封装用户的 SQLite 读写与模型重建。"""
     def create(
         self,
         *,
@@ -26,6 +30,7 @@ class UserRepository:
         password_algorithm: str,
         display_name: str | None = None,
     ) -> UserAccount:
+        """按方法参数限定的主键或用户范围创建相关数据。"""
         now = _utc_now()
         user = UserAccount(
             user_id=str(uuid4()),
@@ -68,6 +73,7 @@ class UserRepository:
         return user
 
     def get(self, user_id: str) -> UserAccount | None:
+        """按方法参数限定的主键或用户范围获取相关数据。"""
         with get_connection() as connection:
             init_database(connection)
             row = connection.execute(
@@ -89,6 +95,7 @@ class UserRepository:
         return self._row_to_user(row)
 
     def list_all(self, *, include_disabled: bool = False) -> list[UserAccount]:
+        """按方法参数限定的主键或用户范围列出all。"""
         where_clause = "" if include_disabled else "WHERE disabled_at IS NULL"
         with get_connection() as connection:
             init_database(connection)
@@ -109,6 +116,7 @@ class UserRepository:
         return [self._row_to_user(row) for row in rows]
 
     def get_with_password(self, username: str) -> dict[str, object] | None:
+        """按方法参数限定的主键或用户范围获取withpassword。"""
         with get_connection() as connection:
             init_database(connection)
             row = connection.execute(
@@ -138,6 +146,7 @@ class UserRepository:
         }
 
     def ensure_local_user(self) -> UserAccount:
+        """按方法参数限定的主键或用户范围确保存在local用户。"""
         with get_connection() as connection:
             init_database(connection)
             row = connection.execute(

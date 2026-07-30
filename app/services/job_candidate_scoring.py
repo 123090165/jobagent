@@ -1,3 +1,5 @@
+"""从职位文本、画像证据和 mission 快照计算候选分数、证据与未知项。"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -50,6 +52,7 @@ HELPER_WARNING_FRAGMENTS = [
 
 
 class CandidateScorecard(BaseModel):
+    """保存候选各评分维度、证据、风险和最终分数。"""
     candidate_index: int
     match_score: int = Field(ge=0, le=100)
     confidence_label: CandidateConfidenceLabel
@@ -63,6 +66,7 @@ class CandidateScorecard(BaseModel):
 
 @dataclass(frozen=True)
 class JobMatchContext:
+    """汇总一个候选的 JD、画像证据、mission 约束和来源信息。"""
     confirmed_profile: ConfirmedProfile
     search_plan: JobSearchPlan
     candidate: RawJobCandidate
@@ -88,6 +92,7 @@ def deterministic_filter(
     limit: int | None = None,
     allowed_indexes: set[int] | None = None,
 ) -> CandidateFilterResult:
+    """执行硬约束和本地评分，在没有 LLM 时仍产生稳定候选顺序。"""
     signals = _ranking_signals(confirmed_profile, search_plan)
     avoid_signals = [item.lower() for item in search_plan.avoid_signals]
     scored: list[tuple[int, int, int, int, CandidateScorecard]] = []
@@ -136,6 +141,7 @@ def build_candidate_scorecard(
     confirmed_profile: ConfirmedProfile,
     search_plan: JobSearchPlan,
 ) -> CandidateScorecard:
+    """根据召回阶段可见文本计算初始候选评分卡。"""
     return _deterministic_scorecard(
         candidate_index,
         candidate,
@@ -150,6 +156,7 @@ def build_final_candidate_scorecard(
     candidate_index: int,
     context: JobMatchContext,
 ) -> CandidateScorecard:
+    """使用结构化 JD 证据重算最终评分，并保留召回分作诊断。"""
     scorecard = build_candidate_scorecard(
         candidate_index,
         context.candidate,
@@ -160,10 +167,12 @@ def build_final_candidate_scorecard(
 
 
 def contains_signal(text: str, signal: str) -> bool:
+    """判断规范化信号是否作为完整词或短语出现在候选文本中。"""
     return any(variant and variant.lower() in text for variant in _signal_variants(signal))
 
 
 def score_from_breakdown(breakdown: dict[str, int]) -> int:
+    """按固定权重把各评分维度合成为 0–100 分。"""
     positive = sum(
         breakdown.get(key, 0)
         for key in [
@@ -179,6 +188,7 @@ def score_from_breakdown(breakdown: dict[str, int]) -> int:
 
 
 def confidence_label_for_score(score: int) -> CandidateConfidenceLabel:
+    """把数值分数映射为前端使用的置信度标签。"""
     if score >= 85:
         return "strong"
     if score >= 72:
@@ -189,6 +199,7 @@ def confidence_label_for_score(score: int) -> CandidateConfidenceLabel:
 
 
 def dedupe_list(values: list[str] | object) -> list[str]:
+    """保持原顺序去重非空文本。"""
     if not isinstance(values, list):
         return []
     items: list[str] = []

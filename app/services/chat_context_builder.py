@@ -1,3 +1,5 @@
+"""把画像、搜索和收藏职位压缩成有限证据包，避免把原始敏感数据直接交给模型。"""
+
 from __future__ import annotations
 
 import json

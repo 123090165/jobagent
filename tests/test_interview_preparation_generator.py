@@ -1,3 +1,5 @@
+"""回归验证面试准备的正常链路、失败边界和兼容契约。"""
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -20,6 +22,7 @@ from app.services.llm_service import LLMServiceError
 
 
 class SequenceLLM:
+    """为当前测试场景提供 SequenceLLM 夹具或替身。"""
     def __init__(self, responses: list[object]) -> None:
         self.responses = responses
         self.system_prompts: list[str] = []
@@ -32,6 +35,7 @@ class SequenceLLM:
         user_prompt: str,
         expected_root_key: str | None = None,
     ) -> dict:
+        """提供 SequenceLLM.chat_completion_json 所需的测试行为。"""
         self.system_prompts.append(system_prompt)
         self.user_prompts.append(user_prompt)
         response = self.responses.pop(0)

@@ -1,3 +1,5 @@
+"""定义Job Brief在 API、领域服务和 JSON 快照之间共用的 Pydantic 契约。"""
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -29,6 +31,7 @@ class JobBrief(BaseModel):
 
 
 class JobBriefGenerateRequest(BaseModel):
+    """描述职位决策简报generate的输入结构。"""
     resume_profile_id: str | None = None
     llm_provider: str | None = None
 

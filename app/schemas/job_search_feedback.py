@@ -1,3 +1,5 @@
+"""定义搜索结果反馈在 API、领域服务和 JSON 快照之间共用的 Pydantic 契约。"""
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -15,6 +17,7 @@ JobSearchFeedbackType = Literal[
 
 
 class JobSearchResultFeedbackUpsertRequest(BaseModel):
+    """描述职位搜索结果反馈upsert的输入结构。"""
     feedback_type: JobSearchFeedbackType
     note: str | None = Field(default=None, max_length=500)
 

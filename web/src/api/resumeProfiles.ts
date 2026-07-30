@@ -1,3 +1,6 @@
+/**
+ * 管理已确认后沉淀的简历画像库，包括默认画像、归档、恢复和删除。
+ */
 import { client } from "./client";
 import type {
   ResumeProfile,

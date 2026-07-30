@@ -1,3 +1,5 @@
+"""实现 env loader 相关逻辑。"""
+
 from __future__ import annotations
 
 import os
@@ -9,6 +11,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
 def load_local_env(env_file: str | Path | None = None) -> Path | None:
+    """加载localenv。"""
     path = _resolve_env_file(env_file)
     if not path.exists() or not path.is_file():
         return None

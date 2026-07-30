@@ -1,4 +1,7 @@
 <script setup lang="ts">
+/**
+ * 处理登录和注册，并在成功后返回原目标页面。
+ */
 import { computed, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { NButton, NInput, NRadioButton, NRadioGroup } from "naive-ui";

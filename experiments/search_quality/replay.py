@@ -1,3 +1,5 @@
+"""用脚本化 Provider 离线重放完整搜索流水线，采集结果后交给指标模块评估。"""
+
 from __future__ import annotations
 
 import argparse
@@ -54,6 +56,7 @@ class TrapLLM:
 
 
 class ScriptedReplayProvider:
+    """把scriptedreplay接入统一 Provider 协议。"""
     provider_kind = "fixture"
 
     def __init__(self, case: EvaluationCase, *, allowed_queries: list[str]):

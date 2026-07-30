@@ -1,3 +1,5 @@
+"""编排 收藏职位及其分析上下文 的所有权检查、状态转换、领域服务和持久化操作。"""
+
 from __future__ import annotations
 
 import asyncio
@@ -152,6 +154,7 @@ def generate_job_brief(
     resume_profiles: ResumeProfileRepository = resume_profile_repository,
     briefs: JobBriefRepository = job_brief_repository,
 ) -> JobBrief:
+    """从收藏职位的当前 JD、最新分析和指定画像生成新的版本化 Brief。"""
     job = saved_jobs.get(user_id=user_id, saved_job_id=saved_job_id)
     if job is None:
         raise _not_found()
@@ -196,6 +199,7 @@ async def generate_interview_preparation(
     resume_profiles: ResumeProfileRepository = resume_profile_repository,
     preparations: InterviewPreparationRepository = interview_preparation_repository,
 ) -> InterviewPreparationWorkspace:
+    """根据真实证据缺口创建准备问题；已有未结束 workspace 默认继续使用。"""
     job = saved_jobs.get(user_id=user_id, saved_job_id=saved_job_id)
     if job is None:
         raise _not_found()
@@ -246,6 +250,7 @@ async def complete_interview_preparation(
     saved_job_id: str, payload: PreparationAnswerRequest, *, user_id: str,
     preparations: InterviewPreparationRepository = interview_preparation_repository,
 ) -> InterviewPreparationWorkspace:
+    """合并本轮答案并推进 Agent；追问、暂停、完成和主动停止分别持久化。"""
     item = get_interview_preparation(saved_job_id, user_id=user_id, preparations=preparations)
     valid_ids = {question.question_id for question in item.questions}
     if (payload.action != "stop" and not payload.answers) or any(
@@ -631,6 +636,7 @@ def save_job_from_search_result(
     resume_profiles: ResumeProfileRepository = resume_profile_repository,
     saved_jobs: SavedJobRepository = saved_job_repository,
 ) -> SavedJob:
+    """保存搜索结果的 JD 与分析快照，并记录它来自哪个 run、result 和画像。"""
     run = search_repository.get(payload.job_search_run_id, user_id=user_id)
     if run is None:
         raise JobAgentError(
@@ -723,6 +729,7 @@ def save_job_from_browser_capture(
     repository: SavedJobRepository = saved_job_repository,
     resume_profiles: ResumeProfileRepository = resume_profile_repository,
 ) -> SavedJob:
+    """把用户当前页采集保存为职位，并在可用时关联分析 run 和画像。"""
     profile = None
     if payload.resume_profile_id is not None:
         profile = resume_profiles.get(

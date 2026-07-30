@@ -1,3 +1,5 @@
+"""串联硬约束、确定性打分和可选 LLM 重排，并保持失败时可用的本地结果。"""
+
 from __future__ import annotations
 
 from dataclasses import asdict

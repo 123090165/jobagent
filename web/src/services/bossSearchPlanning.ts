@@ -1,3 +1,6 @@
+/**
+ * 把后端搜索预览中的英文意图改写为有限的 BOSS 中文查询。
+ */
 import type { JobSearchPreview } from "../types/profileSession";
 import type { BossSearchResult } from "./browserHelper";
 

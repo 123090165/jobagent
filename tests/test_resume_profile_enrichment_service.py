@@ -1,3 +1,5 @@
+"""回归验证可复用简历画像的正常链路、失败边界和兼容契约。"""
+
 from __future__ import annotations
 
 from typing import Any
@@ -21,6 +23,7 @@ JobAgent - built FastAPI APIs and passed 300 tests.
 
 
 class FakeLLMService:
+    """为当前测试场景提供 FakeLLMService 夹具或替身。"""
     def __init__(self, payloads: list[dict[str, Any] | Exception]) -> None:
         self.payloads = list(payloads)
         self.calls: list[dict[str, str]] = []
@@ -31,6 +34,7 @@ class FakeLLMService:
         system_prompt: str,
         user_prompt: str,
     ) -> dict[str, Any]:
+        """提供 FakeLLMService.chat_completion_json 所需的测试行为。"""
         self.calls.append({"system_prompt": system_prompt, "user_prompt": user_prompt})
         if not self.payloads:
             raise LLMServiceError("no fake payload left")

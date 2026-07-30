@@ -1,3 +1,6 @@
+/**
+ * 扩展侧栏：选择上下文、采集当前职位、保存职位并接续 Assistant 会话。
+ */
 const LOCAL_KEYS = ["selectedProfileSessionId", "selectedConversationId", "useLlm"];
 
 const nodes = {
@@ -30,6 +33,7 @@ let assistantStateRefresh = 0;
 
 void init().catch(renderInitializationFailure);
 
+/** 初始化 Side Panel：恢复设置、绑定事件，并加载会话与可选上下文。 */
 async function init() {
   bindEvents();
   const saved = await chrome.storage.local.get(LOCAL_KEYS);
@@ -54,6 +58,7 @@ function handleStorageChange(changes, areaName) {
   void refreshAssistantState();
 }
 
+/** 重新读取配对状态、会话列表和上下文目录，并刷新侧栏控件。 */
 async function refreshAssistantState() {
   const refreshId = ++assistantStateRefresh;
   setStatus("Loading Assistant...");
@@ -127,6 +132,7 @@ async function loadTurns() {
   } catch (error) { setStatus(String(error), true); }
 }
 
+/** 请求后台采集活动标签页，完成后更新 capture 状态和后续操作按钮。 */
 async function captureCurrentPage() {
   setBusy(true); setStatus("Reading the current BOSS job page...");
   let permission = null;
@@ -170,6 +176,7 @@ async function revokeTemporaryPermission(origin) {
   }
 }
 
+/** 使用已保存 capture 触发标准职位分析，并把结果关联回扩展工作区。 */
 async function analyzeCapturedJob() {
   if (!currentCaptureRef) return setStatus("Capture a JD before running match analysis.", true);
   if (!nodes.profile.value) return setStatus("A confirmed Analysis profile is required for match analysis.", true);
@@ -189,6 +196,7 @@ async function analyzeCapturedJob() {
   finally { setBusy(false); }
 }
 
+/** 向当前 Assistant 会话提交问题，并在成功后重新加载消息历史。 */
 async function sendTurn() {
   const question = nodes.question.value.trim();
   if (!question || !nodes.conversation.value) return;
@@ -288,6 +296,7 @@ function fillSavedJobSelect(items) {
   }
 }
 
+/** 把后端返回的证据、风险和建议渲染到侧栏，不在前端重新计算分析。 */
 function renderAnalysisReport(report, warnings) {
   const value = report || {};
   nodes.analysisScore.textContent = Number.isFinite(value.overall_score)
