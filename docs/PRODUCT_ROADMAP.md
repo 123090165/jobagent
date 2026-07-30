@@ -102,9 +102,8 @@ Immediate rules:
   Brief feature.
 
 Current search execution boundaries are documented in
-[ARCHITECTURE.md](ARCHITECTURE.md). Retrieval quality behavior and remaining
-evaluation work are documented in
-[SEARCH_RETRIEVAL_QUALITY_V2_PLAN.md](SEARCH_RETRIEVAL_QUALITY_V2_PLAN.md).
+[ARCHITECTURE.md](ARCHITECTURE.md). Retrieval and ranking behavior is documented
+in [SEARCH_PROVIDER.md](SEARCH_PROVIDER.md).
 
 Before public beta, address durable tasks, authentication mode, database
 migrations, and data lifecycle as explicit architecture work.

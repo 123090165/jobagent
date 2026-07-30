@@ -2,6 +2,12 @@
 __pycache__/
 *.py[cod]
 .pytest_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+test-results/
+.hypothesis/
 .mypy_cache/
 .ruff_cache/
 .streamlit-out.log
@@ -15,6 +21,8 @@ demo_runs/
 !docs/demo_runs/
 !docs/demo_runs/**
 experiments/output/
+experiments/**/output/
+experiments/**/*.local.*
 *.db
 *.sqlite
 *.sqlite3

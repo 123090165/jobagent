@@ -83,7 +83,8 @@ cross-layer or shared-contract change. Report checks that could not run.
 
 ## Git
 
-- Use a focused branch and commit message.
+- Commit focused changes directly to `main`; this repository uses a single
+  branch for controlled local development.
 - Inspect status before editing and before committing.
 - Stage only files belonging to the change.
 - Do not commit local environment files, databases, generated reports, or

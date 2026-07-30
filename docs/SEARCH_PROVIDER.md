@@ -133,8 +133,9 @@ Use fixtures and representative profiles to evaluate:
 - source diversity;
 - analysis fallback frequency.
 
-Network and hosted LLM calls stay out of the default test suite. Live provider
-smoke and recall experiments are explicit commands under experiments/.
+Network and hosted LLM calls stay out of the default test suite. The retained
+offline replay corpus under `experiments/search_quality/` covers deterministic
+retrieval and ranking regressions.
 
 ## Future Workflow Engine
 

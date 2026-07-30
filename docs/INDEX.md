@@ -19,12 +19,6 @@ history archive. Git preserves completed plans and deleted designs.
   boundary.
 - [DEVELOPMENT.md](DEVELOPMENT.md): coding, testing, documentation, and
   refactoring practices.
-- [SEARCH_RETRIEVAL_QUALITY_V2_PLAN.md](SEARCH_RETRIEVAL_QUALITY_V2_PLAN.md):
-  current design, implementation status, and evaluation baseline for typed
-  queries, provider budgets, hard constraints, recall, and final ranking.
-- [SEARCH_SUBAGENT_OPERATING_MODEL.md](SEARCH_SUBAGENT_OPERATING_MODEL.md):
-  project-scoped specialist agents, delegation rules, handoff contracts, and
-  durable knowledge practices for Search V2 work.
 - [SEARCH_HISTORY_RECOVERY.md](SEARCH_HISTORY_RECOVERY.md): user-visible run
   history and the current recovery boundary.
 - [SEARCH_MISSION.md](SEARCH_MISSION.md): intent collection, agent

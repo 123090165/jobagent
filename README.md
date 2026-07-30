@@ -116,7 +116,7 @@ known authentication limitations.
 - app/: FastAPI runtime, use cases, services, repositories, and schemas;
 - web/: Vue user interface;
 - browser-helper/: local browser-assisted provider bridge;
-- experiments/: explicit provider and quality evaluation commands;
+- experiments/: retained offline Search and private RAG quality evaluation;
 - tests/: automated regression coverage;
 - docs/: current product and engineering guidance.
 

@@ -1,172 +1,20 @@
-# Resume Extraction Comparison Experiment
+# Offline Quality Evaluation
 
-## Private RAG Quality
+Only reusable, network-free evaluation assets are kept here.
 
-`experiments/rag_quality/` contains a versioned, privacy-aware retrieval corpus
-for Resume Profile and Saved Job knowledge. Run the network-free lexical
-baseline with:
+## Search quality
+
+`search_quality/` contains the deterministic replay corpus, metrics, reports,
+and frozen baselines used to catch retrieval and ranking regressions.
+
+## Private RAG quality
+
+`rag_quality/` contains a privacy-aware retrieval corpus and evaluator. Run the
+lexical baseline without external services:
 
 ```powershell
 python -m scripts.evaluate_rag_quality --mode lexical
 ```
 
-Use `--mode live` only with the local Modular RAG management and MCP endpoints
-configured. Live mode seeds temporary users, exercises the durable outbox and
-authorized MCP query, checks forbidden cross-user hits, and cleans up the
-indexed resources after evaluation.
-
-This directory contains local-only experiments for comparing DeepSeek-based resume extraction strategies. It does not modify production parser behavior, API routes, frontend behavior, repositories, or job brief logic.
-
-## Modes
-
-- `direct_one_shot`: raw resume text only, one LLM call returns the full shared schema.
-- `direct_fieldwise`: raw resume text only, focused field-group calls are merged by one final LLM call.
-- `guided_reconciliation`: raw resume text plus current deterministic parser output, where deterministic output is only a non-authoritative hint.
-
-## Run With A Fixture
-
-```powershell
-.venv\Scripts\python.exe experiments\resume_extraction_compare.py `
-  --case-id ai_agent_backend `
-  --runs 3 `
-  --env-file .env.deepseek.local
-```
-
-## Run With A Private Local Resume
-
-```powershell
-.venv\Scripts\python.exe experiments\resume_extraction_compare.py `
-  --input-file path\to\private_resume.txt `
-  --runs 3 `
-  --env-file .env.deepseek.local
-```
-
-Do not commit private input resumes or experiment outputs. Reports are written to `experiments/output/`, which is gitignored.
-
-## Multidomain Flow Check
-
-Run the resume-to-search-preview sanity check across synthetic non-engineering resumes:
-
-```powershell
-.venv\Scripts\python.exe experiments\multidomain_flow_check.py
-```
-
-This script does not call DeepSeek or live job providers. It runs local API use cases over the samples in `tests/fixtures/resumes/multidomain_samples/` and writes a Markdown report with parsed resume signals, confirmed profile fields, generalized search intent, provider queries, and pass/fail checks.
-
-## Provider Recall Calibration
-
-Run a small live provider recall check across the same multidomain samples:
-
-```powershell
-.venv\Scripts\python.exe experiments\provider_recall_calibration.py `
-  --env-file .env.deepseek.local `
-  --queries-per-case 2 `
-  --limit-per-query 10
-```
-
-The default provider is `multi_source` with the current frontend sources:
-`cuhksz_career`, `linkedin`, and `remoteok`. The script calls live selected
-providers, so it can consume Serper requests when LinkedIn or `serper_web` is
-included. It does not call DeepSeek, does not perform final LLM ranking, and
-does not build Job Brief. Reports are written to `experiments/output/` as JSON
-and Markdown.
-
-Useful variants:
-
-```powershell
-.venv\Scripts\python.exe experiments\provider_recall_calibration.py `
-  --provider multi_source `
-  --source cuhksz_career `
-  --source remoteok
-
-.venv\Scripts\python.exe experiments\provider_recall_calibration.py `
-  --provider serper_web `
-  --env-file .env.deepseek.local
-```
-
-Required:
-
-- `SERPER_API_KEY` or `JOBAGENT_SERPER_API_KEY` only for Serper-backed sources:
-  `linkedin` and `serper_web`
-
-Optional:
-
-- `JOBAGENT_WEB_SEARCH_SITES=career.cuhk.edu.cn,zhipin.com,linkedin.com`
-
-The report includes per-source raw counts, deduped counts, unretained counts,
-missing URL/detail counts, detail coverage, provider warnings, provider query
-results, and top candidates with source links.
-
-## Provider Live Smoke Check
-
-Run a single-provider live crawler smoke check through the shared
-`JobSearchProvider` interface:
-
-```powershell
-.venv\Scripts\python.exe experiments\provider_live_smoke.py `
-  --provider cuhksz_career `
-  --url "https://career.cuhk.edu.cn/job/search?title=%E7%AE%97%E6%B3%95&title_type=1&city=&d_industry=&nature=&d_skill=&d_category=" `
-  --limit 3 `
-  --min-candidates 1 `
-  --require-detail
-```
-
-This is the fastest reusable check for "can this provider actually fetch public
-job data right now?" It writes JSON and Markdown reports under
-`experiments/output/`. Unit tests for this script use fake providers and do not
-perform network calls.
-
-To smoke-test the same selected-source shape used by the frontend:
-
-```powershell
-.venv\Scripts\python.exe experiments\provider_live_smoke.py `
-  --provider multi_source `
-  --source cuhksz_career `
-  --source linkedin `
-  --source remoteok `
-  --query "brand marketing intern Shanghai" `
-  --limit 3 `
-  --min-candidates 1
-```
-
-## Metrics
-
-Each report includes schema-valid rate, evidence-valid rate, unsupported field count, expected signal coverage, and output stability. The evaluator now also records wall-clock elapsed seconds for every run and the logical LLM request count for each mode, then reports per-mode averages in both JSON and Markdown summaries. This makes it easier to compare extraction quality against latency and request cost.
-
-Evidence entries must use the standard shape:
-
-```json
-{ "value": "...", "quote": "..." }
-```
-
-Malformed evidence is normalized safely in the saved output, but still counted as invalid during evaluation.
-
-## Environment
-
-The experiment reads environment variables only from the file passed with `--env-file`, defaulting to `.env.deepseek.local`. Required:
-
-- `DEEPSEEK_API_KEY`
-
-Optional values follow the existing project conventions:
-
-- `DEEPSEEK_BASE_URL`
-- `DEEPSEEK_MODEL`
-- `JOBAGENT_LLM_TIMEOUT`
-- `JOBAGENT_LLM_TEMPERATURE`
-
-Secrets are not printed in reports or terminal output.
-
-## Persona-Centered Preparation Evaluation
-
-Run an evaluation agent that reads an existing Profile and Saved Job from the
-local database, simulates the imperfect candidate behind the resume, completes
-Preparation in a temporary shadow database, and self-assesses the result using
-the same explicit persona memory:
-
-```powershell
-.venv\Scripts\python.exe -m experiments.preparation_eval.runner `
-  --list-context
-```
-
-See [preparation_eval/README.md](preparation_eval/README.md) for model
-configuration, prompts, memory boundaries, and the full command.
+Use live mode only when the local JobAgent and Modular RAG services are
+configured. Generated reports belong under ignored `output/` directories.
