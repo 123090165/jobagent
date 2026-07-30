@@ -1,5 +1,8 @@
 # Search Mission
 
+> 当前实现标注：Search Mission 仍是有效的后端资源，但独立前端页面已合并到
+> Search Preview。旧 `/search-mission` URL 仅作为重定向兼容入口。
+
 ## Purpose
 
 A confirmed resume describes demonstrated experience. A Search Mission describes

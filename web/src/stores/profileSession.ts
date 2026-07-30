@@ -1,3 +1,6 @@
+/**
+ * 保存简历到搜索主流程的前端状态，并负责上游变更失效、run 轮询和页面恢复。
+ */
 import { defineStore } from "pinia";
 import { AxiosError } from "axios";
 
@@ -9,7 +12,6 @@ import {
   createProfileSession,
   deleteJobSearchRun,
   getConfirmedProfile,
-  getJobSearchProviderStatus,
   getJobSearchRun,
   getJobSearchRunSteps,
   getLlmStatus,
@@ -29,7 +31,6 @@ import type {
   CreateBrowserHelperJobSearchPayload,
   CreateJobSearchRunPayload,
   ConfirmedProfile,
-  JobSearchProviderStatus,
   JobSearchItem,
   JobSearchPreview,
   JobSearchRun,
@@ -50,14 +51,12 @@ interface ProfileSessionState {
   parsedReview: ParsedResumeReview | null;
   profileDraft: ProfileDraft | null;
   confirmedProfile: ConfirmedProfile | null;
-  jobSearchPreview: JobSearchPreview | null;
   jobSearchRun: JobSearchRun | null;
   jobSearchRuns: JobSearchRun[];
   jobSearchSteps: JobSearchTraceStep[];
   jobSearchItems: JobSearchItem[];
   jobSearchItemTotal: number;
   jobSearchItemsError: string | null;
-  jobSearchProviderStatus: JobSearchProviderStatus | null;
   llmStatus: LlmStatus | null;
   isCreating: boolean;
   isSubmitting: boolean;
@@ -67,7 +66,6 @@ interface ProfileSessionState {
   isConfirming: boolean;
   isConfirmedLoading: boolean;
   isJobSearchCreating: boolean;
-  isJobSearchPreviewLoading: boolean;
   isJobSearchLoading: boolean;
   isJobSearchItemsLoading: boolean;
   isJobSearchPolling: boolean;
@@ -75,7 +73,6 @@ interface ProfileSessionState {
   hasLoadedSession: boolean;
   error: string | null;
   jobSearchPollTimer: number | null;
-  jobSearchPreviewRequestId: number;
   jobSearchPreviewControls: JobSearchPreviewControls | null;
   jobSearchClientStartedAt: number | null;
   jobSearchClientRunId: string | null;
@@ -109,14 +106,12 @@ export const useProfileSessionStore = defineStore("profileSession", {
     parsedReview: null,
     profileDraft: null,
     confirmedProfile: null,
-    jobSearchPreview: null,
     jobSearchRun: null,
     jobSearchRuns: [],
     jobSearchSteps: [],
     jobSearchItems: [],
     jobSearchItemTotal: 0,
     jobSearchItemsError: null,
-    jobSearchProviderStatus: null,
     llmStatus: null,
     isCreating: false,
     isSubmitting: false,
@@ -126,7 +121,6 @@ export const useProfileSessionStore = defineStore("profileSession", {
     isConfirming: false,
     isConfirmedLoading: false,
     isJobSearchCreating: false,
-    isJobSearchPreviewLoading: false,
     isJobSearchLoading: false,
     isJobSearchItemsLoading: false,
     isJobSearchPolling: false,
@@ -134,7 +128,6 @@ export const useProfileSessionStore = defineStore("profileSession", {
     hasLoadedSession: false,
     error: null,
     jobSearchPollTimer: null,
-    jobSearchPreviewRequestId: 0,
     jobSearchPreviewControls: null,
     jobSearchClientStartedAt: null,
     jobSearchClientRunId: null,
@@ -150,22 +143,24 @@ export const useProfileSessionStore = defineStore("profileSession", {
       this.jobSearchItemsError = null;
     },
     resetJobSearchState(): void {
-      this.jobSearchPreview = null;
       this.jobSearchPreviewControls = null;
       this.resetJobSearchResults();
     },
     invalidateAfterResumeChange(): void {
+      // 简历是整条流程的根输入；替换后不能继续展示任何由旧简历生成的下游状态。
       this.parsedReview = null;
       this.profileDraft = null;
       this.confirmedProfile = null;
       this.resetJobSearchState();
     },
     invalidateAfterReviewChange(): void {
+      // 重新解析只使草稿及其后续结果失效，保留用户刚得到的新 review。
       this.profileDraft = null;
       this.confirmedProfile = null;
       this.resetJobSearchResults();
     },
     invalidateAfterDraftChange(): void {
+      // 草稿编辑后必须重新确认，旧确认画像和搜索条件都不再可信。
       this.confirmedProfile = null;
       this.resetJobSearchState();
     },
@@ -189,6 +184,7 @@ export const useProfileSessionStore = defineStore("profileSession", {
         this.session = await getProfileSession(sessionId);
         this.hasLoadedSession = true;
         this.error = null;
+        // 后端 session 是恢复页面时的真相源，本地缓存必须按当前引用主动清空。
         if (this.session.current_step !== "resume_review") {
           this.parsedReview = null;
         }
@@ -351,7 +347,6 @@ export const useProfileSessionStore = defineStore("profileSession", {
         const response = await confirmProfileDraft(draftId);
         this.session = response.profile_session;
         this.confirmedProfile = response.confirmed_profile;
-        this.jobSearchPreview = null;
         this.jobSearchPreviewControls = null;
         return response.confirmed_profile;
       } catch (error) {
@@ -391,19 +386,6 @@ export const useProfileSessionStore = defineStore("profileSession", {
         this.isLlmStatusLoading = false;
       }
     },
-    async loadJobSearchProviderStatus(
-      provider?: "mock" | "cuhksz_career" | "linkedin" | "remoteok" | "serper_web" | "browser_helper" | "multi_source"
-    ): Promise<JobSearchProviderStatus> {
-      this.error = null;
-      try {
-        this.jobSearchProviderStatus = await getJobSearchProviderStatus(provider);
-        return this.jobSearchProviderStatus;
-      } catch (error) {
-        this.jobSearchProviderStatus = null;
-        this.error = toApiErrorMessage(error, "Failed to load job search provider status.");
-        throw error;
-      }
-    },
     prepareNewJobSearch(): void {
       this.stopPollingJobSearchRun();
       this.jobSearchRun = null;
@@ -439,6 +421,7 @@ export const useProfileSessionStore = defineStore("profileSession", {
       this.prepareNewJobSearch();
       this.error = null;
       try {
+        // 接口返回 pending/running run；真正执行由后端 BackgroundTasks 继续推进。
         const response = await createJobSearchRun(payload);
         this.session = response.profile_session;
         this.jobSearchRun = response.job_search_run;
@@ -464,6 +447,7 @@ export const useProfileSessionStore = defineStore("profileSession", {
       this.prepareNewJobSearch();
       this.error = null;
       try {
+        // 扩展候选进入后端后仍生成普通 run，结果页不需要维护另一套分析状态。
         const response = await createBrowserHelperJobSearchRun(payload);
         this.session = response.profile_session;
         this.jobSearchRun = response.job_search_run;
@@ -485,26 +469,12 @@ export const useProfileSessionStore = defineStore("profileSession", {
     async previewJobSearch(
       payload: CreateJobSearchRunPayload
     ): Promise<JobSearchPreview> {
-      const requestId = this.jobSearchPreviewRequestId + 1;
-      this.jobSearchPreviewRequestId = requestId;
-      this.isJobSearchPreviewLoading = true;
       this.error = null;
       try {
-        const preview = await previewJobSearchRun(payload);
-        if (requestId === this.jobSearchPreviewRequestId) {
-          this.jobSearchPreview = preview;
-        }
-        return preview;
+        return await previewJobSearchRun(payload);
       } catch (error) {
-        if (requestId === this.jobSearchPreviewRequestId) {
-          this.jobSearchPreview = null;
-          this.error = toApiErrorMessage(error, "Failed to preview job search.");
-        }
+        this.error = toApiErrorMessage(error, "Failed to prepare BOSS search.");
         throw error;
-      } finally {
-        if (requestId === this.jobSearchPreviewRequestId) {
-          this.isJobSearchPreviewLoading = false;
-        }
       }
     },
     async loadJobSearchRun(runId: string): Promise<JobSearchRun> {
@@ -609,6 +579,7 @@ export const useProfileSessionStore = defineStore("profileSession", {
       }
     },
     async pollJobSearchRun(runId: string): Promise<void> {
+      // 使用递归 setTimeout，确保上一轮完成后才发下一轮请求，避免慢请求重叠。
       this.stopPollingJobSearchRun();
       this.isJobSearchPolling = true;
 
@@ -620,6 +591,7 @@ export const useProfileSessionStore = defineStore("profileSession", {
           this.jobSearchSteps = response.steps;
           const status = response.job_search_run.status;
           if (status === "completed" || status === "failed") {
+            // 两种终态都必须停止计时器；失败详情由 run 和 trace 提供。
             this.stopPollingJobSearchRun();
             return;
           }

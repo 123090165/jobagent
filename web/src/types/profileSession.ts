@@ -1,3 +1,6 @@
+/**
+ * 声明主流程会话及各阶段快照的前端类型，对齐后端 ProfileSession 聚合响应。
+ */
 export type ProfileSessionStatus = "active" | "completed" | "archived";
 
 export type ProfileSessionStep =
@@ -389,18 +392,6 @@ export interface LlmStatus {
   model: string | null;
   base_url: string | null;
   reason: string | null;
-}
-
-export interface JobSearchProviderStatus {
-  provider: "mock" | "cuhksz_career" | string;
-  configured: boolean;
-  available_providers: string[];
-  reason: string | null;
-  base_url: string | null;
-  search_url: string | null;
-  allowlisted_domains: string[];
-  source_kind: "mock" | "native_job_board" | "native_api" | "search_engine" | "direct_crawler" | "browser_helper" | "hybrid" | string;
-  detail_strategy: string;
 }
 
 export type LlmProviderName = "deepseek" | "ollama" | "mock";
