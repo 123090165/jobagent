@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from uuid import uuid4
 
 from app.schemas.job_search import (
+    JobSearchItem,
     JobSearchResult,
     JobSearchRun,
     JobSearchTraceStep,
@@ -128,6 +129,121 @@ class JobSearchRepository:
             if cursor.rowcount == 0:
                 return None
         return self.get(run_id)
+
+    def upsert_items(
+        self,
+        *,
+        user_id: str,
+        run_id: str,
+        items: list[JobSearchItem],
+        replace_existing: bool = False,
+    ) -> None:
+        with get_connection() as connection:
+            init_database(connection)
+            if replace_existing:
+                connection.execute(
+                    "DELETE FROM job_search_items WHERE user_id = ? AND job_search_run_id = ?",
+                    (user_id, run_id),
+                )
+            if items:
+                connection.executemany(
+                    """
+                INSERT INTO job_search_items (
+                    job_search_item_id,
+                    user_id,
+                    job_search_run_id,
+                    stable_candidate_key,
+                    rank,
+                    stage,
+                    candidate_json,
+                    result_json,
+                    created_at,
+                    updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(user_id, job_search_run_id, stable_candidate_key)
+                DO UPDATE SET
+                    rank = excluded.rank,
+                    stage = excluded.stage,
+                    candidate_json = excluded.candidate_json,
+                    result_json = excluded.result_json,
+                    updated_at = excluded.updated_at
+                """,
+                    [
+                        (
+                            item.job_search_item_id,
+                            user_id,
+                            run_id,
+                            item.stable_candidate_key,
+                            item.rank,
+                            item.stage,
+                            json.dumps(item.candidate.model_dump(mode="json")),
+                            (
+                                json.dumps(item.result.model_dump(mode="json"))
+                                if item.result is not None
+                                else None
+                            ),
+                            item.created_at.isoformat(),
+                            item.updated_at.isoformat(),
+                        )
+                        for item in items
+                    ],
+                )
+            connection.commit()
+
+    def list_items(
+        self,
+        *,
+        user_id: str,
+        run_id: str,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> list[JobSearchItem]:
+        with get_connection() as connection:
+            init_database(connection)
+            rows = connection.execute(
+                """
+                SELECT *
+                FROM job_search_items
+                WHERE user_id = ? AND job_search_run_id = ?
+                ORDER BY rank ASC, created_at ASC
+                LIMIT ? OFFSET ?
+                """,
+                (user_id, run_id, limit, offset),
+            ).fetchall()
+        return [self._row_to_job_search_item(row) for row in rows]
+
+    def count_items(self, *, user_id: str, run_id: str) -> int:
+        with get_connection() as connection:
+            init_database(connection)
+            row = connection.execute(
+                """
+                SELECT COUNT(*) AS item_count
+                FROM job_search_items
+                WHERE user_id = ? AND job_search_run_id = ?
+                """,
+                (user_id, run_id),
+            ).fetchone()
+        return int(row["item_count"]) if row is not None else 0
+
+    def get_item(
+        self,
+        *,
+        user_id: str,
+        run_id: str,
+        item_id: str,
+    ) -> JobSearchItem | None:
+        with get_connection() as connection:
+            init_database(connection)
+            row = connection.execute(
+                """
+                SELECT *
+                FROM job_search_items
+                WHERE user_id = ? AND job_search_run_id = ? AND job_search_item_id = ?
+                """,
+                (user_id, run_id, item_id),
+            ).fetchone()
+        return self._row_to_job_search_item(row) if row is not None else None
 
     def fail_run(self, run_id: str, error_message: str) -> JobSearchRun | None:
         return self._update_run_state(run_id, status="failed", error_message=error_message)
@@ -282,6 +398,10 @@ class JobSearchRepository:
             )
             connection.execute(
                 "DELETE FROM job_search_result_feedback WHERE user_id = ? AND job_search_run_id = ?",
+                (user_id, run_id),
+            )
+            connection.execute(
+                "DELETE FROM job_search_items WHERE user_id = ? AND job_search_run_id = ?",
                 (user_id, run_id),
             )
             connection.execute(
@@ -737,6 +857,24 @@ class JobSearchRepository:
                 JobSearchResult.model_validate(item)
                 for item in json.loads(row["results_json"])
             ],
+            created_at=datetime.fromisoformat(row["created_at"]),
+            updated_at=datetime.fromisoformat(row["updated_at"]),
+        )
+
+    @staticmethod
+    def _row_to_job_search_item(row: object) -> JobSearchItem:
+        return JobSearchItem(
+            job_search_item_id=row["job_search_item_id"],
+            job_search_run_id=row["job_search_run_id"],
+            stable_candidate_key=row["stable_candidate_key"],
+            rank=row["rank"],
+            stage=row["stage"],
+            candidate=json.loads(row["candidate_json"]),
+            result=(
+                JobSearchResult.model_validate(json.loads(row["result_json"]))
+                if row["result_json"]
+                else None
+            ),
             created_at=datetime.fromisoformat(row["created_at"]),
             updated_at=datetime.fromisoformat(row["updated_at"]),
         )

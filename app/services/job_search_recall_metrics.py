@@ -12,6 +12,7 @@ SNIPPET_ONLY_DETAIL_STATUSES = {
     None,
     "",
     "detail_failed",
+    "detail_fetched_incomplete",
     "detail_missing_url",
     "detail_pending",
     "linkedin_external_link",

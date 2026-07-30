@@ -350,6 +350,22 @@ def init_database(connection: sqlite3.Connection) -> None:
             FOREIGN KEY (job_search_run_id) REFERENCES job_search_runs(job_search_run_id)
         );
 
+        CREATE TABLE IF NOT EXISTS job_search_items (
+            job_search_item_id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            job_search_run_id TEXT NOT NULL,
+            stable_candidate_key TEXT NOT NULL,
+            rank INTEGER NOT NULL,
+            stage TEXT NOT NULL DEFAULT 'recalled',
+            candidate_json TEXT NOT NULL,
+            result_json TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users(user_id),
+            FOREIGN KEY (job_search_run_id) REFERENCES job_search_runs(job_search_run_id),
+            UNIQUE (user_id, job_search_run_id, stable_candidate_key)
+        );
+
         CREATE TABLE IF NOT EXISTS saved_jobs (
             saved_job_id TEXT PRIMARY KEY,
             user_id TEXT NOT NULL,
@@ -957,6 +973,8 @@ def _ensure_indexes(connection: sqlite3.Connection) -> None:
             ON job_search_runs(user_id);
         CREATE INDEX IF NOT EXISTS idx_job_search_runs_resume_profile
             ON job_search_runs(user_id, resume_profile_id, created_at);
+        CREATE INDEX IF NOT EXISTS idx_job_search_items_run_rank
+            ON job_search_items(user_id, job_search_run_id, rank);
         CREATE INDEX IF NOT EXISTS idx_resume_profiles_user_id
             ON resume_profiles(user_id, archived_at, updated_at);
         CREATE UNIQUE INDEX IF NOT EXISTS idx_resume_profiles_one_default

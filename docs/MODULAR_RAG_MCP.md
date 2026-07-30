@@ -186,7 +186,8 @@ The diagnostic command is the explicit live integration check.
 - exposing arbitrary MCP tools directly to an LLM;
 - trusting a Tool argument as authenticated user identity;
 - changing Search V2 retrieval, ranking, or trace stages;
-- managing the Modular RAG process from JobAgent;
+- production process supervision of Modular RAG (the local development script
+  may start and stop it for convenience);
 - treating the RAG index as a JobAgent business-data source of truth.
 
 Production readiness still requires real-data relevance evaluation, supervised

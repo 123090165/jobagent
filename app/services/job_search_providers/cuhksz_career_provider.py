@@ -73,6 +73,30 @@ JOB_DESCRIPTION_LABELS = ["工作内容描述", "岗位职责", "职位描述", 
 COMPANY_INTRO_LABELS = ["企业简介", "公司简介"]
 CONTACT_INFO_LABELS = ["联系方式", "申请方式", "投递方式"]
 
+RESPONSIBILITY_SECTION_LABELS = [
+    "工作内容描述",
+    "岗位职责",
+    "职位描述",
+    "Job Description",
+    "Responsibilities",
+]
+REQUIREMENT_SECTION_LABELS = [
+    "任职要求",
+    "职位要求",
+    "Qualifications",
+    "Requirements",
+]
+JD_SECTION_LABELS = RESPONSIBILITY_SECTION_LABELS + REQUIREMENT_SECTION_LABELS
+SHORT_JD_WARNING = "CUHKSZ detail JD text is too short for reliable evidence extraction."
+NO_JD_SECTIONS_WARNING = (
+    "CUHKSZ detail page did not expose recognizable responsibility or requirement sections; "
+    "full-page text fallback was used."
+)
+MISSING_RESPONSIBILITIES_WARNING = (
+    "CUHKSZ detail page did not expose a recognizable responsibilities section."
+)
+MISSING_REQUIREMENTS_WARNING = "CUHKSZ detail page did not expose a recognizable requirements section."
+
 
 def build_cuhksz_search_url(title: str, *, city: str | None = None) -> str:
     params = {
@@ -270,7 +294,7 @@ class CUHKSZCareerProvider:
             detail_html = self.detail_pages.get(candidate.source_url)
             if detail_html is None:
                 detail_html = self._fetch(candidate.source_url)
-            fields = _parse_detail_fields(detail_html)
+            fields, detail_warnings = _parse_detail_fields(detail_html)
         except Exception as exc:
             return candidate.model_copy(
                 update={
@@ -302,6 +326,7 @@ class CUHKSZCareerProvider:
             snippet = f"{candidate.snippet} | {detail_snippet}"[:320].strip()
         else:
             snippet = (detail_snippet or candidate.snippet or "")[:320].strip()
+        detail_status = "detail_fetched_incomplete" if detail_warnings else "detail_fetched"
         return candidate.model_copy(
             update={
                 "title": merged_title,
@@ -309,7 +334,8 @@ class CUHKSZCareerProvider:
                 "location": merged_location,
                 "snippet": snippet or candidate.snippet,
                 "raw_description": raw_description or candidate.raw_description,
-                "detail_status": "detail_fetched",
+                "detail_status": detail_status,
+                "provider_warnings": _dedupe(candidate.provider_warnings + detail_warnings),
             }
         )
 
@@ -437,7 +463,7 @@ def _is_allowed_detail_url(url: str) -> bool:
     return parsed.scheme in {"http", "https"} and parsed.netloc in CUHKSZ_CAREER_ALLOWED_DOMAINS
 
 
-def _parse_detail_fields(detail_html: str) -> dict[str, str | None]:
+def _parse_detail_fields(detail_html: str) -> tuple[dict[str, str | None], list[str]]:
     soup = BeautifulSoup(detail_html, "html.parser")
     for node in soup.select("script,style,noscript"):
         node.decompose()
@@ -451,12 +477,25 @@ def _parse_detail_fields(detail_html: str) -> dict[str, str | None]:
     salary = _search_label(detail_html, SALARY_LABELS)
     published_date = _search_label(detail_html, PUBLISHED_DATE_LABELS)
     end_date = _search_label(detail_html, END_DATE_LABELS)
-    extracted_jd_text, _warnings = extract_cuhksz_jd_text(detail_html)
-    job_description = _extract_section(detail_html, JOB_DESCRIPTION_LABELS) or extracted_jd_text
+    extracted_jd_text, extraction_warnings = extract_cuhksz_jd_text(detail_html)
+    jd_sections = _extract_sections(detail_html, JD_SECTION_LABELS)
+    job_description = " ".join(section_text for _heading, section_text in jd_sections) or extracted_jd_text
     company_intro = _extract_section(detail_html, COMPANY_INTRO_LABELS)
     contact_info = _extract_section(detail_html, CONTACT_INFO_LABELS)
 
-    return {
+    warnings: list[str] = []
+    if extraction_warnings:
+        warnings.append(SHORT_JD_WARNING)
+    if not jd_sections:
+        warnings.append(NO_JD_SECTIONS_WARNING)
+    else:
+        matched_headings = [heading for heading, _section_text in jd_sections]
+        if not _headings_match_any(matched_headings, RESPONSIBILITY_SECTION_LABELS):
+            warnings.append(MISSING_RESPONSIBILITIES_WARNING)
+        if not _headings_match_any(matched_headings, REQUIREMENT_SECTION_LABELS):
+            warnings.append(MISSING_REQUIREMENTS_WARNING)
+
+    fields = {
         "title": title,
         "company": company,
         "location": location,
@@ -470,6 +509,7 @@ def _parse_detail_fields(detail_html: str) -> dict[str, str | None]:
         "company_intro": company_intro,
         "contact_info": contact_info,
     }
+    return fields, warnings
 
 
 def _build_raw_description(fields: dict[str, str | None]) -> str:
@@ -516,10 +556,17 @@ def _search_label(html: str, labels: list[str]) -> str | None:
 
 
 def _extract_section(html: str, labels: list[str]) -> str | None:
+    sections = _extract_sections(html, labels)
+    return " ".join(section_text for _heading, section_text in sections) or None
+
+
+def _extract_sections(html: str, labels: list[str]) -> list[tuple[str, str]]:
     soup = BeautifulSoup(html, "html.parser")
     for node in soup.select("script,style,noscript"):
         node.decompose()
 
+    sections: list[tuple[str, str]] = []
+    seen_text: set[str] = set()
     headings = soup.find_all(["h1", "h2", "h3", "strong", "b"])
     for heading in headings:
         heading_text = _clean_text(heading.get_text(" ", strip=True))
@@ -545,9 +592,15 @@ def _extract_section(html: str, labels: list[str]) -> str | None:
                     section_parts.append(text)
 
         section_text = " ".join(section_parts).strip()
-        if section_text:
-            return section_text
-    return None
+        normalized = section_text.casefold()
+        if section_text and normalized not in seen_text:
+            seen_text.add(normalized)
+            sections.append((heading_text, section_text))
+    return sections
+
+
+def _headings_match_any(headings: list[str], labels: list[str]) -> bool:
+    return any(label.casefold() in heading.casefold() for heading in headings for label in labels)
 
 
 def _extract_text_fragment(node: object) -> str:

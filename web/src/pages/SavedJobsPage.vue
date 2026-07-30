@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
-import { NButton, NDropdown, NInput, NSelect, NSwitch, NTag } from "naive-ui";
+import { NButton, NCheckbox, NDropdown, NInput, NSelect, NSwitch, NTag } from "naive-ui";
 
 import FlowPageHeader from "../components/FlowPageHeader.vue";
 import { useSavedJobsStore } from "../stores/savedJobs";
@@ -13,6 +13,11 @@ const includeArchived = ref(false);
 const query = ref("");
 const statusFilter = ref<string>("active");
 const actionMessage = ref<string | null>(null);
+const selectionMode = ref(false);
+const selectedJobIds = ref<string[]>([]);
+const bulkStatus = ref<SavedJobStatus | null>(null);
+const isBulkSaving = ref(false);
+const BULK_LIMIT = 50;
 
 const statusOptions: Array<{ label: string; value: SavedJobStatus }> = [
   { label: "Saved", value: "saved" },
@@ -44,6 +49,16 @@ const visibleJobs = computed(() => {
       .some((value) => String(value).toLocaleLowerCase().includes(term));
   });
 });
+const selectedJobs = computed(() =>
+  visibleJobs.value
+    .filter((job) => selectedJobIds.value.includes(job.saved_job_id))
+    .slice(0, BULK_LIMIT)
+);
+const allVisibleSelected = computed(() =>
+  visibleJobs.value.length > 0
+  && visibleJobs.value.slice(0, BULK_LIMIT)
+    .every((job) => selectedJobIds.value.includes(job.saved_job_id))
+);
 
 onMounted(() => void loadJobs());
 watch(includeArchived, () => void loadJobs());
@@ -82,6 +97,96 @@ async function handleRowAction(key: string, job: SavedJob) {
   } catch {
     // Store error is rendered below.
   }
+}
+
+function toggleSelection(jobId: string, checked: boolean) {
+  if (checked) {
+    if (selectedJobIds.value.length >= BULK_LIMIT) {
+      actionMessage.value = `Select up to ${BULK_LIMIT} jobs at a time.`;
+      return;
+    }
+    selectedJobIds.value = [...selectedJobIds.value, jobId];
+  } else {
+    selectedJobIds.value = selectedJobIds.value.filter((id) => id !== jobId);
+  }
+}
+
+function toggleSelectVisible(checked: boolean) {
+  selectedJobIds.value = checked
+    ? visibleJobs.value.slice(0, BULK_LIMIT).map((job) => job.saved_job_id)
+    : [];
+}
+
+function clearCompletedSelection(successfulIds: string[]) {
+  const successful = new Set(successfulIds);
+  selectedJobIds.value = selectedJobIds.value.filter((id) => !successful.has(id));
+}
+
+function reportBulkResult(action: string, jobs: SavedJob[], successfulIds: string[]) {
+  clearCompletedSelection(successfulIds);
+  const failures = jobs.length - successfulIds.length;
+  actionMessage.value = failures
+    ? `${action}: ${successfulIds.length} of ${jobs.length} succeeded; ${failures} failed. Retry the remaining selection.`
+    : `${action}: all ${jobs.length} jobs succeeded.`;
+}
+
+async function bulkArchive() {
+  const jobs = [...selectedJobs.value];
+  if (!jobs.length || isBulkSaving.value) return;
+  isBulkSaving.value = true;
+  actionMessage.value = null;
+  const successfulIds: string[] = [];
+  for (const job of jobs) {
+    try {
+      await store.archiveJob(job.saved_job_id);
+      successfulIds.push(job.saved_job_id);
+    } catch {
+      // Keep failed jobs selected for retry.
+    }
+  }
+  reportBulkResult("Archive", jobs, successfulIds);
+  isBulkSaving.value = false;
+}
+
+async function bulkUpdateStatus() {
+  const jobs = [...selectedJobs.value];
+  if (!jobs.length || !bulkStatus.value || isBulkSaving.value) return;
+  isBulkSaving.value = true;
+  actionMessage.value = null;
+  const status = bulkStatus.value;
+  const successfulIds: string[] = [];
+  for (const job of jobs) {
+    try {
+      await store.updateJob(job.saved_job_id, { status });
+      successfulIds.push(job.saved_job_id);
+    } catch {
+      // Keep failed jobs selected for retry.
+    }
+  }
+  reportBulkResult(`Move to ${status}`, jobs, successfulIds);
+  isBulkSaving.value = false;
+}
+
+async function bulkDelete() {
+  const jobs = [...selectedJobs.value];
+  if (!jobs.length || isBulkSaving.value) return;
+  const confirmed = window.confirm(
+    `Permanently delete ${jobs.length} selected saved job${jobs.length === 1 ? "" : "s"}? This cannot be undone.`
+  );
+  if (!confirmed) return;
+  isBulkSaving.value = true;
+  actionMessage.value = null;
+  const successfulIds: string[] = [];
+  for (const job of jobs) {
+    try {
+      await store.deleteJob(job.saved_job_id);
+      successfulIds.push(job.saved_job_id);
+    } catch {
+      // Keep failed jobs selected for retry.
+    }
+  }
+  reportBulkResult("Permanent delete", jobs, successfulIds);
+  isBulkSaving.value = false;
 }
 
 function statusTagType(status: SavedJobStatus) {
@@ -125,6 +230,55 @@ function nextStep(job: SavedJob): string {
         <n-switch v-model:value="includeArchived" />
       </label>
       <n-button secondary :loading="store.isLoading" @click="loadJobs">Refresh</n-button>
+      <n-button secondary @click="selectionMode = !selectionMode">
+        {{ selectionMode ? "Exit selection" : "Select jobs" }}
+      </n-button>
+    </div>
+
+    <div v-if="selectionMode" class="saved-jobs-bulk-bar workspace-panel">
+      <n-checkbox
+        :checked="allVisibleSelected"
+        :disabled="!visibleJobs.length"
+        @update:checked="toggleSelectVisible"
+      >
+        Select visible (max {{ BULK_LIMIT }})
+      </n-checkbox>
+      <span class="flow-meta">{{ selectedJobIds.length }} selected</span>
+      <n-select
+        v-model:value="bulkStatus"
+        :options="statusOptions"
+        clearable
+        placeholder="Set status"
+        size="small"
+      />
+      <n-button
+        size="small"
+        secondary
+        :loading="isBulkSaving"
+        :disabled="!selectedJobIds.length || !bulkStatus"
+        @click="bulkUpdateStatus"
+      >
+        Update status
+      </n-button>
+      <n-button
+        size="small"
+        secondary
+        :loading="isBulkSaving"
+        :disabled="!selectedJobIds.length"
+        @click="bulkArchive"
+      >
+        Archive
+      </n-button>
+      <n-button
+        size="small"
+        type="error"
+        secondary
+        :loading="isBulkSaving"
+        :disabled="!selectedJobIds.length"
+        @click="bulkDelete"
+      >
+        Delete permanently
+      </n-button>
     </div>
 
     <p v-if="actionMessage" class="flow-meta library-message">{{ actionMessage }}</p>
@@ -138,6 +292,12 @@ function nextStep(job: SavedJob): string {
 
     <div v-else class="saved-jobs-list">
       <article v-for="job in visibleJobs" :key="job.saved_job_id" class="saved-job-row">
+        <n-checkbox
+          v-if="selectionMode"
+          class="saved-job-row-checkbox"
+          :checked="selectedJobIds.includes(job.saved_job_id)"
+          @update:checked="toggleSelection(job.saved_job_id, $event)"
+        />
         <div class="saved-job-row-main">
           <div class="job-card-header">
             <div>

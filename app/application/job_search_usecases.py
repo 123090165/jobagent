@@ -30,6 +30,7 @@ from app.schemas.job_search import (
     BrowserJobCaptureAnalyzeResponse,
     BrowserJobCaptureRequest,
     BrowserHelperJobSearchRunCreateRequest,
+    JobSearchItem,
     JobSearchResult,
     JobSearchPreviewResponse,
     JobSearchRun,
@@ -84,6 +85,7 @@ from app.services.job_search_execution.result_builder import (
     _match_candidates,
     _source_provider_counts,
 )
+from app.services.job_search_execution.search_items import build_search_items
 from app.services.job_search_providers import (
     BrowserHelperPayloadProvider,
     JobSearchProvider,
@@ -510,6 +512,12 @@ def execute_job_search_run(
             max_results=max_results,
         )
         raw_candidates = recall_result.candidates
+        search_repository.upsert_items(
+            user_id=user_id,
+            run_id=run_id,
+            items=build_search_items(run_id, raw_candidates, stage="recalled"),
+            replace_existing=True,
+        )
         search_repository.complete_trace_step(
             provider_step.step_id,
             mode=provider_mode,
@@ -518,7 +526,10 @@ def execute_job_search_run(
                 f"{len(raw_candidates)} remained after URL/title dedupe."
             ),
             guardrails=ASSEMBLY_GUARDRAILS,
-            details=recall_result.details(),
+            details={
+                **recall_result.details(),
+                "persisted_candidate_count": len(raw_candidates),
+            },
         )
 
         filter_step = steps[2]
@@ -632,6 +643,16 @@ def execute_job_search_run(
             guardrails=ASSEMBLY_GUARDRAILS,
         )
         results = _assemble_results(matched_items, source="live_search")
+        search_repository.upsert_items(
+            user_id=user_id,
+            run_id=run_id,
+            items=build_search_items(
+                run_id,
+                raw_candidates,
+                stage="recalled",
+                results=results,
+            ),
+        )
         completed_run = search_repository.complete_run(run_id, results) or run
         updated_session = session_repository.mark_job_search_completed(session_id=run.session_id)
         search_repository.complete_trace_step(
@@ -641,6 +662,7 @@ def execute_job_search_run(
             guardrails=ASSEMBLY_GUARDRAILS,
             details={
                 "final_result_count": len(results),
+                "persisted_candidate_count": len(raw_candidates),
                 "visible_top_count": min(len(results), max_results),
                 "source_providers": _source_provider_counts(results),
             },
@@ -706,6 +728,32 @@ def list_job_search_trace_steps(
             status_code=404,
         )
     return search_repository.list_trace_steps(run_id)
+
+
+def list_job_search_items(
+    run_id: str,
+    *,
+    user_id: str,
+    limit: int = 100,
+    offset: int = 0,
+    search_repository: JobSearchRepository = job_search_repository,
+) -> tuple[list[JobSearchItem], int]:
+    run = search_repository.get(run_id, user_id=user_id)
+    if run is None:
+        raise JobAgentError(
+            message="Job search run not found.",
+            error_code="job_search_run_not_found",
+            status_code=404,
+        )
+    return (
+        search_repository.list_items(
+            user_id=user_id,
+            run_id=run_id,
+            limit=limit,
+            offset=offset,
+        ),
+        search_repository.count_items(user_id=user_id, run_id=run_id),
+    )
 
 
 def list_job_search_runs(

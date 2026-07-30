@@ -66,6 +66,22 @@ Start FastAPI:
 
 Open the API documentation at http://127.0.0.1:8000/docs.
 
+For local full-stack development, start the backend, frontend, RAG sync worker,
+and Modular RAG MCP server together:
+
+```powershell
+.\scripts\start-dev.ps1
+```
+
+The script validates both repositories and their shared service token, starts
+the RAG server before the worker, and writes process logs under
+`$env:TEMP\jobagent-dev`. Useful companion commands:
+
+```powershell
+.\scripts\start-dev.ps1 -Check
+.\scripts\start-dev.ps1 -Stop
+```
+
 Start the Vue application:
 
 ~~~powershell

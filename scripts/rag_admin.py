@@ -5,6 +5,7 @@ import json
 from collections.abc import Sequence
 from dataclasses import asdict
 
+from app.config.env_loader import load_local_env
 from app.services.rag_admin import rag_admin_service
 
 
@@ -63,6 +64,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    load_local_env()
     args = parse_args(argv)
     if args.command == "backfill":
         result = rag_admin_service.backfill(

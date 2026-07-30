@@ -6,6 +6,7 @@ import logging
 import os
 from collections.abc import Sequence
 
+from app.config.env_loader import load_local_env
 from app.services.rag_management import resolve_rag_management_client
 from app.services.rag_sync_worker import RAGSyncWorker
 
@@ -89,6 +90,7 @@ async def _run(
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    load_local_env()
     args = parse_args(argv)
     try:
         return asyncio.run(

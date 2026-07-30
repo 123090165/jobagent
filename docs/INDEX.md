@@ -36,6 +36,9 @@ history archive. Git preserves completed plans and deleted designs.
   learning resources, user questions, and external-model exchange.
 - [MODULAR_RAG_MCP.md](MODULAR_RAG_MCP.md): independent Modular RAG service,
   MCP client contract, typed tool adapters, and live verification.
+- [LOCAL_RAG_END_TO_END_CHECKLIST.md](LOCAL_RAG_END_TO_END_CHECKLIST.md):
+  live-service automation and the minimal manual acceptance checklist for
+  JobAgent, the sync worker, and Modular RAG.
 
 ## Documentation Rules
 

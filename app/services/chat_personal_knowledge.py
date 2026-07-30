@@ -65,6 +65,7 @@ def build_chat_evidence_with_personal_knowledge(
     active_refs: list[str],
     semantic_sources: list[ChatSource],
     personal_knowledge_requested: bool,
+    personal_knowledge_query: str | None = None,
 ) -> tuple[list[ChatEvidence], list[str]]:
     database_evidence, warnings = build_chat_evidence(
         question,
@@ -76,7 +77,7 @@ def build_chat_evidence_with_personal_knowledge(
     personal_evidence: list[ChatEvidence] = []
     if personal_knowledge_requested:
         outcome = search_personal_knowledge(
-            question,
+            personal_knowledge_query or question,
             user_id=user_id,
             allowed_sources=semantic_sources,
         )

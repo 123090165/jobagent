@@ -183,3 +183,19 @@ def test_source_recall_stats_report_missing_detail_and_warnings() -> None:
     assert stats["remoteok"].detail_coverage_rate == 1.0
     assert has_missing_detail(deduped[0]) is True
     assert has_missing_detail(deduped[1]) is False
+
+
+def test_incomplete_fetched_detail_is_not_counted_as_detail_coverage() -> None:
+    candidate = _candidate(
+        title="Sparse CUHKSZ Job",
+        source_provider="cuhksz_career",
+        source_url="https://career.cuhk.edu.cn/job/view/id/1",
+        detail_status="detail_fetched_incomplete",
+        raw_description="Only a short responsibilities fragment.",
+    )
+
+    stats = build_source_recall_stats([candidate], [candidate])[0]
+
+    assert has_missing_detail(candidate) is True
+    assert stats.missing_detail_count == 1
+    assert stats.detail_coverage_rate == 0.0

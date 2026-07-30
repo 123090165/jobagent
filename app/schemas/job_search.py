@@ -18,6 +18,7 @@ JobSearchStepMode: TypeAlias = Literal["deterministic", "llm", "provider", "fall
 JobSearchResultSource: TypeAlias = Literal["local_mock", "live_search"]
 JobSearchAnalysisMode: TypeAlias = Literal["deterministic", "llm", "fallback", "mock"]
 JobSearchConfidenceLabel: TypeAlias = Literal["strong", "medium", "limited", "weak"]
+JobSearchItemStage: TypeAlias = Literal["recalled", "filtered", "analyzed", "final"]
 JobSearchPlanningMode: TypeAlias = Literal["deterministic", "llm", "fallback"]
 JobSearchQueryType: TypeAlias = Literal[
     "user",
@@ -93,6 +94,32 @@ class JobSearchResult(BaseModel):
     recommended_action: str
     analysis_mode: JobSearchAnalysisMode = "mock"
     confidence_label: JobSearchConfidenceLabel = "limited"
+
+
+class JobSearchCandidateSnapshot(BaseModel):
+    title: str
+    company: str | None = None
+    location: str | None = None
+    source_provider: str
+    source_url: str | None = None
+    snippet: str | None = None
+    raw_description: str | None = None
+    discovery_query: str | None = None
+    discovery_rank: int | None = None
+    detail_status: str | None = None
+    provider_warnings: list[str] = Field(default_factory=list)
+
+
+class JobSearchItem(BaseModel):
+    job_search_item_id: str
+    job_search_run_id: str
+    stable_candidate_key: str
+    rank: int
+    stage: JobSearchItemStage = "recalled"
+    candidate: JobSearchCandidateSnapshot
+    result: JobSearchResult | None = None
+    created_at: datetime
+    updated_at: datetime
 
 
 class JobSearchTraceStep(BaseModel):
@@ -381,6 +408,11 @@ class JobSearchRunListResponse(BaseModel):
 
 class JobSearchTraceStepListResponse(BaseModel):
     items: list[JobSearchTraceStep] = Field(default_factory=list)
+
+
+class JobSearchItemListResponse(BaseModel):
+    items: list[JobSearchItem] = Field(default_factory=list)
+    total: int = 0
 
 
 def _compact_text(value: str) -> str:

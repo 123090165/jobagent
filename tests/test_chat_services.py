@@ -5,14 +5,27 @@ from datetime import datetime, timezone
 from types import SimpleNamespace
 
 from app.schemas.chat import (
+    ChatCitation,
     ChatConversation,
     ChatDataScope,
+    ChatRetrievalPlan,
     ChatSearchResultRef,
     ChatTurn,
 )
 from app.schemas.resume_profile import ResumeProfile
-from app.services.chat_agent import classify_agent_failure, default_agent_tools
-from app.services.chat_context_builder import build_chat_evidence, evidence_packet
+from app.services.chat_agent import (
+    ChatAgentStep,
+    ChatAgentToolCall,
+    ChatAgentToolResult,
+    classify_agent_failure,
+    default_agent_tools,
+    request_chat_agent_step,
+)
+from app.services.chat_agent_runtime import (
+    ChatToolExecution,
+    run_chat_agent,
+)
+from app.services.chat_context_builder import ChatEvidence, build_chat_evidence, evidence_packet
 from app.services.chat_intent_rules import resolve_conversation_command
 from app.services.chat_retrieval_planner import (
     build_agent_retrieval_plan,
@@ -162,6 +175,214 @@ def test_agent_failure_categories_are_safe_and_actionable() -> None:
     assert classify_agent_failure(RuntimeError("HTTP 429 rate limit")) == "rate_limited"
     assert classify_agent_failure(RuntimeError("request timed out")) == "timeout"
     assert classify_agent_failure(ValueError("invalid JSON payload")) == "invalid_response"
+
+
+def test_agent_step_accepts_structured_tool_query() -> None:
+    class StructuredToolAgent:
+        def chat_completion_json(self, *, system_prompt, user_prompt, expected_root_key=None):
+            return {
+                "action": "use_tools",
+                "tool_calls": [{
+                    "call_id": "python-jobs",
+                    "name": "search_personal_knowledge",
+                    "query": "saved jobs that explicitly require Python",
+                }],
+                "answer": "",
+                "citation_ids": [],
+                "limitations": [],
+            }
+
+    step, warning = request_chat_agent_step(
+        "Which saved jobs require Python?",
+        conversation=_conversation(),
+        recent_turns=[],
+        context_manifest={},
+        evidence=[],
+        llm_service=StructuredToolAgent(),
+    )
+
+    assert warning is None
+    assert step is not None
+    assert step.tool_calls == [ChatAgentToolCall(
+        call_id="python-jobs",
+        name="search_personal_knowledge",
+        query="saved jobs that explicitly require Python",
+    )]
+
+
+def test_agent_runtime_can_refine_retrieval_after_tool_results() -> None:
+    decisions: list[tuple[int, bool]] = []
+
+    def decide(evidence, tool_results, require_final):
+        decisions.append((len(tool_results), require_final))
+        if not tool_results:
+            return ChatAgentStep(
+                action="use_tools",
+                tool_calls=[ChatAgentToolCall(
+                    call_id="call-python",
+                    name="search_personal_knowledge",
+                    query="saved jobs requiring Python",
+                )],
+                answer="",
+                citation_ids=[],
+                limitations=[],
+            ), None
+        if len(tool_results) == 1:
+            return ChatAgentStep(
+                action="use_tools",
+                tool_calls=[ChatAgentToolCall(
+                    call_id="call-fastapi",
+                    name="search_personal_knowledge",
+                    query="saved jobs requiring FastAPI",
+                )],
+                answer="",
+                citation_ids=[],
+                limitations=[],
+            ), None
+        return ChatAgentStep(
+            action="final",
+            tool_calls=[],
+            answer="Two grounded roles were found.",
+            citation_ids=["saved_job:call-python", "saved_job:call-fastapi"],
+            limitations=[],
+        ), None
+
+    def execute(calls):
+        call = calls[0]
+        citation_id = f"saved_job:{call.call_id}"
+        return ChatToolExecution(
+            results=[ChatAgentToolResult(
+                call_id=call.call_id,
+                name=call.name,
+                status="completed",
+                citation_ids=[citation_id],
+                warnings=[],
+            )],
+            evidence=[ChatEvidence(
+                citation=ChatCitation(
+                    citation_id=citation_id,
+                    source_type="saved_jobs",
+                    resource_id=call.call_id,
+                    label=call.query or call.name,
+                ),
+                content={"query": call.query},
+            )],
+            retrieval_plan=ChatRetrievalPlan(
+                agent_sources=["saved_jobs"],
+                policy_reasons=["agent_tool:search_personal_knowledge"],
+            ),
+        )
+
+    result = run_chat_agent(
+        decide=decide,
+        execute_tools=execute,
+        policy_tools=[],
+    )
+
+    assert decisions == [(0, False), (1, False), (2, False)]
+    assert result.final_step is not None
+    assert len(result.evidence) == 2
+    assert result.requested_tools == ["search_personal_knowledge"]
+
+
+def test_agent_runtime_stops_repeated_identical_tool_call() -> None:
+    decision_count = 0
+    execution_count = 0
+
+    def decide(evidence, tool_results, require_final):
+        nonlocal decision_count
+        decision_count += 1
+        if require_final:
+            return ChatAgentStep(
+                action="final",
+                tool_calls=[],
+                answer="The available evidence is insufficient.",
+                citation_ids=[],
+                limitations=["No additional matches were found."],
+            ), None
+        return ChatAgentStep(
+            action="use_tools",
+            tool_calls=[ChatAgentToolCall(
+                call_id=f"call-{decision_count}",
+                name="search_personal_knowledge",
+                query="same query",
+            )],
+            answer="",
+            citation_ids=[],
+            limitations=[],
+        ), None
+
+    def execute(calls):
+        nonlocal execution_count
+        execution_count += 1
+        call = calls[0]
+        return ChatToolExecution(
+            results=[ChatAgentToolResult(
+                call_id=call.call_id,
+                name=call.name,
+                status="completed",
+                citation_ids=[],
+                warnings=[],
+            )],
+            evidence=[],
+            retrieval_plan=ChatRetrievalPlan(agent_sources=["saved_jobs"]),
+        )
+
+    result = run_chat_agent(
+        decide=decide,
+        execute_tools=execute,
+        policy_tools=[],
+    )
+
+    assert execution_count == 1
+    assert decision_count == 3
+    assert result.final_step is not None
+    assert result.final_step.action == "final"
+    assert "agent_repeated_tool_call" in result.warnings
+
+
+def test_agent_runtime_enforces_tool_round_limit() -> None:
+    execution_count = 0
+
+    def decide(evidence, tool_results, require_final):
+        index = len(tool_results)
+        return ChatAgentStep(
+            action="use_tools",
+            tool_calls=[ChatAgentToolCall(
+                call_id=f"call-{index}",
+                name="search_personal_knowledge",
+                query=f"query {index}",
+            )],
+            answer="",
+            citation_ids=[],
+            limitations=[],
+        ), None
+
+    def execute(calls):
+        nonlocal execution_count
+        execution_count += 1
+        call = calls[0]
+        return ChatToolExecution(
+            results=[ChatAgentToolResult(
+                call_id=call.call_id,
+                name=call.name,
+                status="completed",
+                citation_ids=[],
+                warnings=[],
+            )],
+            evidence=[],
+            retrieval_plan=ChatRetrievalPlan(agent_sources=["saved_jobs"]),
+        )
+
+    result = run_chat_agent(
+        decide=decide,
+        execute_tools=execute,
+        policy_tools=[],
+    )
+
+    assert execution_count == 3
+    assert result.final_step is None
+    assert "agent_tool_round_limit" in result.warnings
 
 
 def test_saved_job_highest_score_selector_is_deterministic() -> None:

@@ -20,6 +20,7 @@ from app.schemas.chat import (
     ChatMemoryResource,
     ChatMemoryStatus,
     ChatProfileContextOption,
+    ChatRetrievalPlan,
     ChatSavedJobContextOption,
     ChatSavedJobAttachment,
     ChatSearchRunContextOption,
@@ -30,12 +31,15 @@ from app.schemas.chat import (
     ChatTurnCreateRequest,
 )
 from app.services.chat_agent import (
+    ChatAgentToolCall,
+    ChatAgentToolResult,
     citations_for_agent_step,
     default_agent_tools,
     derive_agent_route,
     hard_refusal_route,
     request_chat_agent_step,
 )
+from app.services.chat_agent_runtime import ChatToolExecution, run_chat_agent
 from app.services.chat_answer_generator import (
     HARD_REFUSAL_ANSWER,
     compress_chat_memory,
@@ -309,42 +313,6 @@ def create_chat_turn(
         tags=["chat", "content-redacted"],
     ):
         refusal_route = hard_refusal_route(effective_question)
-        agent_step = None
-        agent_warning = None
-        if refusal_route is None:
-            with llm_observation_context(
-                "chat.agent.select",
-                metadata={"force_content_redacted": True},
-                context_parts={"recent_turn_count": len(recent_turns)},
-            ):
-                agent_step, agent_warning = request_chat_agent_step(
-                    effective_question,
-                    conversation=conversation,
-                    recent_turns=recent_turns,
-                    context_manifest=context_manifest,
-                    evidence=[],
-                    llm_service=resolution.service,
-                )
-        policy_tools = (
-            default_agent_tools(
-                effective_question,
-                conversation=conversation,
-                context_manifest=context_manifest,
-            )
-            if refusal_route is None
-            else []
-        )
-        requested_tools = list(dict.fromkeys([
-            *policy_tools,
-            *(agent_step.tool_calls if agent_step is not None and agent_step.action == "use_tools" else []),
-        ]))
-        retrieval_plan = build_agent_retrieval_plan(
-            effective_question,
-            tool_calls=requested_tools,
-            conversation=conversation,
-            recent_turns=recent_turns,
-            attachment_sources=attachment_sources if refusal_route is None else [],
-        )
         attachment_refs = [
             f"search_result:{item.job_search_run_id}:{item.job_result_id}"
             for item in search_attachments
@@ -355,25 +323,59 @@ def create_chat_turn(
             f"search_result:browser_capture:{item.capture_id}"
             for item in capture_attachments
         ]
-        resolved_retrieval = resolve_chat_retrieval(
-            retrieval_plan,
-            recent_turns=recent_turns,
-            attachment_refs=attachment_refs,
-        )
-        route = refusal_route or derive_agent_route(
-            effective_question,
-            sources=retrieval_plan.agent_sources,
-            tool_calls=requested_tools,
-            reason=(
-                "agent_tool_selection"
-                if agent_step is not None and agent_step.action == "use_tools"
-                else "deterministic_tool_policy" if requested_tools or attachment_sources
-                else "agent_direct_answer"
-            ),
-        )
-        try:
-            evidence, context_warnings = (
-                build_chat_evidence_with_personal_knowledge(
+
+        def decide(
+            evidence,
+            tool_results,
+            require_final,
+        ):
+            with llm_observation_context(
+                "chat.agent.decide",
+                metadata={
+                    "force_content_redacted": True,
+                    "require_final": require_final,
+                },
+                context_parts={
+                    "evidence_count": len(evidence),
+                    "recent_turn_count": len(recent_turns),
+                    "tool_result_count": len(tool_results),
+                },
+            ):
+                return request_chat_agent_step(
+                    effective_question,
+                    conversation=conversation,
+                    recent_turns=recent_turns,
+                    context_manifest=context_manifest,
+                    evidence=evidence,
+                    tool_results=tool_results,
+                    llm_service=resolution.service,
+                    require_final=require_final,
+                )
+
+        def execute_tools(calls: list[ChatAgentToolCall]) -> ChatToolExecution:
+            tool_names = list(dict.fromkeys(item.name for item in calls))
+            retrieval_plan = build_agent_retrieval_plan(
+                effective_question,
+                tool_calls=tool_names,
+                conversation=conversation,
+                recent_turns=recent_turns,
+                attachment_sources=attachment_sources,
+            )
+            resolved_retrieval = resolve_chat_retrieval(
+                retrieval_plan,
+                recent_turns=recent_turns,
+                attachment_refs=attachment_refs,
+            )
+            semantic_query = next(
+                (
+                    item.query
+                    for item in calls
+                    if item.name == "search_personal_knowledge" and item.query
+                ),
+                None,
+            )
+            try:
+                evidence, warnings = build_chat_evidence_with_personal_knowledge(
                     effective_question,
                     user_id=user_id,
                     conversation=conversation,
@@ -381,24 +383,81 @@ def create_chat_turn(
                     active_refs=resolved_retrieval.active_refs,
                     semantic_sources=retrieval_plan.agent_sources,
                     personal_knowledge_requested=(
-                        "search_personal_knowledge" in requested_tools
+                        "search_personal_knowledge" in tool_names
                     ),
+                    personal_knowledge_query=semantic_query,
                 )
-                if route.domain == "in_scope" and route.retrieval
-                else ([], [])
+                status = "completed"
+            except Exception as exc:
+                evidence = []
+                warnings = [f"tool_error:{type(exc).__name__}"]
+                status = "failed"
+            citation_ids = [item.citation.citation_id for item in evidence]
+            return ChatToolExecution(
+                results=[
+                    ChatAgentToolResult(
+                        call_id=item.call_id,
+                        name=item.name,
+                        status=status,
+                        citation_ids=citation_ids,
+                        warnings=warnings,
+                    )
+                    for item in calls
+                ],
+                evidence=evidence,
+                retrieval_plan=retrieval_plan,
             )
-        except Exception as exc:
-            repository.fail_turn(
-                user_id=user_id,
-                conversation_id=conversation_id,
-                turn_id=turn.turn_id,
-                fallback_reason=f"context_retrieval_failed:{type(exc).__name__}",
+
+        policy_tools = (
+            list(dict.fromkeys([
+                *default_agent_tools(
+                    effective_question,
+                    conversation=conversation,
+                    context_manifest=context_manifest,
+                ),
+                *(
+                    ["read_pinned_context"]
+                    if "search_results" in attachment_sources
+                    else []
+                ),
+                *(
+                    ["find_saved_jobs"]
+                    if "saved_jobs" in attachment_sources
+                    else []
+                ),
+            ]))
+            if refusal_route is None
+            else []
+        )
+        agent_run = (
+            run_chat_agent(
+                decide=decide,
+                execute_tools=execute_tools,
+                policy_tools=policy_tools,
             )
-            raise JobAgentError(
-                message="Chat context could not be loaded.",
-                error_code="chat_context_retrieval_failed",
-                status_code=500,
-            ) from exc
+            if refusal_route is None
+            else None
+        )
+        retrieval_plan = (
+            agent_run.retrieval_plan
+            if agent_run is not None
+            else ChatRetrievalPlan()
+        )
+        evidence = agent_run.evidence if agent_run is not None else []
+        requested_tools = agent_run.requested_tools if agent_run is not None else []
+        final_step = agent_run.final_step if agent_run is not None else None
+        context_warnings = agent_run.warnings if agent_run is not None else []
+        route = refusal_route or derive_agent_route(
+            effective_question,
+            sources=retrieval_plan.agent_sources,
+            tool_calls=requested_tools,
+            reason=(
+                "agent_tool_loop"
+                if requested_tools
+                else "deterministic_tool_policy" if attachment_sources
+                else "agent_direct_answer"
+            ),
+        )
         answer_warnings: list[str] = []
         answer_fallback: str | None = None
         if refusal_route is not None:
@@ -408,29 +467,10 @@ def create_chat_turn(
                 "refused",
                 refusal_route.reason,
             )
-        elif (
-            agent_step is not None
-            and agent_step.action == "final"
-            and not evidence
-            and not retrieval_plan.requests
-        ):
-            answer, citations, mode = agent_step.answer, [], "llm"
-            answer_warnings = agent_step.limitations
+        elif final_step is not None and not evidence:
+            answer, citations, mode = final_step.answer, [], "llm"
+            answer_warnings = final_step.limitations
         else:
-            with llm_observation_context(
-                "chat.agent.answer",
-                metadata={"force_content_redacted": True, "route_domain": route.domain},
-                context_parts={"evidence_count": len(evidence), "recent_turn_count": len(recent_turns)},
-            ):
-                final_step, final_warning = request_chat_agent_step(
-                    effective_question,
-                    conversation=conversation,
-                    recent_turns=recent_turns,
-                    context_manifest=context_manifest,
-                    evidence=evidence,
-                    llm_service=resolution.service,
-                    require_final=True,
-                )
             if final_step is not None:
                 citations = citations_for_agent_step(final_step, evidence)
             else:
@@ -441,10 +481,18 @@ def create_chat_turn(
             else:
                 answer, citations = deterministic_chat_answer(evidence)
                 mode = "fallback"
-                answer_fallback = final_warning or "agent_answer_missing_citations"
+                answer_fallback = (
+                    next(
+                        (
+                            warning
+                            for warning in reversed(context_warnings)
+                            if warning.startswith("agent_")
+                        ),
+                        None,
+                    )
+                    or "agent_answer_missing_citations"
+                )
     warnings = [*context_warnings, *answer_warnings]
-    if agent_warning:
-        warnings.append(agent_warning)
     if conversation_command:
         warnings.append(f"conversation_command:{conversation_command}")
     completed = repository.complete_turn(

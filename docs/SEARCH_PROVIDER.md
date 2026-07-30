@@ -61,6 +61,14 @@ candidate order. One candidate may fall back without failing the full run.
 Quality gates compare model output with deterministic evidence and reject
 unsupported or materially incomplete analysis.
 
+CUHKSZ detail parsing combines every recognized responsibility and requirement
+section in page order. Sparse pages, missing section families, and full-page
+fallbacks are retained as partial evidence with `detail_fetched_incomplete`
+warnings; they are not reported as complete detail coverage. Browser Helper
+BOSS captures accept employer identity only from JobPosting structured data or
+detail-scoped company links. Ambiguous company text is omitted rather than
+guessed by a word list or model.
+
 ### Profile Matching And Assembly
 
 Use analyzed JD evidence to compute the final score instead of reusing the

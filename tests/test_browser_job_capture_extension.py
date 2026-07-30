@@ -79,6 +79,30 @@ def test_current_page_capture_injected_function_is_self_contained() -> None:
     assert "previewLength" in function_body
 
 
+def test_boss_company_capture_ignores_unrelated_first_match_nodes() -> None:
+    background = _read("browser-helper/background.js")
+    function_body = background.split("function captureCurrentJobPage", 1)[1].split(
+        "\nfunction inferCaptureSource",
+        1,
+    )[0]
+    company_fallback = function_body.split("function extractBossScopedCompany", 1)[1].split(
+        "\n  function inferSource",
+        1,
+    )[0]
+
+    adversarial_unrelated_node = '<aside class="recommend-list"><div class="company-name">Wrong Company</div></aside>'
+    assert "company-name" in adversarial_unrelated_node
+    assert "script[type='application/ld+json']" in function_body
+    assert "hiringOrganization" in function_body
+    assert "findJobPosting" in function_body
+    assert "extractBossStructuredCompany" in function_body
+    assert "extractBossScopedCompany" in function_body
+    assert ".job-detail-box, .job-detail-container, main .job-detail, main" in company_fallback
+    assert '".company-name"' not in company_fallback
+    assert '"[class*=\'company-name\']"' not in company_fallback
+    assert "BOSS company was omitted because no trusted detail-page company field was found." in function_body
+
+
 def test_browser_helper_side_panel_exposes_required_states_and_settings() -> None:
     html = _read("browser-helper/sidepanel.html")
     script = _read("browser-helper/sidepanel.js")

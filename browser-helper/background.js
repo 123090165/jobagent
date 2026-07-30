@@ -747,6 +747,85 @@ function captureCurrentJobPage({ minTextLength, maxTextLength, captureVersion, p
     return null;
   }
 
+  function firstTextWithin(root, selectors) {
+    if (!root) {
+      return null;
+    }
+    for (const selector of selectors) {
+      const node = root.querySelector(selector);
+      const text = compactText(node?.innerText || node?.textContent || "");
+      if (text) {
+        return text;
+      }
+    }
+    return null;
+  }
+
+  function validCompanyName(value) {
+    const text = compactText(value);
+    if (!text || text.length < 2 || text.length > 160 || text.includes("\n")) {
+      return null;
+    }
+    return text;
+  }
+
+  function findJobPosting(value) {
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        const posting = findJobPosting(item);
+        if (posting) {
+          return posting;
+        }
+      }
+      return null;
+    }
+    if (!value || typeof value !== "object") {
+      return null;
+    }
+    const types = Array.isArray(value["@type"]) ? value["@type"] : [value["@type"]];
+    if (types.some((type) => String(type || "").toLowerCase() === "jobposting")) {
+      return value;
+    }
+    return findJobPosting(value["@graph"]);
+  }
+
+  function extractBossStructuredCompany() {
+    for (const script of document.querySelectorAll("script[type='application/ld+json']")) {
+      try {
+        const posting = findJobPosting(JSON.parse(script.textContent || ""));
+        const organization = posting?.hiringOrganization;
+        const organizationTypes = Array.isArray(organization?.["@type"])
+          ? organization["@type"]
+          : [organization?.["@type"]];
+        const hasOrganizationType = organizationTypes.some((type) => {
+          const normalized = String(type || "").toLowerCase();
+          return normalized === "organization" || normalized === "corporation";
+        });
+        if (!hasOrganizationType) {
+          continue;
+        }
+        const company = validCompanyName(organization?.name);
+        if (company) {
+          return company;
+        }
+      } catch (_error) {
+        // Ignore malformed page-owned structured data and continue to the scoped DOM fallback.
+      }
+    }
+    return null;
+  }
+
+  function extractBossScopedCompany() {
+    const detailRoot = document.querySelector(
+      ".job-detail-box, .job-detail-container, main .job-detail, main"
+    );
+    return validCompanyName(firstTextWithin(detailRoot, [
+      ".sider-company .company-info a[ka='job-detail-company_custompage']",
+      ".sider-company .company-info a[href*='/gongsi/']",
+      ".job-sider .company-info a[href*='/gongsi/']"
+    ]));
+  }
+
   function inferSource(hostname) {
     const host = String(hostname || "").toLowerCase();
     if (host === "zhipin.com" || host.endsWith(".zhipin.com")) {
@@ -821,13 +900,8 @@ function captureCurrentJobPage({ minTextLength, maxTextLength, captureVersion, p
       ".info-primary .name",
       "[class*='job-name']"
     ]);
-    const company = firstText([
-      ".company-name",
-      ".sider-company .company-info a",
-      ".company-info .name",
-      ".job-company",
-      "[class*='company-name']"
-    ]);
+    const structuredCompany = extractBossStructuredCompany();
+    const company = structuredCompany || extractBossScopedCompany();
     const location = firstText([
       ".job-area",
       ".location-address",
@@ -864,7 +938,9 @@ function captureCurrentJobPage({ minTextLength, maxTextLength, captureVersion, p
       location,
       salary,
       jd_text: jdText || visibleText,
-      usedStructuredDescription: Boolean(description)
+      usedStructuredDescription: Boolean(description),
+      companyTrusted: Boolean(company),
+      companySource: structuredCompany ? "job_posting_json_ld" : (company ? "detail_scoped_dom" : null)
     };
   }
 
@@ -924,6 +1000,9 @@ function captureCurrentJobPage({ minTextLength, maxTextLength, captureVersion, p
     warnings.push("BOSS current-page capture used DOM text only; no BOSS API calls, hidden tabs, polling, or automatic search were used.");
     if (!fields.usedStructuredDescription) {
       warnings.push("BOSS structured JD selector was not found; visible text fallback was used.");
+    }
+    if (!fields.companyTrusted) {
+      warnings.push("BOSS company was omitted because no trusted detail-page company field was found.");
     }
     if (blockedReason) {
       return {

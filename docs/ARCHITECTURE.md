@@ -118,15 +118,23 @@ Each turn follows a bounded agent and retrieval flow:
 ~~~text
 owned conversation state
 -> compact context manifest
--> answer agent selects read-only tools or answers directly
--> deterministic minimum-context policy
--> reference resolver
--> server-side ownership checks
--> optional typed resource retrieval (one bounded tool round)
+-> LangGraph agent decides whether to answer or request read-only tools
+-> deterministic minimum-context policy supplements the first decision
+-> reference resolver and server-side ownership checks
+-> typed tool results return to the agent
+-> agent either refines retrieval or finishes (at most three tool rounds)
 -> grounded answer with validated citations
 -> persisted turn
 -> optional derived-memory compaction
 ~~~
+
+The graph is an in-process runtime for one turn. Durable conversation history
+continues to use `chat_turns`; the Assistant does not create a second LangGraph
+checkpoint database for the same state. Internally, every tool request has a
+call ID, an allowlisted name, and an optional bounded semantic query. Tool
+results carry status, citation IDs, and safe warnings back into the next model
+decision. Identical calls are not repeated, and the final round must answer
+without requesting another tool.
 
 The compact manifest contains labels and source types for pinned context and
 previous references; it contains no
@@ -174,12 +182,14 @@ backend-side client, static tool allowlist, timeouts, response budgets, and
 typed adapters; the external service owns its retrieval implementation,
 dependencies, and storage.
 
-The Modular RAG integration currently provides service discovery and typed,
-allowlisted calls for collection listing, knowledge retrieval, and document
-summaries. It is not part of Search V2 and its tools are not exposed to the
-Career Assistant or another LLM without a separate product-policy integration.
-An unavailable optional MCP service does not prevent JobAgent from starting.
-See `MODULAR_RAG_MCP.md`.
+The Modular RAG integration provides service discovery and typed, allowlisted
+calls for collection listing, knowledge retrieval, and document summaries. It
+is not part of Search V2. Career Assistant may select the bounded
+`search_personal_knowledge` tool, but JobAgent injects the authenticated
+`user_id`, restricts resource types, and revalidates every returned resource
+against current ownership and sync state. The model never receives service
+credentials or chooses an owner ID. An unavailable optional MCP service does
+not prevent JobAgent from starting. See `MODULAR_RAG_MCP.md`.
 
 ## Persistence
 

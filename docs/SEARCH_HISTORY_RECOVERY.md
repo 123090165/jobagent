@@ -8,6 +8,13 @@
   work.
 - Reopening a pending or running run restarts frontend polling. Completed and
   failed runs remain inspectable after refresh, logout, and login.
+- Each live run stores the bounded, deduplicated provider candidate pool in
+  user-scoped `job_search_items` as soon as recall completes. Final scored
+  `JobSearchRun.results` remain a separate backward-compatible Top N projection.
+- `GET /api/v1/job-search-runs/{run_id}/items` reads the persisted candidate
+  pool without inflating the existing run and history responses.
+- Candidate persistence never creates a Saved Job. Saving remains an explicit
+  user action on a final scored result.
 - A user cannot list or open another user's runs.
 
 ## Recovery Boundary
@@ -30,3 +37,6 @@ opening an interrupted run resumes backend work.
 - Opening a completed run does not create a new run.
 - Opening an active run resumes polling.
 - Search again returns to the original profile session's preview page.
+- Re-executing a run replaces its recalled pool idempotently, final result
+  snapshots attach to matching candidate rows, and deleting the run deletes its
+  candidate rows without deleting Saved Jobs.

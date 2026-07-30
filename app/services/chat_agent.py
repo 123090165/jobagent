@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from typing import Literal, cast
+from uuid import uuid4
 
 from app.schemas.chat import ChatCitation, ChatConversation, ChatRouteDecision, ChatSource, ChatTurn
 from app.services.chat_context_builder import ChatEvidence, evidence_packet
@@ -86,17 +87,36 @@ CHAT_AGENT_SYSTEM_PROMPT = (
     "read_pinned_context and read_previous_references when the user compares 'these two', another "
     "job, or a pinned job with a previously referenced job. Never request IDs, SQL, commands, "
     "secrets, cross-user data, or mutation. Return JSON only. For a tool step return action "
-    "'use_tools', tool_calls as a string array, answer as an empty string, citation_ids as an empty "
-    "array, and limitations as an array. For a final step return action 'final', no tool calls, a "
-    "complete answer, citation_ids, and limitations. Personal career claims must cite supplied "
-    "evidence IDs. Never invent resources or facts."
+    "'use_tools', tool_calls as objects with name and an optional query, answer as an empty string, "
+    "citation_ids as an empty array, and limitations as an array. The query may refine semantic "
+    "retrieval, but must never contain a user ID or resource ID. After tools return, inspect their "
+    "results and either request a different useful tool call or finish. Do not repeat an identical "
+    "tool call. For a final step return action 'final', no tool calls, a complete answer, "
+    "citation_ids, and limitations. Personal career claims must cite supplied evidence IDs. Never "
+    "invent resources or facts."
 )
+
+
+@dataclass(frozen=True)
+class ChatAgentToolCall:
+    call_id: str
+    name: ChatAgentToolName
+    query: str | None = None
+
+
+@dataclass(frozen=True)
+class ChatAgentToolResult:
+    call_id: str
+    name: ChatAgentToolName
+    status: Literal["completed", "failed"]
+    citation_ids: list[str]
+    warnings: list[str]
 
 
 @dataclass(frozen=True)
 class ChatAgentStep:
     action: Literal["use_tools", "final"]
-    tool_calls: list[ChatAgentToolName]
+    tool_calls: list[ChatAgentToolCall]
     answer: str
     citation_ids: list[str]
     limitations: list[str]
@@ -109,6 +129,7 @@ def request_chat_agent_step(
     recent_turns: list[ChatTurn],
     context_manifest: dict[str, object],
     evidence: list[ChatEvidence],
+    tool_results: list[ChatAgentToolResult] | None = None,
     llm_service: JSONChatLLM | None,
     require_final: bool = False,
 ) -> tuple[ChatAgentStep | None, str | None]:
@@ -119,7 +140,13 @@ def request_chat_agent_step(
             system_prompt=CHAT_AGENT_SYSTEM_PROMPT,
             user_prompt=json.dumps(
                 {
-                    "phase": "final_answer" if require_final else "choose_tools_or_answer",
+                    "phase": (
+                        "final_answer"
+                        if require_final
+                        else "continue_after_tools"
+                        if tool_results
+                        else "choose_tools_or_answer"
+                    ),
                     "question": question,
                     "context_manifest": context_manifest,
                     "conversation_summary": conversation.summary,
@@ -128,6 +155,16 @@ def request_chat_agent_step(
                         for item in recent_turns[-4:] if item.status == "completed"
                     ],
                     "evidence": evidence_packet(evidence),
+                    "tool_results": [
+                        {
+                            "call_id": item.call_id,
+                            "name": item.name,
+                            "status": item.status,
+                            "citation_ids": item.citation_ids,
+                            "warnings": item.warnings,
+                        }
+                        for item in (tool_results or [])
+                    ],
                     "must_answer_now": require_final,
                 },
                 ensure_ascii=False,
@@ -289,7 +326,7 @@ def _parse_agent_step(value: dict) -> ChatAgentStep:
     raw_limitations = value.get("limitations", [])
     if not isinstance(raw_tools, list) or not isinstance(raw_citations, list) or not isinstance(raw_limitations, list):
         raise ValueError("invalid agent payload")
-    tools = _allowed_unique_tools([str(item) for item in raw_tools])
+    tools = _parse_tool_calls(raw_tools)
     answer = str(value.get("answer", "")).strip()
     if action == "use_tools" and not tools:
         raise ValueError("tool step did not request a valid tool")
@@ -311,3 +348,31 @@ def _allowed_unique_tools(values: list[str]) -> list[ChatAgentToolName]:
         for item in dict.fromkeys(values)
         if item in allowed
     ][:6]
+
+
+def _parse_tool_calls(values: list[object]) -> list[ChatAgentToolCall]:
+    allowed = set(CHAT_AGENT_TOOLS)
+    calls: list[ChatAgentToolCall] = []
+    seen: set[tuple[str, str]] = set()
+    for value in values:
+        if isinstance(value, str):
+            name = value
+            query = None
+            call_id = f"call-{uuid4().hex}"
+        elif isinstance(value, dict):
+            name = str(value.get("name", ""))
+            raw_query = str(value.get("query", "")).strip()
+            query = raw_query[:500] or None
+            call_id = str(value.get("call_id", "")).strip()[:100] or f"call-{uuid4().hex}"
+        else:
+            continue
+        signature = (name, query or "")
+        if name not in allowed or signature in seen:
+            continue
+        seen.add(signature)
+        calls.append(ChatAgentToolCall(
+            call_id=call_id,
+            name=cast(ChatAgentToolName, name),
+            query=query,
+        ))
+    return calls[:6]

@@ -8,6 +8,7 @@ from app.application.job_search_usecases import (
     create_job_search_run,
     delete_job_search_run,
     get_job_search_run,
+    list_job_search_items,
     list_user_job_search_runs,
     list_job_search_trace_steps,
     preview_job_search_run,
@@ -20,6 +21,7 @@ from app.schemas.auth import UserAccount
 from app.schemas.job_search import (
     BrowserHelperJobSearchRunCreateRequest,
     JobSearchPreviewResponse,
+    JobSearchItemListResponse,
     JobSearchRunCreateRequest,
     JobSearchRunResponse,
     JobSearchRunListResponse,
@@ -103,6 +105,22 @@ def list_job_search_run_steps_endpoint(
     return JobSearchTraceStepListResponse(
         items=list_job_search_trace_steps(run_id, user_id=current_user.user_id)
     )
+
+
+@router.get("/{run_id}/items", response_model=JobSearchItemListResponse)
+def list_job_search_run_items_endpoint(
+    run_id: str,
+    limit: int = Query(default=100, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    current_user: UserAccount = Depends(get_current_user),
+) -> JobSearchItemListResponse:
+    items, total = list_job_search_items(
+        run_id,
+        user_id=current_user.user_id,
+        limit=limit,
+        offset=offset,
+    )
+    return JobSearchItemListResponse(items=items, total=total)
 
 
 @router.get("/{run_id}/feedback", response_model=JobSearchResultFeedbackListResponse)

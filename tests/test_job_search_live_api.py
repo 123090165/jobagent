@@ -45,6 +45,26 @@ class FakeProvider:
         ][:limit]
 
 
+class WideFakeProvider(FakeProvider):
+    def search_jobs(self, *, query: str, location: str | None, limit: int):
+        candidates = super().search_jobs(query=query, location=location, limit=2)
+        return [
+            *candidates,
+            RawJobCandidate(
+                title="Data Platform Intern",
+                company="Warehouse Labs",
+                location=location or "Remote",
+                source_url="https://jobs.example.com/data-platform",
+                source_provider=self.provider_name,
+                snippet="SQL data pipelines and platform reliability.",
+                raw_description="Build SQL data pipelines and improve platform reliability.",
+                discovery_query=query,
+                discovery_rank=3,
+                detail_status="fake_inline",
+            ),
+        ]
+
+
 class FakeJSONLLM:
     def chat_completion_json(self, *, system_prompt: str, user_prompt: str) -> dict:
         if "ranked_candidates" in system_prompt:
@@ -235,3 +255,94 @@ def test_live_run_steps_endpoint_returns_trace(monkeypatch, tmp_path) -> None:
     assert "source_stats" in items[1]["details"]
     assert "logical_provider_call_count" in items[1]["details"]
     assert run_response.job_search_run.llm_enabled is True
+
+
+def test_live_run_persists_bounded_candidate_pool_separately_from_final_results(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    confirmed = _create_session_with_confirmed_profile(
+        tmp_path,
+        monkeypatch,
+        "job-search-live-items.sqlite3",
+    )
+    provider = WideFakeProvider()
+    run_response = create_job_search_run(
+        JobSearchRunCreateRequest(
+            session_id=confirmed["profile_session"]["session_id"],
+            search_mode="live_search",
+            use_llm=False,
+            max_results=1,
+        ),
+        job_search_provider=provider,
+    )
+    run_id = run_response.job_search_run.job_search_run_id
+    assert client.get("/api/v1/saved-jobs").json()["items"] == []
+
+    completed = execute_job_search_run(
+        run_id,
+        job_search_provider=provider,
+        max_results=1,
+    )
+
+    assert len(completed.job_search_run.results) == 1
+    run_payload = client.get(f"/api/v1/job-search-runs/{run_id}").json()
+    assert "items" not in run_payload["job_search_run"]
+
+    items_response = client.get(f"/api/v1/job-search-runs/{run_id}/items")
+    assert items_response.status_code == 200
+    payload = items_response.json()
+    assert payload["total"] == 3
+    assert len(payload["items"]) == 3
+    assert sum(item["stage"] == "final" for item in payload["items"]) == 1
+    assert sum(item["result"] is not None for item in payload["items"]) == 1
+    assert client.get("/api/v1/saved-jobs").json()["items"] == []
+
+    execute_job_search_run(
+        run_id,
+        job_search_provider=provider,
+        max_results=1,
+    )
+    assert client.get(f"/api/v1/job-search-runs/{run_id}/items").json()["total"] == 3
+
+    delete_response = client.delete(f"/api/v1/job-search-runs/{run_id}")
+    assert delete_response.status_code == 204
+    assert client.get(f"/api/v1/job-search-runs/{run_id}/items").status_code == 404
+
+
+def test_candidate_pool_remains_available_when_a_later_stage_fails(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    confirmed = _create_session_with_confirmed_profile(
+        tmp_path,
+        monkeypatch,
+        "job-search-live-items-partial.sqlite3",
+    )
+    provider = WideFakeProvider()
+    run_response = create_job_search_run(
+        JobSearchRunCreateRequest(
+            session_id=confirmed["profile_session"]["session_id"],
+            search_mode="live_search",
+            use_llm=False,
+            max_results=1,
+        ),
+        job_search_provider=provider,
+    )
+    run_id = run_response.job_search_run.job_search_run_id
+    monkeypatch.setattr(
+        "app.application.job_search_usecases.filter_candidates",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("filter boom")),
+    )
+
+    failed = execute_job_search_run(
+        run_id,
+        job_search_provider=provider,
+        max_results=1,
+    )
+
+    assert failed.job_search_run.status == "failed"
+    items_response = client.get(f"/api/v1/job-search-runs/{run_id}/items")
+    assert items_response.status_code == 200
+    assert items_response.json()["total"] == 3
+    assert all(item["stage"] == "recalled" for item in items_response.json()["items"])

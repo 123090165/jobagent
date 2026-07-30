@@ -6,7 +6,10 @@ from app.application.job_search_usecases import create_job_search_run, execute_j
 from app.schemas.job_search import JobSearchRunCreateRequest
 from app.services.job_search_providers.cuhksz_career_provider import (
     CUHKSZ_CAREER_SEARCH_URL,
+    MISSING_REQUIREMENTS_WARNING,
+    NO_JD_SECTIONS_WARNING,
     NO_PROVIDER_MATCH_WARNING,
+    SHORT_JD_WARNING,
     CUHKSZCareerProvider,
     _is_low_quality_candidate,
     build_cuhksz_search_url,
@@ -150,6 +153,88 @@ def test_cuhksz_detail_page_parsing_extracts_description() -> None:
 
     assert candidate.raw_description is not None
     assert "Job Description:" in candidate.raw_description
+
+
+def test_cuhksz_detail_preserves_responsibilities_and_requirements_in_page_order() -> None:
+    source_url = "https://career.cuhk.edu.cn/job/view/id/468293"
+    provider = CUHKSZCareerProvider(
+        detail_pages={
+            source_url: """
+            <main>
+              <h1>AI Intern</h1>
+              <section><h2>Responsibilities</h2><p>Build signal-processing pipelines.</p></section>
+              <section><h2>Qualifications</h2><p>Strong Python and statistics skills.</p></section>
+              <section><h2>Responsibilities</h2><p>Build signal-processing pipelines.</p></section>
+            </main>
+            """,
+        },
+    )
+    candidate = RawJobCandidate(
+        title="AI Intern",
+        company="Example Co",
+        location="Shenzhen",
+        source_url=source_url,
+        source_provider="cuhksz_career",
+        snippet="AI Intern",
+    )
+
+    detailed = provider.fetch_job_detail(candidate)
+
+    assert detailed.raw_description is not None
+    responsibilities_at = detailed.raw_description.index("Build signal-processing pipelines.")
+    requirements_at = detailed.raw_description.index("Strong Python and statistics skills.")
+    assert responsibilities_at < requirements_at
+    assert detailed.raw_description.count("Build signal-processing pipelines.") == 1
+    assert detailed.detail_status == "detail_fetched"
+
+
+def test_cuhksz_short_detail_is_kept_with_completeness_warnings() -> None:
+    source_url = "https://career.cuhk.edu.cn/job/view/id/468293"
+    provider = CUHKSZCareerProvider(
+        detail_pages={
+            source_url: "<main><h1>AI Intern</h1><section><h2>Responsibilities</h2><p>Build models.</p></section></main>",
+        },
+    )
+    candidate = RawJobCandidate(
+        title="AI Intern",
+        company="Example Co",
+        location="Shenzhen",
+        source_url=source_url,
+        source_provider="cuhksz_career",
+        snippet="AI Intern",
+    )
+
+    detailed = provider.fetch_job_detail(candidate)
+
+    assert detailed.source_url == source_url
+    assert detailed.raw_description is not None
+    assert "Build models." in detailed.raw_description
+    assert detailed.detail_status == "detail_fetched_incomplete"
+    assert SHORT_JD_WARNING in detailed.provider_warnings
+    assert MISSING_REQUIREMENTS_WARNING in detailed.provider_warnings
+    assert NO_JD_SECTIONS_WARNING not in detailed.provider_warnings
+
+
+def test_cuhksz_missing_jd_sections_uses_full_page_fallback_with_warning() -> None:
+    source_url = "https://career.cuhk.edu.cn/job/view/id/468293"
+    provider = CUHKSZCareerProvider(
+        detail_pages={source_url: "<main><h1>AI Intern</h1><p>Contact recruiter.</p></main>"},
+    )
+    candidate = RawJobCandidate(
+        title="AI Intern",
+        company="Example Co",
+        location="Shenzhen",
+        source_url=source_url,
+        source_provider="cuhksz_career",
+        snippet="AI Intern",
+    )
+
+    detailed = provider.fetch_job_detail(candidate)
+
+    assert detailed.source_url == source_url
+    assert detailed.detail_status == "detail_fetched_incomplete"
+    assert NO_JD_SECTIONS_WARNING in detailed.provider_warnings
+    assert "Contact recruiter." in (detailed.raw_description or "")
 
 
 def test_cuhksz_detail_generic_title_does_not_replace_list_metadata() -> None:

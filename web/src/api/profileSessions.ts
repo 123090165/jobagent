@@ -4,6 +4,7 @@ import type {
   CreateJobSearchRunPayload,
   ConfirmedProfileResponse,
   JobSearchProviderStatus,
+  JobSearchItemListResponse,
   JobSearchPreview,
   JobSearchTraceStepListResponse,
   JobSearchRunListResponse,
@@ -224,6 +225,18 @@ export async function getJobSearchRun(runId: string): Promise<JobSearchRunRespon
 export async function getJobSearchRunSteps(runId: string): Promise<JobSearchTraceStepListResponse> {
   const response = await client.get<JobSearchTraceStepListResponse>(
     `/api/v1/job-search-runs/${runId}/steps`
+  );
+  return response.data;
+}
+
+export async function listJobSearchItems(
+  runId: string,
+  limit = 100,
+  offset = 0
+): Promise<JobSearchItemListResponse> {
+  const response = await client.get<JobSearchItemListResponse>(
+    `/api/v1/job-search-runs/${runId}/items`,
+    { params: { limit, offset } }
   );
   return response.data;
 }

@@ -17,6 +17,7 @@ import {
   getProfileDraft,
   getProfileSession,
   listJobSearchRuns,
+  listJobSearchItems,
   listUserJobSearchRuns,
   parseResumeForReview,
   previewJobSearchRun,
@@ -29,6 +30,7 @@ import type {
   CreateJobSearchRunPayload,
   ConfirmedProfile,
   JobSearchProviderStatus,
+  JobSearchItem,
   JobSearchPreview,
   JobSearchRun,
   JobSearchTraceStep,
@@ -52,6 +54,9 @@ interface ProfileSessionState {
   jobSearchRun: JobSearchRun | null;
   jobSearchRuns: JobSearchRun[];
   jobSearchSteps: JobSearchTraceStep[];
+  jobSearchItems: JobSearchItem[];
+  jobSearchItemTotal: number;
+  jobSearchItemsError: string | null;
   jobSearchProviderStatus: JobSearchProviderStatus | null;
   llmStatus: LlmStatus | null;
   isCreating: boolean;
@@ -64,6 +69,7 @@ interface ProfileSessionState {
   isJobSearchCreating: boolean;
   isJobSearchPreviewLoading: boolean;
   isJobSearchLoading: boolean;
+  isJobSearchItemsLoading: boolean;
   isJobSearchPolling: boolean;
   isLlmStatusLoading: boolean;
   hasLoadedSession: boolean;
@@ -107,6 +113,9 @@ export const useProfileSessionStore = defineStore("profileSession", {
     jobSearchRun: null,
     jobSearchRuns: [],
     jobSearchSteps: [],
+    jobSearchItems: [],
+    jobSearchItemTotal: 0,
+    jobSearchItemsError: null,
     jobSearchProviderStatus: null,
     llmStatus: null,
     isCreating: false,
@@ -119,6 +128,7 @@ export const useProfileSessionStore = defineStore("profileSession", {
     isJobSearchCreating: false,
     isJobSearchPreviewLoading: false,
     isJobSearchLoading: false,
+    isJobSearchItemsLoading: false,
     isJobSearchPolling: false,
     isLlmStatusLoading: false,
     hasLoadedSession: false,
@@ -135,6 +145,9 @@ export const useProfileSessionStore = defineStore("profileSession", {
       this.jobSearchRun = null;
       this.jobSearchRuns = [];
       this.jobSearchSteps = [];
+      this.jobSearchItems = [];
+      this.jobSearchItemTotal = 0;
+      this.jobSearchItemsError = null;
     },
     resetJobSearchState(): void {
       this.jobSearchPreview = null;
@@ -395,6 +408,9 @@ export const useProfileSessionStore = defineStore("profileSession", {
       this.stopPollingJobSearchRun();
       this.jobSearchRun = null;
       this.jobSearchSteps = [];
+      this.jobSearchItems = [];
+      this.jobSearchItemTotal = 0;
+      this.jobSearchItemsError = null;
       this.error = null;
     },
     beginJobSearchClientTiming(): void {
@@ -493,6 +509,11 @@ export const useProfileSessionStore = defineStore("profileSession", {
     },
     async loadJobSearchRun(runId: string): Promise<JobSearchRun> {
       this.isJobSearchLoading = true;
+      if (this.jobSearchRun?.job_search_run_id !== runId) {
+        this.jobSearchItems = [];
+        this.jobSearchItemTotal = 0;
+        this.jobSearchItemsError = null;
+      }
       this.error = null;
       try {
         const response = await getJobSearchRun(runId);
@@ -519,6 +540,26 @@ export const useProfileSessionStore = defineStore("profileSession", {
         this.jobSearchSteps = [];
         this.error = toApiErrorMessage(error, "Failed to load job search steps.");
         throw error;
+      }
+    },
+    async loadJobSearchItems(runId: string): Promise<JobSearchItem[]> {
+      this.isJobSearchItemsLoading = true;
+      this.jobSearchItemsError = null;
+      try {
+        const response = await listJobSearchItems(runId, 100, 0);
+        this.jobSearchItems = response.items;
+        this.jobSearchItemTotal = response.total;
+        return response.items;
+      } catch (error) {
+        this.jobSearchItems = [];
+        this.jobSearchItemTotal = 0;
+        this.jobSearchItemsError = toApiErrorMessage(
+          error,
+          "Candidate pool could not be loaded."
+        );
+        throw error;
+      } finally {
+        this.isJobSearchItemsLoading = false;
       }
     },
     async loadJobSearchRuns(sessionId: string): Promise<JobSearchRun[]> {

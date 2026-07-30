@@ -12,6 +12,7 @@ from pathlib import Path
 from time import perf_counter
 from uuid import uuid4
 
+from app.config.env_loader import load_local_env
 from app.repositories.resume_profile_repository import ResumeProfileRepository
 from app.repositories.rag_sync_repository import rag_sync_repository
 from app.repositories.saved_job_repository import SavedJobRepository
@@ -59,6 +60,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    load_local_env()
     args = parse_args(argv)
     corpus = load_corpus(args.fixture)
     if args.mode == "lexical":

@@ -163,6 +163,39 @@ export interface JobSearchResult {
   confidence_label: "strong" | "medium" | "limited" | "weak";
 }
 
+export type JobSearchItemStage = "recalled" | "filtered" | "analyzed" | "final";
+
+export interface JobSearchCandidateSnapshot {
+  title: string;
+  company: string | null;
+  location: string | null;
+  source_provider: string;
+  source_url: string | null;
+  snippet: string | null;
+  raw_description: string | null;
+  discovery_query: string | null;
+  discovery_rank: number | null;
+  detail_status: string | null;
+  provider_warnings: string[];
+}
+
+export interface JobSearchItem {
+  job_search_item_id: string;
+  job_search_run_id: string;
+  stable_candidate_key: string;
+  rank: number;
+  stage: JobSearchItemStage;
+  candidate: JobSearchCandidateSnapshot;
+  result: JobSearchResult | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface JobSearchItemListResponse {
+  items: JobSearchItem[];
+  total: number;
+}
+
 export interface JobSearchTraceStep {
   step_id: string;
   job_search_run_id: string;
