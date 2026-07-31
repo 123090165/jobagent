@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [switch]$Stop,
     [switch]$Check,
@@ -204,6 +204,33 @@ function Get-PowerShellExe {
     return "powershell.exe"
 }
 
+function Normalize-ProcessPathEnvironment {
+    $variables = [Environment]::GetEnvironmentVariables("Process")
+    $pathKeys = @(
+        $variables.Keys |
+            Where-Object {
+                ([string]$_).Equals(
+                    "Path",
+                    [StringComparison]::OrdinalIgnoreCase
+                )
+            }
+    )
+    if ($pathKeys.Count -le 1) {
+        return
+    }
+
+    $pathValue = [string]$variables["Path"]
+    foreach ($key in $pathKeys) {
+        [Environment]::SetEnvironmentVariable(
+            [string]$key,
+            $null,
+            "Process"
+        )
+    }
+    # Windows 变量名不区分大小写；先去重可避免 PowerShell 5.1 启动子进程时报重复键。
+    [Environment]::SetEnvironmentVariable("Path", $pathValue, "Process")
+}
+
 function Start-DevWindow {
     param(
         [string]$Name,
@@ -214,6 +241,7 @@ function Start-DevWindow {
 
     $stdoutLog = Join-Path $StateDir "$LogName.out.log"
     $stderrLog = Join-Path $StateDir "$LogName.err.log"
+    Normalize-ProcessPathEnvironment
     $process = Start-Process `
         -FilePath (Get-PowerShellExe) `
         -ArgumentList $ArgumentList `
@@ -229,6 +257,19 @@ function Get-NpmCommand {
     $command = Get-Command npm.cmd -ErrorAction SilentlyContinue
     if ($null -eq $command) {
         $command = Get-Command npm -ErrorAction SilentlyContinue
+    }
+    if ($null -eq $command) {
+        # 隐藏子进程可能无法继承可解析的 PATH，回退到 Windows 常见 Node 安装目录。
+        $candidates = @(
+            "C:\Program Files\nodejs\npm.cmd",
+            "C:\Program Files (x86)\nodejs\npm.cmd"
+        )
+        $npmPath = $candidates |
+            Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } |
+            Select-Object -First 1
+        if ($npmPath) {
+            $command = Get-Item -LiteralPath $npmPath
+        }
     }
     if ($null -eq $command) {
         throw "npm was not found in PATH."
