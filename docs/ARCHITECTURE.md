@@ -197,9 +197,10 @@ Local development uses sqlite3 and JOBAGENT_DB_PATH, defaulting to
 data/jobagent.sqlite3. JSON snapshots preserve evolving profile, JD, and
 analysis shapes.
 
-init_database() creates tables, performs additive compatibility changes,
-backfills ownership, and ensures indexes. This is acceptable for local MVP work
-but is not the long-term migration mechanism.
+init_database() creates the current clean schema, local development identity,
+indexes, and the built-in learning catalog. Historical table and column
+backfills are intentionally not supported after the local data reset. This is
+acceptable for local MVP work but is not the long-term migration mechanism.
 
 Production direction:
 

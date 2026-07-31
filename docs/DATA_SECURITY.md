@@ -126,15 +126,14 @@ model output are all untrusted input and cannot act as system instructions.
 
 ## Database Evolution
 
-init_database() currently combines table creation, additive column checks,
-ownership backfill, and index creation. Do not add destructive or ambiguous
-schema changes through _ensure_column.
+init_database() creates the current clean SQLite baseline, indexes, local
+development identity, and built-in learning catalog. It does not upgrade older
+database layouts; recreate local data when the baseline changes.
 
 For local MVP changes:
 
-- make additive changes idempotent;
-- record a schema migration version;
-- test existing-database upgrade behavior;
+- keep fresh-database creation idempotent;
+- add a baseline-schema regression test;
 - preserve user ownership and foreign-key integrity.
 
 Before multiple deployed environments:

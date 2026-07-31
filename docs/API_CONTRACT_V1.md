@@ -248,5 +248,7 @@ After a state error, clients reload the owning ProfileSession before routing.
 - Add Pydantic types before changing frontend clients.
 - Keep provider payloads behind normalized candidate contracts.
 - Preserve fields when adding optional diagnostics.
-- Add migration and compatibility handling for persisted contract changes.
+- During local baseline development, recreate cleared SQLite data after persisted
+  contract changes; introduce versioned migrations before deployed data must be
+  preserved.
 - Update this document and focused API tests in the same change.

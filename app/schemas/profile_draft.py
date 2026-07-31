@@ -2,10 +2,9 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field
 
 from app.schemas.profile_session import ProfileSession
-from app.schemas.search_ready_profile import SearchReadyProfile
 
 
 class ProfileDraft(BaseModel):
@@ -23,30 +22,8 @@ class ProfileDraft(BaseModel):
     strengths: list[str] = Field(default_factory=list)
     risks: list[str] = Field(default_factory=list)
     missing_info_questions: list[str] = Field(default_factory=list)
-    draft_id: str | None = None
-    status: str | None = None
-    search_ready_profile: SearchReadyProfile | None = None
-    llm_provider: str | None = None
-    llm_model: str | None = None
-    llm_base_url: str | None = None
-    llm_configured: bool | None = None
-    llm_provider_reason: str | None = None
-    user_answers: dict[str, str] = Field(default_factory=dict)
-    user_edit_snapshot: dict[str, object] = Field(default_factory=dict)
-    source_profile_snapshot: dict[str, object] | None = None
     created_at: datetime
     updated_at: datetime
-
-    @model_validator(mode="before")
-    @classmethod
-    def _hydrate_compat_fields(cls, data: object) -> object:
-        if not isinstance(data, dict):
-            return data
-        if not data.get("profile_draft_id") and data.get("draft_id"):
-            data["profile_draft_id"] = data["draft_id"]
-        if not data.get("draft_id") and data.get("profile_draft_id"):
-            data["draft_id"] = data["profile_draft_id"]
-        return data
 
 
 class ProfileDraftResponse(BaseModel):
