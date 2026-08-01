@@ -105,9 +105,10 @@ def test_browser_job_capture_analyze_endpoint_reuses_job_search_pipeline(monkeyp
     confirmed = _create_session_with_confirmed_profile(tmp_path, monkeypatch)
     session_id = confirmed["profile_session"]["session_id"]
 
+    captured = client.post("/api/v1/browser/job-captures", json=_capture_only_payload()).json()
     response = client.post(
-        "/api/v1/browser/job-captures/analyze",
-        json=_capture_payload(session_id),
+        f"/api/v1/browser/job-captures/{captured['capture_id']}/analyze",
+        json={"session_id": session_id, "analysis_mode": "deterministic", "use_llm": False},
     )
 
     assert response.status_code == 200
@@ -119,6 +120,8 @@ def test_browser_job_capture_analyze_endpoint_reuses_job_search_pipeline(monkeyp
     assert payload["report"]["matched_strengths"]
     assert payload["job_search_run_id"]
     assert payload["job_result_id"]
+    assert payload["saved_job_id"] == captured["saved_job_id"]
+    assert payload["saved_job_analysis_id"]
     assert any("generic extractor used" in warning for warning in payload["warnings"])
 
     conversation = client.post(
@@ -161,7 +164,7 @@ def test_browser_job_capture_can_be_saved_and_used_in_chat_without_analysis(monk
         json=_capture_only_payload(),
     )
     assert captured.status_code == 201
-    capture_id = captured.json()["capture_id"]
+    saved_job_id = captured.json()["saved_job_id"]
     assert captured.json()["capture"]["title"] == "Backend Engineer Intern"
     assert "jd_text" not in captured.json()["capture"]
 
@@ -173,19 +176,19 @@ def test_browser_job_capture_can_be_saved_and_used_in_chat_without_analysis(monk
             "question": "What are the main risks in this attached job?",
             "llm_provider": "mock",
             "context_attachments": [{
-                "type": "browser_capture",
-                "capture_id": capture_id,
+                "type": "saved_job",
+                "saved_job_id": saved_job_id,
             }],
         },
     )
     assert turn.status_code == 200
     assert turn.json()["retrieval_plan"]["requests"][0] == {
-        "source": "search_results",
+        "source": "saved_jobs",
         "strategy": "use_attachment",
         "policy_reason": "explicit_attachment",
     }
     assert turn.json()["retrieved_refs"] == [
-        f"search_result:browser_capture:{capture_id}"
+        f"saved_job:{captured.json()['saved_job_id']}"
     ]
 
 
@@ -209,15 +212,39 @@ def test_saved_browser_capture_can_be_analyzed_later(monkeypatch, tmp_path) -> N
     )
     assert response.status_code == 200
     assert response.json()["report"]["overall_score"] > 0
+    saved_job_id = response.json()["saved_job_id"]
+    job = client.get(f"/api/v1/saved-jobs/{saved_job_id}").json()
+    assert job["latest_analysis"]["saved_job_analysis_id"] == response.json()[
+        "saved_job_analysis_id"
+    ]
+
+
+def test_repeated_browser_capture_updates_one_job_workspace(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("JOBAGENT_DB_PATH", str(tmp_path / "capture-job-identity.sqlite3"))
+    first = client.post("/api/v1/browser/job-captures", json=_capture_only_payload())
+    richer_payload = _capture_only_payload()
+    richer_payload["jd_text"] += " Additional ownership of observability and production support."
+    second = client.post("/api/v1/browser/job-captures", json=richer_payload)
+
+    assert first.status_code == 201
+    assert second.status_code == 201
+    assert first.json()["capture_id"] != second.json()["capture_id"]
+    assert first.json()["saved_job_id"] == second.json()["saved_job_id"]
+    jobs = client.get("/api/v1/saved-jobs").json()["items"]
+    assert len(jobs) == 1
+    assert "Additional ownership" in jobs[0]["raw_jd_text"]
 
 
 def test_browser_job_capture_requires_confirmed_profile(monkeypatch, tmp_path) -> None:
     monkeypatch.setenv("JOBAGENT_DB_PATH", str(tmp_path / "browser-capture-no-confirmed.sqlite3"))
     session = client.post("/api/v1/profile-sessions").json()
 
+    capture_id = client.post(
+        "/api/v1/browser/job-captures", json=_capture_only_payload()
+    ).json()["capture_id"]
     response = client.post(
-        "/api/v1/browser/job-captures/analyze",
-        json=_capture_payload(session["session_id"]),
+        f"/api/v1/browser/job-captures/{capture_id}/analyze",
+        json={"session_id": session["session_id"], "use_llm": False},
     )
 
     assert response.status_code == 409

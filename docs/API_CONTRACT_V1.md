@@ -99,18 +99,19 @@ analysis_mode decides deterministic versus LLM-assisted behavior. llm_provider
 selects the implementation behind the shared LLM interface. Provider selection
 is independent from model selection.
 
-## Saved Job Library
+## Job Workspace Data Hub
 
 ~~~text
 GET   /api/v1/saved-jobs
 POST  /api/v1/saved-jobs
 POST  /api/v1/saved-jobs/from-search-result
-POST  /api/v1/saved-jobs/from-browser-capture
 GET   /api/v1/saved-jobs/{saved_job_id}
 DELETE /api/v1/saved-jobs/{saved_job_id}
+GET   /api/v1/saved-jobs/{saved_job_id}/workspace
+POST  /api/v1/saved-jobs/{saved_job_id}/application
+POST  /api/v1/saved-jobs/{saved_job_id}/tailored-resumes
 GET   /api/v1/saved-jobs/{saved_job_id}/analyses
 GET   /api/v1/saved-jobs/{saved_job_id}/contexts
-GET   /api/v1/saved-jobs/{saved_job_id}/status-history
 GET   /api/v1/saved-jobs/{saved_job_id}/briefs
 POST  /api/v1/saved-jobs/{saved_job_id}/briefs
 GET   /api/v1/saved-jobs/{saved_job_id}/preparation
@@ -121,12 +122,29 @@ PATCH /api/v1/saved-jobs/{saved_job_id}
 POST  /api/v1/saved-jobs/{saved_job_id}/archive
 ~~~
 
+~~~text
+PATCH /api/v1/job-applications/{application_id}
+PATCH /api/v1/tailored-resumes/{tailored_resume_id}
+POST  /api/v1/tailored-resumes/{tailored_resume_id}/approve
+GET   /api/v1/tailored-resumes/{tailored_resume_id}/pdf
+PATCH /api/v1/communication-drafts/{draft_id}
+POST  /api/v1/communication-drafts/{draft_id}/confirm-sent
+~~~
+
+Greeting and tailored-resume generation require a configured LLM provider.
+Provider, transport, incomplete-output, or validation failure returns an error
+without persisting a draft/version or advancing application state. Resume
+content validation may request one model correction; there is no deterministic
+content fallback. PDF download is available only for an approved resume version
+and is rendered in memory from its current Markdown content.
+
 Preparation answers use a required structured `experience_level` and optional
 free-text `detail`. The request action is `save`, `complete`, or `stop`. Saving
 checkpoints a paused session, completing generates recommendations and any
 needed learning resources, and stopping intentionally produces no summary.
 
-Deleting a saved job removes only that job's analysis and status history. It
+Deleting a saved job removes its application workspace, application events,
+communication linkage, tailored resume versions, and analysis snapshots. It
 does not delete search runs or resume profiles.
 
 Saving a result copies a canonical JD snapshot and a profile-specific analysis
@@ -140,7 +158,8 @@ contexts.
 ~~~text
 POST /api/v1/browser/job-captures
 POST /api/v1/browser/job-captures/{capture_id}/analyze
-POST /api/v1/browser/job-captures/analyze  # compatibility: capture + analyze
+POST /api/v1/browser/job-captures/{capture_id}/greeting-drafts
+POST /api/v1/browser/job-captures/{capture_id}/tailored-resumes
 GET  /api/v1/job-search-providers/status
 GET  /api/v1/llm/status
 GET  /health
@@ -173,11 +192,10 @@ local-user compatibility and an existing `browser_helper` token are rejected.
 The returned token expires after eight hours and is limited to current-page
 capture plus the documented Assistant subset.
 
-`POST /api/v1/chat/conversations/{conversation_id}/context/browser-captures`
-adds an owned browser capture ID to the conversation's bounded data scope. It
-does not copy JD text into the conversation row. The full JD remains in the
-capture resource and is re-read under the current user's authorization when a
-question requires search-result context.
+`POST /api/v1/browser/job-captures` returns both `capture_id` and
+`saved_job_id`. The capture is an owned page snapshot; the Saved Job is the
+canonical business identity. Helper clients attach the job through
+`POST /api/v1/chat/conversations/{conversation_id}/context/saved-jobs`.
 
 Conversations persist a bounded data-access policy (`auto`, `always`, or
 `off`). A turn uses a client-generated idempotency key. The answer agent may
@@ -189,10 +207,9 @@ packet rather than accepted from model-provided metadata.
 Completed turns include a bounded `retrieval_plan`. `agent_sources` records the
 sources actually selected by agent tools and deterministic policy, while
 `requests` records the policy-approved source and one of `use_attachment`, `reuse_previous`,
-`use_pinned`, or `load_recent`. A turn may include up to five owned search-result,
-browser-capture, or Saved Job references in `context_attachments`. Search-result
-and browser-capture references can be retained by their dedicated context
-endpoints; only identifiers are stored in the conversation scope. `reuse_previous`
+`use_pinned`, or `load_recent`. A turn may include up to five owned search-result
+or Saved Job references in `context_attachments`. Only identifiers are stored
+in the conversation scope. `reuse_previous`
 reuses only the prior resource selector; the
 repository still reads the current owned record. `freshness=refresh_required`
 forbids treating prior answer text or evidence content as a current snapshot.

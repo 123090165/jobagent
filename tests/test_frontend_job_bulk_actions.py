@@ -27,7 +27,6 @@ def test_saved_jobs_page_exposes_bounded_selection_actions() -> None:
     page = _read("pages/SavedJobsPage.vue")
 
     assert "Select jobs" in page
-    assert "Update status" in page
     assert "Archive" in page
     assert "Delete permanently" in page
     assert "BULK_LIMIT = 50" in page

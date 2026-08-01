@@ -17,6 +17,8 @@ Register or login
 -> Search results
 -> Saved jobs
 -> Job Brief
+-> Application workbench
+-> Confirmed greeting and tailored resume
 -> Guided Preparation
 ~~~
 
@@ -33,9 +35,11 @@ Current product capabilities include:
 - persisted search traces, structured JD snapshots, and saved analysis.
 - versioned Job Briefs and LangGraph-backed guided preparation with curated
   learning resources and MCP fallback.
+- manual application tracking, confirmed Browser Helper greetings, and
+  fact-checked tailored resume versions.
 
-Resume tailoring, durable distributed workers, and a complete application-outcome
-loop remain planned work.
+Durable distributed workers and a complete application-outcome loop remain
+planned work.
 
 ## Stack
 

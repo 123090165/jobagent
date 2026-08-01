@@ -29,13 +29,8 @@ class ChatSavedJobAttachment(BaseModel):
     saved_job_id: str = Field(min_length=1, max_length=100)
 
 
-class ChatBrowserCaptureAttachment(BaseModel):
-    type: Literal["browser_capture"] = "browser_capture"
-    capture_id: str = Field(min_length=1, max_length=100)
-
-
 ChatTurnAttachment = Annotated[
-    ChatContextAttachment | ChatSavedJobAttachment | ChatBrowserCaptureAttachment,
+    ChatContextAttachment | ChatSavedJobAttachment,
     Field(discriminator="type"),
 ]
 
@@ -49,7 +44,6 @@ class ChatDataScope(BaseModel):
     job_search_run_ids: list[str] = Field(default_factory=list, max_length=3)
     job_search_result_refs: list[ChatSearchResultRef] = Field(default_factory=list, max_length=20)
     saved_job_ids: list[str] = Field(default_factory=list, max_length=20)
-    browser_capture_ids: list[str] = Field(default_factory=list, max_length=5)
 
     @field_validator("allowed_sources")
     @classmethod
@@ -115,7 +109,6 @@ class ChatSavedJobContextOption(BaseModel):
     label: str
     title: str
     company: str | None = None
-    status: str
     updated_at: datetime
 
 
@@ -205,10 +198,8 @@ class ChatTurnCreateRequest(BaseModel):
         for item in value:
             if isinstance(item, ChatContextAttachment):
                 key = (item.type, item.job_search_run_id, item.job_result_id)
-            elif isinstance(item, ChatSavedJobAttachment):
-                key = (item.type, item.saved_job_id)
             else:
-                key = (item.type, item.capture_id)
+                key = (item.type, item.saved_job_id)
             unique[key] = item
         return list(unique.values())
 

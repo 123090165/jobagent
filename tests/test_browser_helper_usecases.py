@@ -29,11 +29,13 @@ class ResumeProfileRepositoryStub:
         return [
             SimpleNamespace(
                 source_session_id="session-default",
+                resume_profile_id="profile-default",
                 name="Backend Profile",
                 is_default=True,
             ),
             SimpleNamespace(
                 source_session_id="session-secondary",
+                resume_profile_id="profile-secondary",
                 name="Data Profile",
                 is_default=False,
             ),
@@ -54,6 +56,10 @@ def test_browser_helper_session_uses_profile_names_and_default_order() -> None:
     assert [(item.session_id, item.label, item.is_default) for item in result.profile_sessions] == [
         ("session-default", "Backend Profile", True),
         ("session-secondary", "Data Profile", False),
+    ]
+    assert [item.resume_profile_id for item in result.profile_sessions] == [
+        "profile-default",
+        "profile-secondary",
     ]
     assert auth_sessions.created is not None
     assert auth_sessions.created["session_scope"] == "browser_helper"

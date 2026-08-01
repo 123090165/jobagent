@@ -3,15 +3,10 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 from app.repositories.chat_repository import ChatRepository, chat_repository
-from app.repositories.browser_job_capture_repository import (
-    BrowserJobCaptureRepository,
-    browser_job_capture_repository,
-)
 from app.repositories.job_search_repository import JobSearchRepository, job_search_repository
 from app.repositories.resume_profile_repository import ResumeProfileRepository, resume_profile_repository
 from app.repositories.saved_job_repository import SavedJobRepository, saved_job_repository
 from app.schemas.chat import (
-    ChatBrowserCaptureAttachment,
     ChatConversation,
     ChatConversationCreateRequest,
     ChatConversationUpdateRequest,
@@ -103,7 +98,6 @@ def get_chat_context_catalog(
             label=f"{item.title} · {item.company or 'Unknown company'}",
             title=item.title,
             company=item.company,
-            status=item.status,
             updated_at=item.updated_at,
         ) for item in saved_items],
     )
@@ -117,7 +111,6 @@ def get_chat_memory_status(
     profiles: ResumeProfileRepository = resume_profile_repository,
     searches: JobSearchRepository = job_search_repository,
     saved_jobs: SavedJobRepository = saved_job_repository,
-    captures: BrowserJobCaptureRepository = browser_job_capture_repository,
 ) -> ChatMemoryStatus:
     conversation = get_chat_conversation(
         conversation_id,
@@ -130,7 +123,6 @@ def get_chat_memory_status(
         profiles=profiles,
         searches=searches,
         saved_jobs=saved_jobs,
-        captures=captures,
     )
     latest_turn = repository.get_latest_completed_turn(
         user_id=user_id,
@@ -151,7 +143,6 @@ def get_chat_memory_status(
                 profiles=profiles,
                 searches=searches,
                 saved_jobs=saved_jobs,
-                captures=captures,
             ) else "unavailable",
         )
         for citation in (latest_turn.citations if latest_turn is not None else [])
@@ -228,7 +219,6 @@ def create_chat_turn(
     *,
     user_id: str,
     repository: ChatRepository = chat_repository,
-    captures: BrowserJobCaptureRepository = browser_job_capture_repository,
 ) -> ChatTurn:
     conversation = get_chat_conversation(conversation_id, user_id=user_id, repository=repository)
     retry_source = None
@@ -246,6 +236,9 @@ def create_chat_turn(
         if retry_source is not None
         else payload.context_attachments
     )
+    effective_attachments = list({
+        item.model_dump_json(): item for item in effective_attachments
+    }.values())
     search_attachments = [
         item for item in effective_attachments
         if isinstance(item, ChatContextAttachment)
@@ -254,10 +247,6 @@ def create_chat_turn(
         item for item in effective_attachments
         if isinstance(item, ChatSavedJobAttachment)
     ]
-    capture_attachments = [
-        item for item in effective_attachments
-        if isinstance(item, ChatBrowserCaptureAttachment)
-    ]
     _validate_search_result_refs(
         search_attachments,
         user_id=user_id,
@@ -265,11 +254,6 @@ def create_chat_turn(
     _validate_saved_job_ids(
         [item.saved_job_id for item in saved_job_attachments],
         user_id=user_id,
-    )
-    _validate_browser_capture_ids(
-        [item.capture_id for item in capture_attachments],
-        user_id=user_id,
-        captures=captures,
     )
     turn = repository.create_pending_turn(
         user_id=user_id,
@@ -296,7 +280,7 @@ def create_chat_turn(
     )
     resolution = resolve_llm_provider(payload.llm_provider)
     attachment_sources: list[ChatSource] = [
-        *(["search_results"] if search_attachments or capture_attachments else []),
+        *(["search_results"] if search_attachments else []),
         *(["saved_jobs"] if saved_job_attachments else []),
     ]
     context_manifest = _build_agent_context_manifest(
@@ -319,9 +303,6 @@ def create_chat_turn(
         ] + [
             f"saved_job:{item.saved_job_id}"
             for item in saved_job_attachments
-        ] + [
-            f"search_result:browser_capture:{item.capture_id}"
-            for item in capture_attachments
         ]
 
         def decide(
@@ -555,27 +536,33 @@ def attach_chat_search_result(
     return updated
 
 
-def attach_chat_browser_capture(
+def attach_chat_saved_job(
     conversation_id: str,
-    ref: ChatBrowserCaptureAttachment,
+    ref: ChatSavedJobAttachment,
     *,
     user_id: str,
     repository: ChatRepository = chat_repository,
-    captures: BrowserJobCaptureRepository = browser_job_capture_repository,
+    saved_jobs: SavedJobRepository = saved_job_repository,
 ) -> ChatConversation:
-    _validate_browser_capture_ids([ref.capture_id], user_id=user_id, captures=captures)
-    conversation = get_chat_conversation(conversation_id, user_id=user_id, repository=repository)
-    capture_ids = conversation.data_scope.browser_capture_ids
-    if ref.capture_id in capture_ids:
-        return conversation
-    if len(capture_ids) >= 5:
+    if saved_jobs.get(user_id=user_id, saved_job_id=ref.saved_job_id) is None:
         raise JobAgentError(
-            message="A conversation can attach at most 5 browser JD captures.",
+            message="Saved job not found.",
+            error_code="saved_job_not_found",
+            status_code=404,
+        )
+    conversation = get_chat_conversation(conversation_id, user_id=user_id, repository=repository)
+    saved_job_ids = conversation.data_scope.saved_job_ids
+    if ref.saved_job_id in saved_job_ids:
+        return conversation
+    if len(saved_job_ids) >= 20:
+        raise JobAgentError(
+            message="A conversation can attach at most 20 jobs.",
             error_code="chat_context_limit_reached",
             status_code=422,
         )
+    # 聊天只固定岗位主记录，页面 capture 不再成为并行的上下文身份。
     scope = conversation.data_scope.model_copy(update={
-        "browser_capture_ids": [*capture_ids, ref.capture_id],
+        "saved_job_ids": [*saved_job_ids, ref.saved_job_id],
     })
     updated = repository.update_conversation(
         user_id=user_id,
@@ -687,7 +674,6 @@ def _validate_data_scope(
     profiles: ResumeProfileRepository = resume_profile_repository,
     searches: JobSearchRepository = job_search_repository,
     saved_jobs: SavedJobRepository = saved_job_repository,
-    captures: BrowserJobCaptureRepository = browser_job_capture_repository,
 ) -> None:
     if scope.resume_profile_id and profiles.get(
         user_id=user_id, resume_profile_id=scope.resume_profile_id
@@ -702,11 +688,6 @@ def _validate_data_scope(
     )
     if any(saved_jobs.get(user_id=user_id, saved_job_id=item) is None for item in scope.saved_job_ids):
         raise _resource_not_found()
-    _validate_browser_capture_ids(
-        scope.browser_capture_ids,
-        user_id=user_id,
-        captures=captures,
-    )
 
 
 def _validate_search_result_refs(
@@ -738,16 +719,6 @@ def _validate_saved_job_ids(
         raise _resource_not_found()
 
 
-def _validate_browser_capture_ids(
-    capture_ids: Sequence[str],
-    *,
-    user_id: str,
-    captures: BrowserJobCaptureRepository = browser_job_capture_repository,
-) -> None:
-    if any(captures.get(user_id=user_id, capture_id=item) is None for item in capture_ids):
-        raise _resource_not_found()
-
-
 def _build_agent_context_manifest(
     conversation: ChatConversation,
     *,
@@ -763,7 +734,6 @@ def _build_agent_context_manifest(
             profiles=resume_profile_repository,
             searches=job_search_repository,
             saved_jobs=saved_job_repository,
-            captures=browser_job_capture_repository,
         )
         if data_access_enabled
         else []
@@ -807,7 +777,6 @@ def _resolve_pinned_memory_resources(
     profiles: ResumeProfileRepository,
     searches: JobSearchRepository,
     saved_jobs: SavedJobRepository,
-    captures: BrowserJobCaptureRepository,
 ) -> list[ChatMemoryResource]:
     resources: list[ChatMemoryResource] = []
     if scope.resume_profile_id:
@@ -857,18 +826,6 @@ def _resolve_pinned_memory_resources(
             ),
             status="available" if job is not None else "unavailable",
         ))
-    for capture_id in scope.browser_capture_ids:
-        capture = captures.get(user_id=user_id, capture_id=capture_id)
-        resources.append(ChatMemoryResource(
-            source_type="search_results",
-            resource_id=capture_id,
-            label=(
-                f"{capture.title or capture.page_title} · {capture.company or 'Unknown company'}"
-                if capture is not None
-                else "Unavailable browser JD capture"
-            ),
-            status="available" if capture is not None else "unavailable",
-        ))
     return resources
 
 
@@ -883,7 +840,6 @@ def _citation_is_available(
     profiles: ResumeProfileRepository,
     searches: JobSearchRepository,
     saved_jobs: SavedJobRepository,
-    captures: BrowserJobCaptureRepository,
 ) -> bool:
     if source_type == "profile":
         return profiles.get(user_id=user_id, resume_profile_id=resource_id) is not None
@@ -899,8 +855,6 @@ def _citation_is_available(
         parts = citation_id.split(":", 2)
         if len(parts) != 3:
             return False
-        if parts[1] == "browser_capture":
-            return captures.get(user_id=user_id, capture_id=resource_id) is not None
         run = searches.get(parts[1], user_id=user_id)
         return run is not None and any(
             item.job_result_id == resource_id for item in run.results

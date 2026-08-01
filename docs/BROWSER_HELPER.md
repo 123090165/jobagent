@@ -31,8 +31,8 @@ User pairs Browser Helper from the authenticated Assistant page
 -> opens a job detail page and the JobAgent Side Panel
 -> clicks Capture current JD
 -> extension reads visible page text and metadata
--> POST /api/v1/browser/job-captures stores an owned capture without LLM analysis
--> POST /api/v1/chat/conversations/{id}/context/browser-captures binds only the owned capture ID
+-> POST /api/v1/browser/job-captures upserts one canonical Job Workspace and stores an owned page snapshot
+-> POST /api/v1/chat/conversations/{id}/context/saved-jobs binds the canonical saved_job_id
 -> Chat is unlocked with the full captured JD visible in a scrollable preview
 -> user selects or creates a conversation and asks questions directly in the Side Panel composer
 -> POST /api/v1/chat/conversations/{id}/turns
@@ -73,21 +73,30 @@ bridge before creating the scoped session. Pairing updates extension session
 storage, which causes an already-open Side Panel to reload its authenticated
 state automatically.
 The token is accepted only by the small Chat subset needed to create/list
-conversations, read/send turns, pin an owned browser capture, and by current-page
+conversations, read/send turns, pin an owned Job Workspace, and by current-page
 capture. Chat deletion, memory clearing, context catalogs, ordinary profile,
 saved-job, auth, and other APIs require a full session. Every repository lookup
 remains scoped by the token's `user_id`.
 
 The Side Panel stores only UI selections in local extension storage. It does not
-persist chat bodies or JD text. A captured page is stored once by the backend and
-referenced by an owned `capture_id`; the backend re-reads it under the current
-user before answering. Match analysis remains optional and creates normal search
-analysis records only when explicitly requested.
+persist chat bodies or JD text. Each capture stores a page snapshot linked to the
+canonical `saved_job_id`; Chat re-reads the current job workspace after ownership
+validation. Match analysis remains optional and is written to that workspace's
+analysis history only when explicitly requested.
 
 The Side Panel may also request a bounded Saved Job selector catalog. This
-catalog exposes only ID, title, company, and status. Selecting an item sends its
+catalog exposes only ID, title, and company. Selecting an item sends its
 ID as a one-turn attachment; the full JD, notes, and analysis remain backend-only
 and are re-read after ownership validation.
+
+After a user-triggered current-page capture, the Side Panel can ask the configured
+LLM to generate an initial greeting or a tailored resume from the selected Resume
+Profile. Generation failure returns an error and does not create fallback content. A
+greeting is sent only after explicit confirmation and visible-page verification;
+the application stage is unchanged when verification fails. Tailored resume
+generation saves/reuses the job, creates/reuses its application workspace, and
+opens the Resume tab for editing and fact review. Neither action polls BOSS,
+captures recruiter conversations, or watches for resume requests.
 
 For JD analysis, the backend maps each ready workflow session to its Resume
 Profile name. The Side Panel calls this an `Analysis profile`; it never displays

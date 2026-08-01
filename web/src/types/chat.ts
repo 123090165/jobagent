@@ -8,8 +8,7 @@ export interface ChatSearchResultRef {
 
 export type ChatTurnAttachment =
   | ({ type: "search_result" } & ChatSearchResultRef)
-  | { type: "saved_job"; saved_job_id: string }
-  | { type: "browser_capture"; capture_id: string };
+  | { type: "saved_job"; saved_job_id: string };
 
 export interface ChatDataScope {
   allowed_sources: ChatSource[];
@@ -17,7 +16,6 @@ export interface ChatDataScope {
   job_search_run_ids: string[];
   job_search_result_refs: ChatSearchResultRef[];
   saved_job_ids: string[];
-  browser_capture_ids: string[];
 }
 
 export interface ChatConversationCreatePayload {

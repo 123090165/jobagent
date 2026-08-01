@@ -22,7 +22,7 @@ const navigation = [
   { name: "home", label: "Resume Intake", icon: "home" as const },
   { name: "resume-profiles", label: "Profile Library", icon: "profile" as const },
   { name: "search-history", label: "Search History", icon: "history" as const },
-  { name: "saved-jobs", label: "Saved Jobs", icon: "bookmark" as const },
+  { name: "saved-jobs", label: "Jobs", icon: "bookmark" as const },
   { name: "assistant", label: "Assistant", icon: "chat" as const },
   { name: "knowledge-status", label: "Knowledge Status", icon: "target" as const }
 ];

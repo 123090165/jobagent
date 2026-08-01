@@ -212,8 +212,7 @@ async function persistSearchResult(result: JobSearchResult) {
     const savedJob = await savedJobsStore.saveFromSearchResult({
       job_search_run_id: run.value.job_search_run_id,
       job_result_id: result.job_result_id,
-      tags: ["search-result"],
-      status: "saved"
+      tags: ["search-result"]
     });
     if (!locallySavedResultIds.value.includes(result.job_result_id)) {
       locallySavedResultIds.value = [...locallySavedResultIds.value, result.job_result_id];

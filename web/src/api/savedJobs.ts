@@ -10,7 +10,11 @@ import type {
   SavedJobCreatePayload,
   SavedJobFromSearchResultPayload,
   SavedJobListResponse,
-  SavedJobStatusEventListResponse,
+  SavedJobWorkspace,
+  JobApplication,
+  ApplicationStage,
+  ApplicationNextAction,
+  TailoredResumeVersion,
   SavedJobUpdatePayload
 } from "../types/savedJob";
 
@@ -40,11 +44,73 @@ export async function listSavedJobAnalyses(
   return response.data;
 }
 
-export async function listSavedJobStatusHistory(
-  savedJobId: string
-): Promise<SavedJobStatusEventListResponse> {
-  const response = await client.get<SavedJobStatusEventListResponse>(
-    `/api/v1/saved-jobs/${savedJobId}/status-history`
+export async function getSavedJobWorkspace(savedJobId: string): Promise<SavedJobWorkspace> {
+  const response = await client.get<SavedJobWorkspace>(
+    `/api/v1/saved-jobs/${savedJobId}/workspace`
+  );
+  return response.data;
+}
+
+export async function createJobApplication(savedJobId: string): Promise<JobApplication> {
+  const response = await client.post<JobApplication>(
+    `/api/v1/saved-jobs/${savedJobId}/application`,
+    {}
+  );
+  return response.data;
+}
+
+export async function updateJobApplication(
+  applicationId: string,
+  payload: {
+    stage?: ApplicationStage;
+    next_action?: ApplicationNextAction;
+    detail?: string;
+  }
+): Promise<JobApplication> {
+  const response = await client.patch<JobApplication>(
+    `/api/v1/job-applications/${applicationId}`,
+    payload
+  );
+  return response.data;
+}
+
+export async function generateTailoredResume(
+  savedJobId: string,
+  resumeProfileId?: string | null
+): Promise<TailoredResumeVersion> {
+  const response = await client.post<TailoredResumeVersion>(
+    `/api/v1/saved-jobs/${savedJobId}/tailored-resumes`,
+    { resume_profile_id: resumeProfileId ?? null }
+  );
+  return response.data;
+}
+
+export async function updateTailoredResume(
+  tailoredResumeId: string,
+  content: string
+): Promise<TailoredResumeVersion> {
+  const response = await client.patch<TailoredResumeVersion>(
+    `/api/v1/tailored-resumes/${tailoredResumeId}`,
+    { content }
+  );
+  return response.data;
+}
+
+export async function approveTailoredResume(
+  tailoredResumeId: string
+): Promise<TailoredResumeVersion> {
+  const response = await client.post<TailoredResumeVersion>(
+    `/api/v1/tailored-resumes/${tailoredResumeId}/approve`
+  );
+  return response.data;
+}
+
+export async function downloadTailoredResumePdf(
+  tailoredResumeId: string
+): Promise<Blob> {
+  const response = await client.get<Blob>(
+    `/api/v1/tailored-resumes/${tailoredResumeId}/pdf`,
+    { responseType: "blob" }
   );
   return response.data;
 }

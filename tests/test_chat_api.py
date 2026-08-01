@@ -251,7 +251,6 @@ def test_browser_helper_session_is_scoped_to_chat(monkeypatch, tmp_path) -> None
         "saved_job_id": alice_job["saved_job_id"],
         "title": "Selected backend role",
         "company": "Private company",
-        "status": "saved",
     }]
     assert "raw_jd_text" not in catalog.text
     assert "Private application notes" not in catalog.text
@@ -370,7 +369,7 @@ def test_saved_job_turn_attachment_is_exact_and_user_scoped(monkeypatch, tmp_pat
     ).status_code == 422
 
 
-def test_browser_capture_turn_attachment_is_user_scoped(monkeypatch, tmp_path) -> None:
+def test_saved_job_turn_attachment_is_user_scoped(monkeypatch, tmp_path) -> None:
     monkeypatch.setenv("JOBAGENT_DB_PATH", str(tmp_path / "capture-attachment-scope.sqlite3"))
     alice = _register("capture-owner")
     bob = _register("capture-other")
@@ -396,15 +395,15 @@ def test_browser_capture_turn_attachment_is_user_scoped(monkeypatch, tmp_path) -
             "client_turn_id": "foreign-capture",
             "question": "Review this JD.",
             "context_attachments": [{
-                "type": "browser_capture",
-                "capture_id": capture["capture_id"],
+                "type": "saved_job",
+                "saved_job_id": capture["saved_job_id"],
             }],
         },
     )
     assert response.status_code == 404
 
 
-def test_browser_capture_can_be_pinned_by_helper_without_copying_jd(monkeypatch, tmp_path) -> None:
+def test_captured_job_can_be_pinned_by_helper_without_copying_jd(monkeypatch, tmp_path) -> None:
     monkeypatch.setenv("JOBAGENT_DB_PATH", str(tmp_path / "capture-pin-scope.sqlite3"))
     alice = _register("capture-pin-owner")
     bob = _register("capture-pin-other")
@@ -430,30 +429,30 @@ def test_browser_capture_can_be_pinned_by_helper_without_copying_jd(monkeypatch,
     helper = {"Authorization": f"Bearer {paired['access_token']}"}
 
     attached = client.post(
-        f"/api/v1/chat/conversations/{conversation['conversation_id']}/context/browser-captures",
+        f"/api/v1/chat/conversations/{conversation['conversation_id']}/context/saved-jobs",
         headers=helper,
-        json={"type": "browser_capture", "capture_id": capture["capture_id"]},
+        json={"type": "saved_job", "saved_job_id": capture["saved_job_id"]},
     )
 
     assert attached.status_code == 200
-    assert attached.json()["data_scope"]["browser_capture_ids"] == [capture["capture_id"]]
+    assert attached.json()["data_scope"]["saved_job_ids"] == [capture["saved_job_id"]]
     assert jd_text not in attached.text
     memory = client.get(
         f"/api/v1/chat/conversations/{conversation['conversation_id']}/memory",
         headers=alice,
     ).json()
     assert memory["pinned_context"] == [{
-        "source_type": "search_results",
-        "resource_id": capture["capture_id"],
+        "source_type": "saved_jobs",
+        "resource_id": capture["saved_job_id"],
         "label": "Agent developer intern · Example AI",
         "status": "available",
     }]
 
     bob_conversation = client.post("/api/v1/chat/conversations", headers=bob, json={}).json()
     assert client.post(
-        f"/api/v1/chat/conversations/{bob_conversation['conversation_id']}/context/browser-captures",
+        f"/api/v1/chat/conversations/{bob_conversation['conversation_id']}/context/saved-jobs",
         headers=helper,
-        json={"type": "browser_capture", "capture_id": capture["capture_id"]},
+        json={"type": "saved_job", "saved_job_id": capture["saved_job_id"]},
     ).status_code == 404
 
 
@@ -516,13 +515,20 @@ def test_agent_compares_previous_saved_job_with_pinned_browser_jd(monkeypatch, t
     conversation = client.post(
         "/api/v1/chat/conversations",
         headers=headers,
-        json={"data_scope": {"browser_capture_ids": [capture["capture_id"]]}},
+        json={"data_scope": {"saved_job_ids": [capture["saved_job_id"]]}},
     ).json()
     endpoint = f"/api/v1/chat/conversations/{conversation['conversation_id']}/turns"
     first = client.post(
         endpoint,
         headers=headers,
-        json={"client_turn_id": "highest-saved", "question": "找到我 saved job 里分数最高的 job"},
+        json={
+            "client_turn_id": "highest-saved",
+            "question": "Review this saved job first.",
+            "context_attachments": [{
+                "type": "saved_job",
+                "saved_job_id": saved_job["saved_job_id"],
+            }],
+        },
     )
     second = client.post(
         endpoint,
@@ -536,12 +542,9 @@ def test_agent_compares_previous_saved_job_with_pinned_browser_jd(monkeypatch, t
     assert second.json()["analysis_mode"] == "llm"
     assert set(second.json()["retrieved_refs"]) == {
         f"saved_job:{saved_job['saved_job_id']}",
-        f"search_result:browser_capture:{capture['capture_id']}",
+        f"saved_job:{capture['saved_job_id']}",
     }
-    assert {item["source_type"] for item in second.json()["citations"]} == {
-        "saved_jobs",
-        "search_results",
-    }
+    assert {item["source_type"] for item in second.json()["citations"]} == {"saved_jobs"}
 
 
 def test_chat_turn_is_persisted_grounded_and_idempotent(monkeypatch, tmp_path) -> None:

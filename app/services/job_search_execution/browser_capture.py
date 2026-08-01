@@ -56,6 +56,7 @@ def _browser_helper_candidate_to_raw(candidate: BrowserHelperJobCandidate) -> Ra
 def _capture_summary(payload: BrowserJobCaptureRequest) -> BrowserJobCaptureSummary:
     return BrowserJobCaptureSummary(
         source=payload.source,
+        platform_job_id=payload.platform_job_id,
         source_url=payload.source_url,
         page_title=payload.page_title,
         title=payload.title,

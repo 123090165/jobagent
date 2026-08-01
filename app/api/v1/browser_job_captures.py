@@ -7,15 +7,17 @@ from app.application.browser_helper_usecases import (
     analyze_saved_browser_job_capture,
     save_browser_job_capture,
 )
-from app.application.job_search_usecases import analyze_browser_job_capture
+from app.application.communication_usecases import generate_browser_greeting_draft
+from app.application.tailored_resume_usecases import generate_browser_capture_resume
 from app.schemas.auth import UserAccount
+from app.schemas.communication import CommunicationDraft, CommunicationDraftGenerateRequest
 from app.schemas.job_search import (
     BrowserJobCaptureAnalyzeResponse,
     BrowserJobCaptureAnalysisRequest,
     BrowserJobCaptureCreateRequest,
     BrowserJobCaptureCreateResponse,
-    BrowserJobCaptureRequest,
 )
+from app.schemas.tailored_resume import TailoredResumeGenerateRequest, TailoredResumeVersion
 
 router = APIRouter(prefix="/api/v1/browser/job-captures", tags=["v4-browser-job-captures"])
 
@@ -26,14 +28,6 @@ def save_browser_job_capture_endpoint(
     current_user: UserAccount = Depends(get_chat_or_browser_helper_user),
 ) -> BrowserJobCaptureCreateResponse:
     return save_browser_job_capture(payload, user_id=current_user.user_id)
-
-
-@router.post("/analyze", response_model=BrowserJobCaptureAnalyzeResponse)
-def analyze_browser_job_capture_endpoint(
-    payload: BrowserJobCaptureRequest,
-    current_user: UserAccount = Depends(get_chat_or_browser_helper_user),
-) -> BrowserJobCaptureAnalyzeResponse:
-    return analyze_browser_job_capture(payload, user_id=current_user.user_id)
 
 
 @router.post("/{capture_id}/analyze", response_model=BrowserJobCaptureAnalyzeResponse)
@@ -47,3 +41,25 @@ def analyze_saved_browser_job_capture_endpoint(
         payload,
         user_id=current_user.user_id,
     )
+
+
+@router.post("/{capture_id}/greeting-drafts", response_model=CommunicationDraft, status_code=201)
+def generate_browser_greeting_draft_endpoint(
+    capture_id: str,
+    payload: CommunicationDraftGenerateRequest,
+    current_user: UserAccount = Depends(get_chat_or_browser_helper_user),
+) -> CommunicationDraft:
+    return generate_browser_greeting_draft(
+        capture_id,
+        payload,
+        user_id=current_user.user_id,
+    )
+
+
+@router.post("/{capture_id}/tailored-resumes", response_model=TailoredResumeVersion, status_code=201)
+def generate_browser_tailored_resume_endpoint(
+    capture_id: str,
+    payload: TailoredResumeGenerateRequest,
+    current_user: UserAccount = Depends(get_chat_or_browser_helper_user),
+) -> TailoredResumeVersion:
+    return generate_browser_capture_resume(capture_id, payload, user_id=current_user.user_id)

@@ -179,6 +179,9 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
             "analyzeCurrentJob",
             "captureCurrentJob",
             "analyzeCapturedJob",
+            "generateGreetingDraft",
+            "generateTailoredResume",
+            "sendGreetingDraft",
             "bossCurrentPageCapture",
             "bindJobAgentSession",
             "getBrowserHelperConnectionStatus",
@@ -186,7 +189,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
             "createAssistantConversation",
             "loadAssistantTurns",
             "sendAssistantTurn",
-            "attachAssistantBrowserCapture",
+            "attachAssistantSavedJob",
             "pinAssistantSearchResult"
           ]
         });
@@ -290,6 +293,32 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         return;
       }
 
+      if (message.action === "generateGreetingDraft") {
+        sendResponse(await generateGreetingDraft({
+          captureId: message.captureId,
+          resumeProfileId: message.resumeProfileId,
+          llmProvider: message.llmProvider
+        }));
+        return;
+      }
+
+      if (message.action === "generateTailoredResume") {
+        sendResponse(await generateTailoredResume({
+          captureId: message.captureId,
+          resumeProfileId: message.resumeProfileId,
+          llmProvider: message.llmProvider
+        }));
+        return;
+      }
+
+      if (message.action === "sendGreetingDraft") {
+        sendResponse(await sendGreetingDraft({
+          draftId: message.draftId,
+          content: message.content
+        }));
+        return;
+      }
+
       if (message.action === "bindJobAgentSession") {
         const backendUrl = normalizeBackendUrl(message.backendUrl || DEFAULT_JOBAGENT_BACKEND_URL);
         assertAllowedBackendUrl(backendUrl);
@@ -366,13 +395,14 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         return;
       }
 
-      if (message.action === "attachAssistantBrowserCapture") {
+      if (message.action === "attachAssistantSavedJob") {
         const conversationId = encodeURIComponent(String(message.conversationId || ""));
+        const savedJobId = String(message.savedJobId || "").trim();
         const conversation = await jobAgentApiRequest(
-          `/api/v1/chat/conversations/${conversationId}/context/browser-captures`,
+          `/api/v1/chat/conversations/${conversationId}/context/saved-jobs`,
           {
             method: "POST",
-            body: { type: "browser_capture", capture_id: String(message.captureId || "") }
+            body: { type: "saved_job", saved_job_id: savedJobId }
           }
         );
         await notifyAssistantContextUpdated(String(message.conversationId || ""));
@@ -488,7 +518,8 @@ async function persistCurrentJobPage() {
     return {
       ok: true,
       capture: { ...capture, ...(payload.capture || {}) },
-      captureId: payload.capture_id
+      captureId: payload.capture_id,
+      savedJobId: payload.saved_job_id
     };
   } catch (error) {
     return { ok: false, errorType: "network", error: `Failed to save the captured JD: ${String(error)}` };
@@ -529,6 +560,157 @@ async function analyzeCapturedJob({ captureId, sessionId, useLlm, analysisMode, 
   } catch (error) {
     return { ok: false, errorType: "network", error: `Failed to analyze the captured JD: ${String(error)}` };
   }
+}
+
+async function generateGreetingDraft({ captureId, resumeProfileId, llmProvider }) {
+  const assistantSession = await getAssistantSession();
+  if (!assistantSession) return { ok: false, errorType: "authentication", error: "Pair Browser Helper first." };
+  const normalizedCaptureId = String(captureId || "").trim();
+  if (!normalizedCaptureId) return { ok: false, errorType: "configuration", error: "Capture a job before generating a greeting." };
+  try {
+    const response = await fetch(
+      `${assistantSession.backendUrl}/api/v1/browser/job-captures/${encodeURIComponent(normalizedCaptureId)}/greeting-drafts`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${assistantSession.accessToken}`
+        },
+        body: JSON.stringify({
+          resume_profile_id: String(resumeProfileId || "").trim() || null,
+          llm_provider: String(llmProvider || "deepseek").trim().toLowerCase()
+        })
+      }
+    );
+    const payload = await readJsonResponse(response);
+    if (!response.ok) {
+      return { ok: false, errorType: "backend", status: response.status, error: payload?.detail || `JobAgent backend returned ${response.status}.` };
+    }
+    return { ok: true, draft: payload };
+  } catch (error) {
+    return { ok: false, errorType: "network", error: `Failed to generate a greeting: ${String(error)}` };
+  }
+}
+
+async function generateTailoredResume({ captureId, resumeProfileId, llmProvider }) {
+  const session = await getAssistantSession();
+  if (!session) return { ok: false, errorType: "authentication", error: "Pair Browser Helper first." };
+  const normalizedCaptureId = String(captureId || "").trim();
+  if (!normalizedCaptureId) return { ok: false, errorType: "configuration", error: "Capture a job before generating a tailored resume." };
+  try {
+    const resume = await jobAgentApiRequest(
+      `/api/v1/browser/job-captures/${encodeURIComponent(normalizedCaptureId)}/tailored-resumes`,
+      {
+        method: "POST",
+        body: {
+          resume_profile_id: String(resumeProfileId || "").trim() || null,
+          llm_provider: String(llmProvider || "mock").trim() || "mock"
+        }
+      }
+    );
+    const workbenchUrl = `${session.appUrl}/saved-jobs/${encodeURIComponent(resume.saved_job_id)}?tab=resume`;
+    await chrome.tabs.create({ url: workbenchUrl, active: true });
+    return { ok: true, resume, workbenchUrl };
+  } catch (error) {
+    return { ok: false, errorType: "backend", error: String(error) };
+  }
+}
+
+async function sendGreetingDraft({ draftId, content }) {
+  const assistantSession = await getAssistantSession();
+  if (!assistantSession) return { ok: false, errorType: "authentication", error: "Pair Browser Helper first." };
+  const normalizedDraftId = String(draftId || "").trim();
+  const normalizedContent = String(content || "").trim();
+  if (!normalizedDraftId || !normalizedContent) {
+    return { ok: false, errorType: "configuration", error: "A reviewed greeting is required." };
+  }
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab?.id) return { ok: false, errorType: "page", error: "No active BOSS tab is available." };
+  const tabGuard = validateCurrentPageCaptureTab(tab);
+  if (!tabGuard.ok) return { ok: false, errorType: "page", error: tabGuard.error };
+
+  const approved = await jobAgentApiRequest(
+    `/api/v1/communication-drafts/${encodeURIComponent(normalizedDraftId)}`,
+    { method: "PATCH", body: { approved_content: normalizedContent, status: "approved" } }
+  );
+  let pageResult = null;
+  try {
+    [pageResult] = await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: sendBossGreetingFromPage,
+      args: [normalizedContent]
+    });
+  } catch (error) {
+    return { ok: false, errorType: "page", draft: approved, error: `Could not operate the BOSS message composer: ${String(error)}` };
+  }
+  const verification = pageResult?.result;
+  if (!verification?.sent) {
+    return {
+      ok: false,
+      errorType: "send_verification",
+      draft: approved,
+      error: verification?.error || "BOSS did not expose a verifiable sent message. The application stage was not changed."
+    };
+  }
+  const confirmed = await jobAgentApiRequest(
+    `/api/v1/communication-drafts/${encodeURIComponent(normalizedDraftId)}/confirm-sent`,
+    {
+      method: "POST",
+      body: {
+        platform_result: "success",
+        sent_content: normalizedContent,
+        sent_at: new Date().toISOString()
+      }
+    }
+  );
+  return { ok: true, ...confirmed };
+}
+
+async function sendBossGreetingFromPage(content) {
+  const normalized = String(content || "").trim();
+  if (!normalized) return { sent: false, error: "Greeting content is empty." };
+  const composerSelectors = [
+    "textarea[placeholder*='消息']",
+    "textarea[placeholder*='沟通']",
+    ".chat-input textarea",
+    "[contenteditable='true'][role='textbox']",
+    ".chat-input [contenteditable='true']"
+  ];
+  const sendSelectors = [
+    "button[ka*='send']",
+    ".send-message",
+    ".btn-send",
+    ".chat-input button[type='button']"
+  ];
+  const composer = composerSelectors.map((selector) => document.querySelector(selector)).find(Boolean);
+  if (!composer) {
+    return { sent: false, error: "Open the BOSS chat composer for this job, then try again." };
+  }
+  composer.focus();
+  if (composer instanceof HTMLTextAreaElement || composer instanceof HTMLInputElement) {
+    const setter = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(composer), "value")?.set;
+    if (setter) setter.call(composer, normalized);
+    else composer.value = normalized;
+  } else {
+    composer.textContent = normalized;
+  }
+  composer.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: normalized }));
+  composer.dispatchEvent(new Event("change", { bubbles: true }));
+  const sendButton = sendSelectors
+    .map((selector) => document.querySelector(selector))
+    .find((node) => node && !node.disabled && node.offsetParent !== null);
+  if (!sendButton) return { sent: false, error: "BOSS send button was not found. No message was sent." };
+  sendButton.click();
+
+  const deadline = Date.now() + 5000;
+  while (Date.now() < deadline) {
+    const visibleMessages = [...document.querySelectorAll(".message-content, .text, [class*='message']")]
+      .filter((node) => node.offsetParent !== null)
+      .map((node) => String(node.innerText || node.textContent || "").trim());
+    if (visibleMessages.includes(normalized)) return { sent: true };
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  return { sent: false, error: "The send action was not confirmed from the visible BOSS conversation." };
 }
 
 async function getAssistantSession() {
@@ -848,6 +1030,15 @@ function captureCurrentJobPage({ minTextLength, maxTextLength, captureVersion, p
     }
   }
 
+  function extractBossJobId(value) {
+    try {
+      const match = new URL(value).pathname.match(/^\/job_detail\/([^/?#]+?)(?:\.html)?\/?$/i);
+      return match ? decodeURIComponent(match[1]) : null;
+    } catch (_error) {
+      return null;
+    }
+  }
+
   function includesAny(text, markers) {
     return markers.some((marker) => text.includes(marker));
   }
@@ -980,6 +1171,7 @@ function captureCurrentJobPage({ minTextLength, maxTextLength, captureVersion, p
   const sourceUrl = window.location.href;
   const pageTitle = document.title || "";
   const source = inferSource(window.location.hostname);
+  const platformJobId = source === "boss" ? extractBossJobId(sourceUrl) : null;
   const warnings = [];
   let title = null;
   let company = null;
@@ -1009,6 +1201,7 @@ function captureCurrentJobPage({ minTextLength, maxTextLength, captureVersion, p
         blocked: true,
         blocked_reason: blockedReason,
         source,
+        platform_job_id: platformJobId,
         source_url: sourceUrl,
         page_title: pageTitle,
         title,
@@ -1039,6 +1232,7 @@ function captureCurrentJobPage({ minTextLength, maxTextLength, captureVersion, p
 
   return {
     source,
+    platform_job_id: platformJobId,
     source_url: sourceUrl,
     page_title: pageTitle,
     title,

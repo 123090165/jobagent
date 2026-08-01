@@ -115,12 +115,14 @@ def test_browser_helper_side_panel_exposes_required_states_and_settings() -> Non
     assert "without running match analysis" in html
     assert "Optional match analysis" in html
     assert "Analyze JD match" in html
+    assert "Generate greeting" in html
+    assert "Confirm and send" in html
     assert "JD analysis" in html
     assert "Ask about this JD" in html
     assert "Send question" in html
     assert "The captured JD is attached to the selected conversation" in html
     assert "Keep analyzed JD in this conversation" not in html
-    assert "Compare with saved job" in html
+    assert "Compare with another job" in html
     assert "chrome.storage.local" in script
     assert "chrome.runtime.sendMessage" in script
     assert 'analysisMode: nodes.useLlm.checked ? "llm" : "deterministic"' in script
@@ -132,9 +134,12 @@ def test_browser_helper_side_panel_exposes_required_states_and_settings() -> Non
     assert "Reading the current BOSS job page" in script
     assert 'action: "captureCurrentJob"' in script
     assert 'action: "analyzeCapturedJob"' in script
-    assert 'type: "browser_capture"' in script
+    assert 'action: "generateGreetingDraft"' in script
+    assert 'action: "sendGreetingDraft"' in script
+    assert 'type: "saved_job"' in script
+    assert "savedJobId" in script
     assert 'action: "sendAssistantTurn"' in script
-    assert 'action: "attachAssistantBrowserCapture"' in script
+    assert 'action: "attachAssistantSavedJob"' in script
     assert "capture.jd_text" in script
     assert "attachCaptureToConversation" in script
     assert "capture: { ...capture, ...(payload.capture || {}) }" in background
@@ -155,6 +160,10 @@ def test_browser_helper_side_panel_exposes_required_states_and_settings() -> Non
     assert "function bindAsyncEvent(node, eventName, handler)" in script
     assert ".catch(renderActionFailure)" in script
     assert "function revokeTemporaryPermission(origin)" in script
+    assert "window.confirm" in script
+    assert "/confirm-sent" in background
+    assert "sendBossGreetingFromPage" in background
+    assert "The application stage was not changed" in background
 
 
 def test_browser_helper_chat_token_is_session_only_and_sent_as_bearer() -> None:

@@ -47,8 +47,29 @@
           <div id="analysisWarnings" class="analysis-warnings hidden"></div>
         </section>
 
+        <section id="greetingControls" class="card hidden">
+          <div class="row split"><strong>2. Initial greeting</strong><span class="badge">User confirmed</span></div>
+          <p class="meta">Generate a grounded draft, edit it, then explicitly confirm before Browser Helper sends it.</p>
+          <button id="generateGreetingButton" type="button">Generate greeting</button>
+          <div id="greetingDraft" class="hidden">
+            <label class="field"><span>Final message</span><textarea id="greetingContent" rows="6" maxlength="1200"></textarea></label>
+            <div class="analysis-list"><span>Evidence used</span><ul id="greetingEvidence"></ul></div>
+            <div id="greetingAvoidSection" class="analysis-list hidden"><span>Avoid unsupported claims</span><ul id="greetingAvoid"></ul></div>
+            <div class="row greeting-actions">
+              <button id="regenerateGreetingButton" class="quiet" type="button">Regenerate</button>
+              <button id="sendGreetingButton" type="button">Confirm and send</button>
+            </div>
+          </div>
+        </section>
+
+        <section id="resumeControls" class="card hidden">
+          <div class="row split"><strong>3. Tailored resume</strong><span class="badge">Fact checked</span></div>
+          <p class="meta">Create a proactive job-specific version from the captured JD and your verified Resume Profile.</p>
+          <button id="generateResumeButton" type="button">Generate and open workbench</button>
+        </section>
+
         <section id="chatStage" class="hidden">
-          <div class="stage-heading"><strong>2. Ask about this JD</strong><span>The captured JD is attached to the selected conversation.</span></div>
+          <div class="stage-heading"><strong>4. Ask about this JD</strong><span>The captured JD is attached to the selected conversation.</span></div>
           <div class="row">
             <label class="field grow"><span>Conversation</span><select id="conversationSelect"></select></label>
             <button id="newConversationButton" type="button">New conversation</button>
@@ -58,10 +79,10 @@
           <section class="composer">
             <strong>Ask a question</strong>
             <label class="field">
-              <span>Compare with saved job (optional)</span>
+              <span>Compare with another job (optional)</span>
               <select id="savedJobSelect"></select>
             </label>
-            <textarea id="question" rows="4" placeholder="Ask about this captured JD, your profile, or a selected saved job..."></textarea>
+            <textarea id="question" rows="4" placeholder="Ask about this job, your profile, or another selected job..."></textarea>
             <button id="sendButton" type="button">Send question</button>
           </section>
 

@@ -431,7 +431,10 @@ def test_saved_job_highest_score_selector_is_deterministic() -> None:
 
 def test_agent_plan_combines_previous_references_and_pinned_context() -> None:
     conversation = _conversation().model_copy(update={
-        "data_scope": ChatDataScope(browser_capture_ids=["capture-1"]),
+        "data_scope": ChatDataScope(job_search_result_refs=[ChatSearchResultRef(
+            job_search_run_id="run-1",
+            job_result_id="result-1",
+        )]),
     })
     previous = ChatTurn(
         turn_id="turn-1",
@@ -479,27 +482,6 @@ def test_agent_policy_uses_pinned_result_for_first_follow_up() -> None:
             job_search_run_id="run-1",
             job_result_id="result-1",
         )]),
-    })
-    tools = default_agent_tools(
-        "What about this job's main risks?",
-        conversation=conversation,
-        context_manifest={"pinned_context": [{"source_type": "search_results"}]},
-    )
-    plan = build_agent_retrieval_plan(
-        "What about this job's main risks?",
-        tool_calls=tools,
-        conversation=conversation,
-        recent_turns=[],
-    )
-
-    assert [(item.source, item.strategy) for item in plan.requests] == [
-        ("search_results", "use_pinned")
-    ]
-
-
-def test_agent_policy_uses_pinned_browser_capture_for_first_follow_up() -> None:
-    conversation = _conversation().model_copy(update={
-        "data_scope": ChatDataScope(browser_capture_ids=["capture-1"]),
     })
     tools = default_agent_tools(
         "What about this job's main risks?",

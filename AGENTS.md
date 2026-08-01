@@ -16,6 +16,20 @@ These instructions apply to the whole repository.
 - Run focused tests first, broader checks for shared contracts, the Vue build
   for frontend changes, and `git diff --check` before handoff.
 
+## Development Data Compatibility
+
+- The project is still in local development and currently has no valuable
+  production data that requires legacy persistence compatibility.
+- When a new schema or domain invariant introduces required fields, prefer
+  rebuilding or clearing local development data over retaining incomplete
+  legacy rows, nullable compatibility columns, dual-read paths, or fallback
+  values that create partially valid records.
+- Remove obsolete tables, fields, migration branches, API shapes, and adapters
+  once the current code and tests no longer require them. Do not preserve an old
+  data contract solely because it existed in an earlier local version.
+- Preserve legacy data only when the user explicitly identifies data as
+  valuable or explicitly requests a migration path for it.
+
 ## Project Boundaries
 
 - `app/api/v1`: HTTP transport and identity dependencies.

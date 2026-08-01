@@ -12,8 +12,7 @@ def test_assistant_page_loads_catalog_and_exposes_pinned_context_controls() -> N
 
     assert "getChatContextCatalog" in page
     assert "/api/v1/chat/context-catalog" in api
-    assert "browser_capture_ids" in page
-    assert 'kind: "browser_capture"' in page
+    assert "browser_capture_ids" not in page
     assert "handleBrowserHelperContextUpdate" in page
     assert "JOBAGENT_HELPER_CONTEXT_UPDATED" in page
     assert "selectedProfileId" in page

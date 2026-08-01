@@ -4,6 +4,11 @@ from fastapi import APIRouter, Depends, Query, Response, status
 from fastapi.responses import PlainTextResponse
 
 from app.api.dependencies import get_current_user
+from app.application.application_tracking_usecases import (
+    create_job_application,
+    get_saved_job_workspace,
+)
+from app.application.tailored_resume_usecases import generate_application_resume
 from app.application.saved_job_usecases import (
     archive_saved_job,
     create_saved_job,
@@ -18,8 +23,6 @@ from app.application.saved_job_usecases import (
     list_saved_jobs,
     list_saved_job_analyses,
     list_saved_job_contexts,
-    list_saved_job_status_events,
-    save_job_from_browser_capture,
     save_job_from_search_result,
     update_saved_job,
 )
@@ -30,17 +33,21 @@ from app.schemas.interview_preparation import (
     PreparationAnswerRequest,
     PreparationGenerateRequest,
 )
+from app.schemas.job_application import (
+    JobApplication,
+    JobApplicationCreateRequest,
+    SavedJobWorkspace,
+)
 from app.schemas.saved_job import (
     SavedJob,
     SavedJobAnalysisListResponse,
     SavedJobCreateRequest,
-    SavedJobFromBrowserCaptureRequest,
     SavedJobFromSearchResultRequest,
     SavedJobListResponse,
     SavedJobOriginListResponse,
     SavedJobUpdateRequest,
-    SavedJobStatusEventListResponse,
 )
+from app.schemas.tailored_resume import TailoredResumeGenerateRequest, TailoredResumeVersion
 from app.services.llm_observability import anonymous_trace_id, langfuse_agent_trace
 
 router = APIRouter(prefix="/api/v1/saved-jobs", tags=["v4-saved-jobs"])
@@ -75,20 +82,46 @@ def save_job_from_search_result_endpoint(
     return save_job_from_search_result(payload, user_id=current_user.user_id)
 
 
-@router.post("/from-browser-capture", response_model=SavedJob)
-def save_job_from_browser_capture_endpoint(
-    payload: SavedJobFromBrowserCaptureRequest,
-    current_user: UserAccount = Depends(get_current_user),
-) -> SavedJob:
-    return save_job_from_browser_capture(payload, user_id=current_user.user_id)
-
-
 @router.get("/{saved_job_id}", response_model=SavedJob)
 def get_saved_job_endpoint(
     saved_job_id: str,
     current_user: UserAccount = Depends(get_current_user),
 ) -> SavedJob:
     return get_saved_job(saved_job_id, user_id=current_user.user_id)
+
+
+@router.get("/{saved_job_id}/workspace", response_model=SavedJobWorkspace)
+def get_saved_job_workspace_endpoint(
+    saved_job_id: str,
+    current_user: UserAccount = Depends(get_current_user),
+) -> SavedJobWorkspace:
+    return get_saved_job_workspace(saved_job_id, user_id=current_user.user_id)
+
+
+@router.post("/{saved_job_id}/application", response_model=JobApplication, status_code=201)
+def create_job_application_endpoint(
+    saved_job_id: str,
+    payload: JobApplicationCreateRequest,
+    current_user: UserAccount = Depends(get_current_user),
+) -> JobApplication:
+    return create_job_application(
+        saved_job_id,
+        payload,
+        user_id=current_user.user_id,
+    )
+
+
+@router.post(
+    "/{saved_job_id}/tailored-resumes",
+    response_model=TailoredResumeVersion,
+    status_code=201,
+)
+def generate_tailored_resume_endpoint(
+    saved_job_id: str,
+    payload: TailoredResumeGenerateRequest,
+    current_user: UserAccount = Depends(get_current_user),
+) -> TailoredResumeVersion:
+    return generate_application_resume(saved_job_id, payload, user_id=current_user.user_id)
 
 
 @router.get("/{saved_job_id}/analyses", response_model=SavedJobAnalysisListResponse)
@@ -108,16 +141,6 @@ def list_saved_job_contexts_endpoint(
 ) -> SavedJobOriginListResponse:
     return SavedJobOriginListResponse(
         items=list_saved_job_contexts(saved_job_id, user_id=current_user.user_id)
-    )
-
-
-@router.get("/{saved_job_id}/status-history", response_model=SavedJobStatusEventListResponse)
-def list_saved_job_status_events_endpoint(
-    saved_job_id: str,
-    current_user: UserAccount = Depends(get_current_user),
-) -> SavedJobStatusEventListResponse:
-    return SavedJobStatusEventListResponse(
-        items=list_saved_job_status_events(saved_job_id, user_id=current_user.user_id)
     )
 
 

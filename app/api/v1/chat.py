@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Query, Response, status
 
 from app.api.dependencies import get_chat_or_browser_helper_user, get_current_user
 from app.application.chat_usecases import (
-    attach_chat_browser_capture,
+    attach_chat_saved_job,
     attach_chat_search_result,
     clear_chat_memory,
     create_chat_conversation,
@@ -21,13 +21,13 @@ from app.application.chat_usecases import (
 )
 from app.schemas.auth import UserAccount
 from app.schemas.chat import (
-    ChatBrowserCaptureAttachment,
     ChatConversation,
     ChatConversationCreateRequest,
     ChatConversationListResponse,
     ChatConversationUpdateRequest,
     ChatContextCatalog,
     ChatMemoryStatus,
+    ChatSavedJobAttachment,
     ChatSearchResultRef,
     ChatTurn,
     ChatTurnCreateRequest,
@@ -150,13 +150,13 @@ def attach_chat_search_result_endpoint(
     return attach_chat_search_result(conversation_id, payload, user_id=current_user.user_id)
 
 
-@router.post("/{conversation_id}/context/browser-captures", response_model=ChatConversation)
-def attach_chat_browser_capture_endpoint(
+@router.post("/{conversation_id}/context/saved-jobs", response_model=ChatConversation)
+def attach_chat_saved_job_endpoint(
     conversation_id: str,
-    payload: ChatBrowserCaptureAttachment,
+    payload: ChatSavedJobAttachment,
     current_user: UserAccount = Depends(get_chat_or_browser_helper_user),
 ) -> ChatConversation:
-    return attach_chat_browser_capture(
+    return attach_chat_saved_job(
         conversation_id,
         payload,
         user_id=current_user.user_id,

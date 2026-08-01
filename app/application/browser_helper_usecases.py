@@ -19,6 +19,7 @@ from app.repositories.resume_profile_repository import (
     ResumeProfileRepository,
     resume_profile_repository,
 )
+from app.repositories.job_search_repository import JobSearchRepository, job_search_repository
 from app.repositories.saved_job_repository import SavedJobRepository, saved_job_repository
 from app.schemas.browser_helper import (
     BrowserHelperContextCatalog,
@@ -33,9 +34,11 @@ from app.schemas.job_search import (
     BrowserJobCaptureCreateResponse,
     BrowserJobCaptureRequest,
 )
+from app.schemas.saved_job import SavedJobCreateRequest
 from app.services.errors import JobAgentError
 from app.services.job_search_execution.browser_capture import _capture_summary
 from app.services.password_service import generate_auth_token, hash_auth_token
+from app.storage.database import get_connection, init_database
 
 
 BROWSER_HELPER_SESSION_HOURS = 8
@@ -47,10 +50,46 @@ def save_browser_job_capture(
     *,
     user_id: str,
     captures: BrowserJobCaptureRepository = browser_job_capture_repository,
+    saved_jobs: SavedJobRepository = saved_job_repository,
 ) -> BrowserJobCaptureCreateResponse:
-    record = captures.create(user_id=user_id, payload=payload)
+    title = (payload.title or payload.page_title).strip()
+    # Helper 点击抓取即代表用户已经操作该岗位，因此在同一事务中建立唯一岗位主记录和页面快照。
+    with get_connection() as connection:
+        init_database(connection)
+        job = saved_jobs.save_with_connection(
+            connection,
+            user_id=user_id,
+            payload=SavedJobCreateRequest(
+                source_provider=payload.source,
+                platform_job_id=payload.platform_job_id,
+                source_url=payload.source_url,
+                title=title,
+                company=payload.company,
+                location=payload.location,
+                salary=payload.salary,
+                raw_jd_text=payload.jd_text,
+                structured_jd={"source": payload.source, "extractor_version": payload.extractor_version},
+                tags=["browser-helper"],
+            ),
+        )
+        record = captures.create(
+            connection=connection,
+            user_id=user_id,
+            saved_job_id=job.saved_job_id,
+            payload=payload,
+        )
+        saved_jobs.create_origin_with_connection(
+            connection,
+            user_id=user_id,
+            saved_job_id=job.saved_job_id,
+            origin_key=f"browser-capture:{record.capture_id}",
+            origin_type="browser_capture",
+            source_provider=payload.source,
+        )
+        connection.commit()
     return BrowserJobCaptureCreateResponse(
         capture_id=record.capture_id,
+        saved_job_id=job.saved_job_id,
         capture=_capture_summary(record),
     )
 
@@ -61,6 +100,8 @@ def analyze_saved_browser_job_capture(
     *,
     user_id: str,
     captures: BrowserJobCaptureRepository = browser_job_capture_repository,
+    searches: JobSearchRepository = job_search_repository,
+    saved_jobs: SavedJobRepository = saved_job_repository,
 ) -> BrowserJobCaptureAnalyzeResponse:
     record = captures.get(user_id=user_id, capture_id=capture_id)
     if record is None:
@@ -69,7 +110,7 @@ def analyze_saved_browser_job_capture(
             error_code="browser_job_capture_not_found",
             status_code=404,
         )
-    return analyze_browser_job_capture(
+    response = analyze_browser_job_capture(
         BrowserJobCaptureRequest(
             **record.model_dump(
                 exclude={
@@ -88,6 +129,42 @@ def analyze_saved_browser_job_capture(
         ),
         user_id=user_id,
     )
+    run = searches.get(response.job_search_run_id, user_id=user_id)
+    result = run.results[0] if run and run.results else None
+    if run is None or result is None:
+        raise RuntimeError("Browser analysis result disappeared before persistence.")
+    report = response.report
+    analysis = saved_jobs.create_analysis(
+        user_id=user_id,
+        saved_job_id=record.saved_job_id,
+        resume_profile_id=run.resume_profile_id,
+        source_job_search_run_id=run.job_search_run_id,
+        source_job_result_id=result.job_result_id,
+        match_score=report.overall_score,
+        confidence_label=report.confidence_label,
+        recommendation=report.recommendation,
+        matched_strengths=report.matched_strengths,
+        critical_gaps=report.critical_gaps,
+        resume_actions=report.resume_actions,
+        interview_questions=report.interview_questions,
+        analysis=result.model_dump(mode="json"),
+        analysis_mode=report.analysis_mode,
+    )
+    saved_jobs.create_origin(
+        user_id=user_id,
+        saved_job_id=record.saved_job_id,
+        origin_key=f"browser-capture:{record.capture_id}",
+        origin_type="browser_capture",
+        resume_profile_id=run.resume_profile_id,
+        job_search_run_id=run.job_search_run_id,
+        job_search_result_id=result.job_result_id,
+        saved_job_analysis_id=analysis.saved_job_analysis_id,
+        source_provider=record.source,
+    )
+    return response.model_copy(update={
+        "saved_job_id": record.saved_job_id,
+        "saved_job_analysis_id": analysis.saved_job_analysis_id,
+    })
 
 
 def get_browser_helper_context_catalog(
@@ -101,7 +178,6 @@ def get_browser_helper_context_catalog(
                 saved_job_id=item.saved_job_id,
                 title=item.title,
                 company=item.company,
-                status=item.status,
             )
             for item in saved_jobs.list_by_user(user_id)[:BROWSER_HELPER_SAVED_JOB_LIMIT]
         ]
@@ -135,6 +211,7 @@ def create_browser_helper_session(
         profile = profiles_by_session.get(session.session_id)
         options.append(BrowserHelperProfileSessionOption(
             session_id=session.session_id,
+            resume_profile_id=profile.resume_profile_id if profile is not None else None,
             label=profile.name if profile is not None else "Confirmed profile",
             is_default=profile.is_default if profile is not None else False,
         ))

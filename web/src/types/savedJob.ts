@@ -1,12 +1,3 @@
-export type SavedJobStatus =
-  | "saved"
-  | "interested"
-  | "applied"
-  | "interviewing"
-  | "rejected"
-  | "closed"
-  | "archived";
-
 export interface SavedJobAnalysis {
   saved_job_analysis_id: string;
   saved_job_id: string;
@@ -30,6 +21,7 @@ export interface SavedJob {
   saved_job_id: string;
   user_id: string;
   source_provider: string | null;
+  platform_job_id: string | null;
   source_url: string | null;
   normalized_source_key: string | null;
   title: string;
@@ -40,7 +32,6 @@ export interface SavedJob {
   raw_jd_text: string;
   structured_jd: Record<string, unknown>;
   tags: string[];
-  status: SavedJobStatus;
   notes: string | null;
   first_seen_at: string;
   saved_at: string;
@@ -214,22 +205,98 @@ export interface InterviewPreparationWorkspace {
   updated_at: string;
 }
 
-export interface SavedJobStatusEvent {
-  saved_job_status_event_id: string;
-  saved_job_id: string;
+export type ApplicationStage =
+  | "not_started"
+  | "contacted"
+  | "recruiter_replied"
+  | "resume_requested"
+  | "resume_ready"
+  | "resume_sent"
+  | "interview"
+  | "closed";
+
+export type ApplicationNextAction =
+  | "generate_greeting"
+  | "review_greeting"
+  | "wait_for_reply"
+  | "review_reply"
+  | "generate_resume"
+  | "review_resume"
+  | "send_resume"
+  | "prepare_interview"
+  | "none";
+
+export interface JobApplication {
+  application_id: string;
   user_id: string;
-  from_status: SavedJobStatus | null;
-  to_status: SavedJobStatus;
-  reason: string | null;
-  changed_at: string;
+  saved_job_id: string;
+  stage: ApplicationStage;
+  next_action: ApplicationNextAction;
+  last_activity_at: string;
+  contacted_at: string | null;
+  replied_at: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
-export interface SavedJobStatusEventListResponse {
-  items: SavedJobStatusEvent[];
+export interface ApplicationEvent {
+  event_id: string;
+  application_id: string;
+  user_id: string;
+  event_type: string;
+  source: "web" | "browser_helper" | "system" | "user";
+  detail: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface CommunicationDraft {
+  draft_id: string;
+  application_id: string | null;
+  browser_capture_id: string | null;
+  generated_content: string;
+  approved_content: string | null;
+  status: "generated" | "approved" | "sent" | "failed" | "dismissed";
+  evidence_used: string[];
+  avoid_claims: string[];
+  analysis_provider: string | null;
+  created_at: string;
+  updated_at: string;
+  sent_at: string | null;
+}
+
+export interface TailoredResumeVersion {
+  tailored_resume_id: string;
+  user_id: string;
+  saved_job_id: string;
+  resume_profile_id: string;
+  version: number;
+  content: string;
+  validation: {
+    is_valid: boolean;
+    issues: string[];
+    warnings: string[];
+  };
+  status: "needs_review" | "approved";
+  analysis_provider: string | null;
+  created_at: string;
+  updated_at: string;
+  approved_at: string | null;
+}
+
+export interface SavedJobWorkspace {
+  job: SavedJob;
+  application: JobApplication | null;
+  latest_analysis: SavedJobAnalysis | null;
+  communication_draft: CommunicationDraft | null;
+  tailored_resume: TailoredResumeVersion | null;
+  allowed_stage_transitions: ApplicationStage[];
+  events: ApplicationEvent[];
 }
 
 export interface SavedJobCreatePayload {
   source_provider?: string | null;
+  platform_job_id?: string | null;
   source_url?: string | null;
   title: string;
   company?: string | null;
@@ -239,12 +306,10 @@ export interface SavedJobCreatePayload {
   raw_jd_text: string;
   structured_jd?: Record<string, unknown>;
   tags?: string[];
-  status?: SavedJobStatus;
   notes?: string | null;
 }
 
 export interface SavedJobUpdatePayload {
-  status?: SavedJobStatus | null;
   notes?: string | null;
   tags?: string[] | null;
 }
@@ -254,6 +319,5 @@ export interface SavedJobFromSearchResultPayload {
   job_result_id: string;
   resume_profile_id?: string | null;
   tags?: string[];
-  status?: SavedJobStatus;
   notes?: string | null;
 }

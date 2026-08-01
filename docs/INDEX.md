@@ -24,6 +24,8 @@ history archive. Git preserves completed plans and deleted designs.
 - [SEARCH_MISSION.md](SEARCH_MISSION.md): intent collection, agent
   interpretation, conflict detection, confirmation, and search integration.
 - [JOB_BRIEF.md](JOB_BRIEF.md): versioned saved-job decision and action briefs.
+- [APPLICATION_WORKBENCH.md](APPLICATION_WORKBENCH.md): application tracking,
+  confirmed greetings, and fact-checked tailored resume versions.
 - [STREAMLINED_PRODUCT_FLOW.md](STREAMLINED_PRODUCT_FLOW.md): three-stage user
   flow and the Search Analysis versus Job Brief responsibility boundary.
 - [INTERVIEW_PREPARATION.md](INTERVIEW_PREPARATION.md): evidence gaps, MCP
@@ -54,8 +56,8 @@ User login
 -> Search preview
 -> Provider search and analysis
 -> Search results
--> Saved job library
+-> Job workspace data hub
 -> Job Brief
+-> Application workbench
+-> Confirmed communication and tailored resume
 ~~~
-
-Resume tailoring and a complete application workflow remain planned product flows.

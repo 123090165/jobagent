@@ -146,14 +146,12 @@ def test_save_job_from_search_result_creates_saved_job_and_analysis(monkeypatch,
             "job_search_run_id": run["job_search_run_id"],
             "job_result_id": result["job_result_id"],
             "tags": ["priority"],
-            "status": "interested",
         },
     )
 
     assert save_response.status_code == 200
     saved = save_response.json()
     assert saved["title"] == result["title"]
-    assert saved["status"] == "interested"
     assert saved["latest_analysis"]["source_job_search_run_id"] == run["job_search_run_id"]
     assert saved["latest_analysis"]["source_job_result_id"] == result["job_result_id"]
     assert saved["latest_analysis"]["match_score"] == result["match_score"]
@@ -355,67 +353,6 @@ def test_job_search_result_feedback_upserts_and_is_user_scoped(monkeypatch, tmp_
     assert updated.json()["source_provider"] == "local_mock"
     assert updated.json()["resume_profile_id"] is not None
     assert len(listed.json()["items"]) == 1
-    assert other.status_code == 404
-
-
-def test_saved_job_status_history_tracks_transitions_and_is_user_scoped(
-    monkeypatch, tmp_path
-) -> None:
-    monkeypatch.setenv("JOBAGENT_DB_PATH", str(tmp_path / "status-history.sqlite3"))
-    owner_headers = _auth_headers(_register("status-owner"))
-    other_headers = _auth_headers(_register("status-other"))
-    confirmed = _create_confirmed_profile(owner_headers)
-    run = client.post(
-        "/api/v1/job-search-runs",
-        headers=owner_headers,
-        json={
-            "session_id": confirmed["profile_session"]["session_id"],
-            "search_mode": "local_mock",
-        },
-    ).json()["job_search_run"]
-    saved = client.post(
-        "/api/v1/saved-jobs/from-search-result",
-        headers=owner_headers,
-        json={
-            "job_search_run_id": run["job_search_run_id"],
-            "job_result_id": run["results"][0]["job_result_id"],
-        },
-    ).json()
-    client.patch(
-        f"/api/v1/saved-jobs/{saved['saved_job_id']}",
-        headers=owner_headers,
-        json={"status": "applied"},
-    )
-    updated = client.patch(
-        f"/api/v1/saved-jobs/{saved['saved_job_id']}",
-        headers=owner_headers,
-        json={"status": "interviewing"},
-    )
-    client.post(
-        "/api/v1/saved-jobs/from-search-result",
-        headers=owner_headers,
-        json={
-            "job_search_run_id": run["job_search_run_id"],
-            "job_result_id": run["results"][0]["job_result_id"],
-        },
-    )
-
-    history_url = f"/api/v1/saved-jobs/{saved['saved_job_id']}/status-history"
-    history = client.get(history_url, headers=owner_headers)
-    other = client.get(history_url, headers=other_headers)
-
-    assert updated.status_code == 200
-    assert updated.json()["status"] == "interviewing"
-    current = client.get(
-        f"/api/v1/saved-jobs/{saved['saved_job_id']}", headers=owner_headers
-    )
-    assert current.json()["status"] == "interviewing"
-    assert history.status_code == 200
-    assert [item["to_status"] for item in history.json()["items"]] == [
-        "interviewing",
-        "applied",
-        "saved",
-    ]
     assert other.status_code == 404
 
 

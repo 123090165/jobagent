@@ -11,8 +11,6 @@ from app.schemas.saved_job import (
     SavedJobAnalysis,
     SavedJobCreateRequest,
     SavedJobOrigin,
-    SavedJobStatus,
-    SavedJobStatusEvent,
     SavedJobUpdateRequest,
 )
 from app.storage.database import get_connection, init_database
@@ -29,101 +27,70 @@ class SavedJobRepository:
         user_id: str,
         payload: SavedJobCreateRequest,
     ) -> SavedJob:
-        existing = self._get_by_identity(
-            user_id=user_id,
-            source_url=_clean_optional_string(payload.source_url),
-            normalized_source_key=_normalized_source_key(
-                title=payload.title,
-                company=payload.company,
-                location=payload.location,
-                source_provider=payload.source_provider,
-            ),
-        )
-        if existing is not None:
-            next_status = (
-                existing.status
-                if payload.status == "saved" and existing.status != "archived"
-                else payload.status
-            )
-            updated = self.update(
-                user_id=user_id,
-                saved_job_id=existing.saved_job_id,
-                payload=SavedJobUpdateRequest(
-                    status=next_status,
-                    notes=payload.notes if payload.notes is not None else existing.notes,
-                    tags=_clean_list(existing.tags + payload.tags),
-                ),
-            )
-            return self._refresh_content_if_better(
-                user_id=user_id,
-                existing=updated or existing,
-                payload=payload,
-            )
-
-        now = _utc_now()
-        source_url = _clean_optional_string(payload.source_url)
-        job = SavedJob(
-            saved_job_id=str(uuid4()),
-            user_id=user_id,
-            source_provider=_clean_optional_string(payload.source_provider),
-            source_url=source_url,
-            normalized_source_key=_normalized_source_key(
-                title=payload.title,
-                company=payload.company,
-                location=payload.location,
-                source_provider=payload.source_provider,
-            ),
-            title=payload.title.strip(),
-            company=_clean_optional_string(payload.company),
-            location=_clean_optional_string(payload.location),
-            salary=_clean_optional_string(payload.salary),
-            employment_type=_clean_optional_string(payload.employment_type),
-            raw_jd_text=payload.raw_jd_text.strip(),
-            structured_jd=payload.structured_jd,
-            tags=_clean_list(payload.tags),
-            status=payload.status,
-            notes=_clean_optional_string(payload.notes),
-            first_seen_at=now,
-            saved_at=now,
-            updated_at=now,
-        )
         with get_connection() as connection:
             init_database(connection)
+            job = self.save_with_connection(
+                connection,
+                user_id=user_id,
+                payload=payload,
+            )
+            connection.commit()
+        return self.get(user_id=user_id, saved_job_id=job.saved_job_id) or job
+
+    def save_with_connection(
+        self,
+        connection: sqlite3.Connection,
+        *,
+        user_id: str,
+        payload: SavedJobCreateRequest,
+    ) -> SavedJob:
+        source_url = _clean_optional_string(payload.source_url)
+        normalized_key = _normalized_source_key(
+            title=payload.title,
+            company=payload.company,
+            location=payload.location,
+            source_provider=payload.source_provider,
+        )
+        existing = self._get_by_identity_on_connection(
+            connection,
+            user_id=user_id,
+            source_provider=_clean_optional_string(payload.source_provider),
+            platform_job_id=_clean_optional_string(payload.platform_job_id),
+            source_url=source_url,
+            normalized_source_key=normalized_key,
+        )
+        now = _utc_now()
+        if existing is None:
+            job = SavedJob(
+                saved_job_id=str(uuid4()),
+                user_id=user_id,
+                source_provider=_clean_optional_string(payload.source_provider),
+                platform_job_id=_clean_optional_string(payload.platform_job_id),
+                source_url=source_url,
+                normalized_source_key=normalized_key,
+                title=payload.title.strip(),
+                company=_clean_optional_string(payload.company),
+                location=_clean_optional_string(payload.location),
+                salary=_clean_optional_string(payload.salary),
+                employment_type=_clean_optional_string(payload.employment_type),
+                raw_jd_text=payload.raw_jd_text.strip(),
+                structured_jd=payload.structured_jd,
+                tags=_clean_list(payload.tags),
+                notes=_clean_optional_string(payload.notes),
+                first_seen_at=now,
+                saved_at=now,
+                updated_at=now,
+            )
             connection.execute(
                 """
                 INSERT INTO saved_jobs (
-                    saved_job_id,
-                    user_id,
-                    source_provider,
-                    source_url,
-                    normalized_source_key,
-                    title,
-                    company,
-                    location,
-                    salary,
-                    employment_type,
-                    raw_jd_text,
-                    structured_jd_json,
-                    tags_json,
-                    status,
-                    notes,
-                    first_seen_at,
-                    saved_at,
-                    updated_at,
-                    archived_at
-                )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    saved_job_id, user_id, source_provider, platform_job_id, source_url,
+                    normalized_source_key, title, company, location, salary,
+                    employment_type, raw_jd_text, structured_jd_json, tags_json,
+                    notes, first_seen_at, saved_at, updated_at, archived_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 self._job_values(job),
-            )
-            self._insert_status_event(
-                connection,
-                user_id=user_id,
-                saved_job_id=job.saved_job_id,
-                from_status=None,
-                to_status=job.status,
-                reason="Job saved",
-                changed_at=now,
             )
             rag_sync_repository.enqueue_if_enabled(
                 connection=connection,
@@ -132,16 +99,8 @@ class SavedJobRepository:
                 resource_id=job.saved_job_id,
                 operation="upsert",
             )
-            connection.commit()
-        return job
+            return job
 
-    def _refresh_content_if_better(
-        self,
-        *,
-        user_id: str,
-        existing: SavedJob,
-        payload: SavedJobCreateRequest,
-    ) -> SavedJob:
         incoming_jd = payload.raw_jd_text.strip()
         raw_jd_text = (
             incoming_jd
@@ -152,41 +111,73 @@ class SavedJobRepository:
             existing.structured_jd,
             payload.structured_jd,
         )
-        if (
-            raw_jd_text == existing.raw_jd_text
-            and structured_jd == existing.structured_jd
-        ):
-            return existing
-
-        updated_at = _utc_now()
-        with get_connection() as connection:
-            init_database(connection)
-            connection.execute(
-                """
-                UPDATE saved_jobs
-                SET raw_jd_text = ?, structured_jd_json = ?, updated_at = ?
-                WHERE user_id = ? AND saved_job_id = ?
-                """,
-                (
-                    raw_jd_text,
-                    json.dumps(structured_jd),
-                    updated_at.isoformat(),
-                    user_id,
-                    existing.saved_job_id,
+        source_provider = _clean_optional_string(payload.source_provider) or existing.source_provider
+        platform_job_id = _clean_optional_string(payload.platform_job_id) or existing.platform_job_id
+        source_url = source_url or existing.source_url
+        title = payload.title.strip() or existing.title
+        company = _clean_optional_string(payload.company) or existing.company
+        location = _clean_optional_string(payload.location) or existing.location
+        salary = _clean_optional_string(payload.salary) or existing.salary
+        employment_type = (
+            _clean_optional_string(payload.employment_type) or existing.employment_type
+        )
+        updated = existing.model_copy(
+            update={
+                "source_provider": source_provider,
+                "platform_job_id": platform_job_id,
+                "source_url": source_url,
+                "title": title,
+                "company": company,
+                "location": location,
+                "salary": salary,
+                "employment_type": employment_type,
+                "raw_jd_text": raw_jd_text,
+                "structured_jd": structured_jd,
+                "tags": _clean_list(existing.tags + payload.tags),
+                "notes": (
+                    _clean_optional_string(payload.notes)
+                    if payload.notes is not None
+                    else existing.notes
                 ),
-            )
-            rag_sync_repository.enqueue_if_enabled(
-                connection=connection,
-                user_id=user_id,
-                resource_type="saved_job",
-                resource_id=existing.saved_job_id,
-                operation="upsert",
-            )
-            connection.commit()
-        return self.get(
+                "archived_at": None,
+                "updated_at": now,
+            }
+        )
+        connection.execute(
+            """
+            UPDATE saved_jobs
+            SET source_provider = ?, platform_job_id = ?, source_url = ?, title = ?,
+                company = ?, location = ?, salary = ?, employment_type = ?,
+                raw_jd_text = ?, structured_jd_json = ?, tags_json = ?, notes = ?,
+                archived_at = NULL, updated_at = ?
+            WHERE user_id = ? AND saved_job_id = ?
+            """,
+            (
+                updated.source_provider,
+                updated.platform_job_id,
+                updated.source_url,
+                updated.title,
+                updated.company,
+                updated.location,
+                updated.salary,
+                updated.employment_type,
+                updated.raw_jd_text,
+                json.dumps(updated.structured_jd),
+                json.dumps(updated.tags),
+                updated.notes,
+                updated.updated_at.isoformat(),
+                user_id,
+                updated.saved_job_id,
+            ),
+        )
+        rag_sync_repository.enqueue_if_enabled(
+            connection=connection,
             user_id=user_id,
-            saved_job_id=existing.saved_job_id,
-        ) or existing
+            resource_type="saved_job",
+            resource_id=updated.saved_job_id,
+            operation="upsert",
+        )
+        return updated
 
     def create_analysis(
         self,
@@ -286,11 +277,44 @@ class SavedJobRepository:
         search_query: str | None = None,
         source_provider: str | None = None,
     ) -> SavedJobOrigin:
-        created_at = _utc_now()
-        origin_id = str(uuid4())
         with get_connection() as connection:
             init_database(connection)
-            connection.execute(
+            origin = self.create_origin_with_connection(
+                connection,
+                user_id=user_id,
+                saved_job_id=saved_job_id,
+                origin_key=origin_key,
+                origin_type=origin_type,
+                resume_profile_id=resume_profile_id,
+                job_search_run_id=job_search_run_id,
+                job_search_result_id=job_search_result_id,
+                saved_job_analysis_id=saved_job_analysis_id,
+                profile_label=profile_label,
+                search_query=search_query,
+                source_provider=source_provider,
+            )
+            connection.commit()
+        return origin
+
+    def create_origin_with_connection(
+        self,
+        connection: sqlite3.Connection,
+        *,
+        user_id: str,
+        saved_job_id: str,
+        origin_key: str,
+        origin_type: str,
+        resume_profile_id: str | None = None,
+        job_search_run_id: str | None = None,
+        job_search_result_id: str | None = None,
+        saved_job_analysis_id: str | None = None,
+        profile_label: str | None = None,
+        search_query: str | None = None,
+        source_provider: str | None = None,
+    ) -> SavedJobOrigin:
+        created_at = _utc_now()
+        origin_id = str(uuid4())
+        connection.execute(
                 """
                 INSERT INTO saved_job_origins (
                     saved_job_origin_id, origin_key, user_id, saved_job_id,
@@ -318,14 +342,13 @@ class SavedJobRepository:
                     _clean_optional_string(source_provider), created_at.isoformat(),
                 ),
             )
-            row = connection.execute(
-                """
-                SELECT * FROM saved_job_origins
-                WHERE user_id = ? AND saved_job_id = ? AND origin_key = ?
-                """,
-                (user_id, saved_job_id, origin_key),
-            ).fetchone()
-            connection.commit()
+        row = connection.execute(
+            """
+            SELECT * FROM saved_job_origins
+            WHERE user_id = ? AND saved_job_id = ? AND origin_key = ?
+            """,
+            (user_id, saved_job_id, origin_key),
+        ).fetchone()
         if row is None:
             raise RuntimeError("Saved job origin disappeared after creation.")
         return self._row_to_origin(row)
@@ -385,22 +408,14 @@ class SavedJobRepository:
         existing = self.get(user_id=user_id, saved_job_id=saved_job_id)
         if existing is None:
             return None
-        next_status: SavedJobStatus = payload.status or existing.status
-        archived_at = existing.archived_at
-        if next_status == "archived" and archived_at is None:
-            archived_at = _utc_now()
-        elif next_status != "archived":
-            archived_at = None
         updated = existing.model_copy(
             update={
-                "status": next_status,
                 "notes": _clean_optional_string(payload.notes)
                 if payload.notes is not None
                 else existing.notes,
                 "tags": _clean_list(payload.tags)
                 if payload.tags is not None
                 else existing.tags,
-                "archived_at": archived_at,
                 "updated_at": _utc_now(),
             }
         )
@@ -409,35 +424,23 @@ class SavedJobRepository:
             connection.execute(
                 """
                 UPDATE saved_jobs
-                SET status = ?, notes = ?, tags_json = ?, archived_at = ?, updated_at = ?
+                SET notes = ?, tags_json = ?, updated_at = ?
                 WHERE user_id = ? AND saved_job_id = ?
                 """,
                 (
-                    updated.status,
                     updated.notes,
                     json.dumps(updated.tags),
-                    updated.archived_at.isoformat() if updated.archived_at else None,
                     updated.updated_at.isoformat(),
                     user_id,
                     saved_job_id,
                 ),
             )
-            if next_status != existing.status:
-                self._insert_status_event(
-                    connection,
-                    user_id=user_id,
-                    saved_job_id=saved_job_id,
-                    from_status=existing.status,
-                    to_status=next_status,
-                    reason="Status updated",
-                    changed_at=updated.updated_at,
-                )
             rag_sync_repository.enqueue_if_enabled(
                 connection=connection,
                 user_id=user_id,
                 resource_type="saved_job",
                 resource_id=saved_job_id,
-                operation="delete" if updated.archived_at is not None else "upsert",
+                operation="delete" if existing.archived_at is not None else "upsert",
             )
             connection.commit()
         return self.get(user_id=user_id, saved_job_id=saved_job_id)
@@ -452,27 +455,42 @@ class SavedJobRepository:
             connection.execute(
                 """
                 UPDATE saved_jobs
-                SET status = ?, archived_at = ?, updated_at = ?
+                SET archived_at = ?, updated_at = ?
                 WHERE user_id = ? AND saved_job_id = ?
                 """,
-                ("archived", now, now, user_id, saved_job_id),
+                (now, now, user_id, saved_job_id),
             )
-            if existing.status != "archived":
-                self._insert_status_event(
-                    connection,
-                    user_id=user_id,
-                    saved_job_id=saved_job_id,
-                    from_status=existing.status,
-                    to_status="archived",
-                    reason="Job archived",
-                    changed_at=datetime.fromisoformat(now),
-                )
             rag_sync_repository.enqueue_if_enabled(
                 connection=connection,
                 user_id=user_id,
                 resource_type="saved_job",
                 resource_id=saved_job_id,
                 operation="delete",
+            )
+            connection.commit()
+        return self.get(user_id=user_id, saved_job_id=saved_job_id)
+
+    def restore(self, *, user_id: str, saved_job_id: str) -> SavedJob | None:
+        existing = self.get(user_id=user_id, saved_job_id=saved_job_id)
+        if existing is None:
+            return None
+        now = _utc_now().isoformat()
+        with get_connection() as connection:
+            init_database(connection)
+            connection.execute(
+                """
+                UPDATE saved_jobs
+                SET archived_at = NULL, updated_at = ?
+                WHERE user_id = ? AND saved_job_id = ?
+                """,
+                (now, user_id, saved_job_id),
+            )
+            rag_sync_repository.enqueue_if_enabled(
+                connection=connection,
+                user_id=user_id,
+                resource_type="saved_job",
+                resource_id=saved_job_id,
+                operation="upsert",
             )
             connection.commit()
         return self.get(user_id=user_id, saved_job_id=saved_job_id)
@@ -496,10 +514,6 @@ class SavedJobRepository:
             )
             connection.execute(
                 "DELETE FROM saved_job_analyses WHERE user_id = ? AND saved_job_id = ?",
-                (user_id, saved_job_id),
-            )
-            connection.execute(
-                "DELETE FROM saved_job_status_events WHERE user_id = ? AND saved_job_id = ?",
                 (user_id, saved_job_id),
             )
             cursor = connection.execute(
@@ -547,57 +561,43 @@ class SavedJobRepository:
             ).fetchall()
         return [self._row_to_analysis(row) for row in rows]
 
-    def list_status_events(
-        self, *, user_id: str, saved_job_id: str
-    ) -> list[SavedJobStatusEvent]:
-        with get_connection() as connection:
-            init_database(connection)
-            rows = connection.execute(
-                """
-                SELECT * FROM saved_job_status_events
-                WHERE user_id = ? AND saved_job_id = ?
-                ORDER BY changed_at DESC, saved_job_status_event_id DESC
-                """,
-                (user_id, saved_job_id),
-            ).fetchall()
-        return [self._row_to_status_event(row) for row in rows]
-
-    def _get_by_identity(
-        self,
+    @staticmethod
+    def _get_by_identity_on_connection(
+        connection: sqlite3.Connection,
         *,
         user_id: str,
+        source_provider: str | None,
+        platform_job_id: str | None,
         source_url: str | None,
         normalized_source_key: str | None,
     ) -> SavedJob | None:
-        if source_url is not None:
-            with get_connection() as connection:
-                init_database(connection)
-                row = connection.execute(
-                    """
-                    SELECT *
-                    FROM saved_jobs
-                    WHERE user_id = ? AND source_url = ?
-                    """,
-                    (user_id, source_url),
-                ).fetchone()
+        if source_provider is not None and platform_job_id is not None:
+            row = connection.execute(
+                """
+                SELECT * FROM saved_jobs
+                WHERE user_id = ? AND source_provider = ? AND platform_job_id = ?
+                """,
+                (user_id, source_provider, platform_job_id),
+            ).fetchone()
             if row is not None:
-                return self._with_latest_analysis(self._row_to_job(row))
+                return SavedJobRepository._row_to_job(row)
+        if source_url is not None:
+            row = connection.execute(
+                "SELECT * FROM saved_jobs WHERE user_id = ? AND source_url = ?",
+                (user_id, source_url),
+            ).fetchone()
+            if row is not None:
+                return SavedJobRepository._row_to_job(row)
 
         if normalized_source_key is None:
             return None
-        with get_connection() as connection:
-            init_database(connection)
-            row = connection.execute(
-                """
-                SELECT *
-                FROM saved_jobs
-                WHERE user_id = ? AND normalized_source_key = ?
-                """,
-                (user_id, normalized_source_key),
-            ).fetchone()
+        row = connection.execute(
+            "SELECT * FROM saved_jobs WHERE user_id = ? AND normalized_source_key = ?",
+            (user_id, normalized_source_key),
+        ).fetchone()
         if row is None:
             return None
-        return self._with_latest_analysis(self._row_to_job(row))
+        return SavedJobRepository._row_to_job(row)
 
     def _with_latest_analysis(self, job: SavedJob) -> SavedJob:
         return job.model_copy(
@@ -615,6 +615,7 @@ class SavedJobRepository:
             job.saved_job_id,
             job.user_id,
             job.source_provider,
+            job.platform_job_id,
             job.source_url,
             job.normalized_source_key,
             job.title,
@@ -625,7 +626,6 @@ class SavedJobRepository:
             job.raw_jd_text,
             json.dumps(job.structured_jd),
             json.dumps(job.tags),
-            job.status,
             job.notes,
             job.first_seen_at.isoformat(),
             job.saved_at.isoformat(),
@@ -639,6 +639,7 @@ class SavedJobRepository:
             saved_job_id=row["saved_job_id"],
             user_id=row["user_id"],
             source_provider=row["source_provider"],
+            platform_job_id=row["platform_job_id"],
             source_url=row["source_url"],
             normalized_source_key=row["normalized_source_key"],
             title=row["title"],
@@ -649,7 +650,6 @@ class SavedJobRepository:
             raw_jd_text=row["raw_jd_text"],
             structured_jd=json.loads(row["structured_jd_json"]),
             tags=json.loads(row["tags_json"] or "[]"),
-            status=row["status"],
             notes=row["notes"],
             first_seen_at=datetime.fromisoformat(row["first_seen_at"]),
             saved_at=datetime.fromisoformat(row["saved_at"]),
@@ -698,48 +698,6 @@ class SavedJobRepository:
             source_provider=row["source_provider"],
             created_at=datetime.fromisoformat(row["created_at"]),
         )
-
-    @staticmethod
-    def _row_to_status_event(row: object) -> SavedJobStatusEvent:
-        return SavedJobStatusEvent(
-            saved_job_status_event_id=row["saved_job_status_event_id"],
-            saved_job_id=row["saved_job_id"],
-            user_id=row["user_id"],
-            from_status=row["from_status"],
-            to_status=row["to_status"],
-            reason=row["reason"],
-            changed_at=datetime.fromisoformat(row["changed_at"]),
-        )
-
-    @staticmethod
-    def _insert_status_event(
-        connection: sqlite3.Connection,
-        *,
-        user_id: str,
-        saved_job_id: str,
-        from_status: str | None,
-        to_status: str,
-        reason: str,
-        changed_at: datetime,
-    ) -> None:
-        connection.execute(
-            """
-            INSERT INTO saved_job_status_events (
-                saved_job_status_event_id, saved_job_id, user_id,
-                from_status, to_status, reason, changed_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                str(uuid4()),
-                saved_job_id,
-                user_id,
-                from_status,
-                to_status,
-                reason,
-                changed_at.isoformat(),
-            ),
-        )
-
 
 def _normalized_source_key(
     *,

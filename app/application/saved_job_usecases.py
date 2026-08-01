@@ -35,11 +35,9 @@ from app.schemas.saved_job import (
     SavedJob,
     SavedJobAnalysis,
     SavedJobCreateRequest,
-    SavedJobFromBrowserCaptureRequest,
     SavedJobFromSearchResultRequest,
     SavedJobOrigin,
     SavedJobUpdateRequest,
-    SavedJobStatusEvent,
 )
 from app.services.errors import JobAgentError
 from app.services.job_brief_generator import generate_job_brief_content
@@ -118,17 +116,6 @@ def list_saved_job_contexts(
     if repository.get(user_id=user_id, saved_job_id=saved_job_id) is None:
         raise _not_found()
     return repository.list_origins(user_id=user_id, saved_job_id=saved_job_id)
-
-
-def list_saved_job_status_events(
-    saved_job_id: str,
-    *,
-    user_id: str,
-    repository: SavedJobRepository = saved_job_repository,
-) -> list[SavedJobStatusEvent]:
-    if repository.get(user_id=user_id, saved_job_id=saved_job_id) is None:
-        raise _not_found()
-    return repository.list_status_events(user_id=user_id, saved_job_id=saved_job_id)
 
 
 def list_job_briefs(
@@ -677,7 +664,6 @@ def save_job_from_search_result(
             raw_jd_text=result.description,
             structured_jd=_structured_jd_from_result(result),
             tags=payload.tags,
-            status=payload.status,
             notes=payload.notes,
         ),
     )
@@ -714,59 +700,6 @@ def save_job_from_search_result(
     if saved is None:
         raise RuntimeError("Saved job disappeared after analysis creation.")
     return saved
-
-
-def save_job_from_browser_capture(
-    payload: SavedJobFromBrowserCaptureRequest,
-    *,
-    user_id: str,
-    repository: SavedJobRepository = saved_job_repository,
-    resume_profiles: ResumeProfileRepository = resume_profile_repository,
-) -> SavedJob:
-    profile = None
-    if payload.resume_profile_id is not None:
-        profile = resume_profiles.get(
-            user_id=user_id,
-            resume_profile_id=payload.resume_profile_id,
-        )
-        if profile is None or profile.archived_at is not None:
-            raise JobAgentError(
-                message="Resume profile not found or archived.",
-                error_code="resume_profile_not_found",
-                status_code=404,
-            )
-    job = repository.save(user_id=user_id, payload=payload)
-    analysis = None
-    if payload.analysis is not None:
-        analysis = repository.create_analysis(
-            user_id=user_id,
-            saved_job_id=job.saved_job_id,
-            resume_profile_id=payload.resume_profile_id,
-            match_score=payload.match_score,
-            confidence_label=payload.confidence_label,
-            recommendation=payload.recommendation,
-            matched_strengths=[],
-            critical_gaps=[],
-            resume_actions=[payload.recommendation] if payload.recommendation else [],
-            interview_questions=[],
-            analysis=payload.analysis,
-            analysis_mode=str(payload.analysis.get("analysis_mode") or "browser_capture"),
-        )
-    repository.create_origin(
-        user_id=user_id,
-        saved_job_id=job.saved_job_id,
-        origin_key=f"browser:{payload.source_url or job.saved_job_id}:{payload.resume_profile_id or 'none'}",
-        origin_type="browser_capture",
-        resume_profile_id=payload.resume_profile_id,
-        saved_job_analysis_id=analysis.saved_job_analysis_id if analysis else None,
-        profile_label=profile.name if profile else None,
-        source_provider=payload.source_provider,
-    )
-    if analysis is not None:
-        saved = repository.get(user_id=user_id, saved_job_id=job.saved_job_id)
-        if saved is not None:
-            return saved
-    return job
 
 
 def _structured_jd_from_result(result: JobSearchResult) -> dict[str, object]:

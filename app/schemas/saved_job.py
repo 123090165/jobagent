@@ -5,17 +5,6 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
 
-SavedJobStatus = Literal[
-    "saved",
-    "interested",
-    "applied",
-    "interviewing",
-    "rejected",
-    "closed",
-    "archived",
-]
-
-
 class SavedJobAnalysis(BaseModel):
     saved_job_analysis_id: str
     saved_job_id: str
@@ -54,6 +43,7 @@ class SavedJob(BaseModel):
     saved_job_id: str
     user_id: str
     source_provider: str | None = None
+    platform_job_id: str | None = None
     source_url: str | None = None
     normalized_source_key: str | None = None
     title: str
@@ -64,7 +54,6 @@ class SavedJob(BaseModel):
     raw_jd_text: str
     structured_jd: dict[str, object] = Field(default_factory=dict)
     tags: list[str] = Field(default_factory=list)
-    status: SavedJobStatus = "saved"
     notes: str | None = None
     first_seen_at: datetime
     saved_at: datetime
@@ -75,6 +64,7 @@ class SavedJob(BaseModel):
 
 class SavedJobCreateRequest(BaseModel):
     source_provider: str | None = None
+    platform_job_id: str | None = None
     source_url: str | None = None
     title: str
     company: str | None = None
@@ -84,7 +74,6 @@ class SavedJobCreateRequest(BaseModel):
     raw_jd_text: str
     structured_jd: dict[str, object] = Field(default_factory=dict)
     tags: list[str] = Field(default_factory=list)
-    status: SavedJobStatus = "saved"
     notes: str | None = None
 
     @field_validator("title", "raw_jd_text")
@@ -97,7 +86,6 @@ class SavedJobCreateRequest(BaseModel):
 
 
 class SavedJobUpdateRequest(BaseModel):
-    status: SavedJobStatus | None = None
     notes: str | None = None
     tags: list[str] | None = None
 
@@ -107,16 +95,7 @@ class SavedJobFromSearchResultRequest(BaseModel):
     job_result_id: str
     resume_profile_id: str | None = None
     tags: list[str] = Field(default_factory=list)
-    status: SavedJobStatus = "saved"
     notes: str | None = None
-
-
-class SavedJobFromBrowserCaptureRequest(SavedJobCreateRequest):
-    analysis: dict[str, object] | None = None
-    resume_profile_id: str | None = None
-    match_score: int | None = None
-    confidence_label: str | None = None
-    recommendation: str | None = None
 
 
 class SavedJobListResponse(BaseModel):
@@ -129,17 +108,3 @@ class SavedJobAnalysisListResponse(BaseModel):
 
 class SavedJobOriginListResponse(BaseModel):
     items: list[SavedJobOrigin] = Field(default_factory=list)
-
-
-class SavedJobStatusEvent(BaseModel):
-    saved_job_status_event_id: str
-    saved_job_id: str
-    user_id: str
-    from_status: SavedJobStatus | None = None
-    to_status: SavedJobStatus
-    reason: str | None = None
-    changed_at: datetime
-
-
-class SavedJobStatusEventListResponse(BaseModel):
-    items: list[SavedJobStatusEvent] = Field(default_factory=list)

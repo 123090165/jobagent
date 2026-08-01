@@ -43,7 +43,7 @@ import type {
 
 type ContextItem = {
   key: string;
-  kind: "profile" | "search_run" | "search_result" | "saved_job" | "browser_capture";
+  kind: "profile" | "search_run" | "search_result" | "saved_job";
   resourceId: string;
   runId?: string;
   label: string;
@@ -129,17 +129,6 @@ const contextItems = computed<ContextItem[]>(() => {
       label: memoryItem?.label ?? "Pinned search result"
     });
   }
-  for (const captureId of conversation.data_scope.browser_capture_ids) {
-    const memoryItem = memoryStatus.value?.pinned_context.find(
-      (item) => item.source_type === "search_results" && item.resource_id === captureId
-    );
-    items.push({
-      key: `capture:${captureId}`,
-      kind: "browser_capture",
-      resourceId: captureId,
-      label: memoryItem?.label ?? "Captured browser JD"
-    });
-  }
   return items;
 });
 const summaryFactCount = computed(() => {
@@ -150,7 +139,7 @@ const summaryFactCount = computed(() => {
   );
 });
 const suggestions = [
-  "比较我收藏的岗位，告诉我应该优先申请哪一个。",
+  "比较我管理中的岗位，告诉我应该优先申请哪一个。",
   "根据我的 Profile，总结最适合我的岗位方向。",
   "最近搜索结果里有哪些值得关注的风险？"
 ];
@@ -348,8 +337,7 @@ async function useAutomaticContext() {
         resume_profile_id: null,
         job_search_run_ids: [],
         job_search_result_refs: [],
-        saved_job_ids: [],
-        browser_capture_ids: []
+        saved_job_ids: []
       }
     });
     replaceConversation(updated);
@@ -414,8 +402,7 @@ async function removePinnedContext(item: ContextItem) {
     ...conversation.data_scope,
     job_search_run_ids: [...conversation.data_scope.job_search_run_ids],
     job_search_result_refs: [...conversation.data_scope.job_search_result_refs],
-    saved_job_ids: [...conversation.data_scope.saved_job_ids],
-    browser_capture_ids: [...conversation.data_scope.browser_capture_ids]
+    saved_job_ids: [...conversation.data_scope.saved_job_ids]
   };
   if (item.kind === "profile") scope.resume_profile_id = null;
   if (item.kind === "search_run") {
@@ -428,9 +415,6 @@ async function removePinnedContext(item: ContextItem) {
   }
   if (item.kind === "saved_job") {
     scope.saved_job_ids = scope.saved_job_ids.filter((savedJobId) => savedJobId !== item.resourceId);
-  }
-  if (item.kind === "browser_capture") {
-    scope.browser_capture_ids = scope.browser_capture_ids.filter((captureId) => captureId !== item.resourceId);
   }
   try {
     const updated = await updateChatConversation(conversation.conversation_id, { data_scope: scope });
@@ -458,7 +442,7 @@ function sourceLabel(source: ChatSource): string {
   return {
     profile: "profile",
     search_results: "search results",
-    saved_jobs: "saved jobs",
+    saved_jobs: "job workspaces",
     chat_history: "chat history"
   }[source];
 }
@@ -577,7 +561,7 @@ async function scrollToBottom() {
             <n-select v-model:value="selectedRunIds" multiple :max-tag-count="2" :options="searchRunOptions" placeholder="Automatic recent searches" />
           </label>
           <label>
-            <span>Saved jobs (up to 20)</span>
+            <span>Job workspaces (up to 20)</span>
             <n-select v-model:value="selectedSavedJobIds" multiple :max-tag-count="2" :options="savedJobOptions" placeholder="Automatic active jobs" />
           </label>
           <div class="context-panel-actions">

@@ -1,37 +1,22 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
-import { NButton, NCheckbox, NDropdown, NInput, NSelect, NSwitch, NTag } from "naive-ui";
+import { NButton, NCheckbox, NDropdown, NInput, NSwitch, NTag } from "naive-ui";
 
 import FlowPageHeader from "../components/FlowPageHeader.vue";
 import { useSavedJobsStore } from "../stores/savedJobs";
-import type { SavedJob, SavedJobStatus } from "../types/savedJob";
+import type { SavedJob } from "../types/savedJob";
 
 const store = useSavedJobsStore();
 const router = useRouter();
 const includeArchived = ref(false);
 const query = ref("");
-const statusFilter = ref<string>("active");
 const actionMessage = ref<string | null>(null);
 const selectionMode = ref(false);
 const selectedJobIds = ref<string[]>([]);
-const bulkStatus = ref<SavedJobStatus | null>(null);
 const isBulkSaving = ref(false);
 const BULK_LIMIT = 50;
 
-const statusOptions: Array<{ label: string; value: SavedJobStatus }> = [
-  { label: "Saved", value: "saved" },
-  { label: "Interested", value: "interested" },
-  { label: "Applied", value: "applied" },
-  { label: "Interviewing", value: "interviewing" },
-  { label: "Rejected", value: "rejected" },
-  { label: "Closed", value: "closed" }
-];
-const filterOptions = [
-  { label: "Active jobs", value: "active" },
-  ...statusOptions,
-  { label: "All statuses", value: "all" }
-];
 const rowActions = [
   { label: "Archive", key: "archive" },
   { label: "Delete permanently", key: "delete" }
@@ -41,8 +26,6 @@ const visibleJobs = computed(() => {
   const term = query.value.trim().toLocaleLowerCase();
   return store.jobs.filter((job) => {
     if (!includeArchived.value && job.archived_at) return false;
-    if (statusFilter.value === "active" && ["rejected", "closed", "archived"].includes(job.status)) return false;
-    if (statusFilter.value !== "active" && statusFilter.value !== "all" && job.status !== statusFilter.value) return false;
     if (!term) return true;
     return [job.title, job.company, job.location, ...job.tags]
       .filter(Boolean)
@@ -67,16 +50,6 @@ async function loadJobs() {
   actionMessage.value = null;
   try {
     await store.loadJobs(includeArchived.value);
-  } catch {
-    // Store error is rendered below.
-  }
-}
-
-async function updateStatus(job: SavedJob, value: SavedJobStatus) {
-  actionMessage.value = null;
-  try {
-    await store.updateJob(job.saved_job_id, { status: value });
-    actionMessage.value = `${job.title} moved to ${value}.`;
   } catch {
     // Store error is rendered below.
   }
@@ -148,25 +121,6 @@ async function bulkArchive() {
   isBulkSaving.value = false;
 }
 
-async function bulkUpdateStatus() {
-  const jobs = [...selectedJobs.value];
-  if (!jobs.length || !bulkStatus.value || isBulkSaving.value) return;
-  isBulkSaving.value = true;
-  actionMessage.value = null;
-  const status = bulkStatus.value;
-  const successfulIds: string[] = [];
-  for (const job of jobs) {
-    try {
-      await store.updateJob(job.saved_job_id, { status });
-      successfulIds.push(job.saved_job_id);
-    } catch {
-      // Keep failed jobs selected for retry.
-    }
-  }
-  reportBulkResult(`Move to ${status}`, jobs, successfulIds);
-  isBulkSaving.value = false;
-}
-
 async function bulkDelete() {
   const jobs = [...selectedJobs.value];
   if (!jobs.length || isBulkSaving.value) return;
@@ -189,12 +143,6 @@ async function bulkDelete() {
   isBulkSaving.value = false;
 }
 
-function statusTagType(status: SavedJobStatus) {
-  if (["interested", "applied", "interviewing"].includes(status)) return "success";
-  if (["rejected", "archived"].includes(status)) return "warning";
-  return "default";
-}
-
 function scoreLabel(job: SavedJob): string {
   return job.latest_analysis?.match_score === null || job.latest_analysis?.match_score === undefined
     ? "Not scored"
@@ -202,8 +150,6 @@ function scoreLabel(job: SavedJob): string {
 }
 
 function nextStep(job: SavedJob): string {
-  if (job.status === "interviewing") return "Continue interview preparation";
-  if (job.status === "applied") return "Review preparation plan";
   if (!job.latest_analysis) return "Review job details";
   if (job.latest_analysis.critical_gaps.length) return `Review gap: ${job.latest_analysis.critical_gaps[0]}`;
   return job.latest_analysis.recommendation || "Review fit and decide next action";
@@ -214,7 +160,7 @@ function nextStep(job: SavedJob): string {
   <section class="flow-page flow-page-wide">
     <FlowPageHeader
       eyebrow="Library"
-      title="Saved Jobs"
+      title="Job Workspaces"
       description="Compare opportunities, track progress, and continue preparation."
       :meta="`${visibleJobs.length} shown`"
       :active-step="2"
@@ -224,7 +170,6 @@ function nextStep(job: SavedJob): string {
 
     <div class="saved-jobs-toolbar workspace-panel">
       <n-input v-model:value="query" clearable placeholder="Search role, company, location, or tag" />
-      <n-select v-model:value="statusFilter" :options="filterOptions" />
       <label class="saved-jobs-archive-toggle">
         <span>Archived</span>
         <n-switch v-model:value="includeArchived" />
@@ -244,22 +189,6 @@ function nextStep(job: SavedJob): string {
         Select visible (max {{ BULK_LIMIT }})
       </n-checkbox>
       <span class="flow-meta">{{ selectedJobIds.length }} selected</span>
-      <n-select
-        v-model:value="bulkStatus"
-        :options="statusOptions"
-        clearable
-        placeholder="Set status"
-        size="small"
-      />
-      <n-button
-        size="small"
-        secondary
-        :loading="isBulkSaving"
-        :disabled="!selectedJobIds.length || !bulkStatus"
-        @click="bulkUpdateStatus"
-      >
-        Update status
-      </n-button>
       <n-button
         size="small"
         secondary
@@ -284,10 +213,10 @@ function nextStep(job: SavedJob): string {
     <p v-if="actionMessage" class="flow-meta library-message">{{ actionMessage }}</p>
 
     <div v-if="store.isLoading && !store.jobs.length" class="review-empty-state">
-      <p class="flow-message">Loading saved jobs...</p>
+      <p class="flow-message">Loading job workspaces...</p>
     </div>
     <div v-else-if="!visibleJobs.length" class="review-empty-state">
-      <p class="flow-message">No saved jobs match the current filters.</p>
+      <p class="flow-message">No job workspaces match the current filters.</p>
     </div>
 
     <div v-else class="saved-jobs-list">
@@ -306,7 +235,9 @@ function nextStep(job: SavedJob): string {
                 {{ job.company || "Unknown company" }} · {{ job.location || "Location not set" }}
               </p>
             </div>
-            <n-tag :type="statusTagType(job.status)" size="small" round>{{ job.status }}</n-tag>
+            <n-tag :type="job.archived_at ? 'warning' : 'default'" size="small" round>
+              {{ job.archived_at ? "Archived" : "Saved" }}
+            </n-tag>
           </div>
           <div v-if="job.tags.length" class="job-chip-row">
             <n-tag v-for="tag in job.tags.slice(0, 4)" :key="tag" size="small">{{ tag }}</n-tag>
@@ -325,13 +256,6 @@ function nextStep(job: SavedJob): string {
         </div>
 
         <div class="saved-job-row-actions">
-          <n-select
-            :value="job.status"
-            :options="statusOptions"
-            size="small"
-            :disabled="store.isSaving"
-            @update:value="updateStatus(job, $event)"
-          />
           <n-button type="primary" size="small" @click="router.push({ name: 'saved-job-detail', params: { savedJobId: job.saved_job_id } })">
             Open Workspace
           </n-button>

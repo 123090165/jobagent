@@ -5,10 +5,6 @@ import re
 from dataclasses import dataclass
 
 from app.repositories.chat_repository import ChatRepository, chat_repository
-from app.repositories.browser_job_capture_repository import (
-    BrowserJobCaptureRepository,
-    browser_job_capture_repository,
-)
 from app.repositories.job_search_repository import JobSearchRepository, job_search_repository
 from app.repositories.resume_profile_repository import ResumeProfileRepository, resume_profile_repository
 from app.repositories.saved_job_repository import SavedJobRepository, saved_job_repository
@@ -37,7 +33,6 @@ def build_chat_evidence(
     searches: JobSearchRepository = job_search_repository,
     saved_jobs: SavedJobRepository = saved_job_repository,
     chats: ChatRepository = chat_repository,
-    captures: BrowserJobCaptureRepository = browser_job_capture_repository,
 ) -> tuple[list[ChatEvidence], list[str]]:
     evidence: list[ChatEvidence] = []
     warnings: list[str] = []
@@ -111,7 +106,6 @@ def build_chat_evidence(
                     "title": job.title,
                     "company": job.company,
                     "location": job.location,
-                    "status": job.status,
                     "tags": job.tags,
                     "notes": job.notes,
                     "jd_excerpt": job.raw_jd_text[:1400],
@@ -124,41 +118,6 @@ def build_chat_evidence(
 
     if "search_results" in requested_sources:
         active_search_refs = [item.split(":", 2) for item in active_refs if item.startswith("search_result:")]
-        active_capture_ids = list(dict.fromkeys([
-            *scope.browser_capture_ids,
-            *(
-            item[2] for item in active_search_refs
-            if len(item) == 3 and item[1] == "browser_capture"
-            ),
-        ]))
-        for capture_id in active_capture_ids:
-            capture = captures.get(user_id=user_id, capture_id=capture_id)
-            if capture is None:
-                warnings.append("An attached browser JD capture is no longer available.")
-                continue
-            evidence.append(ChatEvidence(
-                citation=ChatCitation(
-                    citation_id=f"search_result:browser_capture:{capture.capture_id}",
-                    source_type="search_results",
-                    resource_id=capture.capture_id,
-                    label=f"{capture.title or capture.page_title} 路 {capture.company or 'Unknown company'}",
-                    excerpt=capture.jd_text[:300],
-                    href=capture.source_url,
-                ),
-                content={
-                    "source": "browser_capture",
-                    "title": capture.title or capture.page_title,
-                    "company": capture.company,
-                    "location": capture.location,
-                    "salary": capture.salary,
-                    "source_url": capture.source_url,
-                    "jd_text": capture.jd_text[:12_000],
-                },
-            ))
-        active_search_refs = [
-            item for item in active_search_refs
-            if len(item) == 3 and item[1] != "browser_capture"
-        ]
         active_run_ids = list(dict.fromkeys(item[1] for item in active_search_refs))
         active_result_ids_by_run: dict[str, set[str]] = {}
         for item in active_search_refs:
@@ -180,8 +139,6 @@ def build_chat_evidence(
                 item for run_id in selected_run_ids
                 if (item := searches.get(run_id, user_id=user_id)) is not None
             ]
-        elif active_capture_ids:
-            runs = []
         else:
             runs = [item for item in searches.list_recent_by_user(user_id, limit=5) if item.status == "completed"]
         candidates = [

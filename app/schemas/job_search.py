@@ -211,6 +211,7 @@ class BrowserHelperJobSearchRunCreateRequest(BaseModel):
 
 class BrowserJobCaptureCreateRequest(BaseModel):
     source: BrowserJobCaptureSource = "unknown"
+    platform_job_id: str | None = None
     source_url: str
     page_title: str
     title: str | None = None
@@ -234,7 +235,7 @@ class BrowserJobCaptureCreateRequest(BaseModel):
             raise ValueError("field cannot be empty")
         return cleaned
 
-    @field_validator("title", "company", "location", "salary", mode="before")
+    @field_validator("platform_job_id", "title", "company", "location", "salary", mode="before")
     @classmethod
     def _optional_string(cls, value: object) -> str | None:
         if value is None:
@@ -310,6 +311,7 @@ class BrowserJobCaptureAnalysisRequest(BaseModel):
 
 class BrowserJobCaptureResource(BrowserJobCaptureCreateRequest):
     capture_id: str
+    saved_job_id: str
     created_at: datetime
 
 
@@ -319,6 +321,7 @@ class BrowserJobCaptureRecord(BrowserJobCaptureResource):
 
 class BrowserJobCaptureSummary(BaseModel):
     source: BrowserJobCaptureSource
+    platform_job_id: str | None = None
     source_url: str
     page_title: str
     title: str | None = None
@@ -332,6 +335,7 @@ class BrowserJobCaptureSummary(BaseModel):
 
 class BrowserJobCaptureCreateResponse(BaseModel):
     capture_id: str
+    saved_job_id: str
     capture: BrowserJobCaptureSummary
 
 
@@ -347,6 +351,8 @@ class BrowserJobCaptureReport(BaseModel):
 
 
 class BrowserJobCaptureAnalyzeResponse(BaseModel):
+    saved_job_id: str | None = None
+    saved_job_analysis_id: str | None = None
     capture: BrowserJobCaptureSummary
     report: BrowserJobCaptureReport
     warnings: list[str] = Field(default_factory=list)

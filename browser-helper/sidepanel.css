@@ -39,4 +39,6 @@ button:disabled { cursor: wait; opacity: .55; }
 .message p { margin: 5px 0 0; white-space: pre-wrap; line-height: 1.45; }
 .composer textarea { resize: vertical; }
 .composer > button { width: 100%; }
+.greeting-actions { margin-top: 10px; align-items: stretch; }
+.greeting-actions button { flex: 1; }
 .hidden { display: none !important; }

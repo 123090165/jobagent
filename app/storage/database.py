@@ -249,6 +249,7 @@ def init_database(connection: sqlite3.Connection) -> None:
             saved_job_id TEXT PRIMARY KEY,
             user_id TEXT NOT NULL,
             source_provider TEXT,
+            platform_job_id TEXT,
             source_url TEXT,
             normalized_source_key TEXT,
             title TEXT NOT NULL,
@@ -259,13 +260,87 @@ def init_database(connection: sqlite3.Connection) -> None:
             raw_jd_text TEXT NOT NULL,
             structured_jd_json TEXT NOT NULL,
             tags_json TEXT NOT NULL DEFAULT '[]',
-            status TEXT NOT NULL DEFAULT 'saved',
             notes TEXT,
             first_seen_at TEXT NOT NULL,
             saved_at TEXT NOT NULL,
             updated_at TEXT NOT NULL,
             archived_at TEXT,
             FOREIGN KEY (user_id) REFERENCES users(user_id)
+        );
+
+        CREATE TABLE IF NOT EXISTS job_applications (
+            application_id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            saved_job_id TEXT NOT NULL,
+            stage TEXT NOT NULL,
+            next_action TEXT NOT NULL,
+            last_activity_at TEXT NOT NULL,
+            contacted_at TEXT,
+            replied_at TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users(user_id),
+            FOREIGN KEY (saved_job_id) REFERENCES saved_jobs(saved_job_id) ON DELETE CASCADE,
+            UNIQUE (user_id, saved_job_id)
+        );
+
+        CREATE TABLE IF NOT EXISTS application_events (
+            event_id TEXT PRIMARY KEY,
+            application_id TEXT NOT NULL,
+            user_id TEXT NOT NULL,
+            event_type TEXT NOT NULL,
+            source TEXT NOT NULL,
+            detail TEXT,
+            metadata_json TEXT NOT NULL DEFAULT '{}',
+            created_at TEXT NOT NULL,
+            FOREIGN KEY (application_id) REFERENCES job_applications(application_id) ON DELETE CASCADE,
+            FOREIGN KEY (user_id) REFERENCES users(user_id)
+        );
+
+        CREATE TABLE IF NOT EXISTS communication_drafts (
+            draft_id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            saved_job_id TEXT NOT NULL,
+            application_id TEXT,
+            browser_capture_id TEXT,
+            draft_type TEXT NOT NULL,
+            generated_content TEXT NOT NULL,
+            approved_content TEXT,
+            status TEXT NOT NULL,
+            evidence_used_json TEXT NOT NULL DEFAULT '[]',
+            avoid_claims_json TEXT NOT NULL DEFAULT '[]',
+            generation_context_json TEXT NOT NULL DEFAULT '{}',
+            analysis_mode TEXT NOT NULL,
+            analysis_provider TEXT,
+            fallback_reason TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            sent_at TEXT,
+            FOREIGN KEY (user_id) REFERENCES users(user_id),
+            FOREIGN KEY (saved_job_id) REFERENCES saved_jobs(saved_job_id) ON DELETE CASCADE,
+            FOREIGN KEY (application_id) REFERENCES job_applications(application_id) ON DELETE SET NULL,
+            FOREIGN KEY (browser_capture_id) REFERENCES browser_job_captures(capture_id) ON DELETE SET NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS tailored_resume_versions (
+            tailored_resume_id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            saved_job_id TEXT NOT NULL,
+            resume_profile_id TEXT NOT NULL,
+            version INTEGER NOT NULL,
+            content TEXT NOT NULL,
+            changes_json TEXT NOT NULL DEFAULT '[]',
+            validation_json TEXT NOT NULL,
+            status TEXT NOT NULL,
+            analysis_mode TEXT NOT NULL,
+            analysis_provider TEXT,
+            fallback_reason TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            approved_at TEXT,
+            FOREIGN KEY (user_id) REFERENCES users(user_id),
+            FOREIGN KEY (saved_job_id) REFERENCES saved_jobs(saved_job_id) ON DELETE CASCADE,
+            UNIQUE (user_id, saved_job_id, version)
         );
 
         CREATE TABLE IF NOT EXISTS saved_job_analyses (
@@ -331,18 +406,6 @@ def init_database(connection: sqlite3.Connection) -> None:
             FOREIGN KEY (confirmed_profile_id) REFERENCES confirmed_profiles(confirmed_profile_id),
             FOREIGN KEY (resume_profile_id) REFERENCES resume_profiles(resume_profile_id),
             UNIQUE (user_id, job_search_run_id, job_result_id)
-        );
-
-        CREATE TABLE IF NOT EXISTS saved_job_status_events (
-            saved_job_status_event_id TEXT PRIMARY KEY,
-            saved_job_id TEXT NOT NULL,
-            user_id TEXT NOT NULL,
-            from_status TEXT,
-            to_status TEXT NOT NULL,
-            reason TEXT,
-            changed_at TEXT NOT NULL,
-            FOREIGN KEY (saved_job_id) REFERENCES saved_jobs(saved_job_id),
-            FOREIGN KEY (user_id) REFERENCES users(user_id)
         );
 
         CREATE TABLE IF NOT EXISTS job_briefs (
@@ -484,7 +547,9 @@ def init_database(connection: sqlite3.Connection) -> None:
         CREATE TABLE IF NOT EXISTS browser_job_captures (
             capture_id TEXT PRIMARY KEY,
             user_id TEXT NOT NULL,
+            saved_job_id TEXT NOT NULL,
             source TEXT NOT NULL,
+            platform_job_id TEXT,
             source_url TEXT NOT NULL,
             page_title TEXT NOT NULL,
             title TEXT,
@@ -497,7 +562,8 @@ def init_database(connection: sqlite3.Connection) -> None:
             extractor_version TEXT NOT NULL,
             warnings_json TEXT NOT NULL DEFAULT '[]',
             created_at TEXT NOT NULL,
-            FOREIGN KEY (user_id) REFERENCES users(user_id)
+            FOREIGN KEY (user_id) REFERENCES users(user_id),
+            FOREIGN KEY (saved_job_id) REFERENCES saved_jobs(saved_job_id) ON DELETE CASCADE
         );
 
         CREATE TABLE IF NOT EXISTS rag_index_outbox (
@@ -635,12 +701,23 @@ def _ensure_indexes(connection: sqlite3.Connection) -> None:
             WHERE is_default = 1 AND archived_at IS NULL;
         CREATE INDEX IF NOT EXISTS idx_saved_jobs_user_id
             ON saved_jobs(user_id, archived_at, updated_at);
+        CREATE INDEX IF NOT EXISTS idx_job_applications_user_stage
+            ON job_applications(user_id, stage, updated_at);
+        CREATE INDEX IF NOT EXISTS idx_application_events_timeline
+            ON application_events(user_id, application_id, created_at);
+        CREATE INDEX IF NOT EXISTS idx_communication_drafts_application
+            ON communication_drafts(user_id, application_id, updated_at);
+        CREATE INDEX IF NOT EXISTS idx_tailored_resumes_saved_job
+            ON tailored_resume_versions(user_id, saved_job_id, version);
         CREATE UNIQUE INDEX IF NOT EXISTS idx_saved_jobs_user_source_url
             ON saved_jobs(user_id, source_url)
             WHERE source_url IS NOT NULL;
         CREATE UNIQUE INDEX IF NOT EXISTS idx_saved_jobs_user_source_key
             ON saved_jobs(user_id, normalized_source_key)
             WHERE normalized_source_key IS NOT NULL;
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_saved_jobs_user_platform_job
+            ON saved_jobs(user_id, source_provider, platform_job_id)
+            WHERE source_provider IS NOT NULL AND platform_job_id IS NOT NULL;
         CREATE INDEX IF NOT EXISTS idx_saved_job_analyses_saved_job_id
             ON saved_job_analyses(saved_job_id, created_at);
         CREATE INDEX IF NOT EXISTS idx_saved_job_origins_job_id
@@ -649,8 +726,6 @@ def _ensure_indexes(connection: sqlite3.Connection) -> None:
             ON saved_job_origins(user_id, resume_profile_id, created_at);
         CREATE INDEX IF NOT EXISTS idx_job_search_feedback_run_id
             ON job_search_result_feedback(user_id, job_search_run_id, updated_at);
-        CREATE INDEX IF NOT EXISTS idx_saved_job_status_events_job_id
-            ON saved_job_status_events(user_id, saved_job_id, changed_at);
         CREATE INDEX IF NOT EXISTS idx_job_briefs_job_id
             ON job_briefs(user_id, saved_job_id, version);
         CREATE INDEX IF NOT EXISTS idx_interview_preparations_job_id
@@ -663,6 +738,10 @@ def _ensure_indexes(connection: sqlite3.Connection) -> None:
             ON chat_turns(user_id, conversation_id, sequence);
         CREATE INDEX IF NOT EXISTS idx_browser_job_captures_user_created
             ON browser_job_captures(user_id, created_at);
+        CREATE INDEX IF NOT EXISTS idx_browser_job_captures_saved_job
+            ON browser_job_captures(user_id, saved_job_id, created_at);
+        CREATE INDEX IF NOT EXISTS idx_communication_drafts_saved_job
+            ON communication_drafts(user_id, saved_job_id, updated_at);
         CREATE INDEX IF NOT EXISTS idx_rag_index_outbox_pending
             ON rag_index_outbox(status, available_at, created_at);
         CREATE INDEX IF NOT EXISTS idx_rag_index_outbox_resource

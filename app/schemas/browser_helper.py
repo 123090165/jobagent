@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 
 class BrowserHelperProfileSessionOption(BaseModel):
     session_id: str
+    resume_profile_id: str | None = None
     label: str
     is_default: bool = False
 
@@ -15,7 +16,6 @@ class BrowserHelperSavedJobOption(BaseModel):
     saved_job_id: str
     title: str
     company: str | None = None
-    status: str
 
 
 class BrowserHelperContextCatalog(BaseModel):

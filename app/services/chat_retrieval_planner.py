@@ -168,7 +168,7 @@ def _pinned_sources(conversation: ChatConversation) -> list[ChatSource]:
     sources: list[ChatSource] = []
     if scope.resume_profile_id:
         sources.append("profile")
-    if scope.job_search_run_ids or scope.job_search_result_refs or scope.browser_capture_ids:
+    if scope.job_search_run_ids or scope.job_search_result_refs:
         sources.append("search_results")
     if scope.saved_job_ids:
         sources.append("saved_jobs")

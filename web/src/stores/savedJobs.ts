@@ -3,9 +3,12 @@ import { AxiosError } from "axios";
 
 import {
   archiveSavedJob,
+  approveTailoredResume,
+  createJobApplication,
   createSavedJob,
   deleteSavedJob,
-  getSavedJob,
+  getSavedJobWorkspace,
+  generateTailoredResume,
   generateJobBrief,
   generateInterviewPreparation,
   getInterviewPreparation,
@@ -13,8 +16,9 @@ import {
   submitPreparationAnswers,
   listSavedJobs,
   listSavedJobAnalyses,
-  listSavedJobStatusHistory,
   saveJobFromSearchResult,
+  updateJobApplication,
+  updateTailoredResume,
   updateSavedJob
 } from "../api/savedJobs";
 import type {
@@ -23,7 +27,11 @@ import type {
   InterviewPreparationWorkspace,
   PreparationAnswer,
   SavedJobAnalysis,
-  SavedJobStatusEvent,
+  ApplicationEvent,
+  ApplicationStage,
+  CommunicationDraft,
+  JobApplication,
+  TailoredResumeVersion,
   SavedJobCreatePayload,
   SavedJobFromSearchResultPayload,
   SavedJobUpdatePayload
@@ -32,8 +40,12 @@ import type {
 interface SavedJobState {
   jobs: SavedJob[];
   selectedJob: SavedJob | null;
+  selectedApplication: JobApplication | null;
+  selectedCommunicationDraft: CommunicationDraft | null;
+  selectedTailoredResume: TailoredResumeVersion | null;
+  allowedStageTransitions: ApplicationStage[];
   selectedJobAnalyses: SavedJobAnalysis[];
-  selectedJobStatusHistory: SavedJobStatusEvent[];
+  selectedApplicationEvents: ApplicationEvent[];
   selectedJobBriefs: JobBrief[];
   selectedPreparation: InterviewPreparationWorkspace | null;
   isLoading: boolean;
@@ -49,8 +61,12 @@ export const useSavedJobsStore = defineStore("savedJobs", {
   state: (): SavedJobState => ({
     jobs: [],
     selectedJob: null,
+    selectedApplication: null,
+    selectedCommunicationDraft: null,
+    selectedTailoredResume: null,
+    allowedStageTransitions: [],
     selectedJobAnalyses: [],
-    selectedJobStatusHistory: [],
+    selectedApplicationEvents: [],
     selectedJobBriefs: [],
     selectedPreparation: null,
     isLoading: false,
@@ -58,9 +74,7 @@ export const useSavedJobsStore = defineStore("savedJobs", {
     error: null
   }),
   getters: {
-    activeJobs: (state) => state.jobs.filter((job) => !job.archived_at),
-    savedCount: (state) => state.jobs.filter((job) => job.status === "saved").length,
-    interestedCount: (state) => state.jobs.filter((job) => job.status === "interested").length
+    activeJobs: (state) => state.jobs.filter((job) => !job.archived_at)
   },
   actions: {
     async loadJobs(includeArchived = false): Promise<SavedJob[]> {
@@ -96,24 +110,31 @@ export const useSavedJobsStore = defineStore("savedJobs", {
       this.isLoading = true;
       this.error = null;
       try {
-        const [job, analyses, statusHistory, briefs, preparation] = await Promise.all([
-          getSavedJob(savedJobId),
+        const [workspace, analyses, briefs, preparation] = await Promise.all([
+          getSavedJobWorkspace(savedJobId),
           listSavedJobAnalyses(savedJobId),
-          listSavedJobStatusHistory(savedJobId),
           listJobBriefs(savedJobId),
           getInterviewPreparation(savedJobId).catch(() => null)
         ]);
-        this.selectedJob = job;
+        this.selectedJob = workspace.job;
+        this.selectedApplication = workspace.application;
+        this.selectedCommunicationDraft = workspace.communication_draft;
+        this.selectedTailoredResume = workspace.tailored_resume;
+        this.allowedStageTransitions = workspace.allowed_stage_transitions;
         this.selectedJobAnalyses = analyses.items;
-        this.selectedJobStatusHistory = statusHistory.items;
+        this.selectedApplicationEvents = workspace.events;
         this.selectedJobBriefs = briefs.items;
         this.selectedPreparation = preparation;
-        this.mergeJob(job);
-        return job;
+        this.mergeJob(workspace.job);
+        return workspace.job;
       } catch (error) {
         this.selectedJob = null;
+        this.selectedApplication = null;
+        this.selectedCommunicationDraft = null;
+        this.selectedTailoredResume = null;
+        this.allowedStageTransitions = [];
         this.selectedJobAnalyses = [];
-        this.selectedJobStatusHistory = [];
+        this.selectedApplicationEvents = [];
         this.selectedJobBriefs = [];
         this.selectedPreparation = null;
         this.error = toApiErrorMessage(error, "Failed to load saved job details.");
@@ -144,11 +165,52 @@ export const useSavedJobsStore = defineStore("savedJobs", {
         this.mergeJob(job);
         if (this.selectedJob?.saved_job_id === savedJobId) {
           this.selectedJob = job;
-          this.selectedJobStatusHistory = (await listSavedJobStatusHistory(savedJobId)).items;
         }
         return job;
       } catch (error) {
         this.error = toApiErrorMessage(error, "Failed to update saved job.");
+        throw error;
+      } finally {
+        this.isSaving = false;
+      }
+    },
+    async startApplication(savedJobId: string): Promise<JobApplication> {
+      this.isSaving = true;
+      this.error = null;
+      try {
+        const application = await createJobApplication(savedJobId);
+        this.selectedApplication = application;
+        const workspace = await getSavedJobWorkspace(savedJobId);
+        this.selectedCommunicationDraft = workspace.communication_draft;
+        this.selectedTailoredResume = workspace.tailored_resume;
+        this.allowedStageTransitions = workspace.allowed_stage_transitions;
+        this.selectedApplicationEvents = workspace.events;
+        return application;
+      } catch (error) {
+        this.error = toApiErrorMessage(error, "Failed to start application tracking.");
+        throw error;
+      } finally {
+        this.isSaving = false;
+      }
+    },
+    async changeApplicationStage(stage: ApplicationStage): Promise<JobApplication> {
+      if (!this.selectedApplication) throw new Error("Application tracking has not started.");
+      this.isSaving = true;
+      this.error = null;
+      try {
+        const application = await updateJobApplication(
+          this.selectedApplication.application_id,
+          { stage }
+        );
+        this.selectedApplication = application;
+        const workspace = await getSavedJobWorkspace(application.saved_job_id);
+        this.selectedCommunicationDraft = workspace.communication_draft;
+        this.selectedTailoredResume = workspace.tailored_resume;
+        this.allowedStageTransitions = workspace.allowed_stage_transitions;
+        this.selectedApplicationEvents = workspace.events;
+        return application;
+      } catch (error) {
+        this.error = toApiErrorMessage(error, "Failed to update application stage.");
         throw error;
       } finally {
         this.isSaving = false;
@@ -164,6 +226,61 @@ export const useSavedJobsStore = defineStore("savedJobs", {
         return job;
       } catch (error) {
         this.error = toApiErrorMessage(error, "Failed to archive saved job.");
+        throw error;
+      } finally {
+        this.isSaving = false;
+      }
+    },
+    async createTailoredResume(savedJobId: string): Promise<TailoredResumeVersion> {
+      this.isSaving = true;
+      this.error = null;
+      try {
+        const version = await generateTailoredResume(savedJobId);
+        this.selectedTailoredResume = version;
+        const workspace = await getSavedJobWorkspace(savedJobId);
+        this.selectedApplication = workspace.application;
+        this.allowedStageTransitions = workspace.allowed_stage_transitions;
+        this.selectedApplicationEvents = workspace.events;
+        return version;
+      } catch (error) {
+        this.error = toApiErrorMessage(error, "Failed to generate a tailored resume.");
+        throw error;
+      } finally {
+        this.isSaving = false;
+      }
+    },
+    async saveTailoredResume(content: string): Promise<TailoredResumeVersion> {
+      if (!this.selectedTailoredResume) throw new Error("No tailored resume is selected.");
+      this.isSaving = true;
+      this.error = null;
+      try {
+        const version = await updateTailoredResume(
+          this.selectedTailoredResume.tailored_resume_id,
+          content
+        );
+        this.selectedTailoredResume = version;
+        return version;
+      } catch (error) {
+        this.error = toApiErrorMessage(error, "Failed to save the tailored resume.");
+        throw error;
+      } finally {
+        this.isSaving = false;
+      }
+    },
+    async confirmTailoredResume(): Promise<TailoredResumeVersion> {
+      if (!this.selectedTailoredResume) throw new Error("No tailored resume is selected.");
+      this.isSaving = true;
+      this.error = null;
+      try {
+        const version = await approveTailoredResume(this.selectedTailoredResume.tailored_resume_id);
+        this.selectedTailoredResume = version;
+        const workspace = await getSavedJobWorkspace(version.saved_job_id);
+        this.selectedApplication = workspace.application;
+        this.allowedStageTransitions = workspace.allowed_stage_transitions;
+        this.selectedApplicationEvents = workspace.events;
+        return version;
+      } catch (error) {
+        this.error = toApiErrorMessage(error, "Resolve validation issues before confirming.");
         throw error;
       } finally {
         this.isSaving = false;
@@ -223,8 +340,12 @@ export const useSavedJobsStore = defineStore("savedJobs", {
         this.jobs = this.jobs.filter((job) => job.saved_job_id !== savedJobId);
         if (this.selectedJob?.saved_job_id === savedJobId) {
           this.selectedJob = null;
+          this.selectedApplication = null;
+          this.selectedCommunicationDraft = null;
+          this.selectedTailoredResume = null;
+          this.allowedStageTransitions = [];
           this.selectedJobAnalyses = [];
-          this.selectedJobStatusHistory = [];
+          this.selectedApplicationEvents = [];
           this.selectedJobBriefs = [];
           this.selectedPreparation = null;
         }

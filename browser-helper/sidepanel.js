@@ -20,13 +20,27 @@ const nodes = {
   analysisStrengths: document.getElementById("analysisStrengths"),
   analysisGaps: document.getElementById("analysisGaps"),
   analysisActions: document.getElementById("analysisActions"),
-  analysisWarnings: document.getElementById("analysisWarnings")
+  analysisWarnings: document.getElementById("analysisWarnings"),
+  greetingControls: document.getElementById("greetingControls"),
+  greetingDraft: document.getElementById("greetingDraft"),
+  greetingContent: document.getElementById("greetingContent"),
+  greetingEvidence: document.getElementById("greetingEvidence"),
+  greetingAvoid: document.getElementById("greetingAvoid"),
+  greetingAvoidSection: document.getElementById("greetingAvoidSection"),
+  generateGreetingButton: document.getElementById("generateGreetingButton"),
+  regenerateGreetingButton: document.getElementById("regenerateGreetingButton"),
+  sendGreetingButton: document.getElementById("sendGreetingButton"),
+  resumeControls: document.getElementById("resumeControls"),
+  generateResumeButton: document.getElementById("generateResumeButton")
 };
 
 let currentCaptureRef = null;
+let currentCaptureId = null;
 let hasAnalysisProfile = false;
 let hasCapturedJob = false;
 let assistantStateRefresh = 0;
+let currentGreetingDraft = null;
+let profileBySessionId = new Map();
 
 void init().catch(renderInitializationFailure);
 
@@ -77,6 +91,10 @@ async function refreshAssistantState() {
 function bindEvents() {
   bindAsyncEvent(nodes.captureButton, "click", captureCurrentPage);
   bindAsyncEvent(nodes.analyzeButton, "click", analyzeCapturedJob);
+  bindAsyncEvent(nodes.generateGreetingButton, "click", generateGreeting);
+  bindAsyncEvent(nodes.regenerateGreetingButton, "click", generateGreeting);
+  bindAsyncEvent(nodes.sendGreetingButton, "click", confirmAndSendGreeting);
+  bindAsyncEvent(nodes.generateResumeButton, "click", generateTailoredResume);
   bindAsyncEvent(nodes.sendButton, "click", sendTurn);
   bindAsyncEvent(nodes.newButton, "click", createConversation);
   bindAsyncEvent(nodes.conversation, "change", async () => {
@@ -134,8 +152,9 @@ async function captureCurrentPage() {
     permission = await ensureBossPermission();
     const response = await request({ action: "captureCurrentJob" });
     const capture = response.capture || {};
-    if (!response.captureId) throw new Error("Capture succeeded but no reusable capture reference was returned.");
-    currentCaptureRef = { type: "browser_capture", capture_id: response.captureId };
+    if (!response.captureId || !response.savedJobId) throw new Error("Capture succeeded but no job workspace reference was returned.");
+    currentCaptureId = response.captureId;
+    currentCaptureRef = { type: "saved_job", saved_job_id: response.savedJobId };
     hasCapturedJob = true;
     nodes.capture.textContent = [
       capture.title || capture.page_title || "Captured job",
@@ -148,6 +167,10 @@ async function captureCurrentPage() {
     nodes.captureBadge.textContent = "Ready";
     nodes.chatStage.classList.remove("hidden");
     nodes.analysisControls.classList.remove("hidden");
+    nodes.greetingControls.classList.remove("hidden");
+    nodes.resumeControls.classList.remove("hidden");
+    currentGreetingDraft = null;
+    nodes.greetingDraft.classList.add("hidden");
     if (!nodes.conversation.value) await createConversation();
     else {
       await attachCaptureToConversation();
@@ -177,7 +200,7 @@ async function analyzeCapturedJob() {
   try {
     const response = await request({
       action: "analyzeCapturedJob",
-      captureId: currentCaptureRef.capture_id,
+      captureId: currentCaptureId,
       sessionId: nodes.profile.value,
       useLlm: nodes.useLlm.checked,
       analysisMode: nodes.useLlm.checked ? "llm" : "deterministic",
@@ -187,6 +210,76 @@ async function analyzeCapturedJob() {
     setStatus("Match analysis complete. The captured JD remains available in Chat.");
   } catch (error) { setStatus(String(error), true); }
   finally { setBusy(false); }
+}
+
+async function generateGreeting() {
+  if (!currentCaptureRef) return setStatus("Capture a JD before generating a greeting.", true);
+  const selectedProfile = profileBySessionId.get(nodes.profile.value);
+  if (!selectedProfile?.resume_profile_id) {
+    return setStatus("A confirmed resume profile is required to generate a grounded greeting.", true);
+  }
+  setBusy(true); setStatus("Generating an evidence-grounded greeting...");
+  try {
+    const response = await request({
+      action: "generateGreetingDraft",
+      captureId: currentCaptureId,
+      resumeProfileId: selectedProfile.resume_profile_id,
+      llmProvider: "deepseek"
+    });
+    currentGreetingDraft = response.draft;
+    nodes.greetingContent.value = currentGreetingDraft.generated_content || "";
+    renderTextList(nodes.greetingEvidence, currentGreetingDraft.evidence_used, "No explicit evidence was selected.");
+    const avoidClaims = uniqueText(currentGreetingDraft.avoid_claims);
+    renderTextList(nodes.greetingAvoid, avoidClaims, "");
+    nodes.greetingAvoidSection.classList.toggle("hidden", avoidClaims.length === 0);
+    nodes.greetingDraft.classList.remove("hidden");
+    setStatus("Greeting ready. Review every claim before sending.");
+  } finally {
+    setBusy(false);
+  }
+}
+
+async function confirmAndSendGreeting() {
+  const content = nodes.greetingContent.value.trim();
+  if (!currentGreetingDraft || !content) return setStatus("Generate and review a greeting first.", true);
+  const confirmed = window.confirm(
+    `Send this exact message through the currently open BOSS page?\n\n${content}`
+  );
+  if (!confirmed) return;
+  setBusy(true); setStatus("Sending and verifying the visible BOSS conversation...");
+  try {
+    const response = await request({
+      action: "sendGreetingDraft",
+      draftId: currentGreetingDraft.draft_id,
+      content
+    });
+    currentGreetingDraft = response.draft;
+    nodes.greetingContent.value = response.draft?.approved_content || content;
+    setStatus("Greeting sent and saved. Application stage is now Contacted.");
+    nodes.sendGreetingButton.disabled = true;
+  } finally {
+    setBusy(false);
+  }
+}
+
+async function generateTailoredResume() {
+  if (!currentCaptureRef) return setStatus("Capture a JD before generating a tailored resume.", true);
+  const selectedProfile = profileBySessionId.get(nodes.profile.value);
+  if (!selectedProfile?.resume_profile_id) {
+    return setStatus("A confirmed resume profile is required to generate a tailored resume.", true);
+  }
+  setBusy(true); setStatus("Creating a fact-checked tailored resume version...");
+  try {
+    const response = await request({
+      action: "generateTailoredResume",
+      captureId: currentCaptureId,
+      resumeProfileId: selectedProfile.resume_profile_id,
+      llmProvider: "deepseek"
+    });
+    setStatus(`Tailored resume version ${response.resume?.version || 1} created. Opening the application workbench.`);
+  } finally {
+    setBusy(false);
+  }
 }
 
 async function sendTurn() {
@@ -208,9 +301,9 @@ async function sendTurn() {
 async function attachCaptureToConversation() {
   if (!currentCaptureRef || !nodes.conversation.value) return;
   const response = await request({
-    action: "attachAssistantBrowserCapture",
+    action: "attachAssistantSavedJob",
     conversationId: nodes.conversation.value,
-    captureId: currentCaptureRef.capture_id
+    savedJobId: currentCaptureRef.saved_job_id
   });
   const title = response.conversation?.title || selectedConversationTitle();
   nodes.conversationContext.textContent = `JD attached to “${title}”. It is also visible as pinned context in the full chat.`;
@@ -253,6 +346,7 @@ function fillSelect(select, items, valueKey, labelKey, selected, emptyLabel) {
 }
 
 function configureAnalysisProfiles(profiles, storedSessionId) {
+  profileBySessionId = new Map(profiles.map((item) => [item.session_id, item]));
   hasAnalysisProfile = profiles.length > 0;
   const defaultProfile = profiles.find((item) => item.is_default) || profiles[0];
   const selectedSessionId = profiles.some((item) => item.session_id === storedSessionId)
@@ -284,7 +378,7 @@ function fillSavedJobSelect(items) {
   nodes.savedJob.add(new Option("Let the agent search automatically", ""));
   for (const item of items) {
     const company = item.company ? ` · ${item.company}` : "";
-    nodes.savedJob.add(new Option(`${item.title}${company} · ${item.status}`, item.saved_job_id));
+    nodes.savedJob.add(new Option(`${item.title}${company}`, item.saved_job_id));
   }
 }
 
@@ -331,4 +425,8 @@ function setBusy(value) {
   nodes.analyzeButton.disabled = value || !hasAnalysisProfile || !hasCapturedJob;
   nodes.sendButton.disabled = value;
   nodes.newButton.disabled = value;
+  nodes.generateGreetingButton.disabled = value || !hasAnalysisProfile || !hasCapturedJob;
+  nodes.generateResumeButton.disabled = value || !hasAnalysisProfile || !hasCapturedJob;
+  nodes.regenerateGreetingButton.disabled = value;
+  nodes.sendGreetingButton.disabled = value || currentGreetingDraft?.status === "sent";
 }

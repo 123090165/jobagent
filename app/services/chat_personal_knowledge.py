@@ -243,7 +243,6 @@ def search_personal_knowledge(
                 "title": job.title,
                 "company": job.company,
                 "location": job.location,
-                "status": job.status,
                 "tags": job.tags,
                 "notes": job.notes,
                 "jd_excerpt": job.raw_jd_text[:1_400],
