@@ -12,8 +12,7 @@ import type {
   SavedJobListResponse,
   SavedJobWorkspace,
   JobApplication,
-  ApplicationStage,
-  ApplicationNextAction,
+  ExternalApplicationStage,
   TailoredResumeVersion,
   SavedJobUpdatePayload
 } from "../types/savedJob";
@@ -51,24 +50,12 @@ export async function getSavedJobWorkspace(savedJobId: string): Promise<SavedJob
   return response.data;
 }
 
-export async function createJobApplication(savedJobId: string): Promise<JobApplication> {
-  const response = await client.post<JobApplication>(
-    `/api/v1/saved-jobs/${savedJobId}/application`,
-    {}
-  );
-  return response.data;
-}
-
-export async function updateJobApplication(
-  applicationId: string,
-  payload: {
-    stage?: ApplicationStage;
-    next_action?: ApplicationNextAction;
-    detail?: string;
-  }
+export async function recordExternalApplicationProgress(
+  savedJobId: string,
+  payload: { stage: ExternalApplicationStage; detail?: string | null }
 ): Promise<JobApplication> {
-  const response = await client.patch<JobApplication>(
-    `/api/v1/job-applications/${applicationId}`,
+  const response = await client.post<JobApplication>(
+    `/api/v1/saved-jobs/${savedJobId}/application/external-progress`,
     payload
   );
   return response.data;

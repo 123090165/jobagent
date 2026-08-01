@@ -7,6 +7,7 @@ from app.api.dependencies import get_current_user
 from app.application.application_tracking_usecases import (
     create_job_application,
     get_saved_job_workspace,
+    record_external_application_progress,
 )
 from app.application.tailored_resume_usecases import generate_application_resume
 from app.application.saved_job_usecases import (
@@ -36,6 +37,7 @@ from app.schemas.interview_preparation import (
 from app.schemas.job_application import (
     JobApplication,
     JobApplicationCreateRequest,
+    ExternalApplicationProgressRequest,
     SavedJobWorkspace,
 )
 from app.schemas.saved_job import (
@@ -105,6 +107,22 @@ def create_job_application_endpoint(
     current_user: UserAccount = Depends(get_current_user),
 ) -> JobApplication:
     return create_job_application(
+        saved_job_id,
+        payload,
+        user_id=current_user.user_id,
+    )
+
+
+@router.post(
+    "/{saved_job_id}/application/external-progress",
+    response_model=JobApplication,
+)
+def record_external_application_progress_endpoint(
+    saved_job_id: str,
+    payload: ExternalApplicationProgressRequest,
+    current_user: UserAccount = Depends(get_current_user),
+) -> JobApplication:
+    return record_external_application_progress(
         saved_job_id,
         payload,
         user_id=current_user.user_id,

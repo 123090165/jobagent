@@ -90,3 +90,57 @@ def test_application_transition_sets_default_action_and_is_user_scoped(
     assert updated.json()["contacted_at"] is not None
     assert forbidden.status_code == 404
     assert invalid.status_code == 409
+
+
+def test_user_can_record_external_progress_without_fake_intermediate_stages(
+    monkeypatch, tmp_path
+) -> None:
+    monkeypatch.setenv("JOBAGENT_DB_PATH", str(tmp_path / "external-progress.sqlite3"))
+    headers = _register("external-progress-owner")
+    job = _save_job(headers, "External Interview Role")
+    endpoint = (
+        f"/api/v1/saved-jobs/{job['saved_job_id']}"
+        "/application/external-progress"
+    )
+
+    recorded = client.post(
+        endpoint,
+        headers=headers,
+        json={"stage": "interview", "detail": "Interview arranged outside JobAgent."},
+    )
+    workspace = client.get(
+        f"/api/v1/saved-jobs/{job['saved_job_id']}/workspace",
+        headers=headers,
+    ).json()
+
+    assert recorded.status_code == 200
+    assert recorded.json()["stage"] == "interview"
+    assert recorded.json()["next_action"] == "prepare_interview"
+    assert len(workspace["events"]) == 1
+    assert workspace["events"][0]["metadata"] == {
+        "from_stage": None,
+        "to_stage": "interview",
+    }
+    assert workspace["events"][0]["detail"] == "Interview arranged outside JobAgent."
+
+
+def test_external_progress_is_scoped_and_validated(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("JOBAGENT_DB_PATH", str(tmp_path / "external-progress-scope.sqlite3"))
+    owner = _register("external-progress-scope-owner")
+    other = _register("external-progress-scope-other")
+    job = _save_job(owner, "Scoped External Role")
+    endpoint = (
+        f"/api/v1/saved-jobs/{job['saved_job_id']}"
+        "/application/external-progress"
+    )
+
+    assert client.post(
+        endpoint,
+        headers=other,
+        json={"stage": "contacted"},
+    ).status_code == 404
+    assert client.post(
+        endpoint,
+        headers=owner,
+        json={"stage": "not_started"},
+    ).status_code == 422

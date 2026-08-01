@@ -1,13 +1,26 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { NButton, NCollapse, NCollapseItem, NInput, NModal, NRadio, NRadioGroup, NSelect, NTabPane, NTabs, NTag } from "naive-ui";
+import { NButton, NCollapse, NCollapseItem, NDropdown, NInput, NModal, NRadio, NRadioGroup, NTabPane, NTabs, NTag } from "naive-ui";
 
 import AppIcon from "../components/AppIcon.vue";
 import { createChatConversation } from "../api/chat";
 import { downloadTailoredResumePdf } from "../api/savedJobs";
+import {
+  applicationStageLabels,
+  deriveJobNextStep,
+  externalProgressOptions,
+  progressIndex
+} from "../domain/jobWorkspace";
 import { useSavedJobsStore } from "../stores/savedJobs";
-import type { ApplicationStage, PreparationAnswer, PreparationQuestion } from "../types/savedJob";
+import type {
+  CommunicationDraft,
+  ExternalApplicationStage,
+  InterviewPreparationWorkspace,
+  PreparationAnswer,
+  PreparationQuestion,
+  SavedJobWorkspace
+} from "../types/savedJob";
 
 const route = useRoute();
 const router = useRouter();
@@ -22,21 +35,12 @@ const preparationDialogOpen = ref(false);
 const currentPreparationQuestion = ref(0);
 const preparationAnswers = ref<Record<string, PreparationAnswer>>({});
 const openingAssistant = ref(false);
-const stageOptions: Array<{ label: string; value: ApplicationStage }> = [
-  { label: "Not started", value: "not_started" },
-  { label: "Contacted", value: "contacted" },
-  { label: "Recruiter replied", value: "recruiter_replied" },
-  { label: "Resume requested", value: "resume_requested" },
-  { label: "Resume ready", value: "resume_ready" },
-  { label: "Resume sent", value: "resume_sent" },
-  { label: "Interview", value: "interview" },
-  { label: "Closed", value: "closed" }
-];
-const availableStageOptions = computed(() => {
-  if (!application.value) return [];
-  const allowed = new Set([application.value.stage, ...store.allowedStageTransitions]);
-  return stageOptions.filter((option) => allowed.has(option.value));
-});
+const externalFlowOpened = ref(false);
+const progressSteps = ["Saved", "Contacted", "Resume", "Interview", "Closed"];
+const manualProgressOptions = externalProgressOptions.map((item) => ({
+  ...item,
+  key: item.value
+}));
 
 const job = computed(() => store.selectedJob);
 const application = computed(() => store.selectedApplication);
@@ -45,6 +49,20 @@ const tailoredResume = computed(() => store.selectedTailoredResume);
 const latestAnalysis = computed(() => store.selectedJobAnalyses[0] ?? job.value?.latest_analysis ?? null);
 const latestBrief = computed(() => store.selectedJobBriefs[0] ?? null);
 const preparation = computed(() => store.selectedPreparation);
+const workspace = computed<SavedJobWorkspace | null>(() => job.value ? ({
+  job: job.value,
+  application: application.value,
+  latest_analysis: latestAnalysis.value,
+  communication_draft: communicationDraft.value,
+  tailored_resume: tailoredResume.value,
+  allowed_stage_transitions: store.allowedStageTransitions,
+  events: store.selectedApplicationEvents
+}) : null);
+const nextStep = computed(() => workspace.value
+  ? deriveJobNextStep(workspace.value, preparation.value)
+  : null
+);
+const currentProgressIndex = computed(() => progressIndex(application.value?.stage ?? null));
 const structuredEntries = computed(() => Object.entries(job.value?.structured_jd ?? {}));
 const skillTags = computed(() => {
   const structured = job.value?.structured_jd ?? {};
@@ -71,6 +89,8 @@ const hasPendingFollowUp = computed(() => Object.values(preparationAnswers.value
 ));
 
 onMounted(async () => {
+  window.addEventListener("focus", refreshAfterExternalFlow);
+  document.addEventListener("visibilitychange", refreshAfterExternalFlow);
   try {
     if (route.query.tab === "resume") activeTab.value = "resume";
     const loaded = await store.loadJobDetail(savedJobId.value);
@@ -81,6 +101,11 @@ onMounted(async () => {
   } catch {
     // Store error is rendered below.
   }
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener("focus", refreshAfterExternalFlow);
+  document.removeEventListener("visibilitychange", refreshAfterExternalFlow);
 });
 
 async function saveTracking() {
@@ -97,25 +122,66 @@ async function saveTracking() {
   }
 }
 
-async function startApplication() {
+async function recordExternalProgress(value: string | number) {
   if (!job.value) return;
+  const stage = String(value) as ExternalApplicationStage;
   actionMessage.value = null;
   try {
-    await store.startApplication(job.value.saved_job_id);
-    actionMessage.value = "Application tracking started.";
+    await store.recordExternalProgress(job.value.saved_job_id, stage);
+    actionMessage.value = `Progress recorded: ${applicationStageLabels[stage]}.`;
   } catch {
     // Store error is rendered above.
   }
 }
 
-async function changeApplicationStage(stage: ApplicationStage) {
-  actionMessage.value = null;
+function openJobListing(forCommunication = false) {
+  if (!job.value?.source_url) {
+    actionMessage.value = "This job does not have a source listing URL.";
+    return;
+  }
+  externalFlowOpened.value = true;
+  window.open(job.value.source_url, "_blank", "noopener,noreferrer");
+  actionMessage.value = forCommunication
+    ? "The listing is open. Open Browser Helper there, capture the current JD, then generate or continue the message."
+    : "The original listing is open in a new tab.";
+}
+
+async function refreshAfterExternalFlow() {
+  if (!externalFlowOpened.value || document.visibilityState !== "visible" || !job.value) return;
+  externalFlowOpened.value = false;
   try {
-    await store.changeApplicationStage(stage);
-    actionMessage.value = `Application moved to ${formatToken(stage)}.`;
+    await store.loadJobDetail(job.value.saved_job_id);
+    tailoredResumeText.value = store.selectedTailoredResume?.content ?? "";
+    syncPreparationAnswers();
+    actionMessage.value = "Workspace refreshed with the latest Browser Helper activity.";
   } catch {
     // Store error is rendered above.
   }
+}
+
+async function runNextStep() {
+  if (!nextStep.value) return;
+  if (nextStep.value.action === "open_communication") {
+    activeTab.value = "communication";
+    openJobListing(true);
+    return;
+  }
+  if (nextStep.value.action === "open_resume") {
+    activeTab.value = "resume";
+    if (nextStep.value.key === "generate_resume") await createTailoredResume();
+    if (nextStep.value.key === "send_resume") await downloadApprovedResume();
+    return;
+  }
+  if (nextStep.value.action === "open_preparation") {
+    activeTab.value = "preparation";
+    openPreparation();
+    return;
+  }
+  if (nextStep.value.action === "open_activity") {
+    activeTab.value = "activity";
+    return;
+  }
+  if (nextStep.value.action === "open_listing") openJobListing();
 }
 
 async function createTailoredResume() {
@@ -388,8 +454,54 @@ function formatDate(value: string): string {
   return new Date(value).toLocaleString();
 }
 
-function formatToken(value: string): string {
-  return value.replace(/_/g, " ");
+function communicationStatusLabel(status: CommunicationDraft["status"]): string {
+  return {
+    generated: "Draft ready",
+    approved: "Ready to send",
+    sent: "Sent",
+    failed: "Generation failed",
+    dismissed: "Dismissed"
+  }[status];
+}
+
+function preparationStatusLabel(status: InterviewPreparationWorkspace["status"]): string {
+  return {
+    questions_ready: "Ready for answers",
+    paused: "Needs more detail",
+    completed: "Plan ready",
+    stopped: "Ended without summary"
+  }[status];
+}
+
+function evidenceStatusLabel(status: string): string {
+  return {
+    supported: "Evidence found",
+    partial: "Partial evidence",
+    unknown: "Needs confirmation",
+    missing: "Evidence missing"
+  }[status] ?? status;
+}
+
+function applicationEventLabel(eventType: string): string {
+  return {
+    stage_changed: "Progress updated",
+    greeting_generated: "First message generated",
+    greeting_edited: "First message edited",
+    greeting_sent: "First message sent",
+    resume_requested: "Resume requested",
+    tailored_resume_generated: "Tailored resume generated",
+    resume_confirmed: "Tailored resume approved",
+    resume_sent: "Resume sent"
+  }[eventType] ?? "Application activity";
+}
+
+function applicationEventSourceLabel(source: string): string {
+  return {
+    browser_helper: "Browser Helper",
+    system: "Automatic update",
+    user: "Manual update",
+    web: "JobAgent"
+  }[source] ?? "JobAgent";
 }
 
 function formatValue(value: unknown): string {
@@ -425,23 +537,21 @@ function preparationResource(url: string) {
           </div>
           <div class="saved-job-header-actions">
             <span class="status-pill">
-              {{ application ? formatToken(application.stage) : "Not tracking" }}
+              {{ application ? applicationStageLabels[application.stage] : "Saved for review" }}
             </span>
-            <n-select
-              v-if="application"
-              :value="application.stage"
-              :options="availableStageOptions"
-              @update:value="changeApplicationStage"
-            />
-            <n-button v-else type="primary" :loading="store.isSaving" @click="startApplication">
-              Start tracking
-            </n-button>
             <n-button secondary :loading="openingAssistant" @click="askAssistantAboutJob">
               <AppIcon name="chat" /> Ask Assistant
             </n-button>
-            <n-button v-if="job.source_url" tag="a" :href="job.source_url" target="_blank" secondary>
+            <n-button v-if="job.source_url" secondary @click="openJobListing()">
               Open Listing
             </n-button>
+            <n-dropdown
+              trigger="click"
+              :options="manualProgressOptions"
+              @select="recordExternalProgress"
+            >
+              <n-button text>More actions</n-button>
+            </n-dropdown>
           </div>
         </div>
         <p v-if="actionMessage" class="flow-meta library-message">{{ actionMessage }}</p>
@@ -489,21 +599,27 @@ function preparationResource(url: string) {
               </div>
             </section>
 
-            <aside class="workspace-panel saved-job-tracking-panel bento-tracking">
-              <div class="panel-heading"><div><p class="card-kicker"><AppIcon name="bookmark" /> Progress</p><h2>Tracking & Notes</h2><p>Private notes and organization.</p></div></div>
-              <template v-if="application">
-                <label class="draft-field"><span>Application stage</span><n-select :value="application.stage" :options="availableStageOptions" @update:value="changeApplicationStage" /></label>
-                <div class="flow-message">
-                  <strong>Next action:</strong> {{ formatToken(application.next_action) }}
+            <aside v-if="nextStep" class="workspace-panel saved-job-next-step-card bento-tracking" :data-tone="nextStep.tone">
+              <div class="panel-heading">
+                <div>
+                  <p class="card-kicker"><AppIcon name="bookmark" /> Current task</p>
+                  <h2>{{ nextStep.title }}</h2>
+                  <p>{{ nextStep.description }}</p>
                 </div>
-              </template>
-              <div v-else class="flow-message">
-                This job is saved, but application tracking has not started.
-                <n-button size="small" secondary :loading="store.isSaving" @click="startApplication">Start manually</n-button>
               </div>
-              <label class="draft-field"><span>Notes</span><n-input v-model:value="notes" type="textarea" :rows="5" /></label>
-              <label class="draft-field"><span>Tags</span><n-input v-model:value="tagsText" placeholder="priority, remote" /></label>
-              <n-button type="primary" :loading="store.isSaving" @click="saveTracking">Save Notes</n-button>
+              <div class="application-progress" aria-label="Application progress">
+                <div
+                  v-for="(step, index) in progressSteps"
+                  :key="step"
+                  class="application-progress-step"
+                  :class="{ active: index <= currentProgressIndex, current: index === currentProgressIndex }"
+                >
+                  <span></span><small>{{ step }}</small>
+                </div>
+              </div>
+              <n-button v-if="nextStep.buttonLabel" type="primary" :loading="store.isSaving" @click="runNextStep">
+                {{ nextStep.buttonLabel }}
+              </n-button>
             </aside>
           </div>
 
@@ -516,15 +632,8 @@ function preparationResource(url: string) {
             <div class="skill-section"><h3>Skills & tags</h3><div v-if="skillTags.length" class="job-chip-row"><n-tag v-for="tag in skillTags" :key="tag" size="small">{{ tag }}</n-tag></div><p v-else class="empty-copy">No skill tags available.</p></div>
           </section>
 
-          <section class="saved-job-primary-next-step workspace-panel bento-next-action">
-            <div><h2>Continue with this opportunity</h2><p>Turn the current evidence gaps into a focused preparation plan.</p></div>
-            <n-button type="primary" :loading="store.isSaving" @click="openPreparation">
-              {{ preparation ? "Continue Preparation" : "Start Preparation" }}
-            </n-button>
-          </section>
-
           <section class="workspace-panel bento-interview">
-            <div class="panel-heading"><div><p class="card-kicker"><AppIcon name="check" /> Interview checklist</p><h2>Prepare the evidence</h2></div><n-tag v-if="preparation" size="small">{{ preparation.status }}</n-tag></div>
+            <div class="panel-heading"><div><p class="card-kicker"><AppIcon name="check" /> Interview checklist</p><h2>Prepare the evidence</h2></div><n-tag v-if="preparation" size="small">{{ preparationStatusLabel(preparation.status) }}</n-tag></div>
             <ul v-if="interviewChecklist.length" class="checklist"><li v-for="item in interviewChecklist" :key="item"><span><AppIcon name="check" /></span>{{ item }}</li></ul>
             <p v-else class="empty-copy">No interview checklist is available yet. Start preparation to build one from real evidence.</p>
           </section>
@@ -538,7 +647,7 @@ function preparationResource(url: string) {
                 <h2>Recruiter communication</h2>
                 <p>Messages are sent only after explicit confirmation in Browser Helper.</p>
               </div>
-              <n-tag v-if="communicationDraft" size="small">{{ communicationDraft.status }}</n-tag>
+              <n-tag v-if="communicationDraft" size="small">{{ communicationStatusLabel(communicationDraft.status) }}</n-tag>
             </div>
             <div v-if="communicationDraft" class="decision-columns">
               <div>
@@ -546,17 +655,37 @@ function preparationResource(url: string) {
                 <p>{{ communicationDraft.generated_content }}</p>
               </div>
               <div>
-                <h3>Final sent version</h3>
-                <p>{{ communicationDraft.approved_content || "Not sent yet." }}</p>
+                <h3>{{ communicationDraft.status === "sent" ? "Final sent version" : "Confirmed version" }}</h3>
+                <p>{{ communicationDraft.approved_content || "Continue in Browser Helper to review this draft." }}</p>
               </div>
               <div>
                 <h3>Evidence used</h3>
                 <ul class="review-list"><li v-for="item in communicationDraft.evidence_used" :key="item">{{ item }}</li></ul>
               </div>
+              <div v-if="communicationDraft.avoid_claims.length">
+                <h3>Avoid claiming</h3>
+                <ul class="review-list"><li v-for="item in communicationDraft.avoid_claims" :key="item">{{ item }}</li></ul>
+              </div>
+            </div>
+            <div v-if="communicationDraft" class="saved-job-header-actions communication-actions">
+              <n-button
+                v-if="communicationDraft.status !== 'sent'"
+                type="primary"
+                @click="openJobListing(true)"
+              >Continue in BOSS with Browser Helper</n-button>
+              <n-button v-else secondary @click="openJobListing()">Reopen BOSS listing</n-button>
+              <span v-if="communicationDraft.sent_at" class="flow-meta">
+                Sent {{ formatDate(communicationDraft.sent_at) }}
+              </span>
             </div>
             <div v-else class="flow-message">
-              No initial greeting has been generated. Open this job on BOSS and use Browser Helper,
-              or start application tracking manually.
+              <p>Generate a focused first message from the current JD and your verified profile facts.</p>
+              <ul class="review-list">
+                <li>Uses the current job description</li>
+                <li>Uses verified skills and project evidence</li>
+                <li>Requires your explicit confirmation before sending</li>
+              </ul>
+              <n-button type="primary" @click="openJobListing(true)">Open BOSS and generate message</n-button>
             </div>
           </section>
         </n-tab-pane>
@@ -571,7 +700,7 @@ function preparationResource(url: string) {
               </div>
               <div class="saved-job-header-actions">
                 <n-tag v-if="tailoredResume" :type="tailoredResume.status === 'approved' ? 'success' : 'warning'" size="small">
-                  v{{ tailoredResume.version }} · {{ tailoredResume.status }}
+                  v{{ tailoredResume.version }} · {{ tailoredResume.status === "approved" ? "Approved" : "Needs review" }}
                 </n-tag>
                 <n-button type="primary" :loading="store.isSaving" @click="createTailoredResume">
                   {{ tailoredResume ? "Generate new version" : "Generate tailored resume" }}
@@ -627,7 +756,7 @@ function preparationResource(url: string) {
             <p v-if="!preparation" class="flow-message">Start a guided session to review the most important preparation areas.</p>
             <template v-else>
               <div class="preparation-status-row">
-                <n-tag :type="preparation.status === 'completed' ? 'success' : 'warning'" round>{{ preparation.status }}</n-tag>
+                <n-tag :type="preparation.status === 'completed' ? 'success' : 'warning'" round>{{ preparationStatusLabel(preparation.status) }}</n-tag>
                 <span v-if="preparation.resource_warning" class="flow-meta">{{ preparation.resource_warning }}</span>
               </div>
 
@@ -635,7 +764,7 @@ function preparationResource(url: string) {
                 <h3>Preparation areas</h3>
                 <div class="preparation-gap-grid">
                   <article v-for="gap in preparation.skill_gaps" :key="gap.skill" class="preparation-gap-item">
-                    <div class="job-card-header"><strong>{{ gap.skill }}</strong><n-tag size="small">{{ gap.evidence_status }}</n-tag></div>
+                    <div class="job-card-header"><strong>{{ gap.skill }}</strong><n-tag size="small">{{ evidenceStatusLabel(gap.evidence_status) }}</n-tag></div>
                     <p>{{ gap.rationale }}</p>
                     <small class="flow-meta">{{ gap.jd_evidence }}</small>
                   </article>
@@ -681,6 +810,14 @@ function preparationResource(url: string) {
             </dl>
             <p v-else class="flow-message">No structured fields are available.</p>
           </section>
+          <section class="workspace-panel saved-job-organization-panel">
+            <div class="panel-heading">
+              <div><h2>Personal organization</h2><p>Private notes and tags for managing this opportunity.</p></div>
+            </div>
+            <label class="draft-field"><span>Notes</span><n-input v-model:value="notes" type="textarea" :rows="5" /></label>
+            <label class="draft-field"><span>Tags</span><n-input v-model:value="tagsText" placeholder="priority, remote" /></label>
+            <n-button type="primary" :loading="store.isSaving" @click="saveTracking">Save notes and tags</n-button>
+          </section>
           <n-collapse class="saved-job-raw-jd">
             <n-collapse-item title="Raw job description" name="raw-jd"><p class="saved-job-jd">{{ job.raw_jd_text }}</p></n-collapse-item>
           </n-collapse>
@@ -694,7 +831,7 @@ function preparationResource(url: string) {
                 <p v-if="!store.selectedApplicationEvents.length" class="flow-message">No application activity recorded.</p>
                 <div v-else class="status-history-list">
                   <div v-for="event in store.selectedApplicationEvents" :key="event.event_id" class="status-history-item">
-                    <div><strong>{{ formatToken(event.event_type) }}</strong><span class="flow-meta"> · {{ event.source }}</span></div>
+                    <div><strong>{{ applicationEventLabel(event.event_type) }}</strong><span class="flow-meta"> · {{ applicationEventSourceLabel(event.source) }}</span></div>
                     <div class="status-history-meta"><span>{{ formatDate(event.created_at) }}</span><span v-if="event.detail">{{ event.detail }}</span></div>
                   </div>
                 </div>

@@ -17,6 +17,7 @@ from app.schemas.job_application import (
     ApplicationEvent,
     ApplicationNextAction,
     ApplicationStage,
+    ExternalApplicationProgressRequest,
     JobApplication,
     JobApplicationCreateRequest,
     JobApplicationUpdateRequest,
@@ -91,6 +92,44 @@ def update_job_application(
         stage=stage,
         next_action=next_action,
         detail=payload.detail,
+        source="user",
+    )
+    if updated is None:
+        raise _application_not_found()
+    return updated
+
+
+def record_external_application_progress(
+    saved_job_id: str,
+    payload: ExternalApplicationProgressRequest,
+    *,
+    user_id: str,
+    saved_jobs: SavedJobRepository = saved_job_repository,
+    applications: JobApplicationRepository = job_application_repository,
+) -> JobApplication:
+    if saved_jobs.get(user_id=user_id, saved_job_id=saved_job_id) is None:
+        raise _saved_job_not_found()
+    detail = payload.detail or "Progress recorded from an external application channel."
+    existing = applications.get_by_saved_job(
+        user_id=user_id,
+        saved_job_id=saved_job_id,
+    )
+    if existing is None:
+        # 外部进度是用户报告的事实，直接落到真实阶段，避免伪造未发生的中间状态。
+        return applications.create_for_job(
+            user_id=user_id,
+            saved_job_id=saved_job_id,
+            stage=payload.stage,
+            next_action=DEFAULT_NEXT_ACTION[payload.stage],
+            source="user",
+            detail=detail,
+        )
+    updated = applications.update_tracking(
+        user_id=user_id,
+        application_id=existing.application_id,
+        stage=payload.stage,
+        next_action=DEFAULT_NEXT_ACTION[payload.stage],
+        detail=detail,
         source="user",
     )
     if updated is None:

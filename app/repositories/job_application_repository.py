@@ -44,8 +44,10 @@ class JobApplicationRepository:
         *,
         user_id: str,
         saved_job_id: str,
+        stage: ApplicationStage = "not_started",
         next_action: ApplicationNextAction = "generate_greeting",
         source: ApplicationEventSource = "user",
+        detail: str | None = None,
         connection: sqlite3.Connection | None = None,
     ) -> JobApplication:
         with _connection_scope(connection) as (database, owns_connection):
@@ -61,9 +63,10 @@ class JobApplicationRepository:
                 application_id=str(uuid4()),
                 user_id=user_id,
                 saved_job_id=saved_job_id,
-                stage="not_started",
+                stage=stage,
                 next_action=next_action,
                 last_activity_at=now,
+                contacted_at=now if stage == "contacted" else None,
                 created_at=now,
                 updated_at=now,
             )
@@ -82,8 +85,12 @@ class JobApplicationRepository:
                 user_id=user_id,
                 event_type="stage_changed",
                 source=source,
-                detail="Application tracking started.",
-                metadata={"from_stage": None, "to_stage": "not_started"},
+                detail=detail or (
+                    "Application tracking started."
+                    if stage == "not_started"
+                    else "External application progress recorded."
+                ),
+                metadata={"from_stage": None, "to_stage": stage},
                 created_at=now,
             )
             if owns_connection:

@@ -21,6 +21,12 @@ transitions, latest communication draft, latest tailored resume version, and an
 append-only application event timeline. Saved Job archival remains library
 organization; application stage is the only application-progress state.
 
+The Web workbench presents one resource-derived current task instead of exposing
+the internal `stage` and `next_action` values as primary controls. Browser Helper
+actions update the same workspace, and the page refreshes it when the user returns
+from the source listing. Progress completed outside JobAgent can be recorded as a
+single user-reported stage without inventing intermediate events.
+
 ## Communication
 
 Browser Helper reads the current job page only after a user click. A configured

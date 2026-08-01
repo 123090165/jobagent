@@ -215,6 +215,11 @@ export type ApplicationStage =
   | "interview"
   | "closed";
 
+export type ExternalApplicationStage = Extract<
+  ApplicationStage,
+  "contacted" | "resume_requested" | "resume_sent" | "interview" | "closed"
+>;
+
 export type ApplicationNextAction =
   | "generate_greeting"
   | "review_greeting"

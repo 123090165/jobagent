@@ -4,7 +4,6 @@ import { AxiosError } from "axios";
 import {
   archiveSavedJob,
   approveTailoredResume,
-  createJobApplication,
   createSavedJob,
   deleteSavedJob,
   getSavedJobWorkspace,
@@ -16,8 +15,8 @@ import {
   submitPreparationAnswers,
   listSavedJobs,
   listSavedJobAnalyses,
+  recordExternalApplicationProgress,
   saveJobFromSearchResult,
-  updateJobApplication,
   updateTailoredResume,
   updateSavedJob
 } from "../api/savedJobs";
@@ -29,6 +28,7 @@ import type {
   SavedJobAnalysis,
   ApplicationEvent,
   ApplicationStage,
+  ExternalApplicationStage,
   CommunicationDraft,
   JobApplication,
   TailoredResumeVersion,
@@ -174,11 +174,15 @@ export const useSavedJobsStore = defineStore("savedJobs", {
         this.isSaving = false;
       }
     },
-    async startApplication(savedJobId: string): Promise<JobApplication> {
+    async recordExternalProgress(
+      savedJobId: string,
+      stage: ExternalApplicationStage,
+      detail?: string | null
+    ): Promise<JobApplication> {
       this.isSaving = true;
       this.error = null;
       try {
-        const application = await createJobApplication(savedJobId);
+        const application = await recordExternalApplicationProgress(savedJobId, { stage, detail });
         this.selectedApplication = application;
         const workspace = await getSavedJobWorkspace(savedJobId);
         this.selectedCommunicationDraft = workspace.communication_draft;
@@ -187,30 +191,7 @@ export const useSavedJobsStore = defineStore("savedJobs", {
         this.selectedApplicationEvents = workspace.events;
         return application;
       } catch (error) {
-        this.error = toApiErrorMessage(error, "Failed to start application tracking.");
-        throw error;
-      } finally {
-        this.isSaving = false;
-      }
-    },
-    async changeApplicationStage(stage: ApplicationStage): Promise<JobApplication> {
-      if (!this.selectedApplication) throw new Error("Application tracking has not started.");
-      this.isSaving = true;
-      this.error = null;
-      try {
-        const application = await updateJobApplication(
-          this.selectedApplication.application_id,
-          { stage }
-        );
-        this.selectedApplication = application;
-        const workspace = await getSavedJobWorkspace(application.saved_job_id);
-        this.selectedCommunicationDraft = workspace.communication_draft;
-        this.selectedTailoredResume = workspace.tailored_resume;
-        this.allowedStageTransitions = workspace.allowed_stage_transitions;
-        this.selectedApplicationEvents = workspace.events;
-        return application;
-      } catch (error) {
-        this.error = toApiErrorMessage(error, "Failed to update application stage.");
+        this.error = toApiErrorMessage(error, "Failed to record external application progress.");
         throw error;
       } finally {
         this.isSaving = false;

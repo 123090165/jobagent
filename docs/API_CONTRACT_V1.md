@@ -124,6 +124,7 @@ POST  /api/v1/saved-jobs/{saved_job_id}/archive
 
 ~~~text
 PATCH /api/v1/job-applications/{application_id}
+POST /api/v1/saved-jobs/{saved_job_id}/application/external-progress
 PATCH /api/v1/tailored-resumes/{tailored_resume_id}
 POST  /api/v1/tailored-resumes/{tailored_resume_id}/approve
 GET   /api/v1/tailored-resumes/{tailored_resume_id}/pdf

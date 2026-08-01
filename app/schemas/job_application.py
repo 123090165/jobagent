@@ -30,6 +30,13 @@ ApplicationNextAction = Literal[
     "prepare_interview",
     "none",
 ]
+ExternalApplicationStage = Literal[
+    "contacted",
+    "resume_requested",
+    "resume_sent",
+    "interview",
+    "closed",
+]
 ApplicationEventSource = Literal["web", "browser_helper", "system", "user"]
 ApplicationEventType = Literal[
     "job_saved",
@@ -72,6 +79,11 @@ class JobApplicationUpdateRequest(BaseModel):
         if self.stage is None and self.next_action is None:
             raise ValueError("stage or next_action is required")
         return self
+
+
+class ExternalApplicationProgressRequest(BaseModel):
+    stage: ExternalApplicationStage
+    detail: str | None = Field(default=None, max_length=500)
 
 
 class ApplicationEvent(BaseModel):
